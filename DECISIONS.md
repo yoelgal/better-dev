@@ -79,6 +79,18 @@ Create is the last resort — prefer proven, installed skills over fresh ones (p
 the ecosystem already has). A freshly-created skill passes test-before-promote first; once proven it can
 later be published back. So `tool-sourcing` and `self-extension` are **one ordered flow**, not two.
 
+## D9 · Subagents & workflows are how we do dev — component `orchestrating-agents`
+Non-trivial dev work is **decomposed and run through the host's subagent/workflow primitives**, not
+done inline: fan out independent work in parallel, dispatch fresh-context workers for isolated tasks,
+keep planner/generator/evaluator separate (verify independently of generate). New Phase-1 component
+**`orchestrating-agents`** owns this practice **and the D4 dispatch verb**. Agent-agnostic: use the
+host's primitive (Claude Code `Task` + `Workflow`; equivalents elsewhere); fallback = in-session
+role-switch with an explicit context reset. A bash helper can only *prepare and record* a brief/receipt
+— it can't spawn the host's agent, so dispatch itself is prose the orchestrator executes.
+`autonomous-loop`'s OUTER layer **references** this skill (single source of truth), never re-specifies
+dispatch. Harvest: superpowers `subagent-driven-development`, forge/devloop dispatch, frugal (route
+subtasks — a practice, not a provider spine). This is also how better-dev itself is built (dogfood).
+
 ## Tracer-bullet findings (2026-07-03, on the papers.town clone) — bind Phase 1
 Ran `onboard` + one feature slice → staging end-to-end on the real clone (locally, no push). Proven, plus:
 1. **Helpers → `.better-dev/bin/`** (bare `scripts/` collides with the project's own — see D0 install contract).

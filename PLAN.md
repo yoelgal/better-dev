@@ -118,7 +118,8 @@ deeply, then reimplement** (§12) — capture the actual mechanism, don't approx
 | **onboard** | orrgal1 `welcome` (idempotent phases), mp `setup` (entry-file rule), forge `forge-setup`/`forge-ground` (never-guess, premise-verify) |
 | **plan-grill** | mp `grilling` (one-Q-at-a-time + confirm gate), `to-prd`; forge `forge-ground` |
 | **diagnose** (fix front-end) | mp `diagnosing-bugs` (red-first, minimise-repro, falsifiable), devloop `/root-cause` `/trace` `/pepper`, forge premise-verify, loop-library error-sweep |
-| **autonomous-loop** | superpowers subagent-driven-development (+ prompts, scripts), devloop `grind`+`stuck-check`, loop-library `loopy`, mp `tdd`+`diagnosing-bugs`; karpathy LOOPS.md §V for restart (inspiration only, never quoted) — see §5-loop |
+| **autonomous-loop** | devloop `grind`+`stuck-check` (INNER), loop-library `loopy` + forge proof-chain (INVARIANTS), mp `tdd`; owned SPINE = terminal-states + ledger + restart-from-contract (karpathy LOOPS.md §V inspiration only, never quoted). OUTER dispatch **references `/orchestrating-agents`** — see §5-loop |
+| **orchestrating-agents** (new) | superpowers `subagent-driven-development` (dispatch fresh workers, file handoffs, never self-grade, planner/generator/evaluator split), forge/devloop dispatch, frugal (route subtasks — practice only). Owns the D4 dispatch verb + fan-out/pipeline patterns; agent-agnostic (host `Task`/`Workflow`, in-session fallback) |
 | **worktree-branching** | superpowers `using-git-worktrees` (detect-isolation, native-first), forge `forge-start` (HANDOFF_WORKTREE stop) |
 | **review** | mp `code-review` (Standards+Spec, no self-grade), superpowers `task-reviewer` (distrust-report, diff-only) |
 | **tool-sourcing** | find-skills CLI (ride it) + wrapped discovery (§7) |
@@ -135,7 +136,7 @@ deeply, then reimplement** (§12) — capture the actual mechanism, don't approx
 ## 11. Build order & status
 
 - **Phase 0 — foundations:** `writing-skills` ✅ · `memory-contract` (bd-mem) ✅ · `onboard` ✅ (+ `bd-block`) · **tracer-bullet ✅ PASSED**.
-- **Phase 1 — core loop:** worktree-branching → plan-grill / **diagnose** → autonomous-loop → review.
+- **Phase 1 — core loop:** worktree-branching → plan-grill / **diagnose** → **orchestrating-agents** → autonomous-loop → review.
 - **Phase 2 — self-improvement:** tool-sourcing → self-extension.
 - **Phase 3 — ship:** bootstrap-hooks → packaging → release/promotion, guardrails-install, pr-and-verify, browser-capability.
 
