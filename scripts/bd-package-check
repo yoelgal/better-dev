@@ -39,6 +39,8 @@ for f in skills/*/SKILL.md; do
   [ "$name" = "$dir" ] || errs="$errs name!=dir($name)"
   [ -n "$desc" ] || errs="$errs no-description"
   case "$desc" in "Use when"*) ;; *) errs="$errs desc-not-'Use when'";; esac
+  ah="$(printf '%s\n' "$fm" | sed -n 's/^argument-hint: *//p' | head -1)"
+  case "$ah" in ""|\"*|\'*) ;; \[*|\{*) errs="$errs argument-hint-must-be-a-quoted-string" ;; esac
   printf '%s' "$prose" | grep -qE '(^|[^A-Za-z0-9])@[A-Za-z0-9_./-]+\.(md|sh)' && errs="$errs @-link"
   printf '%s' "$prose" | grep -qE '\b(MUST|ALWAYS|STOP|CRITICAL|SHALL)\b' && errs="$errs shouting"
   [ -z "$errs" ] && ok "$dir" || bad "$dir:$errs"

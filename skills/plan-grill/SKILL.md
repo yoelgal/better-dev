@@ -1,7 +1,7 @@
 ---
 name: plan-grill
 description: Use when a feature work-item is starting and its plan isn't yet watertight — before any implementation, to check the baseline, ideate and grill the design until decisions are settled, and pin the observable done-criteria the loop will drive to. For a bug fix, reach for /diagnose instead.
-argument-hint: [feature-slug or rough intent]
+argument-hint: "[feature-slug or rough intent]"
 ---
 
 # plan-grill — the feature front-end
