@@ -72,7 +72,7 @@ Reconcile better-dev's defaults with what the repo already does. **What's alread
 recorded as an override rather than overwritten:
 
 - Repo uses `feat/* → staging → main`? Keep it. Record `feature branch prefix = feat/` and
-  `integration branch = staging` via `scripts/bd-mem persist-override "<line>"`. Don't force
+  `integration branch = staging` via `.better-dev/bin/bd-mem persist-override "<line>"`. Don't force
   `feature/`.
 - No integration branch anywhere? *Offer* to create `staging` off the default branch (confirm first);
   greenfield gets `main` + `staging`, an existing repo adapts to what it has.
@@ -84,11 +84,14 @@ Present these as decisions one at a time; don't batch a wall of questions.
 
 ### Phase 3 — Wire memory
 
-Point the memory contract at what Phase 1 found, then initialize it:
+better-dev's helpers live under `.better-dev/bin/` (a namespaced home — a bare `scripts/` at the root
+collides with a project that already has one). Point the memory contract at what Phase 1 found, then
+initialize it:
 
-- Files default (nothing else detected) → `scripts/bd-mem init`.
+- Files default (nothing else detected) → `.better-dev/bin/bd-mem init`.
 - A detected backend → record it (`export BETTER_DEV_MEMORY=mcp:<server>` or `cmd:<command>`) so
-  `bd-mem` routes there, then `bd-mem init`. Note the export in the discovery block so it persists.
+  `bd-mem` routes there, then `.better-dev/bin/bd-mem init`. Note the export in the discovery block so
+  it persists.
 
 Keep transient loop state out of version control:
 
@@ -104,7 +107,7 @@ Write the discovery block into the **entry file** from Phase 1 with the shared w
 the block in place and never touches the operator's own text:
 
 ```bash
-printf '%s\n' "$BLOCK" | scripts/bd-block CLAUDE.md better-dev
+printf '%s\n' "$BLOCK" | .better-dev/bin/bd-block CLAUDE.md better-dev
 ```
 
 Fill the block from what you actually detected (branching, memory backend). Shape:
@@ -117,7 +120,7 @@ This repo uses **better-dev** — portable dev practices that run inside your ag
 - **Feature** → `/plan-grill`, then the autonomous loop. **Bug/fix** → `/diagnose`, then the loop.
 - Each feature/fix runs in its **own git worktree** off `<integration-branch>`; branching is
   `<detected convention>`.
-- Durable rules & lessons: `scripts/bd-mem` (backend: `<detected>`). Project overrides live in
+- Durable rules & lessons: `.better-dev/bin/bd-mem` (backend: `<detected>`). Project overrides live in
   `.better-dev/overrides.md` and **win over defaults** — read them first.
 - Hit a capability gap? **Source a skill** (`find-skills`) before writing one.
 - Re-run `/onboard` any time to wire in what's missing.
@@ -135,7 +138,7 @@ correctly in the entry file.
 Recap what changed, then list any phase the operator skipped or deferred (no integration branch, a
 memory backend left on files, an unmapped test command) so they can come back with `/onboard <phase>`.
 Record a durable rule for anything worth remembering next session
-(`scripts/bd-mem remember "<rule>"`).
+(`.better-dev/bin/bd-mem remember "<rule>"`).
 
 ## Composability
 

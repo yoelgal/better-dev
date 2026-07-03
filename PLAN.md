@@ -62,7 +62,7 @@ composes with standard memory by *being part of it*. `bd-mem` exists and passes 
 - **OUTER (orchestration):** reimplement superpowers' subagent-driven-development — read plan+constraints → per task dispatch a **fresh isolated-context worker** (agent-agnostic dispatch verb, `scripts/bd-dispatch`, single-session role-switch fallback) with a file brief → generate a diff/review package → **independent reviewer that distrusts the report** (spec + quality verdict) → fix worker for Critical/Important → append ledger line → next → broad final review → hand off to PR-into-staging. File handoffs; never grade own work.
 - **INNER (drive-to-green):** reimplement devloop `grind` (verify→pick→implement-one-step→re-verify→log→commit, budget, protect-set) + `stuck-check` (rabbit-hole detector → halt-STUCK); precondition from mp `diagnosing-bugs`: name one **already-run red-capable command** before hypothesizing; per-slice from mp `tdd` (one test→one impl at agreed seams).
 - **INVARIANTS (legitimacy):** from loop-library `loopy` + forge — observable done-criteria (no "until happy"), **never error/exhausted = success**, no-progress stop (don't invent limits), ask-don't-invent, verify separate from signal, independent evaluator, "done means proven not asserted", pre-loop ground-truth gate.
-- **SPINE (fresh, ours):** ONE canonical terminal-state taxonomy = `DONE · DONE_WITH_CONCERNS · BLOCKED · NEEDS_INPUT · EXHAUSTED · NO_PROGRESS` (every source's verdicts map onto it); ONE durable ledger (SDD progress + grind scratchpad + loopy receipt merged, via bd-mem); **restart-from-contract** (on `NO_PROGRESS` confirmed by stuck-check → reset worktree off staging, replay `contract.md`, human only if the contract is wrong — karpathy §V reimplemented, never quoted); the dispatch verb + contract front-end + worktree/PR glue.
+- **SPINE (fresh, ours):** ONE canonical terminal-state taxonomy = `DONE · DONE_WITH_CONCERNS · BLOCKED · NEEDS_INPUT · EXHAUSTED · NO_PROGRESS` (every source's verdicts map onto it); ONE durable ledger (SDD progress + grind scratchpad + loopy receipt merged, via bd-mem) — in the **primary checkout's** `.better-dev/ledger/<feature>/`, shared across worktrees (tracer-bullet finding); **restart-from-contract** (on `NO_PROGRESS` confirmed by stuck-check → reset worktree off staging, replay `contract.md`, human only if the contract is wrong — karpathy §V reimplemented, never quoted); the dispatch verb + contract front-end + worktree/PR glue.
 
 ## 6. Onboarding — the entry skill `onboard`
 
@@ -134,14 +134,19 @@ deeply, then reimplement** (§12) — capture the actual mechanism, don't approx
 
 ## 11. Build order & status
 
-- **Phase 0 — foundations:** `writing-skills` ✅ · `memory-contract` (bd-mem) ✅ · **`onboard` ← NEXT** · then tracer-bullet.
+- **Phase 0 — foundations:** `writing-skills` ✅ · `memory-contract` (bd-mem) ✅ · `onboard` ✅ (+ `bd-block`) · **tracer-bullet ✅ PASSED**.
 - **Phase 1 — core loop:** worktree-branching → plan-grill / **diagnose** → autonomous-loop → review.
 - **Phase 2 — self-improvement:** tool-sourcing → self-extension.
 - **Phase 3 — ship:** bootstrap-hooks → packaging → release/promotion, guardrails-install, pr-and-verify, browser-capability.
 
-**Tracer-bullet gate (after Phase 0):** run `onboard` on the papers.town clone, then drive one small
-feature through the loop → PR-into-staging, **locally** (no push to their repo). Prove the spine before
-mass-producing Phase 1+.
+**Tracer-bullet gate (after Phase 0): ✅ PASSED** — ran `onboard` + one feature slice → staging on the
+papers.town clone, locally, no push. onboard adapted (didn't impose), wrote an idempotent non-clobbering
+discovery block, wired files-memory; the slice went worktree-off-staging → verify GREEN → merge-to-staging
+→ DONE. **Six findings now bind Phase 1 (see `DECISIONS.md` → Tracer-bullet findings):** helpers live in
+`.better-dev/bin/` (not a bare `scripts/`, which collides); the ledger lives in the *primary* checkout's
+`.better-dev/ledger/<feature>/` (shared across worktrees); detection is premise-verified at the git level;
+the primary checkout tracks the integration branch while features are worktrees off it; done = a real check
+going GREEN.
 
 ## 12. Build method
 

@@ -14,6 +14,9 @@ hooks/                         # optional SessionStart / SubagentStart injection
 .agents/                       # agent-agnostic install target (symlink + copy-fallback)
 NOTICE  README.md  install.sh
 ```
+**Install contract (tracer-bullet finding):** in a *target* repo the helpers install to **`.better-dev/bin/`**,
+never a bare `scripts/` — a real project (papers.town) already owns `scripts/` and a bare path collides.
+Skills reference helpers as `.better-dev/bin/bd-mem` etc. (`scripts/` remains only the dev-repo source home).
 
 ## D1 · Canonical terminal-state taxonomy
 One set every harvested vocabulary (loopy/grind/SDD/forge) maps onto. Hard rule: **never map an error or
@@ -75,6 +78,20 @@ On a capability gap the agent **first sources an existing skill** via `find-skil
 Create is the last resort — prefer proven, installed skills over fresh ones (ponytail: don't reinvent what
 the ecosystem already has). A freshly-created skill passes test-before-promote first; once proven it can
 later be published back. So `tool-sourcing` and `self-extension` are **one ordered flow**, not two.
+
+## Tracer-bullet findings (2026-07-03, on the papers.town clone) — bind Phase 1
+Ran `onboard` + one feature slice → staging end-to-end on the real clone (locally, no push). Proven, plus:
+1. **Helpers → `.better-dev/bin/`** (bare `scripts/` collides with the project's own — see D0 install contract).
+2. **Ledger lives in the primary checkout's `.better-dev/ledger/<feature>/`, shared across worktrees** — not in
+   the feature worktree (separate working tree). `autonomous-loop` + `worktree-branching` write there (forge keeps
+   state in a shared `$FORGE_HOME` for the same reason).
+3. **Premise-verify earns its place:** `staging` was documented in `CLAUDE.md` but absent from `git` — onboard must
+   verify at the git level, never trust prose. Same rule for any detected capability.
+4. **Primary checkout tracks the integration branch (`staging`); features are worktrees off it** (papers.town
+   convention). `worktree-branching` detects and respects this rather than imposing a layout.
+5. **Entry-file rule holds:** `CLAUDE.md` `@`-imports `AGENTS.md` → block into `CLAUDE.md`, idempotent, no clobber
+   (verified against the real 2.6 KB file via `bd-block`).
+6. **Done = a real runnable check going GREEN**, recorded as the contract's observable done-criteria (not a claim).
 
 ## Build order (phase-gated, verify each)
 0. authoring-standard → memory-contract (D2) → onboard  ← **foundations, built first**
