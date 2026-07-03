@@ -1,6 +1,6 @@
 ---
 name: packaging
-description: Use when installing better-dev into a repo, cutting a release, or validating the package before distribution — covers the vendored install, the Claude Code plugin manifest, and the release gate.
+description: Use when installing better-dev on a machine, cutting a release, or validating the package before distribution — covers the global per-host install, the Claude Code plugin manifest, and the release gate.
 allowed-tools:
   - Bash
   - Read
@@ -9,25 +9,33 @@ allowed-tools:
 
 # Packaging & distribution
 
-better-dev ships as a **vendored, agent-agnostic** layer, not a host-specific plugin: the practices live
-in the repo so any agent — Claude Code, Codex, pi, hermes — and every collaborator picks them up. One job
-here: get the package into a repo cleanly, and prove it's shippable before a release.
+better-dev ships in two layers, and packaging owns getting both in cleanly and proving the package is
+shippable before a release.
+
+- **The tool — global, once per machine.** The skills, `bd-*` helpers, and hooks live in one clone and
+  link into the host's global skills directory (`~/.claude/skills/better-dev`,
+  `~/.codex/skills/better-dev`, and so on), gstack-style — every repo on the machine shares one copy.
+  Nothing is ever vendored per repo; updating is a `git pull` in the clone.
+- **A repo's `.better-dev/` — data only.** A project carries just its own data (`rules.md`,
+  `overrides.md`, `learnings.jsonl`, and a gitignored loop `ledger/`) plus `.better-dev/bin`, a
+  per-machine symlink back to the global tool. Skills keep referencing helpers at `.better-dev/bin/bd-mem`
+  unchanged, and that path resolves through the symlink.
 
 ## Two ways in
 
-- **Vendored install (primary, any agent).** `./install.sh [target-repo]` copies the `bd-*` helpers into
-  the target's `.better-dev/bin/`, the skills into `.better-dev/skills/`, and the hooks into
-  `.better-dev/hooks/`; when a `.claude/` directory is present it also links the skills into
-  `.claude/skills/` so Claude Code discovers them. It's idempotent. Afterwards, `/onboard` wires the
-  project (memory backend, branching, the discovery block).
+- **Installer (any host).** `install.sh` links the tool into the host's global skills directory, falling
+  back to a copy where symlinks aren't available. It's idempotent.
 - **Claude Code plugin (convenience).** `.claude-plugin/plugin.json` lets a Claude Code user install the
-  skills and `hooks/hooks.json` globally. The skill contract is unchanged: skills still resolve their
-  helpers at `.better-dev/bin/`, which `/onboard` (or `install.sh`) populates per repo. Skills are
-  discovered from `skills/` and hooks from `hooks/hooks.json` by convention — there's no per-skill list to
-  maintain in the manifest.
+  same skills and `hooks/hooks.json` as a plugin. Skills are discovered from `skills/` and hooks from
+  `hooks/hooks.json` by convention — no per-skill list to maintain in the manifest.
 
-The vendored path is the source of truth; the plugin is a thin front door for one host. A non-Claude user
-never needs the plugin.
+Either way, `/onboard` then wires a repo's `.better-dev/` data and its `bin` symlink. The one-paste
+front door — `BOOTSTRAP.md` — sequences the whole thing (detect host, install globally, onboard the
+repo) for a user who just pastes a prompt.
+
+Repo-authored skills stay out of the global tool: a skill minted by `/self-extension` is committed into
+that repo's own project skills directory (`.claude/skills/<name>` on Claude Code) and discovered only
+there. Promoting one to the global tool is a separate, deliberate step.
 
 ## The release gate
 

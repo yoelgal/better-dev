@@ -8,11 +8,18 @@
 # outside the skills root — the same defenses that stop a stray recursive move from wiping a skills
 # tree). Staging is a temp dir; discard is a bounded rm. Nothing touches the live tree until `commit`.
 #
-#   bd-skill-stage dir                      # mint a staging dir, print its path
-#   bd-skill-stage lint    <dir>            # gate the candidate SKILL.md; nonzero + reasons on fail
-#   bd-skill-stage commit  <dir> [root]     # atomic mv into <root>/<name> (root defaults .agents/skills)
-#   bd-skill-stage discard <dir>            # remove a staging dir (only one this tool minted)
+#   bd-skill-stage dir                          # mint a staging dir, print its path
+#   bd-skill-stage lint    <dir>                # gate the candidate SKILL.md; nonzero + reasons on fail
+#   bd-skill-stage commit  <dir> local  [root]  # atomic mv into <root>/<name> (local root defaults .claude/skills)
+#   bd-skill-stage commit  <dir> global  root   # stage a repo-agnostic skill into the tool's skills tree (root required)
+#   bd-skill-stage discard <dir>                # remove a staging dir (only one this tool minted)
 #   bd-skill-stage selftest
+#
+# The commit target enforces the scope split. `local` lands the skill in the repo's own project skills
+# dir, where it's discovered only here — reversible and cheap. `global` is the bigger step: it refuses a
+# silent default and demands an explicit root (the better-dev clone's skills/ tree), so a repo-agnostic
+# skill reaches every repo only by being routed through the tool's publish path (bd-package-check + git),
+# never by a quiet write into a machine-global dir.
 #
 # The landing folder is taken from the frontmatter `name`, so name == folder holds by construction.
 # The lint is a mechanical tripwire, not a restatement of the standard — the authoring rules live in
@@ -95,8 +102,13 @@ lint() {
 
 # ── commit: atomic land into the live tree, with the three refusals ──────────
 commit() {
-  local dir="${1:-}"; [ -n "$dir" ] || die "commit <dir> [root]"
-  local root="${2:-.agents/skills}"
+  local dir="${1:-}"; [ -n "$dir" ] || die "commit <dir> <local|global> [root]"
+  local target="${2:-}" root="${3:-}"
+  case "$target" in
+    local)  root="${root:-.claude/skills}" ;;
+    global) [ -n "$root" ] || die "global commit needs an explicit skills-tree root — route it through the tool's publish path (the better-dev clone's skills/ + bd-package-check), not a silent global write" ;;
+    *) die "commit target must be 'local' or 'global'" ;;
+  esac
   local name; name="$(staged_name "$dir/SKILL.md")"
 
   [ -L "$dir" ] && die "staged dir is a symlink — refusing to commit through it"
@@ -155,15 +167,32 @@ selftest() {
   good_skill | sed 's/name: sample-skill/name: Sample_Skill/' >"$s/SKILL.md"
   "$SELF" lint "$s" 2>/dev/null && { echo "FAIL: bad name passed"; return 1; }
 
-  # commit is atomic + lands at <root>/<name>; re-commit is clobber-refused
+  # local commit is atomic + lands at <root>/<name>; re-commit is clobber-refused
   good_skill >"$s/SKILL.md"
   r="$(mktemp -d)"; mkdir -p "$r/skills"; realr="$(cd "$r/skills" && pwd -P)"
-  dest="$("$SELF" commit "$s" "$r/skills")"
-  [ "$dest" = "$realr/sample-skill" ] || { echo "FAIL: commit dest $dest"; return 1; }
+  dest="$("$SELF" commit "$s" local "$r/skills")"
+  [ "$dest" = "$realr/sample-skill" ] || { echo "FAIL: local commit dest $dest"; return 1; }
   [ -f "$dest/SKILL.md" ] || { echo "FAIL: committed SKILL.md missing"; return 1; }
   [ -d "$s" ] && { echo "FAIL: staged dir survived commit"; return 1; }
   s2="$("$SELF" dir)"; good_skill >"$s2/SKILL.md"
-  "$SELF" commit "$s2" "$r/skills" 2>/dev/null && { echo "FAIL: clobber not refused"; return 1; }
+  "$SELF" commit "$s2" local "$r/skills" 2>/dev/null && { echo "FAIL: clobber not refused"; return 1; }
+
+  # commit rejects a missing/unknown target and lands local at the default .claude/skills root
+  "$SELF" commit "$s2" 2>/dev/null && { echo "FAIL: missing target accepted"; return 1; }
+  "$SELF" commit "$s2" bogus "$r/skills" 2>/dev/null && { echo "FAIL: unknown target accepted"; return 1; }
+  td="$(mktemp -d)"
+  ( cd "$td" && "$SELF" commit "$s2" local >/dev/null ) || { echo "FAIL: default local root"; return 1; }
+  [ -f "$td/.claude/skills/sample-skill/SKILL.md" ] || { echo "FAIL: local default landed wrong"; return 1; }
+
+  # global refuses a silent default and lands only into an explicit tool skills tree
+  s3="$("$SELF" dir)"; good_skill >"$s3/SKILL.md"
+  ( cd "$td" && "$SELF" commit "$s3" global >/dev/null 2>&1 ) && { echo "FAIL: global without root accepted"; return 1; }
+  [ -d "$s3" ] || { echo "FAIL: global refusal should leave the staged dir intact"; return 1; }
+  mkdir -p "$r/tool-skills"; realg="$(cd "$r/tool-skills" && pwd -P)"
+  gdest="$("$SELF" commit "$s3" global "$r/tool-skills")"
+  [ "$gdest" = "$realg/sample-skill" ] || { echo "FAIL: global commit dest $gdest"; return 1; }
+  [ -f "$gdest/SKILL.md" ] || { echo "FAIL: global committed SKILL.md missing"; return 1; }
+  rm -rf "$td"
 
   # discard removes a minted dir, refuses an unminted one
   "$SELF" discard "$s2" || { echo "FAIL: discard minted dir"; return 1; }

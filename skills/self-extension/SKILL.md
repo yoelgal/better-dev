@@ -74,14 +74,27 @@ owns the two steps that have to be machine-enforced rather than trusted to prose
    also run that script's own fixture and test inside the staging dir, with an assertion that checks real
    output, not just that it didn't throw. If the check fails, fix it in place and retry at most twice,
    showing the diff each time; if it still fails, discard and stop rather than lower the bar.
-3. **Approve.** An installed skill runs with full agent permissions, so land it only behind an explicit yes.
-   Present it plainly — what it captures, where it will land, the one thing that could go wrong — and ask.
-   In an autonomous run there's no human at the keyboard, so this stop is a `NEEDS_INPUT` state (the
-   vocabulary is `/autonomous-loop`'s), not a failure; promotion resumes when approval comes.
-4. **Land or discard.** On a yes, `bd-skill-stage commit <dir>` atomically moves it into the place the host
-   discovers skills — `.agents/skills/<name>` by default, the same tree `/tool-sourcing` installs into —
-   refusing to clobber an existing skill, follow a symlink, or land outside that root. The folder is taken
-   from the frontmatter `name`, so name and folder always match. On a no, or after the retries are spent,
+3. **Classify the scope — local or global.** Decide where the proven skill belongs before you commit it. A
+   skill that only makes sense *here* — it names this repo's tools, paths, domain, or conventions — is
+   **local**: it belongs to this repo alone and shouldn't surface in your other repos. A general,
+   repo-agnostic practice is a candidate for **global**, the shared tool every repo sees. When the answer is
+   clear, take it. When you're unsure, ask the user the one question that settles it: just this repo, or all
+   your repos? If it's still unclear, default to local — local is reversible (easy to promote later), while a
+   global skill clutters every repo and is painful to claw back. Global is the bigger commitment: gate it
+   behind an explicit confirmation and route it through the tool's publish path — the better-dev repo and
+   `/packaging`'s release gate — never a silent write into the machine's global skills dir.
+4. **Approve.** An installed skill runs with full agent permissions, so land it only behind an explicit yes.
+   Present it plainly — what it captures, whether it's local or global and where that lands, the one thing
+   that could go wrong — and ask. In an autonomous run there's no human at the keyboard, so this stop is a
+   `NEEDS_INPUT` state (the vocabulary is `/autonomous-loop`'s), not a failure; promotion resumes when
+   approval comes.
+5. **Land or discard.** On a yes for a local skill, `bd-skill-stage commit <dir> local` atomically moves it
+   into the repo's own project skills dir — `.claude/skills/<name>` on Claude — where it's discovered only in
+   this repo, refusing to clobber an existing skill, follow a symlink, or land outside that root. The folder
+   is taken from the frontmatter `name`, so name and folder always match. For a global skill,
+   `bd-skill-stage commit <dir> global <path-to-the-better-dev-skills-tree>` stages it into the tool's own
+   skills tree, where `/packaging`'s `bd-package-check` gates it and git publishes it — a deliberate step
+   this flow sets up but doesn't complete on its own. On a no, or after the retries are spent,
    `bd-skill-stage discard <dir>` clears the staging dir.
 
 ## 5. Verify and record

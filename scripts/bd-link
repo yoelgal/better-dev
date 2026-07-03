@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+# bd-link — wire a repo's portable .better-dev/bin to the globally-installed better-dev scripts.
+#
+# Skills reference helpers by the repo-relative path .better-dev/bin/bd-mem so one SKILL.md works in
+# every repo. This creates that per-machine bridge: .better-dev/bin -> the scripts dir of the better-dev
+# clone installed on THIS machine (a symlink, or a copy where symlinks don't refresh). The bridge is
+# per-machine, so onboard lists bin/ in .better-dev/.gitignore — it is never committed.
+#
+#   bd-link link [repo]     wire <repo>/.better-dev/bin -> installed scripts dir (default repo: git root, else cwd)
+#   bd-link scripts-dir     print the resolved installed scripts dir
+#   bd-link selftest
+#
+# The scripts dir is this file's own dir (bd-link ships in it); override with BD_SCRIPTS_DIR.
+# Reimplemented for better-dev from understanding; no source files copied.
+set -euo pipefail
+
+case "$0" in /*) SELF="$0" ;; *) SELF="$PWD/$0" ;; esac
+die() { printf 'bd-link: %s\n' "$*" >&2; exit 1; }
+
+IS_WINDOWS=0
+case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*|Windows_NT) IS_WINDOWS=1 ;; esac
+[ "${BD_FORCE_COPY:-0}" = 1 ] && IS_WINDOWS=1
+
+# ponytail: same symlink-or-copy invariant as install.sh; ~6 lines, not worth a shared sourced file.
+link_or_copy() {
+  local src="$1" dst="$2"
+  rm -rf "$dst"
+  if [ "$IS_WINDOWS" -eq 1 ]; then cp -R "$src" "$dst"; else ln -snf "$src" "$dst"; fi
+}
+
+scripts_dir() {
+  if [ -n "${BD_SCRIPTS_DIR:-}" ]; then printf '%s' "$BD_SCRIPTS_DIR"; return; fi
+  cd "$(dirname "$SELF")" && pwd -P
+}
+
+repo_root() {
+  git -C "${1:-$PWD}" rev-parse --show-toplevel 2>/dev/null || printf '%s' "${1:-$PWD}"
+}
+
+do_link() {
+  local repo bin sd
+  repo="$(repo_root "${1:-}")"
+  sd="$(scripts_dir)"
+  [ -f "$sd/bd-mem" ] || die "scripts dir '$sd' has no bd-mem — is better-dev installed? (set BD_SCRIPTS_DIR)"
+  mkdir -p "$repo/.better-dev"
+  bin="$repo/.better-dev/bin"
+  link_or_copy "$sd" "$bin"
+  [ -e "$bin/bd-mem" ] || die "failed to wire $bin -> $sd"
+  printf 'wired %s -> %s\n' "$bin" "$sd"
+}
+
+selftest() {
+  local d sd r
+  d="$(mktemp -d)"
+  sd="$d/clone/scripts"; mkdir -p "$sd"
+  printf '#!/bin/sh\necho stub\n' >"$sd/bd-mem"; chmod +x "$sd/bd-mem"
+  mkdir -p "$d/repo"
+  ( set -e
+    BD_SCRIPTS_DIR="$sd" "$SELF" link "$d/repo" >/dev/null
+    [ -L "$d/repo/.better-dev/bin" ]      || { echo "FAIL: bin not a symlink"; exit 1; }
+    [ -e "$d/repo/.better-dev/bin/bd-mem" ] || { echo "FAIL: bin/bd-mem does not resolve"; exit 1; }
+    # re-run is idempotent
+    BD_SCRIPTS_DIR="$sd" "$SELF" link "$d/repo" >/dev/null
+    [ -L "$d/repo/.better-dev/bin" ]      || { echo "FAIL: not idempotent"; exit 1; }
+    # copy fallback (Windows / degraded FS): a real copy, not a link
+    BD_SCRIPTS_DIR="$sd" BD_FORCE_COPY=1 "$SELF" link "$d/repo" >/dev/null
+    [ ! -L "$d/repo/.better-dev/bin" ] && [ -f "$d/repo/.better-dev/bin/bd-mem" ] \
+                                          || { echo "FAIL: copy fallback"; exit 1; }
+    [ "$(BD_SCRIPTS_DIR="$sd" "$SELF" scripts-dir)" = "$sd" ] || { echo "FAIL: scripts-dir"; exit 1; }
+  ) && r=0 || r=1
+  rm -rf "$d"
+  [ $r = 0 ] && echo "selftest OK" || { echo "selftest FAILED" >&2; exit 1; }
+}
+
+case "${1:-}" in
+  link) shift; do_link "${1:-}" ;;
+  scripts-dir) printf '%s\n' "$(scripts_dir)" ;;
+  selftest) selftest ;;
+  ""|-h|--help) sed -n '2,17p' "$SELF"; exit 0 ;;
+  *) die "unknown command '$1' (link | scripts-dir | selftest)" ;;
+esac

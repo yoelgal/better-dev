@@ -8,15 +8,35 @@ not set in stone. Spec: `raw/better-dev-design-principles.md`. Build plan: `raw/
 Product lives at the **repo root**; `raw/` stays the research archive.
 ```
 skills/<name>/SKILL.md         # agentskills.io units (+ sibling .md refs, progressive disclosure)
-scripts/                       # shared bash (memory resolver, dispatch, ledger, stage-test-commit)
+scripts/bd-*                   # the bd-* spine (mem+ledger, block, dispatch, worktree-guard, review-package, skill-stage, link, package-check)
+hosts/<host>                   # per-host install adapters (claude, codex, …) — each host's global skills dir
 hooks/                         # optional SessionStart / SubagentStart injection
-.claude-plugin/plugin.json     # Claude Code plugin manifest (generated)
-.agents/                       # agent-agnostic install target (symlink + copy-fallback)
-NOTICE  README.md  install.sh
+.claude-plugin/plugin.json     # Claude Code plugin manifest
+NOTICE  README.md  install.sh  BOOTSTRAP.md
 ```
-**Install contract (tracer-bullet finding):** in a *target* repo the helpers install to **`.better-dev/bin/`**,
-never a bare `scripts/` — a real project (papers.town) already owns `scripts/` and a bare path collides.
-Skills reference helpers as `.better-dev/bin/bd-mem` etc. (`scripts/` remains only the dev-repo source home).
+**Install model:** the TOOL installs **globally, per host** (never vendored per repo); a repo's `.better-dev/`
+holds **data only** plus a per-machine `.better-dev/bin` symlink to the global install, so skills keep the
+portable reference `.better-dev/bin/bd-mem`. Full model in **D10** (which revises the earlier per-repo /
+`.agents/` vendoring assumption).
+
+## D10 · Install model — global per host; a repo carries data only (revises D0, 2026-07-04)
+Two layers (gstack-confirmed; per-repo skill-vendoring + a `.claude/skills` symlink-bridge is the deprecated
+model — dropped):
+- **Tool — global, once per machine.** `install.sh` links this clone's `skills/` into each detected host's
+  native global skills dir (`~/.claude/skills/better-dev`, `~/.codex/skills/better-dev`) through one
+  symlink-or-copy helper (`scripts/bd-link`; Windows copy-fallback), with per-host adapters under `hosts/`.
+  Claude Code alternative = the `.claude-plugin` plugin. Update = `git pull` in the clone. Never duplicated per repo.
+- **Repo `.better-dev/` = DATA only, committed** — `rules.md`, `overrides.md`, `learnings.jsonl` tracked;
+  `ledger/` and `bin/` gitignored. `.better-dev/bin` is a per-machine symlink → the global install's scripts,
+  so `.better-dev/bin/bd-mem` resolves everywhere (**Option-B reference model — zero skill churn**; skills
+  never hard-code `${CLAUDE_PLUGIN_ROOT}`).
+- **Repo-authored skills (from `/self-extension`) are repo-scoped** — committed to the repo's own project
+  skills dir (`.claude/skills/<name>` on Claude), discovered only there, never added to the global tool.
+  `/self-extension` classifies scope: project-specific → **local** (default when unsure); broadly-reusable →
+  **global** (explicit confirm + the publish path); genuinely unsure → **ask**. This is what makes a global tool
+  safe: a repo-specific skill never clutters other repos.
+- **One-paste bootstrap** (`BOOTSTRAP.md` + a README block) is the front door: detect host → global-install →
+  `/onboard` wires the repo's data + the `bin` symlink + the discovery block.
 
 ## D1 · Canonical terminal-state taxonomy
 One set every harvested vocabulary (loopy/grind/SDD/forge) maps onto. Hard rule: **never map an error or
