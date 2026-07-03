@@ -1,0 +1,183 @@
+#!/usr/bin/env bash
+# bd-skill-stage — the test-before-promote machinery for a freshly authored skill.
+#
+# The /self-extension flow drafts a candidate SKILL.md in a throwaway staging dir, gates it with a
+# runnable check, and only lands it in the live skills tree on pass + approval. This helper owns the
+# two operations that must be enforced by a machine rather than trusted to prose: the lint gate (the
+# "test" for a prose skill) and the atomic commit (which refuses to clobber, follow a symlink, or land
+# outside the skills root — the same defenses that stop a stray recursive move from wiping a skills
+# tree). Staging is a temp dir; discard is a bounded rm. Nothing touches the live tree until `commit`.
+#
+#   bd-skill-stage dir                      # mint a staging dir, print its path
+#   bd-skill-stage lint    <dir>            # gate the candidate SKILL.md; nonzero + reasons on fail
+#   bd-skill-stage commit  <dir> [root]     # atomic mv into <root>/<name> (root defaults .agents/skills)
+#   bd-skill-stage discard <dir>            # remove a staging dir (only one this tool minted)
+#   bd-skill-stage selftest
+#
+# The landing folder is taken from the frontmatter `name`, so name == folder holds by construction.
+# The lint is a mechanical tripwire, not a restatement of the standard — the authoring rules live in
+# the writing-skills skill; failures here point back to it.
+#
+# Reimplemented for better-dev from understanding; no source files copied.
+set -euo pipefail
+
+case "$0" in /*) SELF="$0" ;; *) SELF="$PWD/$0" ;; esac
+die()  { printf 'bd-skill-stage: %s\n' "$*" >&2; exit 2; }
+STAGE_PREFIX='bd-skill-stage.'
+
+# ── frontmatter helpers ─────────────────────────────────────────────────────
+# Naive first-block scan: everything between the opening `---` line and the next `---`. Good enough
+# for the single-line name/description skills use; if frontmatter grows multi-line values, swap for a
+# real YAML parse. ponytail: naive frontmatter scan, upgrade to a YAML parse only if keys go multiline.
+frontmatter() { awk 'NR==1 && $0=="---"{f=1;next} f && $0=="---"{exit} f{print}' "$1"; }
+body()        { awk 'NR==1 && $0=="---"{f=1;next} f && $0=="---"{b=1;next} b{print}' "$1"; }
+fm_value()    { printf '%s\n' "$1" | sed -n "s/^$2:[[:space:]]*//p" | head -1 | sed -e 's/^"\(.*\)"$/\1/' -e "s/^'\(.*\)'\$/\1/"; }
+
+NAME_RE='^[a-z][a-z0-9]*(-[a-z0-9]+)*$'
+
+# Extract + validate the skill name from a staged SKILL.md; prints the name or dies.
+staged_name() {
+  local f="$1" fm name
+  [ -f "$f" ] || die "no SKILL.md in staged dir"
+  fm="$(frontmatter "$f")"
+  name="$(fm_value "$fm" name)"
+  [ -n "$name" ] || die "frontmatter has no name"
+  [ "${#name}" -le 64 ] || die "name exceeds 64 chars: $name"
+  printf '%s' "$name" | grep -Eq "$NAME_RE" || die "name is not kebab-case: $name"
+  printf '%s' "$name"
+}
+
+# ── lint: the runnable gate a prose skill has to pass before promotion ───────
+lint() {
+  local dir="${1:-}"; [ -n "$dir" ] || die "lint <dir>"
+  local f="$dir/SKILL.md"
+  [ -f "$f" ] || die "no SKILL.md in $dir"
+  local fm body name desc fails=""
+  add() { fails="${fails}  - $1"$'\n'; }
+
+  head -n1 "$f" | grep -qx -- '---' || add "SKILL.md must open with a --- frontmatter line"
+  fm="$(frontmatter "$f")"
+  body="$(body "$f" | sed '/^[[:space:]]*$/d')"
+  [ -n "$fm" ]   || add "frontmatter block is empty or unterminated (needs a closing --- line)"
+  [ -n "$body" ] || add "body is empty after the frontmatter"
+
+  name="$(fm_value "$fm" name)"
+  if [ -z "$name" ]; then add "frontmatter is missing 'name'"
+  else
+    [ "${#name}" -le 64 ] || add "name exceeds 64 chars"
+    printf '%s' "$name" | grep -Eq "$NAME_RE" \
+      || add "name must be kebab-case (^[a-z][a-z0-9]*(-[a-z0-9]+)*\$) and match the folder"
+  fi
+
+  desc="$(fm_value "$fm" description)"
+  if [ -z "$desc" ]; then add "frontmatter is missing 'description' (the only hard fail in writing-skills)"
+  else
+    [ "${#desc}" -le 1024 ] || add "description exceeds 1024 chars"
+    case "$desc" in "Use when"*) ;; *) add "description must state triggering conditions — start it with \"Use when …\"" ;; esac
+  fi
+
+  printf '%s\n' "$fm" | grep -Eq '^(version|license):' \
+    && add "drop version/license from frontmatter — writing-skills keeps it to name + description"
+
+  # No @-links / @-imports: an @ glued to a path token force-loads a file on every run.
+  printf '%s\n' "$body" | grep -Eq '(^|[[:space:](])@[A-Za-z0-9._/-]+/' \
+    && add "body uses an @-link/import — reach siblings by a prose pointer, not @path"
+
+  [ "$(wc -c <"$f")" -le 100000 ] || add "SKILL.md exceeds 100000 chars — split into sibling .md files"
+
+  if [ -n "$fails" ]; then
+    printf 'lint FAILED for %s:\n%s' "$f" "$fails" >&2
+    printf 'These are mechanical checks; the authoring standard itself lives in the writing-skills skill.\n' >&2
+    return 1
+  fi
+  printf 'lint OK: %s\n' "$name"
+}
+
+# ── commit: atomic land into the live tree, with the three refusals ──────────
+commit() {
+  local dir="${1:-}"; [ -n "$dir" ] || die "commit <dir> [root]"
+  local root="${2:-.agents/skills}"
+  local name; name="$(staged_name "$dir/SKILL.md")"
+
+  [ -L "$dir" ] && die "staged dir is a symlink — refusing to commit through it"
+  [ -d "$dir" ] || die "staged path is not a directory: $dir"
+
+  mkdir -p "$root"
+  local realroot dest; realroot="$(cd "$root" && pwd -P)"
+  dest="$realroot/$name"
+  case "$dest" in "$realroot"/*) ;; *) die "destination escapes the skills root" ;; esac
+  if [ -e "$dest" ] || [ -L "$dest" ]; then
+    die "a skill named '$name' already exists at $dest — pick a different name or remove it first"
+  fi
+  mv "$dir" "$dest"
+  printf '%s\n' "$dest"
+}
+
+# ── discard: remove a staging dir, bounded to ones this tool minted ──────────
+discard() {
+  local dir="${1:-}"; [ -n "$dir" ] || die "discard <dir>"
+  case "$(basename "$dir")" in "$STAGE_PREFIX"*) ;; *) die "refusing to discard $dir: not a bd-skill-stage dir" ;; esac
+  [ -L "$dir" ] && die "refusing to discard a symlink: $dir"
+  rm -rf "$dir"
+}
+
+dir() { mktemp -d "${TMPDIR:-/tmp}/${STAGE_PREFIX}XXXXXX"; }
+
+good_skill() {
+  cat <<'EOF'
+---
+name: sample-skill
+description: Use when a sample capability is needed for the bd-skill-stage selftest fixture.
+---
+
+# Sample
+
+Body that does one job.
+EOF
+}
+
+selftest() {
+  local s r dest
+  s="$("$SELF" dir)"
+  case "$(basename "$s")" in "$STAGE_PREFIX"*) ;; *) echo "FAIL: dir prefix"; return 1 ;; esac
+
+  # good candidate lints clean
+  good_skill >"$s/SKILL.md"
+  "$SELF" lint "$s" >/dev/null || { echo "FAIL: good skill should lint"; return 1; }
+
+  # each defect trips the lint
+  good_skill | sed 's/Use when a sample/A sample/' >"$s/SKILL.md"
+  "$SELF" lint "$s" 2>/dev/null && { echo "FAIL: non-'Use when' description passed"; return 1; }
+  printf -- '---\nname: sample-skill\ndescription: Use when a sample capability is needed.\nversion: 0.1.0\n---\n\n# Sample\n\nBody.\n' >"$s/SKILL.md"
+  "$SELF" lint "$s" 2>/dev/null && { echo "FAIL: version in frontmatter passed"; return 1; }
+  { good_skill; echo 'see @scripts/x.md'; } >"$s/SKILL.md"
+  "$SELF" lint "$s" 2>/dev/null && { echo "FAIL: @-link passed"; return 1; }
+  good_skill | sed 's/name: sample-skill/name: Sample_Skill/' >"$s/SKILL.md"
+  "$SELF" lint "$s" 2>/dev/null && { echo "FAIL: bad name passed"; return 1; }
+
+  # commit is atomic + lands at <root>/<name>; re-commit is clobber-refused
+  good_skill >"$s/SKILL.md"
+  r="$(mktemp -d)"; mkdir -p "$r/skills"; realr="$(cd "$r/skills" && pwd -P)"
+  dest="$("$SELF" commit "$s" "$r/skills")"
+  [ "$dest" = "$realr/sample-skill" ] || { echo "FAIL: commit dest $dest"; return 1; }
+  [ -f "$dest/SKILL.md" ] || { echo "FAIL: committed SKILL.md missing"; return 1; }
+  [ -d "$s" ] && { echo "FAIL: staged dir survived commit"; return 1; }
+  s2="$("$SELF" dir)"; good_skill >"$s2/SKILL.md"
+  "$SELF" commit "$s2" "$r/skills" 2>/dev/null && { echo "FAIL: clobber not refused"; return 1; }
+
+  # discard removes a minted dir, refuses an unminted one
+  "$SELF" discard "$s2" || { echo "FAIL: discard minted dir"; return 1; }
+  [ -d "$s2" ] && { echo "FAIL: discard left the dir"; return 1; }
+  un="$(mktemp -d)"; "$SELF" discard "$un" 2>/dev/null && { echo "FAIL: discarded an unminted dir"; return 1; }
+  rm -rf "$r" "$un"
+  echo "bd-skill-stage selftest OK"
+}
+
+case "${1:-}" in
+  dir)      dir ;;
+  lint)     shift; lint "$@" ;;
+  commit)   shift; commit "$@" ;;
+  discard)  shift; discard "$@" ;;
+  selftest) selftest ;;
+  *) die "usage: bd-skill-stage dir | lint <dir> | commit <dir> [root] | discard <dir> | selftest" ;;
+esac
