@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+# bd-package-check — validate the whole better-dev package before install or release.
+#
+# Lints every skill (frontmatter minimal + name==folder + "Use when" description + no @-links + calm
+# voice), runs every helper's selftest, validates the JSON manifests, and checks that backtick-wrapped
+# /skill references resolve (to a shipped skill or a known host-optional builtin). Non-zero exit on any
+# failure — a release / CI gate, and what `/self-extension` runs before promoting a freshly authored skill.
+set -uo pipefail
+
+# Package root = the dir holding skills/ + scripts/ (run from anywhere in the dev repo).
+ROOT="$(cd "$(dirname "$0")/.." 2>/dev/null && pwd)"
+[ -d "$ROOT/skills" ] || ROOT="$(pwd)"
+cd "$ROOT"
+
+fail=0
+ok()  { printf '  \033[32m✓\033[0m %s\n' "$*"; }
+bad() { printf '  \033[31m✗\033[0m %s\n' "$*"; fail=1; }
+
+# /refs a skill may compose from the host but better-dev does not ship.
+HOST_OPTIONAL="code-review security-review verify domain-modeling"
+
+# SKILL body with frontmatter, fenced code, inline code, and quoted spans removed — so a backticked
+# `@AGENTS.md` or a quoted "MUST" (naming a token to forbid it) doesn't read as a real violation.
+prose_of() {
+  awk 'NR==1&&$0=="---"{f=1;next} f&&$0=="---"{f=0;b=1;next} b{print}' "$1" \
+    | awk '/^```/{c=!c;next} !c{print}' \
+    | sed 's/`[^`]*`//g; s/"[^"]*"//g'
+}
+
+echo "== skills =="
+for f in skills/*/SKILL.md; do
+  [ -f "$f" ] || continue
+  dir="$(basename "$(dirname "$f")")"
+  fm="$(awk 'NR==1&&$0=="---"{f=1;next} f&&$0=="---"{exit} f{print}' "$f")"
+  name="$(printf '%s\n' "$fm" | awk -F': *' '/^name:/{print $2; exit}')"
+  desc="$(printf '%s\n' "$fm" | sed -n 's/^description: *//p' | head -1)"
+  prose="$(prose_of "$f")"
+  errs=""
+  [ "$name" = "$dir" ] || errs="$errs name!=dir($name)"
+  [ -n "$desc" ] || errs="$errs no-description"
+  case "$desc" in "Use when"*) ;; *) errs="$errs desc-not-'Use when'";; esac
+  printf '%s' "$prose" | grep -qE '(^|[^A-Za-z0-9])@[A-Za-z0-9_./-]+\.(md|sh)' && errs="$errs @-link"
+  printf '%s' "$prose" | grep -qE '\b(MUST|ALWAYS|STOP|CRITICAL|SHALL)\b' && errs="$errs shouting"
+  [ -z "$errs" ] && ok "$dir" || bad "$dir:$errs"
+done
+
+echo "== helper scripts (selftest) =="
+for s in scripts/bd-*; do
+  [ "$(basename "$s")" = "bd-package-check" ] && continue
+  b="$(basename "$s")"
+  [ -x "$s" ] || { bad "$b not executable"; continue; }
+  "$s" selftest >/dev/null 2>&1 && ok "$b" || bad "$b selftest FAILED"
+done
+
+echo "== hook scripts (selftest) =="
+for s in hooks/bd-*; do
+  [ -e "$s" ] || continue
+  b="$(basename "$s")"
+  [ -x "$s" ] && "$s" selftest >/dev/null 2>&1 && ok "$b" || bad "$b selftest FAILED"
+done
+
+echo "== manifests (valid JSON) =="
+for j in .claude-plugin/plugin.json hooks/hooks.json; do
+  [ -f "$j" ] || { bad "$j missing"; continue; }
+  jq -e . "$j" >/dev/null 2>&1 && ok "$j" || bad "$j invalid JSON"
+done
+
+# Informational only: a backtick `/word` is used for real skill invocations, but also for illustrative
+# examples, placeholders (`/name`), URL paths (`/dashboard`), and flow names (`/learn`) — too ambiguous to
+# gate on. Surface unknowns for a human glance; don't fail the build.
+echo "== cross-skill /refs (informational) =="
+present="$(ls skills/ 2>/dev/null | tr '\n' ' ')"
+unknown=""
+for ref in $(grep -rhoE '`/[a-z][a-z-]+`' skills/*/SKILL.md 2>/dev/null | tr -d '`/' | sort -u); do
+  case " $present $HOST_OPTIONAL " in *" $ref "*) ;; *) unknown="$unknown $ref" ;; esac
+done
+[ -z "$unknown" ] && ok "every backtick /ref is a shipped or host-optional skill" \
+  || printf '  \033[33m•\033[0m illustrative/placeholder /refs (not gated):%s\n' "$unknown"
+
+echo
+[ $fail = 0 ] && echo "package-check: PASS ($(ls skills/ | wc -l | tr -d ' ') skills)" || { echo "package-check: FAIL"; exit 1; }

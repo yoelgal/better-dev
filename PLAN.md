@@ -137,8 +137,10 @@ deeply, then reimplement** (§12) — capture the actual mechanism, don't approx
 
 - **Phase 0 — foundations:** `writing-skills` ✅ · `memory-contract` (bd-mem) ✅ · `onboard` ✅ (+ `bd-block`) · **tracer-bullet ✅ PASSED**.
 - **Phase 1 — core loop: ✅ built + integration-tested** — `worktree-branching`, `plan-grill`, `diagnose`, `orchestrating-agents`, `autonomous-loop`, `review` (fanned out via Workflow, each reimplemented from real opensrc source). Spine unified: `bd-mem` now resolves the primary checkout and owns the ledger (`bd-mem ledger dir|init|resume|put|read`); helpers normalized to the `bd-*` namespace (`bd-mem`, `bd-block`, `bd-dispatch`, `bd-worktree-guard`, `bd-review-package`), all self-tests + a cross-skill worktree integration test green.
-- **Phase 2 — self-improvement:** tool-sourcing → self-extension.
-- **Phase 3 — ship:** bootstrap-hooks → packaging → release/promotion, guardrails-install, pr-and-verify, browser-capability.
+- **Phase 2 — self-improvement: ✅** `tool-sourcing` (rides find-skills CLI) + `self-extension` (hermes /learn fallback, `bd-skill-stage` test-before-promote).
+- **Phase 3 — ship: ✅** `bootstrap-hooks`, `pr-and-verify`, `release-promotion`, `guardrails-install`, `overrides`, `browser-capability`, and `packaging` (`install.sh` vendored install + `.claude-plugin/plugin.json` + `bd-package-check` release gate).
+
+**Build complete.** 17 skills + 7 `bd-*` scripts + hooks; `bd-package-check` green; `install.sh` proven end-to-end on a throwaway repo. Remaining is human-only (see §13): publish to a marketplace/npm, real-remote branch protection, and live multi-harness in-agent runs.
 
 **Tracer-bullet gate (after Phase 0): ✅ PASSED** — ran `onboard` + one feature slice → staging on the
 papers.town clone, locally, no push. onboard adapted (didn't impose), wrote an idempotent non-clobbering

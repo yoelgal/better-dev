@@ -1,0 +1,22 @@
+{
+  "name": "better-dev",
+  "description": "Portable dev practices as skills — onboard a repo, plan or diagnose in worktrees, drive an autonomous loop to proven-done, review, source tools, and self-extend. Runs inside the coding agent you already use.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Yoel Gal"
+  },
+  "homepage": "https://github.com/yoelgal/better-dev",
+  "repository": "https://github.com/yoelgal/better-dev",
+  "license": "MIT",
+  "keywords": [
+    "skills",
+    "dev-workflow",
+    "autonomous-loop",
+    "git-worktrees",
+    "code-review",
+    "bug-diagnosis",
+    "memory",
+    "self-extending",
+    "agent-agnostic"
+  ]
+}
