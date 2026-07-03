@@ -1,0 +1,20 @@
+# Research archive — NEVER committed (user directive 2026-07-03)
+raw/
+
+# Local per-project memory / runtime state
+.better-dev/
+
+# Eval sandboxes (clones of other repos for testing the workflow)
+*-bd-eval/
+_eval/
+
+# Dependencies / build output
+node_modules/
+dist/
+build/
+*.log
+
+# OS / editor cruft
+.DS_Store
+.idea/
+.vscode/
