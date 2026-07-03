@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+# bd-review-package — pin a fixed point and pack the diff a reviewer reads in one call.
+#
+# Writes commit list + stat summary + the net diff with wide context into ONE file under
+# .better-dev/review/, so a separated reviewer sees exactly the change and never crawls the
+# codebase. Uses the recorded BASE (not HEAD~1, which silently drops all but the last commit).
+# Fails fast on a bad ref or an empty diff — before any reviewer is dispatched — so the failure
+# lands here, not inside a fresh worker with no way to report it.
+#
+# The package dir sits in the working tree (not under .git/, which agents are denied writes to)
+# and self-ignores via a `*` .gitignore, so review artifacts never reach `git status` or a commit.
+#
+# Usage: bd-review-package [BASE] [HEAD]
+#   BASE default: git merge-base <integration> HEAD  (staging, else origin/main, else main)
+#   HEAD default: HEAD
+# Prints the package path on stdout; a one-line summary on stderr.
+#
+# Reimplemented for better-dev from understanding; no source files copied.
+set -euo pipefail
+
+BD_DIR="${BETTER_DEV_DIR:-.better-dev}"
+die() { printf 'bd-review-package: %s\n' "$*" >&2; exit 1; }
+
+# Default BASE: merge-base against the integration branch better-dev tracks.
+default_base() {
+  local ref
+  for ref in staging origin/staging origin/main main; do
+    if git rev-parse --verify --quiet "$ref" >/dev/null; then
+      git merge-base "$ref" HEAD && return 0
+    fi
+  done
+  # No integration branch found — fall back to the parent commit.
+  git rev-parse --verify --quiet HEAD~1 >/dev/null && { git rev-parse HEAD~1; return 0; }
+  die "no BASE given and no staging/main/HEAD~1 to derive one from — pass BASE explicitly"
+}
+
+package() {
+  local base head dir out short_b short_h
+  base=${1:-$(default_base)}
+  head=${2:-HEAD}
+
+  git rev-parse --verify --quiet "$base" >/dev/null || die "bad BASE: $base"
+  git rev-parse --verify --quiet "$head" >/dev/null || die "bad HEAD: $head"
+
+  # Fail fast on an empty diff — nothing to review.
+  git diff --quiet "$base..$head" && die "empty diff: $base..$head — nothing to review"
+
+  dir="$(git rev-parse --show-toplevel)/$BD_DIR/review"
+  mkdir -p "$dir"
+  printf '*\n' >"$dir/.gitignore"
+
+  short_b=$(git rev-parse --short "$base")
+  short_h=$(git rev-parse --short "$head")
+  out="$dir/review-${short_b}..${short_h}.diff"
+
+  {
+    echo "# Review package: ${base}..${head}"
+    echo
+    echo "## Commits"
+    git log --oneline "${base}..${head}"
+    echo
+    echo "## Files changed"
+    git diff --stat "${base}..${head}"
+    echo
+    echo "## Diff"
+    git diff -U10 "${base}..${head}"
+  } >"$out"
+
+  printf '%s\n' "$out"
+  printf 'bd-review-package: %s commit(s), %s bytes\n' \
+    "$(git rev-list --count "${base}..${head}")" "$(wc -c <"$out" | tr -d ' ')" >&2
+}
+
+selftest() {
+  local tmp rc=0 out
+  tmp=$(mktemp -d)
+  trap 'rm -rf "$tmp"' RETURN
+  (
+    cd "$tmp"
+    git init -q
+    git config user.email t@t; git config user.name t
+    git checkout -q -b staging
+    echo one >a.txt; git add a.txt; git commit -qm one
+    git checkout -q -b feature
+    echo two >b.txt; git add b.txt; git commit -qm two
+    echo three >c.txt; git add c.txt; git commit -qm three
+
+    # Default BASE = merge-base(staging, HEAD); package captures BOTH feature commits.
+    out=$(BETTER_DEV_DIR=.better-dev "$SELF")
+    [ -s "$out" ] || { echo "FAIL: package empty"; exit 1; }
+    grep -q b.txt "$out" || { echo "FAIL: missing first feature commit"; exit 1; }
+    grep -q c.txt "$out" || { echo "FAIL: missing second feature commit"; exit 1; }
+    grep -q '\*' .better-dev/review/.gitignore || { echo "FAIL: no self-ignoring .gitignore"; exit 1; }
+
+    # Empty diff fails fast.
+    if "$SELF" HEAD HEAD >/dev/null 2>&1; then echo "FAIL: empty diff not rejected"; exit 1; fi
+    # Bad ref fails fast.
+    if "$SELF" nope HEAD >/dev/null 2>&1; then echo "FAIL: bad ref not rejected"; exit 1; fi
+  ) || rc=1
+  [ $rc = 0 ] && echo "selftest OK" || die "selftest FAILED"
+}
+
+# Absolute path to self — selftest runs from a temp dir.
+case "$0" in /*) SELF="$0" ;; *) SELF="$PWD/$0" ;; esac
+
+case "${1:-}" in
+  selftest) selftest ;;
+  -h | --help) sed -n '2,17p' "$SELF" ;;
+  *) package "$@" ;;
+esac

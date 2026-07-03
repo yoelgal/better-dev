@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+# bd-worktree-guard — fail-closed ownership proof before removing a git worktree.
+#
+# A worktree teardown that reaches for `git worktree remove --force` or `rm -rf` can delete
+# the wrong path if the caller's state is poisoned (a stale variable, a mis-resolved slug).
+# This gate proves the target is a *linked* worktree of the current repo before any forced
+# removal is allowed. Any doubt ⇒ refuse: a wrongly-refused removal costs a re-run, a wrongly
+# -allowed one costs a working tree.
+#
+# Reimplemented for better-dev from understanding (gstack staging-guard principle); no source copied.
+#
+#   bd-worktree-guard guard <path>   # exit 0 = safe to remove, non-zero + reason on stderr
+#   bd-worktree-guard selftest
+set -euo pipefail
+
+resolve() { # realpath that doesn't need coreutils
+  local p="$1"
+  [ -e "$p" ] || return 1
+  ( cd "$p" 2>/dev/null && pwd -P )
+}
+
+guard() {
+  local target="${1:?guard <path>}" p primary
+  p="$(resolve "$target")" || { echo "guard: path does not resolve: $target" >&2; return 1; }
+
+  # Not-a-repo / primary tripwire: a *linked* worktree carries a `.git` FILE (gitdir pointer);
+  # the primary checkout carries a `.git` DIRECTORY. Refuse to force-remove a real checkout.
+  if [ -d "$p/.git" ]; then
+    echo "guard: refusing — $p holds a .git directory (primary checkout or nested repo, not a linked worktree)" >&2
+    return 1
+  fi
+  [ -f "$p/.git" ] || { echo "guard: refusing — $p has no .git pointer file (not a linked worktree)" >&2; return 1; }
+
+  # Structural proof: the path must be a registered worktree of THIS repo.
+  if ! git worktree list --porcelain 2>/dev/null | grep -qxF "worktree $p"; then
+    echo "guard: refusing — $p is not in 'git worktree list' for this repo" >&2
+    return 1
+  fi
+
+  # Never remove the primary root even if it somehow reached here.
+  primary="$(git worktree list --porcelain 2>/dev/null | awk '/^worktree /{print $2; exit}')"
+  [ "$p" != "$primary" ] || { echo "guard: refusing — $p is the primary worktree" >&2; return 1; }
+
+  return 0
+}
+
+selftest() {
+  local d main wt out; d="$(mktemp -d)"; main="$d/main"
+  git init -q "$main"
+  ( cd "$main" && git config user.email t@t && git config user.name t \
+      && git commit -q --allow-empty -m init )
+  wt="$d/.worktrees/feat-x"
+  ( cd "$main" && git worktree add -q -b feat/x "$wt" ) >/dev/null 2>&1
+
+  # PASS: a real linked worktree.
+  ( cd "$main" && guard "$wt" ) || { echo "FAIL: rejected a valid linked worktree" >&2; exit 1; }
+
+  # REFUSE: the primary checkout (has a .git dir).
+  if ( cd "$main" && guard "$main" ) 2>/dev/null; then
+    echo "FAIL: allowed removal of the primary checkout" >&2; exit 1; fi
+
+  # REFUSE: a random non-worktree dir.
+  mkdir -p "$d/random"
+  if ( cd "$main" && guard "$d/random" ) 2>/dev/null; then
+    echo "FAIL: allowed a non-worktree directory" >&2; exit 1; fi
+
+  # REFUSE: a path that does not exist.
+  if ( cd "$main" && guard "$d/nope" ) 2>/dev/null; then
+    echo "FAIL: allowed a nonexistent path" >&2; exit 1; fi
+
+  rm -rf "$d"
+  echo "selftest: ok"
+}
+
+case "${1:-}" in
+  guard) shift; guard "$@" ;;
+  selftest) selftest ;;
+  *) echo "usage: bd-worktree-guard guard <path> | selftest" >&2; exit 1 ;;
+esac

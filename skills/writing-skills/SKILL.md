@@ -44,8 +44,8 @@ Never put `version`, `license`, or prose in frontmatter.
 
 - A skill **adds**; it never disables or replaces what the project already has installed.
 - Read `.better-dev/overrides.md` first and honor any project override before applying a default.
-- Record durable rules and lessons through the memory contract (`scripts/bd-mem`), never by hand-writing
-  state files. See `writing-skills` companion `memory.md` once it exists.
+- Record durable rules and lessons through the memory contract (`.better-dev/bin/bd-mem`), never by
+  hand-writing state files.
 
 ## How this standard reaches skills
 

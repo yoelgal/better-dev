@@ -44,11 +44,15 @@ On `NO_PROGRESS` confirmed by stuck-check → **reset the feature worktree off `
 `.better-dev/ledger/<feature>/contract.md`**, escalate to human **only if the contract itself is wrong**.
 Reimplemented in our own words (LOOPS.md §V is personal-use — inspiration only).
 
-## D4 · Agent-agnostic dispatch verb
-`scripts/bd-dispatch <role> <brief-file>` — prefer the host's fresh-context subagent primitive (Claude Code
-Task, etc.); **fall back to a single-session role-switch with an explicit context reset** when none exists.
-Preserves planner / generator / evaluator separation on Codex / pi / hermes. We **advise** model-tiering in
-prose ("least-capable model that works"); we never **route** (no provider spine — see spec out-of-scope).
+## D4 · Agent-agnostic dispatch verb (owned by `orchestrating-agents`, D9)
+**Dispatch itself is prose**, run through the host's fresh-context subagent primitive (Claude Code `Task`
+for one worker, `Workflow` for fan-out/pipeline; equivalents elsewhere) — a bash script cannot spawn the
+host's agent. Fallback when none exists: a single-session role-switch with an explicit context reset.
+`.better-dev/bin/bd-dispatch` owns only the **file-handoff + ledger bookkeeping** around a dispatch —
+`dir | brief <role> | record <role> <state> [note] | pending` — so a run survives compaction and resumes
+finished work instead of re-dispatching it (it defers ledger resolution to `bd-mem ledger`). Preserves
+planner / generator / evaluator separation on Codex / pi / hermes. We **advise** model-tiering in prose
+("least-capable model that works"); we never **route** (no provider spine — see spec out-of-scope).
 
 ## D5 · Overrides layer = its own component
 `.better-dev/overrides.md` (managed block), **read first by every skill**. The confirm gate

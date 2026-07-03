@@ -1,22 +1,24 @@
 #!/usr/bin/env bash
-# bd-mem — better-dev memory contract: init / remember / learn / recall / persist-override / read.
+# bd-mem — better-dev memory contract: init / remember / learn / recall / persist-override / read / ledger.
 #
-# The four operations skills use are remember, recall, persist(-override) and read; `learn` and `init`
-# are helpers. The backend is swappable via BETTER_DEV_MEMORY:
+# The four operations skills use are remember, recall, persist(-override) and read; `learn`, `init`, and
+# `ledger` are helpers. The backend is swappable via BETTER_DEV_MEMORY:
 #   files          plain files under .better-dev/  (default, zero infra)
 #   cmd:<command>  delegate every call to: <command> <op> <args...>
 #   mcp:<server>   memory lives in an MCP server; skills call that tool directly (bd-mem just says so)
+#
+# .better-dev is resolved at the PRIMARY checkout so every git worktree shares one memory + one ledger
+# (a feature worktree is a separate working tree — a cwd-relative .better-dev there would be private and
+# `git clean`-able). This is the single place that resolution lives; other helpers defer to it.
 #
 # Reimplemented for better-dev from understanding; no source files copied.
 set -euo pipefail
 
 # Absolute path to self — selftest cd's into a temp dir.
 case "$0" in /*) SELF="$0" ;; *) SELF="$PWD/$0" ;; esac
-
-BD_DIR="${BETTER_DEV_DIR:-.better-dev}"
-BACKEND="${BETTER_DEV_MEMORY:-files}"
 die() { printf 'bd-mem: %s\n' "$*" >&2; exit 1; }
 
+BACKEND="${BETTER_DEV_MEMORY:-files}"
 case "$BACKEND" in
   files | "") ;;
   cmd:*) exec ${BACKEND#cmd:} "$@" ;;
@@ -24,18 +26,68 @@ case "$BACKEND" in
   *) die "unknown BETTER_DEV_MEMORY backend: $BACKEND" ;;
 esac
 
-RULES="$BD_DIR/rules.md"
-LEARN="$BD_DIR/learnings.jsonl"
-OVER="$BD_DIR/overrides.md"
+# Resolve .better-dev: an explicit BETTER_DEV_DIR wins; else the primary checkout's .better-dev
+# (git-common-dir points every worktree at the main .git — its parent is the primary root, pwd -P
+# canonicalized so a worktree and the primary resolve to the SAME path); else cwd when not in git.
+resolve_bd() {
+  if [ -n "${BETTER_DEV_DIR:-}" ]; then printf '%s' "$BETTER_DEV_DIR"; return; fi
+  local common
+  if common="$(git rev-parse --git-common-dir 2>/dev/null)"; then
+    case "$common" in /*) ;; *) common="$PWD/$common" ;; esac
+    printf '%s/.better-dev' "$(cd "$(dirname "$common")" && pwd -P)"
+  else
+    printf '.better-dev'
+  fi
+}
+BD_DIR="$(resolve_bd)"
+RULES="$BD_DIR/rules.md"; LEARN="$BD_DIR/learnings.jsonl"; OVER="$BD_DIR/overrides.md"
 
 # JSON-encode $1 as a quoted string (dependency-free; rules/lessons are single-line).
 jstr() { printf '"%s"' "$(printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g')"; }
+
+# Normalize a work-item name into a ledger slug: drop a branch prefix, lowercase, alnum + dash.
+slug() {
+  printf '%s' "$1" | sed -E 's#^(feat|feature|fix|hotfix|chore)/##; s/[^A-Za-z0-9-]/-/g; s/-+/-/g' \
+    | tr '[:upper:]' '[:lower:]' | sed -E 's/^-|-$//g'
+}
 
 ensure() {
   mkdir -p "$BD_DIR/ledger"
   [ -f "$RULES" ] || printf '# Project rules (promoted, human-readable)\n\n' >"$RULES"
   [ -f "$OVER" ]  || printf '<!-- BEGIN better-dev overrides -->\n<!-- END better-dev overrides -->\n' >"$OVER"
   : >>"$LEARN"
+}
+
+# --- ledger: the one durable per-work-item loop record, in the primary checkout ---------------------
+ledger_dir() { printf '%s/ledger/%s' "$BD_DIR" "$(slug "$1")"; }
+
+ledger() {
+  local sub="${1:-list}"; [ $# -gt 0 ] && shift || true
+  case "$sub" in
+    where) [ $# -ge 1 ] || die "ledger where <work-item>"; ledger_dir "$1"; echo ;;
+    dir)   [ $# -ge 1 ] || die "ledger dir <work-item>"; local d; d="$(ledger_dir "$1")"; mkdir -p "$d"; printf '%s\n' "$d" ;;
+    init)  # scaffold contract/progress/receipts (never clobber an existing contract from a front-end)
+      [ $# -ge 1 ] || die "ledger init <work-item>"
+      local d; d="$(ledger_dir "$1")"; mkdir -p "$d"
+      [ -f "$d/contract.md" ]  || printf '# Contract — %s\n\nDone-criteria (observable, graded not asserted — from /plan-grill or /diagnose):\n\n- [ ] \n\nPremise verified: \nRed-capable signal (already run once): \n' "$1" >"$d/contract.md"
+      [ -f "$d/progress.md" ]  || printf '# Progress — %s\n\nAppend-only recovery map: one settled step per line, then the terminal state.\nOn resume, trust this and `git log` over recollection.\n\n' "$1" >"$d/progress.md"
+      [ -f "$d/receipts.md" ]  || printf '# Receipts — %s\n\nPer-iteration detail: tried / result / learned / plan-delta.\n' "$1" >"$d/receipts.md"
+      printf '%s\n' "$d" ;;
+    resume) [ $# -ge 1 ] || die "ledger resume <work-item>"
+      local d; d="$(ledger_dir "$1")"; [ -d "$d" ] || die "no ledger for '$1' — run: bd-mem ledger init '$1'"
+      printf '=== contract ===\n'; cat "$d/contract.md" 2>/dev/null || true
+      printf '\n=== progress (tail) ===\n'; tail -n 20 "$d/progress.md" 2>/dev/null || true
+      printf '\n=== last receipt ===\n'; awk 'BEGIN{RS="\n## "} END{if(NR>1)printf "## %s",$0}' "$d/receipts.md" 2>/dev/null || true ;;
+    put)  { [ $# -ge 2 ]; } || die "ledger put <work-item> <name> [<file>|-]"
+      local d; d="$(ledger_dir "$1")"; mkdir -p "$d"
+      if [ $# -ge 3 ] && [ "$3" != - ]; then cp "$3" "$d/$2"; else cat >"$d/$2"; fi
+      printf '%s\n' "$d/$2" ;;
+    read) [ $# -ge 1 ] || die "ledger read <work-item> [name]"
+      local d; d="$(ledger_dir "$1")"
+      if [ $# -ge 2 ]; then cat "$d/$2"; else ls -1 "$d" 2>/dev/null || true; fi ;;
+    list) ls -1 "$BD_DIR/ledger" 2>/dev/null || true ;;
+    *) die "ledger where|dir|init|resume|put|read|list" ;;
+  esac
 }
 
 op="${1:-}"; [ $# -gt 0 ] && shift || true
@@ -56,6 +108,8 @@ case "$op" in
     ensure; [ $# -ge 1 ] || die "persist-override <line>"
     grep -qF -- "$1" "$OVER" || { t="$OVER.tmp"; awk -v l="- $1" '/<!-- END better-dev overrides -->/{print l} {print}' "$OVER" >"$t" && mv "$t" "$OVER"; }
     echo "override persisted" ;;
+  ledger)
+    ensure; ledger "$@" ;;
   read)
     ensure; case "${1:-rules}" in
       rules) cat "$RULES" ;;
@@ -64,9 +118,12 @@ case "$op" in
       ledger) ls -1 "$BD_DIR/ledger" 2>/dev/null || true ;;
       *) die "read rules|overrides|learnings|ledger" ;;
     esac ;;
+  where) # print the resolved .better-dev (debugging / other helpers)
+    printf '%s\n' "$BD_DIR" ;;
   selftest)
     d="$(mktemp -d)"
     ( cd "$d"
+      # --- files backend, no git: cwd-relative .better-dev ---
       "$SELF" init >/dev/null
       "$SELF" remember "run typecheck before every PR" >/dev/null
       "$SELF" remember "run typecheck before every PR" >/dev/null   # must dedup
@@ -78,6 +135,25 @@ case "$op" in
       grep -q webhook .better-dev/learnings.jsonl             || { echo "FAIL: learn"; exit 1; }
     ) && r=0 || r=1
     rm -rf "$d"
-    [ $r = 0 ] && echo "selftest OK" || die "selftest FAILED" ;;
-  *) die "usage: bd-mem init|remember|learn|recall|persist-override|read|selftest" ;;
+    [ $r = 0 ] || die "selftest FAILED"
+    # --- git worktree: memory + ledger resolve to the PRIMARY checkout from a linked worktree ---
+    g="$(mktemp -d)"
+    ( cd "$g"
+      git init -q primary && cd primary
+      git config user.email t@t && git config user.name t && git commit -q --allow-empty -m init
+      here="$(pwd -P)"
+      "$SELF" ledger init "feat/login-x" >/dev/null
+      [ -d "$here/.better-dev/ledger/login-x" ]               || { echo "FAIL: ledger init (slug strips feat/)"; exit 1; }
+      "$SELF" persist-override "primary override" >/dev/null
+      git worktree add -q ../wt -b feat/x >/dev/null
+      cd ../wt
+      [ "$("$SELF" ledger where login-x)" = "$here/.better-dev/ledger/login-x" ] || { echo "FAIL: worktree ledger not shared with primary"; exit 1; }
+      "$SELF" ledger put login-x contract.md - <<<'done: check green' >/dev/null   # write from the worktree
+      [ ! -d "$PWD/.better-dev" ]                             || { echo "FAIL: memory leaked into worktree"; exit 1; }
+      grep -q "check green" "$here/.better-dev/ledger/login-x/contract.md" || { echo "FAIL: worktree write didn't reach primary"; exit 1; }
+      grep -q "primary override" "$("$SELF" where)/overrides.md" || { echo "FAIL: worktree recall of primary overrides"; exit 1; }
+    ) && r=0 || r=1
+    rm -rf "$g"
+    [ $r = 0 ] && echo "selftest OK" || die "selftest FAILED (git/worktree)" ;;
+  *) die "usage: bd-mem init|remember|learn|recall|persist-override|ledger|read|where|selftest" ;;
 esac

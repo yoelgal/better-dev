@@ -1,0 +1,131 @@
+#!/usr/bin/env bash
+# orchestrating-agents-dispatch.sh — installs as .better-dev/bin/bd-dispatch.
+#
+# Prepare and RECORD subagent dispatches. It cannot spawn the host's agent — the
+# dispatch itself is prose the orchestrator runs through the host primitive
+# (Claude Code Task / Workflow, or an equivalent). This helper only owns the
+# file-handoff + ledger bookkeeping around a dispatch, so a run survives
+# compaction and resumes instead of re-dispatching finished work.
+#
+# The ledger is pinned to the PRIMARY checkout and shared across git worktrees:
+# a worker dispatched from a feature worktree records to the primary checkout's
+# .better-dev/ledger/<work-item>/, never the worktree's own copy (gitignored
+# ledger scratch inside a worktree is invisible elsewhere and `git clean` wipes
+# it). --git-common-dir points at the primary's .git even from a linked
+# worktree; its parent is the primary root.
+#
+#   bd-dispatch dir     <work-item>
+#   bd-dispatch brief   <work-item> <role>
+#   bd-dispatch record  <work-item> <role> <state> [note]
+#   bd-dispatch pending <work-item>
+#
+# <state> is a better-dev terminal state: DONE DONE_WITH_CONCERNS BLOCKED
+# NEEDS_INPUT EXHAUSTED NO_PROGRESS  (DONE / DONE_WITH_CONCERNS = finished).
+#
+# Reimplemented for better-dev from understanding; no source files copied.
+set -euo pipefail
+
+case "$0" in /*) SELF="$0" ;; *) SELF="$PWD/$0" ;; esac
+die() { printf 'bd-dispatch: %s\n' "$*" >&2; exit 1; }
+
+# The shared .better-dev/ledger (primary-checkout rooted, worktree-safe, slug-normalized) is resolved
+# in ONE place — bd-mem, our sibling. bd-dispatch owns only the dispatch bookkeeping on top of it.
+BD_MEM="$(dirname "$SELF")/bd-mem"
+
+ledger_dir() {
+  [ -n "${1:-}" ] || die "work-item required"
+  local d; d="$("$BD_MEM" ledger dir "$1")" || die "cannot resolve ledger for '$1'"
+  mkdir -p "$d/briefs" "$d/reports"
+  printf '%s\n' "$d"
+}
+
+is_finished() { [ "$1" = DONE ] || [ "$1" = DONE_WITH_CONCERNS ]; }
+
+op="${1:-}"; [ $# -gt 0 ] && shift || true
+case "$op" in
+  dir)
+    ledger_dir "${1:-}" ;;
+
+  brief) # write a self-contained brief skeleton for a role; print its path
+    wi="${1:-}"; role="${2:-}"; { [ -n "$wi" ] && [ -n "$role" ]; } || die "brief <work-item> <role>"
+    d="$(ledger_dir "$wi")"
+    n=1; while [ -e "$d/briefs/$role-$n.md" ]; do n=$((n + 1)); done
+    f="$d/briefs/$role-$n.md"
+    cat >"$f" <<EOF
+# Brief: $role ($wi #$n)
+
+<!-- One self-contained task. The worker starts with zero context: give absolute
+     paths, inline excerpts for anything it cannot re-derive from the repo, and
+     an explicit output spec. Do not paste session history or prior-task
+     summaries — a brief is one task, not the run's story so far. -->
+
+## Task
+<one bounded task>
+
+## Context (inline — the worker cannot see your session)
+- files / interfaces it touches:
+- excerpts it needs verbatim:
+- decisions from earlier work it cannot know:
+
+## Constraints (the reviewer's attention lens — copy binding values verbatim)
+- exact values / formats / "same as X" relationships:
+
+## Report
+Write the full report to: $d/reports/$role-$n.md
+Return only: terminal state (DONE|DONE_WITH_CONCERNS|BLOCKED|NEEDS_INPUT|EXHAUSTED|NO_PROGRESS),
+commits, a one-line verify summary, and concerns.
+EOF
+    printf '%s\n' "$f" ;;
+
+  record) # append a dispatch receipt to the shared ledger
+    wi="${1:-}"; role="${2:-}"; state="${3:-}"; note="${4:-}"
+    { [ -n "$wi" ] && [ -n "$role" ] && [ -n "$state" ]; } || die "record <work-item> <role> <state> [note]"
+    case "$state" in
+      DONE | DONE_WITH_CONCERNS | BLOCKED | NEEDS_INPUT | EXHAUSTED | NO_PROGRESS) ;;
+      *) die "state must be a better-dev terminal state, got: $state" ;;
+    esac
+    d="$(ledger_dir "$wi")"
+    printf '%s\t%s\t%s\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$role" "$state" "$note" >>"$d/dispatch-log.tsv"
+    echo recorded ;;
+
+  pending) # roles whose latest receipt is not a finished state (resume map)
+    wi="${1:-}"; [ -n "$wi" ] || die "pending <work-item>"
+    log="$(ledger_dir "$wi")/dispatch-log.tsv"
+    [ -s "$log" ] || exit 0
+    awk -F'\t' '{last[$2]=$3}
+      END{for (r in last) if (last[r]!="DONE" && last[r]!="DONE_WITH_CONCERNS") print r"\t"last[r]}' "$log" | sort ;;
+
+  selftest)
+    d="$(cd "$(mktemp -d)" && pwd -P)"; ok=1
+    (
+      set -e
+      cd "$d"
+      git init -q primary && cd primary
+      git config user.email t@t && git config user.name t
+      git commit -q --allow-empty -m init
+      L="$("$SELF" dir feat-x)"
+      [ "$L" = "$d/primary/.better-dev/ledger/feat-x" ] || { echo "FAIL dir: $L"; exit 1; }
+      B="$("$SELF" brief feat-x implementer)"
+      [ -f "$B" ] && grep -q "zero context" "$B"           || { echo "FAIL brief skeleton"; exit 1; }
+      grep -q "reports/implementer-1.md" "$B"              || { echo "FAIL brief report path"; exit 1; }
+      [ "$("$SELF" brief feat-x implementer)" = "$d/primary/.better-dev/ledger/feat-x/briefs/implementer-2.md" ] \
+                                                           || { echo "FAIL brief not indexed"; exit 1; }
+      "$SELF" record feat-x implementer BLOCKED "waiting on schema" >/dev/null
+      "$SELF" pending feat-x | grep -q "implementer.BLOCKED" || { echo "FAIL pending shows blocked"; exit 1; }
+      "$SELF" record feat-x implementer DONE "5/5 pass" >/dev/null
+      [ -z "$("$SELF" pending feat-x)" ]                   || { echo "FAIL pending not cleared on DONE"; exit 1; }
+      if "$SELF" record feat-x r BOGUS 2>/dev/null; then echo "FAIL bad state accepted"; exit 1; fi
+      # a linked worktree must resolve the SAME primary ledger, not its own
+      git worktree add -q ../wt -b feat/x
+      cd ../wt
+      [ "$("$SELF" dir feat-x)" = "$d/primary/.better-dev/ledger/feat-x" ] \
+                                                           || { echo "FAIL worktree ledger not shared"; exit 1; }
+      "$SELF" record feat-x reviewer DONE clean >/dev/null
+      grep -q reviewer "$d/primary/.better-dev/ledger/feat-x/dispatch-log.tsv" \
+                                                           || { echo "FAIL worktree receipt not in primary"; exit 1; }
+    ) || ok=0
+    rm -rf "$d"
+    [ $ok = 1 ] && echo "selftest OK" || die "selftest FAILED" ;;
+
+  *) die "usage: bd-dispatch dir|brief|record|pending|selftest <work-item> ..." ;;
+esac
