@@ -107,7 +107,9 @@ from the *idea*, not by paraphrasing their file. `NOTICE` credits **only** expre
 
 ## 10. Components → reimplement from (condensed; full detail in the harvest manifest, §14)
 
-All sources MIT unless noted; **reimplement, don't copy**. Coverage from the harvest: all buildable (2 full, rest partial, 0 from-scratch).
+All sources MIT unless noted. **opensrc the real files first (paths in `harvest.json`), understand them
+deeply, then reimplement** (§12) — capture the actual mechanism, don't approximate. Coverage: all buildable
+(2 full, rest partial, 0 from-scratch).
 
 | Component | Reimplement from (understanding) |
 |---|---|
@@ -143,12 +145,28 @@ mass-producing Phase 1+.
 
 ## 12. Build method
 
-Reimplement from understanding (§9) — never paraphrase a source file. **Verify every component** (valid
-SKILL.md frontmatter; scripts run + self-test; lint; dry-run). Phase-gated: foundations proven before
-consumers build on them. Use **subagents/workflows** for fan-out (one component per agent, worktree-isolated
-when writing files in parallel), then a verify/synthesis pass. Commit clean per component (Co-Authored-By
-trailer). Repo layout: `skills/<name>/SKILL.md`, `scripts/`, `hooks/`, `.claude-plugin/`, `.agents/`,
-`NOTICE README LICENSE install.sh`.
+**Read the REAL source first — do NOT underbuild.** Before reimplementing a component, the build agent
+**`opensrc` (or reads the local clone of) the exact files listed in `harvest.json` for that component**
+(each source's `repo:path`) and studies how the mechanism *actually* works — its real logic, edge cases,
+and the parts that make it good. `harvest.json`'s per-component `sources[]` (repo:path + what + adapt_notes
++ `copy_mode`) is the **reading list and the instruction**. This is not optional: "reimplement from
+understanding" means *understand the real code deeply, then rebuild it in our own structure* — never a thin
+approximation from the summary or from memory.
+
+- Respect each source's **`copy_mode`**: `verbatim` (trivially-small helpers — copy as-is, then attribute in
+  `NOTICE`), `adapt`, or `pattern-only` (reimplement the mechanism in our own voice).
+- **Study the richest sources hardest — especially `forge` / `devloop` (orrgal1):** the proof-chain
+  (goal→scenario→real test→passing run, "done means proven, not asserted"), `forge-ground` (premise verify),
+  `forge-status` (disk-state resume), `grind` (iterate-to-green), `stuck-check` (rabbit-hole detector). Take
+  these *properly* — they are the closest existing implementation of our core loop.
+- If a component ends up thinner than its source's real capability, that's a bug — re-read the source.
+
+**Verify every component** (valid SKILL.md frontmatter; scripts run + self-test; lint; dry-run). Phase-gated:
+foundations proven before consumers build on them. Use **subagents/workflows** for fan-out (one component per
+agent, worktree-isolated when writing files); **every build-agent prompt points it at `harvest.json` + the
+source repos + this PLAN and tells it to opensrc the real files before writing.** Then a verify/synthesis
+pass. Commit clean per component (Co-Authored-By trailer). Repo layout: `skills/<name>/SKILL.md`, `scripts/`,
+`hooks/`, `.claude-plugin/`, `.agents/`, `NOTICE README LICENSE install.sh`.
 
 ## 13. What still needs the human (can't do autonomously)
 
