@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+# bd-mem — better-dev memory contract: init / remember / learn / recall / persist-override / read.
+#
+# The four operations skills use are remember, recall, persist(-override) and read; `learn` and `init`
+# are helpers. The backend is swappable via BETTER_DEV_MEMORY:
+#   files          plain files under .better-dev/  (default, zero infra)
+#   cmd:<command>  delegate every call to: <command> <op> <args...>
+#   mcp:<server>   memory lives in an MCP server; skills call that tool directly (bd-mem just says so)
+#
+# Reimplemented for better-dev from understanding; no source files copied.
+set -euo pipefail
+
+# Absolute path to self — selftest cd's into a temp dir.
+case "$0" in /*) SELF="$0" ;; *) SELF="$PWD/$0" ;; esac
+
+BD_DIR="${BETTER_DEV_DIR:-.better-dev}"
+BACKEND="${BETTER_DEV_MEMORY:-files}"
+die() { printf 'bd-mem: %s\n' "$*" >&2; exit 1; }
+
+case "$BACKEND" in
+  files | "") ;;
+  cmd:*) exec ${BACKEND#cmd:} "$@" ;;
+  mcp:*) printf 'bd-mem: backend %s — call the MCP memory tool directly for "%s".\n' "$BACKEND" "${1:-}" >&2; exit 3 ;;
+  *) die "unknown BETTER_DEV_MEMORY backend: $BACKEND" ;;
+esac
+
+RULES="$BD_DIR/rules.md"
+LEARN="$BD_DIR/learnings.jsonl"
+OVER="$BD_DIR/overrides.md"
+
+# JSON-encode $1 as a quoted string (dependency-free; rules/lessons are single-line).
+jstr() { printf '"%s"' "$(printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g')"; }
+
+ensure() {
+  mkdir -p "$BD_DIR/ledger"
+  [ -f "$RULES" ] || printf '# Project rules (promoted, human-readable)\n\n' >"$RULES"
+  [ -f "$OVER" ]  || printf '<!-- BEGIN better-dev overrides -->\n<!-- END better-dev overrides -->\n' >"$OVER"
+  : >>"$LEARN"
+}
+
+op="${1:-}"; [ $# -gt 0 ] && shift || true
+case "$op" in
+  init)
+    ensure; printf 'initialized %s\n' "$BD_DIR" ;;
+  remember) # promote a durable rule (idempotent) and log it
+    ensure; [ $# -ge 1 ] || die "remember <rule>"
+    grep -qxF -- "- $1" "$RULES" || printf -- '- %s\n' "$1" >>"$RULES"
+    printf '{"kind":"rule","text":%s}\n' "$(jstr "$1")" >>"$LEARN"; echo remembered ;;
+  learn) # log a lesson with optional confidence (0..1)
+    ensure; [ $# -ge 1 ] || die "learn <lesson> [confidence]"
+    printf '{"kind":"lesson","text":%s,"confidence":%s}\n' "$(jstr "$1")" "${2:-1}" >>"$LEARN"; echo logged ;;
+  recall) # matching rules + lessons for a query
+    ensure; q="${1:-}"
+    { grep -i -- "$q" "$RULES" 2>/dev/null || true; grep -i -- "$q" "$LEARN" 2>/dev/null || true; } | sed '/^[[:space:]]*$/d' ;;
+  persist-override) # add a project override inside the managed block (idempotent)
+    ensure; [ $# -ge 1 ] || die "persist-override <line>"
+    grep -qF -- "$1" "$OVER" || { t="$OVER.tmp"; awk -v l="- $1" '/<!-- END better-dev overrides -->/{print l} {print}' "$OVER" >"$t" && mv "$t" "$OVER"; }
+    echo "override persisted" ;;
+  read)
+    ensure; case "${1:-rules}" in
+      rules) cat "$RULES" ;;
+      overrides) cat "$OVER" ;;
+      learnings) cat "$LEARN" ;;
+      ledger) ls -1 "$BD_DIR/ledger" 2>/dev/null || true ;;
+      *) die "read rules|overrides|learnings|ledger" ;;
+    esac ;;
+  selftest)
+    d="$(mktemp -d)"
+    ( cd "$d"
+      "$SELF" init >/dev/null
+      "$SELF" remember "run typecheck before every PR" >/dev/null
+      "$SELF" remember "run typecheck before every PR" >/dev/null   # must dedup
+      "$SELF" learn "checkout e2e flakes on a webhook race" 0.8 >/dev/null
+      "$SELF" persist-override "review fixes push to the PR, no new worktree" >/dev/null
+      [ -n "$("$SELF" recall typecheck)" ]                    || { echo "FAIL: recall"; exit 1; }
+      [ "$(grep -c typecheck .better-dev/rules.md)" = 1 ]     || { echo "FAIL: dedup"; exit 1; }
+      grep -q "no new worktree" .better-dev/overrides.md      || { echo "FAIL: override"; exit 1; }
+      grep -q webhook .better-dev/learnings.jsonl             || { echo "FAIL: learn"; exit 1; }
+    ) && r=0 || r=1
+    rm -rf "$d"
+    [ $r = 0 ] && echo "selftest OK" || die "selftest FAILED" ;;
+  *) die "usage: bd-mem init|remember|learn|recall|persist-override|read|selftest" ;;
+esac
