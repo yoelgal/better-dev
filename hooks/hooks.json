@@ -1,0 +1,33 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/bd-session-start\"",
+            "commandWindows": "if (Get-Command bash -ErrorAction SilentlyContinue) { bash \"$env:CLAUDE_PLUGIN_ROOT\\hooks\\bd-session-start\" }",
+            "async": false,
+            "timeout": 5,
+            "statusMessage": "Checking for better-dev practices..."
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/bd-subagent-start\"",
+            "commandWindows": "if (Get-Command bash -ErrorAction SilentlyContinue) { bash \"$env:CLAUDE_PLUGIN_ROOT\\hooks\\bd-subagent-start\" }",
+            "async": false,
+            "timeout": 5,
+            "statusMessage": "Checking for better-dev practices..."
+          }
+        ]
+      }
+    ]
+  }
+}

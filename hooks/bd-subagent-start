@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+# better-dev SubagentStart hook.
+#
+# SessionStart context reaches the parent thread only — a freshly dispatched
+# subagent never sees it. So when a worker is spawned inside a better-dev repo,
+# re-inject a SHORT note that the practices (and any project overrides) still
+# apply to its task. A no-op when better-dev is not installed.
+#
+# The load-bearing difference from SessionStart: for a subagent, Claude Code
+# drops raw stdout — the context is only picked up when wrapped in
+# hookSpecificOutput.{hookEventName,additionalContext}. (Pattern understood from
+# ponytail's runtime.js, MIT, DietrichGebert; reimplemented in bash, not copied.)
+#
+# This note is intentionally short and NOT the onboarding body: a focused worker
+# should do its briefed task, not re-run repo onboarding.
+
+set -euo pipefail
+
+case "$0" in /*) SELF="$0" ;; *) SELF="$PWD/$0" ;; esac
+
+find_bd_root() {
+  local d="$PWD"
+  while [ "$d" != "/" ] && [ -n "$d" ]; do
+    [ -d "$d/.better-dev" ] && { printf '%s' "$d"; return 0; }
+    d="$(dirname "$d")"
+  done
+  [ -d "/.better-dev" ] && { printf '/'; return 0; }
+  return 1
+}
+
+escape_for_json() {
+  local s="$1"
+  s="${s//\\/\\\\}"
+  s="${s//\"/\\\"}"
+  s="${s//$'\n'/\\n}"
+  s="${s//$'\r'/\\r}"
+  s="${s//$'\t'/\\t}"
+  printf '%s' "$s"
+}
+
+emit() {
+  local root="$1" note context escaped
+  note=""
+  [ -s "$root/.better-dev/overrides.md" ] && note=" Honor .better-dev/overrides.md before any built-in default."
+  context="You're a worker dispatched in a better-dev repo. The project's practices still apply to your task — see /orchestrating-agents for how dispatch and file handoffs work.${note} Do the specific task you were briefed with; no need to re-run onboarding."
+  escaped=$(escape_for_json "$context")
+
+  # Codex reads a nested hookSpecificOutput too, but also surfaces a top-level
+  # systemMessage. Everything else (Claude Code included) needs the nested shape.
+  if [ -n "${PLUGIN_DATA:-}" ] && [ -z "${COPILOT_PLUGIN_DATA:-}" ]; then
+    printf '{ "systemMessage": "better-dev active", "hookSpecificOutput": { "hookEventName": "SubagentStart", "additionalContext": "%s" } }\n' "$escaped"
+  else
+    printf '{ "hookSpecificOutput": { "hookEventName": "SubagentStart", "additionalContext": "%s" } }\n' "$escaped"
+  fi
+}
+
+if [ "${1:-}" = "selftest" ]; then
+  fail() { echo "selftest FAIL: $1" >&2; exit 1; }
+  tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
+
+  out="$(cd "$tmp" && "$SELF" 2>/dev/null)" || fail "errored when not installed"
+  [ -z "$out" ] || fail "emitted output when not installed"
+
+  mkdir -p "$tmp/proj/.better-dev"
+  out="$(cd "$tmp/proj" && "$SELF")" || fail "errored when installed"
+  printf '%s' "$out" | jq -e '.hookSpecificOutput.additionalContext' >/dev/null || fail "missing SubagentStart shape"
+  printf '%s' "$out" | jq -e '.hookSpecificOutput.hookEventName == "SubagentStart"' >/dev/null || fail "wrong hookEventName"
+  printf '%s' "$out" | grep -q "orchestrating-agents" || fail "missing dispatch pointer"
+
+  out="$(cd "$tmp/proj" && PLUGIN_DATA=x "$SELF")"; printf '%s' "$out" | jq -e '.systemMessage' >/dev/null || fail "Codex systemMessage missing"
+
+  echo "bd-subagent-start selftest: ok"
+  exit 0
+fi
+
+bd_root="$(find_bd_root)" || exit 0
+emit "$bd_root"
+exit 0

@@ -1,0 +1,103 @@
+#!/usr/bin/env bash
+# better-dev SessionStart hook.
+#
+# When a session starts inside a repo that has better-dev installed (a
+# `.better-dev/` scaffold), emit a short awareness note so the agent knows the
+# practices are here and where the project's overrides live. When better-dev is
+# not installed, this is a no-op — it never errors and never blocks the session.
+#
+# Reimplemented for better-dev from understanding of superpowers' session-start
+# (MIT, Jesse Vincent): the single-pass JSON escape, the three-way platform
+# branch, and printf-not-heredoc (bash 5.3+ heredoc hang, superpowers #571).
+# No source file was copied.
+
+set -euo pipefail
+
+case "$0" in /*) SELF="$0" ;; *) SELF="$PWD/$0" ;; esac
+
+# --- locate a better-dev repo by walking up from the working directory --------
+# We deliberately do NOT read stdin (a hook that blocks on stdin can freeze the
+# session); the current directory is enough to tell whether better-dev is here.
+find_bd_root() {
+  local d="$PWD"
+  while [ "$d" != "/" ] && [ -n "$d" ]; do
+    [ -d "$d/.better-dev" ] && { printf '%s' "$d"; return 0; }
+    d="$(dirname "$d")"
+  done
+  [ -d "/.better-dev" ] && { printf '/'; return 0; }
+  return 1
+}
+
+# Single C-level pass per substitution — fast, and safe for embedding in JSON.
+escape_for_json() {
+  local s="$1"
+  s="${s//\\/\\\\}"
+  s="${s//\"/\\\"}"
+  s="${s//$'\n'/\\n}"
+  s="${s//$'\r'/\\r}"
+  s="${s//$'\t'/\\t}"
+  printf '%s' "$s"
+}
+
+emit() {
+  local root="$1" note context escaped
+  # Point at the overrides layer only when the project actually has one, so the
+  # note never sends the agent to an empty file.
+  note=""
+  if [ -s "$root/.better-dev/overrides.md" ]; then
+    note=" This project records overrides in .better-dev/overrides.md that take precedence over any built-in default — read them before applying one."
+  fi
+  context="better-dev practices are installed in this repo. The project's conventions and the list of available skills (onboard, plan-grill, diagnose, autonomous-loop, review, orchestrating-agents, worktree-branching, and more) live in a managed better-dev block in this project's CLAUDE.md or AGENTS.md; each skill self-describes through its description.${note}"
+  escaped=$(escape_for_json "$context")
+
+  # Emit only the field the current host reads. Cursor wants snake_case
+  # additional_context; Claude Code wants nested hookSpecificOutput; Copilot and
+  # other SDK hosts want a top-level additionalContext. Claude Code reads several
+  # of these without de-duping, so we branch instead of emitting all of them.
+  if [ -n "${CURSOR_PLUGIN_ROOT:-}" ]; then
+    printf '{ "additional_context": "%s" }\n' "$escaped"
+  elif [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] && [ -z "${COPILOT_CLI:-}" ]; then
+    printf '{ "hookSpecificOutput": { "hookEventName": "SessionStart", "additionalContext": "%s" } }\n' "$escaped"
+  else
+    printf '{ "additionalContext": "%s" }\n' "$escaped"
+  fi
+}
+
+# --- selftest: run in a temp repo, assert install-aware + valid JSON ----------
+if [ "${1:-}" = "selftest" ]; then
+  fail() { echo "selftest FAIL: $1" >&2; exit 1; }
+  tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
+
+  # No .better-dev anywhere -> no-op (empty output, exit 0).
+  out="$(cd "$tmp" && CLAUDE_PLUGIN_ROOT=x "$SELF" 2>/dev/null)" || fail "errored when not installed"
+  [ -z "$out" ] || fail "emitted output when better-dev not installed"
+
+  # Installed, no overrides -> valid JSON, mentions the skills, omits overrides.
+  mkdir -p "$tmp/proj/.better-dev"
+  out="$(cd "$tmp/proj" && CLAUDE_PLUGIN_ROOT=x "$SELF")" || fail "errored when installed"
+  printf '%s' "$out" | jq -e . >/dev/null || fail "installed output is not valid JSON"
+  printf '%s' "$out" | grep -q "better-dev practices are installed" || fail "missing awareness note"
+  printf '%s' "$out" | grep -q "overrides.md" && fail "mentioned overrides with none present"
+
+  # Detection walks up from a nested subdir.
+  mkdir -p "$tmp/proj/src/deep"
+  out="$(cd "$tmp/proj/src/deep" && CLAUDE_PLUGIN_ROOT=x "$SELF")" || fail "errored in subdir"
+  printf '%s' "$out" | jq -e . >/dev/null || fail "subdir output not valid JSON"
+
+  # Overrides present -> the note points at them, still valid JSON.
+  printf 'use tabs\n' > "$tmp/proj/.better-dev/overrides.md"
+  out="$(cd "$tmp/proj" && CLAUDE_PLUGIN_ROOT=x "$SELF")" || fail "errored with overrides"
+  printf '%s' "$out" | jq -e . >/dev/null || fail "overrides output not valid JSON"
+  printf '%s' "$out" | grep -q "overrides.md" || fail "did not point at overrides"
+
+  # Cursor / Copilot field selection.
+  out="$(cd "$tmp/proj" && CURSOR_PLUGIN_ROOT=x "$SELF")"; printf '%s' "$out" | jq -e '.additional_context' >/dev/null || fail "Cursor field missing"
+  out="$(cd "$tmp/proj" && COPILOT_CLI=1 "$SELF")"; printf '%s' "$out" | jq -e '.additionalContext' >/dev/null || fail "Copilot field missing"
+
+  echo "bd-session-start selftest: ok"
+  exit 0
+fi
+
+bd_root="$(find_bd_root)" || exit 0
+emit "$bd_root"
+exit 0
