@@ -77,24 +77,25 @@ owns the two steps that have to be machine-enforced rather than trusted to prose
 3. **Classify the scope — local or global.** Decide where the proven skill belongs before you commit it. A
    skill that only makes sense *here* — it names this repo's tools, paths, domain, or conventions — is
    **local**: it belongs to this repo alone and shouldn't surface in your other repos. A general,
-   repo-agnostic practice is a candidate for **global**, the shared tool every repo sees. When the answer is
-   clear, take it. When you're unsure, ask the user the one question that settles it: just this repo, or all
-   your repos? If it's still unclear, default to local — local is reversible (easy to promote later), while a
-   global skill clutters every repo and is painful to claw back. Global is the bigger commitment: gate it
-   behind an explicit confirmation and route it through the tool's publish path — the better-dev repo and
-   `/packaging`'s release gate — never a silent write into the machine's global skills dir.
+   repo-agnostic practice you'd want everywhere is a candidate for **global** — your own global host skills
+   dir (`~/.claude/skills/<name>` on Claude), so every repo you work in sees it. Global is still *your* skill:
+   it sits alongside the installed better-dev tool in that directory, never inside it, so a tool update never
+   touches it — and it is not packaged into better-dev or pushed upstream. It just travels with you across
+   your repos. When the answer is clear, take it. Unsure? Ask the one question that settles it — just this
+   repo, or all your repos? — and if it's still unclear, default to **local**: local is reversible (promote it
+   to global later in one move), while a global skill you didn't need surfaces in every repo and is more
+   annoying to walk back. Global is the bigger step, so gate it behind an explicit confirmation.
 4. **Approve.** An installed skill runs with full agent permissions, so land it only behind an explicit yes.
    Present it plainly — what it captures, whether it's local or global and where that lands, the one thing
    that could go wrong — and ask. In an autonomous run there's no human at the keyboard, so this stop is a
    `NEEDS_INPUT` state (the vocabulary is `/autonomous-loop`'s), not a failure; promotion resumes when
    approval comes.
-5. **Land or discard.** On a yes for a local skill, `bd-skill-stage commit <dir> local` atomically moves it
-   into the repo's own project skills dir — `.claude/skills/<name>` on Claude — where it's discovered only in
-   this repo, refusing to clobber an existing skill, follow a symlink, or land outside that root. The folder
-   is taken from the frontmatter `name`, so name and folder always match. For a global skill,
-   `bd-skill-stage commit <dir> global <path-to-the-better-dev-skills-tree>` stages it into the tool's own
-   skills tree, where `/packaging`'s `bd-package-check` gates it and git publishes it — a deliberate step
-   this flow sets up but doesn't complete on its own. On a no, or after the retries are spent,
+5. **Land or discard.** On a yes, `bd-skill-stage commit <dir> local` atomically moves a local skill into
+   this repo's project skills dir (`.claude/skills/<name>`, discovered only here), and
+   `bd-skill-stage commit <dir> global` moves a global one into your host's own global skills dir
+   (`~/.claude/skills/<name>`, seen across your repos) — either way refusing to clobber an existing skill,
+   follow a symlink, or land outside the target root. The folder is taken from the frontmatter `name`, so
+   name and folder always match. On a no, or after the retries are spent,
    `bd-skill-stage discard <dir>` clears the staging dir.
 
 ## 5. Verify and record
@@ -105,5 +106,6 @@ commit; the caller deserves to see it.
 
 Record what the run taught through the memory contract: `.better-dev/bin/bd-mem learn "<lesson>"` for a
 durable technique, and `bd-mem remember "authored <skill> for <capability>"` so the next time that gap
-surfaces the choice is reused instead of re-created. A skill proven this way can later be published back for
-others to source — the same loop, run in reverse.
+surfaces the choice is reused instead of re-created. Separately and optionally, a skill that proves broadly
+useful can be shared to the wider ecosystem for others to source (`/tool-sourcing` in reverse) — a distinct,
+deliberate choice, never automatic and unrelated to the local/global scoping above.

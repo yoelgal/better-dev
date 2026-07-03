@@ -32,8 +32,10 @@ model — dropped):
   never hard-code `${CLAUDE_PLUGIN_ROOT}`).
 - **Repo-authored skills (from `/self-extension`) are repo-scoped** — committed to the repo's own project
   skills dir (`.claude/skills/<name>` on Claude), discovered only there, never added to the global tool.
-  `/self-extension` classifies scope: project-specific → **local** (default when unsure); broadly-reusable →
-  **global** (explicit confirm + the publish path); genuinely unsure → **ask**. This is what makes a global tool
+  `/self-extension` classifies scope: project-specific → **local** (`.claude/skills/<name>`, this repo only;
+  default when unsure); broadly-reusable → **global** = the user's OWN `~/.claude/skills/<name>`, seen across
+  their repos — still their skill, sitting alongside the installed tool but never inside it (a tool `git pull`
+  never touches it), and NOT packaged into better-dev or pushed upstream; genuinely unsure → **ask**. This is what makes a global tool
   safe: a repo-specific skill never clutters other repos.
 - **One-paste bootstrap** (`BOOTSTRAP.md` + a README block) is the front door: detect host → global-install →
   `/onboard` wires the repo's data + the `bin` symlink + the discovery block.
