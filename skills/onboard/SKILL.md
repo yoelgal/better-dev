@@ -177,8 +177,10 @@ and the block reads correctly in the entry file.
 
 Recap what changed, then list any phase the operator skipped or deferred (tool not yet installed
 globally, no integration branch, a memory backend left on files, an unmapped test command) so they can
-come back with `/onboard <phase>`. Record a durable rule for anything worth remembering next session
-(`.better-dev/bin/bd-mem remember "<rule>"`).
+come back with `/onboard <phase>`. When this was a greenfield or brand-new project, point to
+`/groundwork` as the next step — it takes the idea to a shared foundation and a set of parallelizable
+work-items before any single feature is grilled. Record a durable rule for anything worth remembering
+next session (`.better-dev/bin/bd-mem remember "<rule>"`).
 
 ## Composability
 
