@@ -1,7 +1,6 @@
 ---
 name: writing-skills
-description: Use when authoring, reviewing, or refactoring a better-dev skill (any SKILL.md), or when unsure how to structure a skill's frontmatter, description, or progressive disclosure.
-disable-model-invocation: true
+description: Use when authoring, reviewing, or refactoring any better-dev skill — writing or editing a SKILL.md, including when the self-extension flow generates a new one.
 ---
 
 # Writing better-dev skills
@@ -21,8 +20,10 @@ Required — two keys, nothing else load-bearing:
 Optional — add only when a skill actually needs it:
 
 - `disable-model-invocation: true` — makes the skill **user-invoked** (`/name` only), with zero standing
-  context cost. Use it for reference disciplines and for destructive or expensive actions. Omit it to let
-  the agent auto-fire the skill from its description.
+  context cost. Use it *only* when a skill should fire at a human's deliberate command: destructive or
+  expensive actions, or a reference a person pulls up by hand. Do **not** use it for disciplines the
+  *agent* must apply on its own — like this authoring standard, which the self-extension flow needs when it
+  writes a skill. Those stay **model-invoked** so the agent can reach them. Omit the key to auto-fire.
 - `argument-hint` — e.g. `[feature-slug]`, shown at the `/name` prompt.
 - `allowed-tools` — narrow the tools the skill may reach for.
 
