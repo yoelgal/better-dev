@@ -47,6 +47,15 @@ Never put `version`, `license`, or prose in frontmatter.
 - Record durable rules and lessons through the memory contract (`scripts/bd-mem`), never by hand-writing
   state files. See `writing-skills` companion `memory.md` once it exists.
 
+## How this standard reaches skills
+
+better-dev writes a new skill only as a **fallback**: on a capability gap it first tries to *source* an
+existing skill with `find-skills`, and only when nothing adequate turns up does the hermes **self-extension
+flow** (`/learn`) draft one — read state, draft a `SKILL.md` in a staged dir, test it, then promote. No engine. That flow —
+and the `review` skill — **apply this standard by referencing this file**, never by inlining a copy of its
+rules (one source of truth). This skill is model-invoked only so the agent *also* reaches it when it edits
+or refactors a skill outside that flow.
+
 ## Completion criterion
 
 A skill is done when: an agent can decide whether to run it from the `description` alone; the body does

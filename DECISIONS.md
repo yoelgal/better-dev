@@ -69,6 +69,13 @@ New component **`diagnose`** (fix front-end), Phase 1 beside `plan-grill`. Harve
 (red-first, minimise-repro, falsifiable hypotheses), `devloop` `/root-cause` `/hypothesize` `/trace` `/pepper`,
 `forge:forge-ground` (bug-premise verify), `loop-library` production-error-sweep / ticket-to-PR-ready.
 
+## D8 · Source before create (self-extension is the fallback)
+On a capability gap the agent **first sources an existing skill** via `find-skills` (`npx skills find` →
+`add`); it **only writes a new skill** (hermes `/learn` self-extension) when nothing adequate exists.
+Create is the last resort — prefer proven, installed skills over fresh ones (ponytail: don't reinvent what
+the ecosystem already has). A freshly-created skill passes test-before-promote first; once proven it can
+later be published back. So `tool-sourcing` and `self-extension` are **one ordered flow**, not two.
+
 ## Build order (phase-gated, verify each)
 0. authoring-standard → memory-contract (D2) → onboard  ← **foundations, built first**
    ↳ then a tracer-bullet slice: onboard → one loop → PR-into-staging, run in a throwaway repo
