@@ -2,8 +2,8 @@
 
 The Standards channel carries the repo's own conventions first. On top of them — and even when the repo
 documents nothing — it also carries this fixed baseline, so the axis always has something to judge against.
-The set is the classic Fowler refactoring smells (Martin Fowler, _Refactoring_, ch. 3); the readings below
-are our own.
+The set is the classic Fowler refactoring smells (Martin Fowler, _Refactoring_, ch. 3), plus comment slop
+— a modern addition of our own for the AI-slop era; the readings below are our own.
 
 Two rules bind the whole baseline:
 
@@ -38,3 +38,7 @@ Match each against the diff. The reading is *the signal* → *the move*.
   real target directly.
 - **Refused Bequest** — a subclass or implementer that ignores most of what it inherits. → Drop the
   inheritance; use composition instead.
+- **Comment slop** — a comment that restates what the code already says, narrates the obvious, or reads as
+  auto-generated scaffolding. → Delete it. Keep only the comment carrying what the code can't — a
+  non-obvious *why*, a gotcha, an invariant — and hold each survivor to one line. (Not a Fowler smell;
+  ours.)

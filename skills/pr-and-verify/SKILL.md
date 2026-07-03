@@ -43,9 +43,12 @@ gh pr view --json number 2>/dev/null || gh pr create --base <integration> --fill
 ```
 
 The **brief** is a tight what/why — one to three present-tense sentences leading with the change and its
-purpose, plus a `⚠️` line for each concern carried in from a `DONE_WITH_CONCERNS` settle. Compose it
-from the contract and the diff, never from the loop's session history, and splice it into a bounded
-region so re-running never clobbers the rest of the body and an unchanged brief writes nothing:
+purpose, plus a `⚠️` line for each concern carried in from a `DONE_WITH_CONCERNS` settle. Shape it in
+causal reading order — the entry point, then the core change, then the ripple it forces — so a reviewer
+reads *why this, then what it touches* rather than a file-ordered dump. That reading-ordered walkthrough is
+`/review`'s to construct; compose the brief from the walkthrough it produces, grounded in the contract and
+the diff, never from the loop's session history. Splice it into a bounded region so re-running never
+clobbers the rest of the body and an unchanged brief writes nothing:
 
 ```
 gh pr view --json body -q .body > /tmp/pr-body
@@ -90,8 +93,11 @@ edit, so the change moves toward the criteria instead of moving the goalposts). 
 pushes; CI re-runs; this skill re-reads the signal. That keeps the generate-and-verify separation intact:
 the thing that writes the fix is never the thing that grades it green.
 
-Two failures are not fix passes. A base that will not merge cleanly (a genuine rebase conflict) is a
-`BLOCKED` external block — surface it, let it be resolved, resume. A fix that could only pass by touching
+Two failures are not fix passes. When the only blocker is one external condition the fix loop cannot touch
+— a base PR not yet green, an infra incident, a dependency PR that has to land first — do not dead-end on a
+human: arm the bounded wait-for gate (`watch.md`) over that one condition and resume the instant it clears.
+A base that will not merge cleanly (a genuine rebase conflict) is different — nothing clears it by waiting,
+so it stays a `BLOCKED` external block for whoever owns the branch. A fix that could only pass by touching
 a protected path is a contract question, not a code question — it settles `NEEDS_INPUT` for the contract
 owner. And a signal that repeats with no new learning across passes is `NO_PROGRESS`, not budget to keep
 burning — the loop's stuck-check owns that call.
@@ -116,8 +122,10 @@ budget is ever a successful one:
   integration branch. Merge it (honoring branch protection and any override that gates merging to a
   release step), or hand a green mergeable PR to that step.
 - **`DONE_WITH_CONCERNS`** — the same, with non-blocking flags named in the PR body.
-- **`BLOCKED`** — an external block: a red base, infra, a dependency, a genuine rebase conflict. Surface
-  it and hold.
+- **`BLOCKED`** — an external block. When it is a single waitable condition (a base going green, an infra
+  incident clearing, a dependency landing), the bounded wait-for gate (`watch.md`) watches it and resumes
+  the moment it clears; a genuine halt that no waiting resolves — a real rebase conflict, a contract or
+  architectural dead-end — surfaces and holds.
 - **`NEEDS_INPUT`** — a done-criterion can't be run from here, a fix would need a protected surface, or a
   gate needs a human. Ask the one question.
 - **`EXHAUSTED`** — an operator-set budget was reached without converging. Report honestly; never dress

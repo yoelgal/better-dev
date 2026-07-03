@@ -88,6 +88,15 @@ separate fresh workers; a worker's "done" is a claim, not proof.
 - Verify at or above the tier that did the work, never below it. An undetected bad result poisons every
   downstream stage.
 
+For a claim no runnable check can settle — a concept fully removed, no caller left depending on the old
+behavior, an invariant that lives in prose — reach for **adversarial refutation**. Dispatch an
+independent worker whose one job is to *refute* the claim: hunt the surviving reference, the caller that
+still breaks, the symbol renamed-not-deleted, the case the summary glossed. Instruct it to default to
+"refuted" whenever it's uncertain, so the burden sits on the claim rather than on the doubt. The claim
+holds only if that refutation fails to land, with cited counter-evidence when it does. A single
+self-graded read is never proof — this is the strongest move against a worker (or you) believing its own
+report. `/review` runs this as its refuter channel.
+
 ## Right-size the worker
 
 Give each subtask to the least-capable worker you're confident will one-shot it; unsure between two, take

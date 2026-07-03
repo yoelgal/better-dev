@@ -47,6 +47,17 @@ Hand the reviewer three files — the same brief, the report file, and the diff 
 constraints block. The diff never enters your own context; the reviewer reads the commit list, the stat
 summary, and the full diff with context in one read.
 
+## Seed one risk map before fanning out review channels
+
+When a review fans out — several channels, or several lenses over one diff — each worker otherwise
+spends its opening turns rediscovering the same thing: where this change is likeliest wrong. Do that work
+once, before you dispatch. From the diff itself — the touched paths, the +A/-D shape, the stack position —
+derive 3-5 concrete hot-spots, each anchored to a real path or area, not a category. "The retry loop in
+`client.go` — off-by-one on the final attempt" earns its place; "concurrency" doesn't. Seed that one
+shared map into every channel's brief. Channels still hunt freely past it; the map just spares each of
+them the same discovery cost and keeps a risky spot from slipping through the gap between two channels'
+assumed scope.
+
 ## When the reviewer can't verify something from the diff
 
 A reviewer may flag requirements it can't confirm from the diff alone — things that live in unchanged

@@ -21,7 +21,8 @@ The flow is four steps behind one closing gate. Work from the feature worktree
 A feature is built on assumptions — "X doesn't exist yet", "the flow works like Y and we'll extend
 it". Grilling a false premise wastes the whole loop, so verify the premise at `file:line` first, in
 one bounded observation pass. Locate the code path in the touched area, read what it does *today*,
-and look for anything that already provides the capability.
+and look for anything that already provides the capability — `/codebase-map` gives you the callers and
+dependents to answer that from the best structural map available.
 
 Land on a verdict backed by receipts (`file:line`, a command run and its output). If the baseline
 maps as assumed, proceed. If the capability **already exists**, or a core assumption is plainly
@@ -62,7 +63,10 @@ fake. Prefer an existing seam, use the highest one that observes the behavior, a
 low; check the seams with the user before locking them.
 
 Give the goal one clear shape (a capability, an end-state, an invariant, or a removal) so its proof
-is obvious. Keep file paths and code snippets out of the prose — they go stale — with one exception:
+is obvious, and keep the committed goal set small — a main goal plus at most two secondary end-states,
+three in all; when the grill surfaces a fourth, halt before code and split into focused work items so
+each stays reviewable. Right-size the criteria too: one per property the goal claims, dropping any whose
+removal would miss nothing. Keep file paths and code snippets out of the prose — they go stale — with one exception:
 inline a small prototype-derived type, schema, or state-machine when it pins a decision more
 precisely than words. For the full template (problem, goal shape, user stories, done-criteria,
 implementation decisions, out-of-scope) read `done-contract.md`.
@@ -70,7 +74,10 @@ implementation decisions, out-of-scope) read `done-contract.md`.
 ## Close the gate, then hand off
 
 Present the contract and wait for the user's confirmation before treating the plan as locked —
-nothing downstream should run on an un-agreed contract. If a question can't be settled and blocks
+nothing downstream should run on an un-agreed contract. On confirmation, pin the approval to the
+contract's content hash (via `.better-dev/bin/bd-mem`) so a later edit re-opens this gate rather than
+letting the loop advance on a stale sign-off — `done-contract.md` covers the pinning. If a question
+can't be settled and blocks
 the plan, that's a `NEEDS_INPUT` state, not a guess: record it and stop rather than inventing an
 answer.
 

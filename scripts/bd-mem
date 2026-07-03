@@ -61,6 +61,9 @@ ensure() {
 # --- ledger: the one durable per-work-item loop record, in the primary checkout ---------------------
 ledger_dir() { printf '%s/ledger/%s' "$BD_DIR" "$(slug "$1")"; }
 
+# Portable sha256 of a file's bytes — pins a contract approval to that exact text.
+hash_file() { if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1"; else shasum -a 256 "$1"; fi | awk '{print $1}'; }
+
 ledger() {
   local sub="${1:-list}"; [ $# -gt 0 ] && shift || true
   case "$sub" in
@@ -86,7 +89,18 @@ ledger() {
       local d; d="$(ledger_dir "$1")"
       if [ $# -ge 2 ]; then cat "$d/$2"; else ls -1 "$d" 2>/dev/null || true; fi ;;
     list) ls -1 "$BD_DIR/ledger" 2>/dev/null || true ;;
-    *) die "ledger where|dir|init|resume|put|read|list" ;;
+    approve) # pin approval to the current contract.md bytes
+      [ $# -ge 1 ] || die "ledger approve <work-item>"
+      local d; d="$(ledger_dir "$1")"; [ -f "$d/contract.md" ] || die "no contract.md to approve for '$1'"
+      hash_file "$d/contract.md" >"$d/.approved"; printf 'approved %s\n' "$(cat "$d/.approved")" ;;
+    check-approval) # exit 0 = contract unchanged since approval; non-zero = gate re-opened
+      [ $# -ge 1 ] || die "ledger check-approval <work-item>"
+      local d; d="$(ledger_dir "$1")"
+      [ -f "$d/.approved" ]   || { echo "not approved" >&2; exit 1; }
+      [ -f "$d/contract.md" ] || { echo "no contract.md" >&2; exit 1; }
+      [ "$(hash_file "$d/contract.md")" = "$(cat "$d/.approved")" ] && echo approved \
+        || { echo "contract edited since approval — gate re-opened" >&2; exit 1; } ;;
+    *) die "ledger where|dir|init|resume|put|read|list|approve|check-approval" ;;
   esac
 }
 
@@ -152,6 +166,10 @@ case "$op" in
       [ ! -d "$PWD/.better-dev" ]                             || { echo "FAIL: memory leaked into worktree"; exit 1; }
       grep -q "check green" "$here/.better-dev/ledger/login-x/contract.md" || { echo "FAIL: worktree write didn't reach primary"; exit 1; }
       grep -q "primary override" "$("$SELF" where)/overrides.md" || { echo "FAIL: worktree recall of primary overrides"; exit 1; }
+      "$SELF" ledger approve login-x >/dev/null
+      "$SELF" ledger check-approval login-x >/dev/null          || { echo "FAIL: approval invalid right after pin"; exit 1; }
+      printf 'sneaky edit\n' >>"$here/.better-dev/ledger/login-x/contract.md"
+      if "$SELF" ledger check-approval login-x >/dev/null 2>&1; then echo "FAIL: edit must re-open the approval gate"; exit 1; fi
     ) && r=0 || r=1
     rm -rf "$g"
     [ $r = 0 ] && echo "selftest OK" || die "selftest FAILED (git/worktree)" ;;

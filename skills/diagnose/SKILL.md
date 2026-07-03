@@ -41,6 +41,16 @@ move is a conversation, maybe closing the ticket, not a PR. Otherwise the deviat
 you continue. Receipts throughout — `file:line`, the command and its output — a verdict without
 receipts is just a guess.
 
+**The symptom-only gate** (a bright line, not a suggestion). A symptom names a deviation — "X is
+wrong / broken / slow" — but rarely states the *concrete correct behavior*. Never fill that gap by
+guessing the expected behavior from the symptom: a guessed expectation gets baked into the Phase 4
+red signal and regression test, so the loop then drives green against a made-up target and may
+happily "fix" a non-bug. When the claimed-expected is `not stated`, source it from the reporter, a
+spec, or an intent contract before you write the fix-contract — cite where it came from. If none can
+state it, halt with a `NEEDS_INPUT` stop that quotes the symptom and asks for the correct behavior (or
+a pointer to where it's specified); don't proceed on an invented one. This is the same discipline
+`/plan-grill` applies to feature baselines — a goal you can't state concretely isn't one you can prove.
+
 ## Phase 1 — Build a red-capable signal
 
 This is the skill; everything after it is mechanical. The loop cannot run without this, so spend
@@ -75,6 +85,15 @@ in Phase 3 and becomes the clean regression test in Phase 4.
 
 ## Phase 3 — Root-cause via falsifiable hypotheses
 
+**Recall first.** Before generating any hypotheses, distill the red signal into a **failure
+signature** — the stable fingerprint of *this* failure, not the run that happened to expose it: the
+error class and message shape, the top frames of the stack, the failing assertion, the symptom in one
+line. Ask `.better-dev/bin/bd-mem recall "<signature>"` for a prior diagnosis of the same shape. A
+confident match returns a known root cause and the fix that resolved it last time — apply it and
+re-run the Phase 1 signal to confirm it goes green here too, rather than re-deriving from scratch. A
+match that no longer holds (the signal stays red) isn't wasted: it rules out a candidate and tells you
+the shape recurred for a new reason. No match, or a stale one, drops you into fresh hypotheses below.
+
 Write **3–5 ranked hypotheses before testing any of them** — generating one at a time anchors on the
 first plausible idea. Each states a prediction that could falsify it: "if X is the cause, then changing
 Y makes the bug disappear (or changing Z makes it worse)." A hypothesis with no prediction is a vibe —
@@ -86,7 +105,8 @@ parallel fan-out for cross-service bugs, tagged trace probes and log peppering, 
 to disk, and building the evidence chain — read `instrument.md`.
 
 Fix the root cause, not the symptom. Before you settle on where the fix lands, grep every caller of the
-function you'd touch: one guard in the shared function all callers route through is a smaller, more
+function you'd touch — `/codebase-map` surfaces them from a structural map when one's installed, plain
+grep when it isn't: one guard in the shared function all callers route through is a smaller, more
 correct change than a guard in the single path the ticket named — which leaves every sibling caller
 broken.
 
@@ -114,8 +134,12 @@ the regression test, watches it fail, applies the fix, watches it pass, and re-r
 against the original scenario. The fix's done-contract is exactly *red signal goes green + regression
 test at a correct seam* — no new discipline for the loop to learn.
 
-Record any durable lesson worth carrying forward with `.better-dev/bin/bd-mem learn "<lesson>"` (for
-example, a repro technique that worked, or a recurring flake signature).
+When the diagnosis was fresh (recall found nothing), close the loop that Phase 3 opened: propose
+capturing the **failure signature → root cause + fix** through `.better-dev/bin/bd-mem learn` so the
+next occurrence of this shape hits the fast-path instead of re-deriving. Record the *durable* thing —
+the root cause and the fix that resolved it, plus any repro technique worth reusing — never the
+transient run that surfaced it (a one-off timeout, a flake seed, a machine-specific path). `bd-mem`
+proposes rather than writes; you're offering a candidate, not editing memory by hand.
 
 ## Composability
 

@@ -45,6 +45,14 @@ output are findings — test output should be pristine.
   body): requirements **missing** or only partly done; behaviour **added** that nobody asked for (scope
   creep); requirements built the **wrong way**. Quote the contract line for each finding. No contract
   available → say "no spec available" and stop; don't invent requirements.
+
+  A criterion the author calls proven by a test isn't proven until you read the test *body*. The triangle
+  is **criterion ↔ what the test sets out to do ↔ what it actually asserts**, and all three have to be the
+  same thing: the assertion must exercise the real symptom or behaviour the criterion names, not an
+  adjacent surface that happens to pass. A linked, green test that asserts something else — a logged line
+  in place of the call it claims to prove, a status code in place of the state change, the happy path when
+  the criterion is about the error — is a finding, not a pass. Name the criterion and the mismatched
+  assertion.
 - **Standards channel** — measure the diff against the repo's documented conventions plus the smell baseline
   you were handed (`standards-baseline.md`). Cite the standard (file + rule) for a documented breach; name
   the smell and quote the hunk for a baseline call. Distinguish hard violations from judgement calls — a
@@ -54,6 +62,27 @@ output are findings — test output should be pristine.
 Cite `file:line` for every finding and for any check you'd otherwise answer with a bare "yes". If a
 requirement can't be judged from this diff alone — it lives in unchanged code or spans changes — report it
 as a `⚠️ cannot verify from the diff` item and say what to check, rather than broadening your search.
+
+## Fingerprint what this diff touches
+
+On top of your axis, notice what *kind* of change this is — some surfaces carry sharp, recurring failure
+modes a general read slides past. Match the diff against this list, and where one fits, spend a focused
+check there — `/codebase-map` finds the callers and dependents of a changed or removed symbol, so a
+blast-radius check rests on who actually reaches it rather than a guess:
+
+- **Auth / authz** — a check moved, weakened, or bypassed; a new entry point that skips one.
+- **Migrations / schema** — irreversibility, a backfill on a large table, a column dropped while code
+  still reads it, a default that takes a lock.
+- **Concurrency** — shared mutable state, a lock taken in a new order, a check-then-act race, an `await`
+  that widens a window.
+- **Money / quantities** — rounding, a float where integer units belong, a sign flip, a unit mismatch.
+- **Wire format / serialization** — a field renamed or retyped on a contract others consume, a
+  backward-incompatible change to a stored or transmitted shape.
+- **Deletions** — a caller left pointing at what's gone, behaviour quietly dropped, a flag or config
+  removed that something still reads.
+
+This is a reflex, not a registry to work through. Where a surface fits, the check lands as a finding on
+your axis, or as a `⚠️` when you can't settle it from the diff. Where none fits, invent nothing.
 
 ## Severity
 

@@ -140,7 +140,7 @@ deeply, then reimplement** (§12) — capture the actual mechanism, don't approx
 - **Phase 2 — self-improvement: ✅** `tool-sourcing` (rides find-skills CLI) + `self-extension` (hermes /learn fallback, `bd-skill-stage` test-before-promote).
 - **Phase 3 — ship: ✅** `bootstrap-hooks`, `pr-and-verify`, `release-promotion`, `guardrails-install`, `overrides`, `browser-capability`, and `packaging` (`install.sh` vendored install + `.claude-plugin/plugin.json` + `bd-package-check` release gate).
 
-**Build complete.** 17 skills + 7 `bd-*` scripts + hooks; `bd-package-check` green; `install.sh` proven end-to-end on a throwaway repo. Remaining is human-only (see §13): publish to a marketplace/npm, real-remote branch protection, and live multi-harness in-agent runs.
+**Build complete + quality-upgraded.** 18 skills + 7 `bd-*` scripts + hooks; `bd-package-check` green; `install.sh` proven end-to-end. A forge+devloop audit (175 mechanisms; 59 already-covered, 15 skipped as plumbing) drove a quality pass — proof-realism (test-body-realizes-criterion), adversarial refutation for non-runnable claims, diff-fingerprint review scrutiny, red-triage (flake/infra/genuine), deslop-on-green, bounded wait-for, content-pinned contract approval (`bd-mem ledger approve`/`check-approval`) — plus `codebase-map` (sourced structural orientation, sibling to `browser-capability`). Remaining is human-only (see §13): publish, real-remote branch protection, live multi-harness runs.
 
 **Tracer-bullet gate (after Phase 0): ✅ PASSED** — ran `onboard` + one feature slice → staging on the
 papers.town clone, locally, no push. onboard adapted (didn't impose), wrote an idempotent non-clobbering
