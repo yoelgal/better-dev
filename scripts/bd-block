@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# bd-block — idempotently write a marker-bounded managed block into a file.
+#
+# Replaces the content between "<!-- BEGIN <name> -->" and "<!-- END <name> -->"
+# with the block body read from stdin, appending a fresh block if none exists.
+# Text outside the markers is never touched, and re-running with the same body
+# leaves the file byte-identical. Used to write the better-dev discovery block
+# into CLAUDE.md / AGENTS.md and to mirror overrides — anywhere a self-describing
+# block must update in place without clobbering the operator's own edits.
+#
+#   printf '...body...' | bd-block <file> [block-name]      # name defaults to better-dev
+#
+# Reimplemented for better-dev from understanding; no source files copied.
+set -euo pipefail
+
+case "$0" in /*) SELF="$0" ;; *) SELF="$PWD/$0" ;; esac
+usage() { echo "usage: <body-on-stdin> | bd-block <file> [block-name]  (or: bd-block selftest)" >&2; exit 1; }
+
+write_block() {
+  local file="$1" name="$2" begin end existed tb ta tmp
+  begin="<!-- BEGIN $name -->"; end="<!-- END $name -->"
+  local body; body="$(cat)"
+  [ -e "$file" ] || : >"$file"
+  if grep -qxF -- "$begin" "$file"; then existed=1; else existed=0; fi
+  tb="$(mktemp)"; ta="$(mktemp)"; tmp="$file.bd-block.tmp"
+  awk -v b="$begin" '$0==b{exit} {print}' "$file" >"$tb"   # everything before the block
+  awk -v e="$end" 'f{print} $0==e{f=1}' "$file" >"$ta"     # everything after the block
+  {
+    cat "$tb"
+    [ "$existed" = 0 ] && [ -s "$tb" ] && printf '\n'      # one separator only when first appending
+    printf '%s\n%s\n%s\n' "$begin" "$body" "$end"
+    cat "$ta"
+  } >"$tmp"
+  mv "$tmp" "$file"
+  rm -f "$tb" "$ta"
+}
+
+selftest() {
+  local d; d="$(mktemp -d)"
+  ( cd "$d"
+    printf '# Title\n\nkeep me\n' >f.md
+    printf 'line one\nline two\n' | "$SELF" f.md >/dev/null
+    grep -q "keep me" f.md                                  || { echo "FAIL: clobbered outside content"; exit 1; }
+    grep -qx "<!-- BEGIN better-dev -->" f.md               || { echo "FAIL: no begin marker"; exit 1; }
+    a="$(cat f.md)"
+    printf 'line one\nline two\n' | "$SELF" f.md >/dev/null
+    [ "$a" = "$(cat f.md)" ]                                || { echo "FAIL: not idempotent"; exit 1; }
+    printf 'fresh body\n' | "$SELF" f.md >/dev/null
+    grep -q "fresh body" f.md                               || { echo "FAIL: body not updated"; exit 1; }
+    ! grep -q "line two" f.md                               || { echo "FAIL: old body survived"; exit 1; }
+    [ "$(grep -c '<!-- BEGIN better-dev -->' f.md)" = 1 ]   || { echo "FAIL: duplicate block"; exit 1; }
+    grep -q "keep me" f.md                                  || { echo "FAIL: lost outside content on update"; exit 1; }
+  ) && r=0 || r=1
+  rm -rf "$d"
+  [ $r = 0 ] && echo "selftest OK" || { echo "selftest FAILED" >&2; exit 1; }
+}
+
+case "${1:-}" in
+  "") usage ;;
+  selftest) selftest ;;
+  *) file="$1"; write_block "$file" "${2:-better-dev}" ;;
+esac
