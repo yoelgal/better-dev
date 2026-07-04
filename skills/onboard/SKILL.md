@@ -87,9 +87,13 @@ recorded as an override rather than overwritten:
 - Repo uses `feat/* → staging → main`? Keep it. Record `feature branch prefix = feat/` and
   `integration branch = staging` via `.better-dev/bin/bd-mem persist-override "<line>"`. Don't force
   `feature/`.
-- No integration branch anywhere? Under quiet defaults, greenfield gets `main` + `staging` scaffolded;
-  an existing repo with real history is the case worth a quick confirm before creating `staging` off
-  the default branch (this is a choice that genuinely matters).
+- **Only `main`, no integration branch?** The common case — most fresh repos start `main`-only.
+  Suggest the integration + feature-branch mechanism: a `staging` branch off `main` that feature/fix
+  worktrees branch from and merge back into, promoted to `main` on release, with work on `feat/*`
+  (`fix/*`). Greenfield: scaffold it under quiet defaults. An existing repo with real history: confirm
+  once before creating `staging` off the default branch (a choice that genuinely matters). Either way,
+  record `integration branch = staging` and `feature branch prefix = feat/` via
+  `.better-dev/bin/bd-mem persist-override "<line>"`.
 - Installed skills stay installed. better-dev complements them.
 
 Present real decisions one at a time; skip the ones you can default.
