@@ -64,12 +64,17 @@ Everything you paste into a dispatch, and everything a worker prints back, stays
 and is re-read every turn. Move artifacts as files instead:
 
 - **Brief** — one task, written for a zero-context worker: absolute paths, inline excerpts for anything
-  it can't re-derive, an explicit output spec. Not your session history. `bd-dispatch brief <work-item>
-  <role>` writes a skeleton into the shared ledger and prints its path.
+  it can't re-derive, an explicit output spec, and — when the worker will write files — the repo's
+  high-consequence denylist with the standing instruction to escalate rather than edit those paths (settle
+  `NEEDS_INPUT`), so a fresh worker doesn't discover the rule only at review. Not your session history.
+  `bd-dispatch brief <work-item> <role>` writes a skeleton into the shared ledger and prints its path.
 - **Report** — the worker writes its full report to a file and returns only its terminal state, commits,
   a one-line verify summary, and concerns. Name the report file in the brief.
-- **Review inputs** — the reviewer gets the same brief, the report file, and a diff package, all as
-  files, never the diff pasted into the prompt.
+- **Review inputs** — the reviewer gets the same brief, the report file, a diff package, and the
+  work-item slug, all as files or plain values, never the diff pasted into the prompt. The slug resolves
+  the shared ledger, so the reviewer can read the work-item's `approvals.log`
+  (`.better-dev/bin/bd-mem ledger read <work-item> approvals.log`) and tell an approved blast-radius edit
+  from an unapproved one — hand over only the package and the reviewer can't confirm the gate at all.
 
 For the discipline of writing a clean brief and a clean reviewer prompt — and the anti-patterns that
 quietly bloat both — read `briefs-and-reviews.md`.

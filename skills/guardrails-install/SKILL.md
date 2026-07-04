@@ -1,6 +1,6 @@
 ---
 name: guardrails-install
-description: Use when a repo is missing basic commit-time or CI guardrails — no pre-commit hook, no lint/typecheck gate, or no CI workflow — and you want to add the minimum where it is absent. Invoked by /onboard while bootstrapping the minimum base, or run directly to install a pre-commit hook or a basic CI check without touching what the repo already has.
+description: Use when a repo needs its guardrails installed or recorded — a missing commit-time or CI gate (no pre-commit hook, no lint/typecheck gate, no CI workflow), or the autonomous loop's blast-radius policy (the high-consequence paths it should escalate rather than auto-edit, the change classes that gate a human, the scope threshold). Invoked by /onboard while bootstrapping the minimum base, or run directly to fill a guardrail gap or record the safety policy without touching what the repo already has.
 allowed-tools:
   - Bash
   - Read
@@ -13,9 +13,10 @@ allowed-tools:
 
 # Install a repo's minimum guardrails
 
-Give this repo the smallest set of automated checks that catch a broken commit before it lands —
-a pre-commit hook and a CI check — built out of the commands the repo *already* runs, not commands
-invented for it. One job: **fill the guardrail gaps, and leave everything already there alone.**
+Give this repo the smallest set of guardrails that keep its automated work honest — a pre-commit hook and
+a CI check that catch a broken commit before it lands, plus the **blast-radius policy** the autonomous loop
+reads before it acts — all built from what the repo *already* is, not rules invented for it. One job:
+**give this repo its guardrails, and leave everything already there alone.**
 
 `/onboard` calls this while setting up the minimum base; it also runs on its own when a repo needs
 guardrails wired after the fact.
@@ -60,6 +61,51 @@ Then read the repo's own definition of its checks — never assume them:
 An unmapped check (no lint script, no typecheck anywhere) is a **gap**: name it, and either offer to add
 the tooling or leave it out of the hook. Do not wire a hook to a command the repo does not have.
 
+## Detect the repo's high-consequence surface
+
+The guardrails above catch a broken commit. The autonomous loop needs a second map: **where this repo keeps
+what is costly to get wrong**, so it escalates instead of auto-editing there, and stops for a human on the
+change classes that warrant one. The canonical defaults below are the starting point; the same
+premise-not-fact discipline applies — locate each at `file:`level from the repo's real layout, and record a
+class as absent rather than guessing a home for it.
+
+**High-consequence path denylist** — a loop edit that would touch one of these settles `NEEDS_INPUT` with
+the evidence instead of writing:
+
+- **Secrets & credentials** — `.env*`, `**/secrets/**`, key/credential files (`*.pem`, `*.key`, `id_rsa*`,
+  service-account JSON). A pattern gate — it holds for a file not yet committed.
+- **DB migrations** — the repo's real migrations dir (`**/migrations/**`, or a framework form like
+  `prisma/migrations/`, `alembic/versions/`, `db/migrate/`, `supabase/migrations/`).
+- **Auth / authz code** — where sign-in, sessions, permissions, and access policy actually live.
+- **Payments / billing / PII** — payment, billing, checkout, subscription, or personal-data handling.
+- **Infrastructure & prod config** — `*.tf` / `*.tfvars`, `k8s/**/production/**`, and deploy config
+  (Dockerfile, compose, deploy workflows, `vercel.json`, and the like).
+- **Dependency manifests + lockfiles** — `package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`, `Cargo.lock`,
+  `go.sum`, `poetry.lock`, and their manifests — from the ones the repo actually has.
+
+**Human-gate change classes** — a change landing in one of these is a `NEEDS_INPUT` for a human even on a
+green, clean check: security/auth, payments/PII/money, infra/Terraform/prod config, and dependency/version
+bumps. Record which have a real surface here; a class the repo has no code for needs no gate.
+
+**Scope-creep gate** — a diff touching more than ~10 files stops for a human rather than auto-proceeding.
+Ten is the default; record the repo's own number where its norms differ.
+
+These **extend** the loop's existing protect-set — the tests and contract artifacts it may never edit, which
+keep it from moving its own goalposts — rather than replacing it. A denylist path or a gated class means
+escalate, not edit-or-merge past it. None of it is a permanent block; each is an ask a human answers.
+
+A read-only sweep to locate them — report the observed path and move on, then read the hits to confirm a
+match is real (a `payments.md` doc is not the payments surface; an `auth-header.test.ts` is not the auth code):
+
+```bash
+git ls-files | grep -iE '(^|/)(migrations|migrate|alembic/versions)/'                  # DB migrations
+git ls-files | grep -iE '(^|/)(auth|authz|session|login|rbac|permission|guard)'        # auth / authz
+git ls-files | grep -iE '(^|/)(payment|billing|checkout|subscription|invoice|refund)'  # payments / billing
+git ls-files | grep -iE '\.tf$|\.tfvars$|k8s/.*/production/|(^|/)(deploy|helm)/'        # infra / prod config
+git ls-files | grep -iE '(^|/)secrets/|(^|/)\.env|\.pem$|\.key$|credential'            # secrets / credentials
+ls package-lock.json yarn.lock pnpm-lock.yaml Cargo.lock go.sum poetry.lock 2>/dev/null # dependency lockfiles
+```
+
 ## Install the minimum where it is absent
 
 Add only the gaps. Never overwrite or disable an existing hook, config, or workflow — an installed check
@@ -95,6 +141,29 @@ After wiring, record each check you mapped as a durable rule so the rest of bett
 
 The autonomous loop and `/pr-and-verify` recall these to run the same checks the hook and CI enforce —
 one detection, reused everywhere, no guessing downstream.
+
+## Record the blast-radius policy
+
+The surface detected above earns the same confirm-first flow: show the operator the resolved policy — the
+denylist paths, the gated classes, the scope number — one decision at a time, and write on a yes. Recording
+it turns that surface into something the loop, `/review`, and the PR brief recall and grade against, so the
+one detection is reused everywhere and nothing downstream re-guesses it.
+
+Promote it as durable rules through the memory contract, keyed so a single `recall "safety"` returns the
+whole policy — the same shape this skill already uses for the verify commands. One write per key, and
+this skill's prose above is the authoritative home for what each key means:
+
+```bash
+.better-dev/bin/bd-mem remember "safety-denylist: <detected globs>"    # the paths a loop edit escalates on, not edits
+.better-dev/bin/bd-mem remember "safety-gate: <classes with a real surface here>"
+.better-dev/bin/bd-mem remember "safety-scope: <n>"                    # files touched that trip the scope gate; ~10 default
+```
+
+A recorded default, never a hardcode and never a permanent hard-fail — each entry is an escalation a human
+answers, not a wall. A project waives, narrows, or widens any of it through `/overrides`: a line in the
+read-first `.better-dev/overrides.md` (e.g. "safety scope-gate is 20 files", "don't gate dependency bumps
+here") wins over the recalled baseline. The loop and `/review` read that overrides layer first, then the
+baseline — so the resolved policy is honored every run and stays this project's to adjust.
 
 ## Agent-side git safety (optional, host-specific)
 

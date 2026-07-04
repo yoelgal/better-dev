@@ -39,6 +39,32 @@ escape_for_json() {
   printf '%s' "$s"
 }
 
+# --- update nudge: is the installed better-dev clone behind its origin? -------
+# Best-effort and strictly non-blocking. The clone is the plugin install
+# (CLAUDE_PLUGIN_ROOT); if it isn't a git checkout with an upstream we say
+# nothing. A bounded fetch refreshes the count when we can time-box it; when we
+# can't (no `timeout`), we skip the fetch and report from the last-known
+# upstream rather than risk a hang. Never pulls — unless the project opted into
+# ff-only auto-update in overrides, which can only fast-forward, never clobber.
+update_nudge() {
+  local overrides="$1" clone="${CLAUDE_PLUGIN_ROOT:-}" tobin behind
+  [ -n "$clone" ] && [ -d "$clone/.git" ] || return 0
+  git -C "$clone" rev-parse --abbrev-ref '@{u}' >/dev/null 2>&1 || return 0
+
+  tobin="$(command -v timeout || command -v gtimeout || true)"
+  [ -n "$tobin" ] && "$tobin" 5 git -C "$clone" fetch --quiet 2>/dev/null || true
+
+  behind="$(git -C "$clone" rev-list --count 'HEAD..@{u}' 2>/dev/null || echo 0)"
+  [ "${behind:-0}" -gt 0 ] 2>/dev/null || return 0
+
+  if [ -n "$overrides" ] && grep -qiE 'better-dev[[:space:]]+auto-update:[[:space:]]*ff-only' "$overrides" 2>/dev/null \
+     && git -C "$clone" merge --ff-only --quiet '@{u}' 2>/dev/null; then
+    printf ' better-dev: auto-updated %s commit(s) (ff-only).' "$behind"
+    return 0
+  fi
+  printf ' better-dev: update available (%s commit(s)) — git -C %s pull' "$behind" "$clone"
+}
+
 emit() {
   local root="$1" note context escaped
   # Point at the overrides layer only when the project actually has one, so the
@@ -48,6 +74,7 @@ emit() {
     note=" This project records overrides in .better-dev/overrides.md that take precedence over any built-in default — read them before applying one."
   fi
   context="better-dev practices are installed in this repo. The project's conventions and the list of available skills (onboard, plan-grill, diagnose, autonomous-loop, review, orchestrating-agents, worktree-branching, and more) live in a managed better-dev block in this project's CLAUDE.md or AGENTS.md; each skill self-describes through its description.${note}"
+  context="${context}$(update_nudge "$root/.better-dev/overrides.md")"
   escaped=$(escape_for_json "$context")
 
   # Emit only the field the current host reads. Cursor wants snake_case
@@ -93,6 +120,26 @@ if [ "${1:-}" = "selftest" ]; then
   # Cursor / Copilot field selection.
   out="$(cd "$tmp/proj" && CURSOR_PLUGIN_ROOT=x "$SELF")"; printf '%s' "$out" | jq -e '.additional_context' >/dev/null || fail "Cursor field missing"
   out="$(cd "$tmp/proj" && COPILOT_CLI=1 "$SELF")"; printf '%s' "$out" | jq -e '.additionalContext' >/dev/null || fail "Copilot field missing"
+
+  # Update nudge: clone that isn't a git repo -> silent.
+  out="$(cd "$tmp/proj" && CLAUDE_PLUGIN_ROOT="$tmp/notgit" "$SELF")"
+  printf '%s' "$out" | grep -q "update available" && fail "nudged when clone is not a git repo"
+
+  # Update nudge: a clone one commit behind its origin gets a pull nudge.
+  origin="$tmp/origin"; git init -q --bare "$origin"
+  seed="$tmp/seed"; git clone -q "$origin" "$seed"
+  ( cd "$seed" && git config user.email a@b.c && git config user.name t \
+      && echo one > f && git add f && git commit -qm one && git push -q origin HEAD:main ) >/dev/null 2>&1
+  clone="$tmp/clone"; git clone -q "$origin" "$clone"
+  ( cd "$seed" && echo two >> f && git commit -qam two && git push -q origin HEAD:main ) >/dev/null 2>&1
+  ( cd "$clone" && git fetch -q ) >/dev/null 2>&1   # clone now knows origin is ahead
+  out="$(cd "$tmp/proj" && CLAUDE_PLUGIN_ROOT="$clone" "$SELF")"
+  printf '%s' "$out" | grep -q "update available" || fail "no update nudge when clone is behind"
+
+  # Opt-in ff-only auto-update: with the override, the clone fast-forwards itself.
+  printf 'better-dev auto-update: ff-only\n' >> "$tmp/proj/.better-dev/overrides.md"
+  out="$(cd "$tmp/proj" && CLAUDE_PLUGIN_ROOT="$clone" "$SELF")"
+  printf '%s' "$out" | grep -q "auto-updated" || fail "ff-only override did not auto-update"
 
   echo "bd-session-start selftest: ok"
   exit 0

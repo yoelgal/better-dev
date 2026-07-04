@@ -47,6 +47,12 @@ genuine external block and a stuck loop; keep them apart, because they call for 
 one waits, the other restarts. SDD's `BLOCKED` splits the same way on whether the missing thing is
 outside the loop (wait) or a decision only the human holds (ask).
 
+The blast-radius stops land on the ask side of that same split: a step that would edit a high-consequence
+denylist path, or a diff in a human-gate change class (security/auth, payments/PII/money,
+infra/Terraform/prod config, a dependency bump) or past the scope-creep threshold, settles `NEEDS_INPUT`
+— a human's call, not an external blocker, so never `BLOCKED`. `/autonomous-loop` defines the denylist
+and the classes.
+
 ## Where each state comes to rest
 
 `DONE` and `DONE_WITH_CONCERNS` are the only exits that flow forward into a PR. The other four are

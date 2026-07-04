@@ -84,6 +84,34 @@ blast-radius check rests on who actually reaches it rather than a guess:
 This is a reflex, not a registry to work through. Where a surface fits, the check lands as a finding on
 your axis, or as a `⚠️` when you can't settle it from the diff. Where none fits, invent nothing.
 
+## Blast-radius policy — a breach is a finding, not just a lens
+
+Some of those surfaces carry a bounded-blast-radius policy the loop is meant to honor, and crossing it is
+a finding in its own right — the loop should have escalated for a human (settled NEEDS_INPUT with the
+evidence) rather than auto-editing or merging. The policy is the one `/guardrails-install` records per
+repo: recall it with `.better-dev/bin/bd-mem recall "safety"` (one read returns the denylist, the gated
+classes, and the scope number together), then read `.better-dev/overrides.md`, whose waivers and
+narrowings win. When recall is empty, fall back to the brief defaults below rather than treating the
+surface as unguarded:
+
+- **High-consequence denylist** — the paths the loop escalates rather than auto-edits: secrets and
+  credentials, DB migrations, auth/authz code, payments/billing/PII, infrastructure and prod config, and
+  dependency manifests and lockfiles. `/guardrails-install` is the authoritative home for the exact globs;
+  a diff that edits one of these is a finding unless an approval is recorded for that edit.
+- **Human-gate change classes** — security/auth, payments/PII/money, infra/Terraform/prod config, and
+  dependency/version bumps land only behind a human gate; so does a scope-creep gate — a diff touching more
+  than the recorded scope number of files (the `safety-scope` recall, ~10 by default, read not hardcoded).
+  A change in a gated class, or one that crosses the scope gate, with no recorded human gate, is a finding.
+
+Confirm the gate before you flag: read the work-item's approvals log for a sign-off on this escalation —
+`.better-dev/bin/bd-mem ledger read <work-item> approvals.log`, using the slug the orchestrator handed you.
+A diff that touches a denylist path or a gated class without a matching entry there is ungated, and that
+is the finding. Grade the breach on the ladder below and cite the offending paths — an auto-edited secret,
+migration, or auth path is Critical; an ungated dependency bump or a scope-gate sprawl with no sign-off is
+at least Important. This extends the protect-set (tests and contract artifacts stay untouchable to prevent
+goalpost-moving); it doesn't replace it. A denylist path or gated class is escalate, not edit — so the
+finding names the missing human sign-off, which a re-edit can't supply.
+
 ## Severity
 
 Three tiers. Categorize by real severity — not everything is Critical.

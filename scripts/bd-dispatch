@@ -69,6 +69,24 @@ case "$op" in
 
 ## Constraints (the reviewer's attention lens — copy binding values verbatim)
 - exact values / formats / "same as X" relationships:
+EOF
+    # A file-writing role carries the repo's blast-radius denylist inline — a fresh worker
+    # can't see the repo's guardrails, so it escalates (settles NEEDS_INPUT) rather than
+    # editing those paths. Read-only review roles don't write files, so they skip this slot.
+    case "$role" in
+      review | reviewer | refuter | spec | standards | security) ;;
+      *) cat >>"$f" <<EOF
+
+## High-consequence paths (escalate, don't edit)
+<!-- Paste the recalled denylist below: .better-dev/bin/bd-mem recall "safety", with
+     .better-dev/overrides.md adjustments applied (they win). If this task turns out to
+     touch one of these paths, settle NEEDS_INPUT with what you found and what you need —
+     don't edit through it and don't work around it; the blast radius is a human's call. -->
+- recalled denylist (orchestrator pastes here):
+EOF
+      ;;
+    esac
+    cat >>"$f" <<EOF
 
 ## Report
 Write the full report to: $d/reports/$role-$n.md

@@ -22,7 +22,13 @@ Two extensionless bash scripts and a manifest, all under `hooks/`:
 - `bd-session-start` — fires on session `startup`, `resume`, `clear`, and `compact`. If the working
   directory sits inside a repo with a `.better-dev/` scaffold, it emits a one-paragraph pointer to
   the better-dev discovery block and, when the project has one, to `.better-dev/overrides.md` so the
-  agent reads project overrides before applying any built-in default.
+  agent reads project overrides before applying any built-in default. It also appends a one-line
+  update nudge when the installed better-dev clone (its plugin root) is behind its origin — a bounded,
+  best-effort `git fetch` and behind-count that degrades to a silent no-op when the clone isn't a git
+  checkout, is offline, or can't be time-boxed. The nudge only suggests `git -C <clone> pull`; it never
+  pulls on its own, honoring never-blocking. A project that wants hands-off updates can opt in with a
+  `better-dev auto-update: ff-only` line in its overrides, which lets the clone fast-forward itself —
+  and only fast-forward, so it can never clobber local work.
 - `bd-subagent-start` — fires when the host dispatches a subagent. SessionStart context reaches the
   parent thread only, so a fresh worker would otherwise run better-dev-unaware. This re-injects a
   *short* note — the practices and overrides still apply, see `/orchestrating-agents` for how

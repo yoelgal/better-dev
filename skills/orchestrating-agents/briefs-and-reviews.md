@@ -18,6 +18,14 @@ What belongs in the brief:
   cases. These live in the brief, not in your prose around it.
 - Interfaces and decisions from earlier tasks that the brief can't derive on its own.
 - Your resolution of any ambiguity you noticed while writing it — don't pass a known ambiguity through.
+- For a worker that writes files, the repo's high-consequence denylist, pasted in with the standing
+  instruction to escalate rather than edit. A fresh worker can't see the repo's guardrails, so the brief
+  carries the list itself: if the task turns out to touch one of those paths — secrets and credentials, DB
+  migrations, auth code, payments/PII, infra or prod config, dependency manifests and lockfiles — the
+  worker settles `NEEDS_INPUT` with what it found and what it needs, rather than editing blind and letting
+  the rule surface only at review. `/guardrails-install` records that list per repo; recall it with
+  `.better-dev/bin/bd-mem recall "safety"`, then apply any `.better-dev/overrides.md` adjustments (which
+  win), so the brief carries this repo's actual set rather than a generic one.
 - The report file path and the report contract (terminal state, commits, one-line verify summary,
   concerns).
 
@@ -43,9 +51,11 @@ outcome.
   and a plan's example code is a starting point, not proof its weaknesses were chosen. Let the reviewer
   raise it and adjudicate it in the loop.
 
-Hand the reviewer three files — the same brief, the report file, and the diff package — plus the
-constraints block. The diff never enters your own context; the reviewer reads the commit list, the stat
-summary, and the full diff with context in one read.
+Hand the reviewer the same brief, the report file, the diff package, and the work-item slug — plus the
+constraints block. The slug resolves the shared ledger, so the reviewer can read the work-item's
+`approvals.log` and confirm a blast-radius escalation was signed off rather than bypassed. The diff never
+enters your own context; the reviewer reads the commit list, the stat summary, and the full diff with
+context in one read.
 
 ## Seed one risk map before fanning out review channels
 

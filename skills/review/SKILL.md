@@ -52,7 +52,9 @@ Each channel runs as its own fresh worker via `/orchestrating-agents` (host suba
 role-switch with a context reset). Running them apart is the point: neither pollutes the other's context,
 and none of them is you. Each axis worker gets the same brief — `reviewer-brief.md`, which carries the
 distrust-the-report rule, the read-only-the-diff discipline, the severity ladder, and the output shape —
-plus the package path, the reading-ordered walkthrough from step 2, and the channel's own focus:
+plus the package path, the reading-ordered walkthrough from step 2, the work-item slug (so a channel can
+resolve the shared ledger and read the work-item's `approvals.log` to confirm a blast-radius sign-off),
+and the channel's own focus:
 
 - **Spec** — does the diff implement what was asked, nothing missing and nothing smuggled in? Judge it
   against the plan or contract from `/plan-grill` (or the fix contract from `/diagnose`), which is the
@@ -100,6 +102,12 @@ buried). Map the aggregate onto the loop's terminal-state vocabulary from `/auto
   implementer and not a reviewer — which addresses only the listed findings; then re-review the new diff.
 - A `⚠️ cannot verify from the diff` item the reviewer couldn't settle is for the orchestrator to check
   itself (or escalate as **NEEDS_INPUT** if it needs the human or the contract).
+- A **blast-radius policy finding** — the diff auto-edited a high-consequence denylist path, or landed a
+  human-gate class or a scope-gate sprawl with no matching sign-off in the work-item's `approvals.log`
+  (`reviewer-brief.md` defines the set, and the confirm-via-ledger check that reads it) — is a
+  **NEEDS_INPUT**, not fix-worker fodder. What's missing is a human's sign-off, which a fix context can't
+  supply by re-editing; surface it with the offending paths and the absent approval so the human waives,
+  narrows, or reverts. It stays a NEEDS_INPUT even on an otherwise-green verdict.
 
 Order the fix hand-off by *smallest blocking set*, not by severity rank: lead with the one root-cause fix
 that clears the most findings at once. Several findings often trace back to a single wrong seam — naming

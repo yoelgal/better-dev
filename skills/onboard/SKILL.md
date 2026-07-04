@@ -135,6 +135,11 @@ both stay out of version control, while rules, overrides, and learnings are trac
 printf 'bin/\nledger/\n' > .better-dev/.gitignore   # rules.md / overrides.md / learnings.jsonl stay tracked
 ```
 
+**Wire the minimum base.** With memory live, hand off to `/guardrails-install` — it records this repo's
+real verify command and its safety baseline (the denylist, the gated classes, the scope number) through
+`bd-mem`, filling only what's missing, so Phase 5's "guardrails/CI wired" and "verify command mapped"
+signals rest on something recorded rather than assumed.
+
 ---
 
 ### Phase 4 — Self-describe
@@ -177,7 +182,28 @@ and the block reads correctly in the entry file.
 
 Recap what changed, then list any phase the operator skipped or deferred (tool not yet installed
 globally, no integration branch, a memory backend left on files, an unmapped test command) so they can
-come back with `/onboard <phase>`. When this was a greenfield or brand-new project, point to
+come back with `/onboard <phase>`.
+
+Close with a **loop-readiness** read — a short prose check on whether this repo can actually drive the
+loop, not a score. Five signals, each drawn from what the phases above already turned up:
+
+- **Integration branch** — one exists (the `staging`/`develop` or the recorded integration branch) for
+  feature worktrees to branch off; without it `/worktree-branching` has no base to start a loop from.
+- **Guardrails & CI wired** — a pre-commit hook and a CI check run the repo's real lint/typecheck/test
+  (`/guardrails-install`), so the loop's green rests on gates that actually hold.
+- **Verify command mapped** — the repo's real verify command is recorded, not guessed (the `verify`
+  rules `/guardrails-install` records for `bd-mem` to recall); an unmapped one is a gap the loop can't
+  grade against.
+- **Memory wired** — `.better-dev/bin/bd-mem` resolves and is initialized to the detected backend, so
+  overrides, rules, and the shared ledger survive across sessions.
+- **Red-capable-signal discipline** — the operator understands that each work-item names a check already
+  seen to go red before the loop drives it; without one, a "green" run proves nothing (`/autonomous-loop`,
+  `/diagnose`).
+
+All five clear → the repo is ready to drive the loop. A gap isn't a blocker: name it alongside the
+`/onboard <phase>` or `/guardrails-install` that closes it, and let the operator decide when to.
+
+When this was a greenfield or brand-new project, point to
 `/groundwork` as the next step — it takes the idea to a shared foundation and a set of parallelizable
 work-items before any single feature is grilled. Record a durable rule for anything worth remembering
 next session (`.better-dev/bin/bd-mem remember "<rule>"`).
