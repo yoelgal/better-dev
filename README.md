@@ -7,8 +7,6 @@
 <p align="center">
   <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT" />
   <img src="https://img.shields.io/badge/agent--agnostic-Claude%20Code%20·%20Codex%20·%20pi%20·%20hermes-0d9488" alt="agent-agnostic" />
-  <img src="https://img.shields.io/badge/19%20skills-·%208%20bd--scripts-0d9488" alt="19 skills, 8 scripts" />
-  <img src="https://img.shields.io/badge/engines-none-5a6472" alt="no engines" />
 </p>
 
 ---
