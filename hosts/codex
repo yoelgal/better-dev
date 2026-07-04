@@ -1,8 +1,8 @@
-# hosts/codex — better-dev adapter for the OpenAI Codex CLI.
+# hosts/codex - better-dev adapter for the OpenAI Codex CLI.
 #
-# Codex scans its global skills dir recursively for SKILL.md files, so linking this clone's skills/ dir
-# in as `better-dev` exposes every practice under better-dev/<skill>/SKILL.md. Sourced by install.sh,
-# which reads these four variables. Adding a host = drop a sibling file like this.
+# install.sh links each skill in one level deep at <skills-dir>/<name>, which Codex discovers by its
+# SKILL.md - the same depth-1 layout every host uses, so no host relies on namespace-nested discovery.
+# Sourced by install.sh, which reads these four variables. Adding a host = drop a sibling file like this.
 bd_host_name="codex"
 bd_host_display="OpenAI Codex CLI"
 bd_host_cli="codex"                         # PATH probe for --host auto

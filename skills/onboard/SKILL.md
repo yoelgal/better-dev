@@ -1,6 +1,6 @@
 ---
 name: onboard
-description: Use when setting up better-dev in a repository for the first time, or re-running to wire in anything missing — greenfield or existing codebase. Also use when the repo has the better-dev tool installed but no .better-dev/ scaffold, no .better-dev/bin bridge, or no CLAUDE.md discovery block yet.
+description: Use when setting up better-dev in a repository for the first time, or re-running to wire in anything missing - greenfield or existing codebase. Also use when the repo has the better-dev tool installed but no .better-dev/ scaffold, no .better-dev/bin bridge, or no CLAUDE.md discovery block yet.
 argument-hint: "[phase to jump to, optional]"
 allowed-tools:
   - Bash
@@ -14,21 +14,21 @@ allowed-tools:
 
 # Onboard a repo into better-dev
 
-Bring better-dev into this project — greenfield or an existing codebase — by detecting what's
+Bring better-dev into this project - greenfield or an existing codebase - by detecting what's
 already here, adapting to it, wiring memory, and leaving a discovery block so every later session
 knows the practices are available. One job: **get the repo wired, without imposing.**
 
 better-dev installs in two layers, and onboard only touches the second. The **tool** (the skills +
 `bd-*` scripts + hooks) is installed once per machine, globally, into your host's native skills dir
-(Claude Code: `~/.claude/skills/better-dev`; Codex: `~/.codex/skills/better-dev`) — never vendored
-per repo. This repo carries only **data**: `.better-dev/` with tracked rules, overrides, and
+(Claude Code: `~/.claude/skills/<skill>`; Codex: `~/.codex/skills/<skill>`, one symlink per skill), never
+vendored per repo. This repo carries only **data**: `.better-dev/` with tracked rules, overrides, and
 learnings, plus a per-machine `.better-dev/bin` symlink back to the global install so the portable
 path `.better-dev/bin/bd-mem` resolves here.
 
 ## Agent contract
 
 Run the phases in order. If `$ARGUMENTS` names a phase, jump straight to it. At each phase:
-**detect → report tersely → confirm → act.** Skip anything already done — this skill is idempotent
+**detect → report tersely → confirm → act.** Skip anything already done - this skill is idempotent
 and safe to re-run; re-running only fills gaps.
 
 Three rules carry the whole skill:
@@ -37,9 +37,9 @@ Three rules carry the whole skill:
   named `staging` in `CLAUDE.md` prose isn't a `staging` branch until `git` shows it. Report what you
   actually observed, with where.
 - **Never guess a command.** An unmapped capability (test runner, lint, typecheck) is a *gap* to
-  record and ask about — not a command to invent. Silence beats a wrong guess.
+  record and ask about - not a command to invent. Silence beats a wrong guess.
 - **Quiet defaults.** Take the obvious call and keep moving; stop to ask only when a choice genuinely
-  matters — no integration branch to base worktrees on, or an entry file that's truly ambiguous.
+  matters - no integration branch to base worktrees on, or an entry file that's truly ambiguous.
   Don't batch a wall of questions, and don't ask about a default you can safely pick and record.
 
 You can't drive interactive UIs (a plugin installer, an auth login) or make global machine changes
@@ -48,7 +48,7 @@ in-session); do file ops yourself after confirming.
 
 ---
 
-### Phase 1 — Detect
+### Phase 1 - Detect
 
 A read-only sweep. Report each as *observed value + where*, then move on:
 
@@ -56,30 +56,31 @@ A read-only sweep. Report each as *observed value + where*, then move on:
 ls CLAUDE.md AGENTS.md 2>/dev/null                        # entry file(s)
 grep -l '@AGENTS.md' CLAUDE.md 2>/dev/null                # which imports which
 ls -d .better-dev .better-dev/bin .mcp.json 2>/dev/null   # prior data scaffold? bin bridge? MCP?
-ls -d "$HOME/.claude/skills/better-dev" "$HOME/.codex/skills/better-dev" 2>/dev/null  # tool installed globally?
+ls "$HOME/.claude/skills/.better-dev-install" "$HOME/.codex/skills/.better-dev-install" 2>/dev/null  # tool installed? (marker holds clone path)
 git rev-parse --is-inside-work-tree 2>/dev/null && git branch --format='%(refname:short)'
 git remote -v 2>/dev/null | head -1
 ```
 
 Read (don't guess) six things:
 
-1. **Is the tool installed for this host** — a `better-dev` entry in the host's global skills dir
-   above. Absent → Phase 3 helps the operator install it before anything else can work.
-2. **Entry file** — `CLAUDE.md`, `AGENTS.md`, both, or neither. If both exist, the convention is that
+1. **Is the tool installed for this host**: the `.better-dev-install` marker in the host's global skills
+   dir above (install.sh writes it beside the per-skill symlinks, holding the clone path). Absent means
+   Phase 3 helps the operator install it before anything else can work.
+2. **Entry file** - `CLAUDE.md`, `AGENTS.md`, both, or neither. If both exist, the convention is that
    one `@`-imports the other (papers.town: `CLAUDE.md` opens `@AGENTS.md`); the **importer is the
    entry file** and the block goes there. Neither → create `CLAUDE.md`.
-3. **Installed skills / MCP** — note them so you never disable or replace them. better-dev only adds.
-4. **Existing memory system** — an MCP memory server in `.mcp.json`, claude-mem, Mem0/Graphiti, or a
+3. **Installed skills / MCP** - note them so you never disable or replace them. better-dev only adds.
+4. **Existing memory system** - an MCP memory server in `.mcp.json`, claude-mem, Mem0/Graphiti, or a
    host-native store. Found → that becomes the memory backend. None → the zero-infra files default.
-5. **Git + branching** — does an integration branch (`staging`/`develop`) exist, what's the feature
+5. **Git + branching** - does an integration branch (`staging`/`develop`) exist, what's the feature
    prefix in use (`feat/` vs `feature/`), is there a remote. Read it from branch names and the entry
    file, not from an assumption.
-6. **Prior better-dev data** — `.better-dev/` or a discovery block already present → this is a
+6. **Prior better-dev data** - `.better-dev/` or a discovery block already present → this is a
    top-up run; a missing `.better-dev/bin` is the common gap to fill.
 
 ---
 
-### Phase 2 — Adapt, don't impose
+### Phase 2 - Adapt, don't impose
 
 Reconcile better-dev's defaults with what the repo already does. **What's already here wins**, and is
 recorded as an override rather than overwritten:
@@ -87,7 +88,7 @@ recorded as an override rather than overwritten:
 - Repo uses `feat/* → staging → main`? Keep it. Record `feature branch prefix = feat/` and
   `integration branch = staging` via `.better-dev/bin/bd-mem persist-override "<line>"`. Don't force
   `feature/`.
-- **Only `main`, no integration branch?** The common case — most fresh repos start `main`-only.
+- **Only `main`, no integration branch?** The common case - most fresh repos start `main`-only.
   Suggest the integration + feature-branch mechanism: a `staging` branch off `main` that feature/fix
   worktrees branch from and merge back into, promoted to `main` on release, with work on `feat/*`
   (`fix/*`). Greenfield: scaffold it under quiet defaults. An existing repo with real history: confirm
@@ -100,11 +101,11 @@ Present real decisions one at a time; skip the ones you can default.
 
 ---
 
-### Phase 3 — Ensure the tool, then wire this repo
+### Phase 3 - Ensure the tool, then wire this repo
 
 **First, make sure the tool is installed for this host.** If Phase 1 found no `better-dev` entry in
 the host's global skills dir, the practices can't load. Hand the operator the one-paste bootstrap and
-let them run it — you can't change their machine globally on your own:
+let them run it - you can't change their machine globally on your own:
 
 ```bash
 git clone https://github.com/yoelgal/better-dev ~/better-dev && ~/better-dev/install.sh
@@ -118,8 +119,8 @@ skills; resolve them and let `bd-link` create the per-machine symlink (or a copy
 refresh):
 
 ```bash
-for s in "$HOME/.claude/skills/better-dev" "$HOME/.codex/skills/better-dev"; do
-  [ -e "$s" ] && sd="$(cd -P "$s/../scripts" 2>/dev/null && pwd)" && [ -n "$sd" ] && break
+for m in "$HOME/.claude/skills/.better-dev-install" "$HOME/.codex/skills/.better-dev-install"; do
+  [ -f "$m" ] && sd="$(cat "$m")/scripts" && [ -f "$sd/bd-mem" ] && break
 done
 "$sd/bd-link" link          # creates .better-dev/bin -> the global install's scripts
 ```
@@ -139,16 +140,16 @@ both stay out of version control, while rules, overrides, and learnings are trac
 printf 'bin/\nledger/\n' > .better-dev/.gitignore   # rules.md / overrides.md / learnings.jsonl stay tracked
 ```
 
-**Wire the minimum base.** With memory live, hand off to `/guardrails-install` — it records this repo's
+**Wire the minimum base.** With memory live, hand off to `/guardrails-install` - it records this repo's
 real verify command and its safety baseline (the denylist, the gated classes, the scope number) through
 `bd-mem`, filling only what's missing, so Phase 5's "guardrails/CI wired" and "verify command mapped"
 signals rest on something recorded rather than assumed.
 
 ---
 
-### Phase 4 — Self-describe
+### Phase 4 - Self-describe
 
-Write the discovery block into the **entry file** from Phase 1 with the shared writer — it replaces
+Write the discovery block into the **entry file** from Phase 1 with the shared writer - it replaces
 the block in place and never touches the operator's own text:
 
 ```bash
@@ -160,21 +161,25 @@ Fill the block from what you actually detected (branching, memory backend). Shap
 ```markdown
 ## better-dev is wired here
 
-This repo uses **better-dev** — portable dev practices that run inside your agent (installed globally
-for your host, not vendored here). On non-trivial work:
+This repo uses **better-dev**: portable dev practices that run inside your agent (installed globally
+for your host, not vendored here). On non-trivial work, drive it through these skills:
 
-- **Feature** → `/plan-grill`, then the autonomous loop. **Bug/fix** → `/diagnose`, then the loop.
-- Each feature/fix runs in its **own git worktree** off `<integration-branch>`; branching is
-  `<detected convention>`.
-- Durable rules & lessons: `.better-dev/bin/bd-mem` (backend: `<detected>`). Project overrides live in
-  `.better-dev/overrides.md` and **win over defaults** — read them first.
+- **Feature**: `/plan-grill` to forge an observable done-contract, then `/autonomous-loop` to drive it
+  to proven-done, then `/pr-and-verify` to land it. **Bug or fix**: `/diagnose` first, then the loop.
+- Each feature or fix runs in its **own git worktree** via `/worktree-branching`, off
+  `<integration-branch>`; branching is `<detected convention>`.
+- Durable rules and lessons: `.better-dev/bin/bd-mem` (backend: `<detected>`). Project overrides in
+  `.better-dev/overrides.md` **win over defaults**, so read them first.
+- Hit a capability gap? Source an existing skill with `/tool-sourcing` before building anything; author
+  one with `/self-extension` only when discovery genuinely comes up empty. A skill you author here is
+  repo-scoped: it lands in this repo's own project skills dir, not the global tool.
+- `/guardrails-install` records this repo's real verify command and safety baseline; on a greenfield
+  project, `/groundwork` takes the idea to a shared foundation and parallelizable work-items.
 - `.better-dev/` holds tracked data (rules, overrides, learnings); `bin/` and `ledger/` are per-machine
   and gitignored. A fresh clone re-runs `/onboard` to rebuild the `bin` bridge.
-- Hit a capability gap? **Source a skill** (`find-skills`) before writing one. A skill you author here
-  is repo-scoped — it lands in this repo's own project skills dir, not the global tool.
 - Re-run `/onboard` any time to wire in what's missing.
 
-better-dev is additive — it complements, never replaces, whatever else is installed.
+better-dev is additive: it complements, never replaces, whatever else is installed.
 ```
 
 Then confirm the `.better-dev/` scaffold exists (`bd-mem init` created it), the `bin` bridge resolves,
@@ -182,25 +187,25 @@ and the block reads correctly in the entry file.
 
 ---
 
-### Phase 5 — Confirm & close
+### Phase 5 - Confirm & close
 
 Recap what changed, then list any phase the operator skipped or deferred (tool not yet installed
 globally, no integration branch, a memory backend left on files, an unmapped test command) so they can
 come back with `/onboard <phase>`.
 
-Close with a **loop-readiness** read — a short prose check on whether this repo can actually drive the
+Close with a **loop-readiness** read - a short prose check on whether this repo can actually drive the
 loop, not a score. Five signals, each drawn from what the phases above already turned up:
 
-- **Integration branch** — one exists (the `staging`/`develop` or the recorded integration branch) for
+- **Integration branch** - one exists (the `staging`/`develop` or the recorded integration branch) for
   feature worktrees to branch off; without it `/worktree-branching` has no base to start a loop from.
-- **Guardrails & CI wired** — a pre-commit hook and a CI check run the repo's real lint/typecheck/test
+- **Guardrails & CI wired** - a pre-commit hook and a CI check run the repo's real lint/typecheck/test
   (`/guardrails-install`), so the loop's green rests on gates that actually hold.
-- **Verify command mapped** — the repo's real verify command is recorded, not guessed (the `verify`
+- **Verify command mapped** - the repo's real verify command is recorded, not guessed (the `verify`
   rules `/guardrails-install` records for `bd-mem` to recall); an unmapped one is a gap the loop can't
   grade against.
-- **Memory wired** — `.better-dev/bin/bd-mem` resolves and is initialized to the detected backend, so
+- **Memory wired** - `.better-dev/bin/bd-mem` resolves and is initialized to the detected backend, so
   overrides, rules, and the shared ledger survive across sessions.
-- **Red-capable-signal discipline** — the operator understands that each work-item names a check already
+- **Red-capable-signal discipline** - the operator understands that each work-item names a check already
   seen to go red before the loop drives it; without one, a "green" run proves nothing (`/autonomous-loop`,
   `/diagnose`).
 
@@ -208,7 +213,7 @@ All five clear → the repo is ready to drive the loop. A gap isn't a blocker: n
 `/onboard <phase>` or `/guardrails-install` that closes it, and let the operator decide when to.
 
 When this was a greenfield or brand-new project, point to
-`/groundwork` as the next step — it takes the idea to a shared foundation and a set of parallelizable
+`/groundwork` as the next step - it takes the idea to a shared foundation and a set of parallelizable
 work-items before any single feature is grilled. Record a durable rule for anything worth remembering
 next session (`.better-dev/bin/bd-mem remember "<rule>"`).
 
@@ -216,6 +221,6 @@ next session (`.better-dev/bin/bd-mem remember "<rule>"`).
 
 Everything here is additive and idempotent. It never disables an installed skill, never rewrites a
 shared skill to encode a preference (that's what `.better-dev/overrides.md` is for), and never
-clobbers the operator's edits to the entry file. It vendors nothing into the repo — the tool stays
+clobbers the operator's edits to the entry file. It vendors nothing into the repo - the tool stays
 global; the repo keeps only data and a per-machine `bin` bridge. When authoring or revising this
 skill, follow `/writing-skills`.

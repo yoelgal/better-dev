@@ -1,11 +1,12 @@
 #!/usr/bin/env sh
-# install.sh — install better-dev GLOBALLY, per host, from this clone.
+# install.sh - install better-dev GLOBALLY, per host, from this clone.
 #
 # better-dev is a set of portable dev practices (SKILL.md) plus bd-* helper scripts and hooks. This
 # installs the tool ONCE per machine: it links this clone's skills/ dir into each detected host's native
-# global skills dir (Claude: ~/.claude/skills/better-dev, Codex: ~/.codex/skills/better-dev), so every
-# repo you open sees the practices — nothing is ever vendored per project. Update with a plain `git pull`
-# in this clone; the link means every host picks the new version up at once.
+# global skills dir, ONE LEVEL DEEP (~/.claude/skills/<skill>, ~/.codex/skills/<skill>) - hosts discover a
+# skill only at <skills-dir>/<name>/SKILL.md, never nested under a namespace folder - so every repo you
+# open sees the practices, and nothing is ever vendored per project. Update with a plain `git pull` in
+# this clone; the per-skill symlinks mean every host picks the new version up at once.
 #
 #   ./install.sh [--host claude|codex|auto]     # default: auto (link every host whose CLI is on PATH)
 #
@@ -64,8 +65,28 @@ for h in $hosts; do
     continue
   fi
   mkdir -p "$bd_host_skills_dir"
-  _link_or_copy "$SRC/skills" "$bd_host_skills_dir/better-dev"
-  echo "  linked $bd_host_display -> $bd_host_skills_dir/better-dev"
+  # Migrate off the old whole-dir link: it nested every SKILL.md two levels deep, where hosts never
+  # look, so those skills were silently undiscovered. Drop it if it's ours.
+  old="$bd_host_skills_dir/better-dev"
+  [ -L "$old" ] && case "$(readlink "$old" 2>/dev/null)" in "$SRC"/skills|"$SRC"/skills/) rm -f "$old" ;; esac
+  # Link each skill one level deep. Non-destructive: never replace a same-named skill that isn't ours.
+  n=0; skipped=""
+  for skill in "$SRC"/skills/*/; do
+    [ -f "${skill}SKILL.md" ] || continue
+    dst="$bd_host_skills_dir/$(basename "$skill")"
+    if [ -e "$dst" ] || [ -L "$dst" ]; then
+      ours=0
+      case "$(readlink "$dst" 2>/dev/null)" in "$SRC"/skills/*) ours=1 ;; esac
+      [ -f "$dst/.better-dev-skill" ] && ours=1
+      [ "$ours" -eq 1 ] || { skipped="$skipped $(basename "$skill")"; continue; }
+    fi
+    _link_or_copy "${skill%/}" "$dst"
+    [ "$IS_WINDOWS" -eq 1 ] && : > "$dst/.better-dev-skill"   # sentinel so copy-mode re-runs refresh
+    n=$((n + 1))
+  done
+  printf '%s\n' "$SRC" > "$bd_host_skills_dir/.better-dev-install"   # marker: install detection + scripts-dir resolution
+  echo "  linked $n skill(s) for $bd_host_display in $bd_host_skills_dir/"
+  [ -n "$skipped" ] && echo "    skipped (name already used by a non-better-dev skill):$skipped"
   installed=$((installed + 1))
 done
 
@@ -77,7 +98,7 @@ if [ "$installed" -eq 0 ]; then
 fi
 
 if [ "$IS_WINDOWS" -eq 1 ]; then
-  echo "Windows: installed as file copies — re-run ./install.sh after every 'git pull' to refresh."
+  echo "Windows: installed as file copies - re-run ./install.sh after every 'git pull' to refresh."
 else
   echo "Update any time:  git -C \"$SRC\" pull   (the link means every host sees the new version at once)."
 fi

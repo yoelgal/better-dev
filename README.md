@@ -1,7 +1,7 @@
 <h1 align="center">better-dev</h1>
 
 <p align="center">
-  <strong>Portable dev practices, packaged as skills</strong> — that run <em>inside</em> the coding agent you already use.
+  <strong>Portable dev practices, packaged as skills</strong> - that run <em>inside</em> the coding agent you already use.
 </p>
 
 <p align="center">
@@ -11,19 +11,19 @@
 
 ---
 
-better-dev is a set of `SKILL.md` practices that make your existing agent — Claude Code, Codex, hermes, pi —
+better-dev is a set of `SKILL.md` practices that make your existing agent - Claude Code, Codex, hermes, pi -
 do software development *well*, whether you're **starting a project from scratch** or working in an existing
 codebase. It's **not an agent, framework, or provider layer.** It adds one opinionated method and gets out of
 the way of everything else you've installed:
 
-> **idea → scope it into an observable contract → isolate it → drive a loop to *proven* done → ship** — and
+> **idea → scope it into an observable contract → isolate it → drive a loop to *proven* done → ship** - and
 > when you're missing a tool, go source it.
 
 > **Status:** built and self-verified (`bd-package-check` green), reimplemented from ~100 sources and audited
 > against forge/devloop and loop-engineering. Not yet battle-tested in live multi-harness runs. Design notes:
 > [`docs/PLAN.md`](docs/PLAN.md) · [`docs/DECISIONS.md`](docs/DECISIONS.md).
 
-## Quick start — one paste
+## Quick start - one paste
 
 From inside the repo you want to set up, paste this into your agent. It installs better-dev once for your
 machine, then wires the repo:
@@ -42,7 +42,7 @@ Set up better-dev in this repo. It's a portable set of dev practices packaged as
 TOOL (skills + bd-* scripts + hooks) installs GLOBALLY once per machine and every repo shares it; a repo's
 .better-dev/ holds that repo's DATA only.
 
-1. Detect which coding agent I'm in (Claude Code ~/.claude, Codex ~/.codex, or other) — that decides the
+1. Detect which coding agent I'm in (Claude Code ~/.claude, Codex ~/.codex, or other) - that decides the
    install command and the global skills directory.
 2. Install the tool globally, once per machine. If it's already installed (a better-dev entry in the host's
    global skills dir, or an existing clone), run `git pull` in the clone and skip to step 3. Otherwise: on
@@ -63,14 +63,14 @@ Then your next message can just be *"here's a bug…"* or *"here's a feature…"
 
 ## The method
 
-Start a project **from scratch**, or land a feature or fix in an **existing codebase** — the work runs one spine:
+Start a project **from scratch**, or land a feature or fix in an **existing codebase** - the work runs one spine:
 
-0. **New project, or a large epic?** `/groundwork` takes the idea to a **minimum shared foundation** — schema,
-   types, the interfaces between areas, the build/test/deploy pipeline — then carves the rest into **disjoint,
+0. **New project, or a large epic?** `/groundwork` takes the idea to a **minimum shared foundation** - schema,
+   types, the interfaces between areas, the build/test/deploy pipeline - then carves the rest into **disjoint,
    parallelizable work-items**, so several loops can run at once without colliding. (A single feature or fix in
    an existing repo skips straight to step 1.)
-1. **Scope it.** `/plan-grill` (feature) or `/diagnose` (fix) settles an *observable* done-contract — a real
-   check that's red now and goes green exactly when the work is done — before any code.
+1. **Scope it.** `/plan-grill` (feature) or `/diagnose` (fix) settles an *observable* done-contract - a real
+   check that's red now and goes green exactly when the work is done - before any code.
 2. **Isolate it.** `/worktree-branching` puts the work in its own git worktree off the integration branch.
 3. **Drive it to proven done.** `/autonomous-loop` runs verify → one step → re-verify → log against the
    contract, dispatching fresh workers (`/orchestrating-agents`), grading with an independent `/review` that
@@ -82,7 +82,7 @@ Start a project **from scratch**, or land a feature or fix in an **existing code
    fallback (staged, tested, then promoted).
 
 Durable rules, lessons, and loop state live in a per-project memory + ledger (`bd-mem`) shared across
-worktrees. Override any practice in flow and it persists to `.better-dev/overrides.md` and *wins* — the
+worktrees. Override any practice in flow and it persists to `.better-dev/overrides.md` and *wins* - the
 shared skills are never rewritten to encode your preference.
 
 ## The skills
@@ -101,16 +101,16 @@ shared skills are never rewritten to encode your preference.
 
 Two layers, so the tool updates once and your data travels with the repo:
 
-- **The tool — global, once per machine.** The skills, `bd-*` scripts, and hooks live in one clone and link
-  into your host's global skills dir (`~/.claude/skills/better-dev`, `~/.codex/skills/better-dev`, …), so
-  every repo shares one copy. Claude Code users can install the plugin
-  ([`.claude-plugin/plugin.json`](.claude-plugin/plugin.json)) instead — same skill contract. Update with a
+- **The tool - global, once per machine.** The skills, `bd-*` scripts, and hooks live in one clone and link
+  into your host's global skills dir, one symlink per skill (`~/.claude/skills/<skill>`,
+  `~/.codex/skills/<skill>`, …), so every repo shares one copy. Claude Code users can install the plugin
+  ([`.claude-plugin/plugin.json`](.claude-plugin/plugin.json)) instead - same skill contract. Update with a
   single `git pull` in the clone.
-- **The repo — data only.** `/onboard` creates `.better-dev/` for *this repo's data* (`rules.md`,
+- **The repo - data only.** `/onboard` creates `.better-dev/` for *this repo's data* (`rules.md`,
   `overrides.md`, `learnings.jsonl` committed; loop `ledger/` gitignored) plus `.better-dev/bin`, a
   per-machine symlink to the global tool. No practices are ever copied into the repo.
 
-Skills you later mint with `/self-extension` are **repo-scoped** by default — committed to the repo's own
+Skills you later mint with `/self-extension` are **repo-scoped** by default - committed to the repo's own
 `.claude/skills/<name>`, seen only there. A tool update never touches them.
 
 ## Layout
@@ -118,7 +118,7 @@ Skills you later mint with `/self-extension` are **repo-scoped** by default — 
 | Path | What |
 |------|------|
 | `skills/` | the 19 practices (agentskills.io: `name` + `description`, progressive disclosure) |
-| `scripts/` | the `bd-*` spine — `bd-mem` (memory + ledger), `bd-block`, `bd-dispatch`, `bd-worktree-guard`, `bd-review-package`, `bd-skill-stage`, `bd-link`, `bd-package-check` |
+| `scripts/` | the `bd-*` spine - `bd-mem` (memory + ledger), `bd-block`, `bd-dispatch`, `bd-worktree-guard`, `bd-review-package`, `bd-skill-stage`, `bd-link`, `bd-package-check` |
 | `hooks/` · `hosts/` | SessionStart / SubagentStart injection · per-host install adapters |
 | `install.sh` · `BOOTSTRAP.md` · `.claude-plugin/` | installer · one-paste bootstrap · Claude Code plugin manifest |
 | [`docs/`](docs/) · [`NOTICE`](NOTICE) | design plan + decisions · attribution |
