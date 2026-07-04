@@ -66,9 +66,9 @@ there, and lands only on approval; on any failure the staging dir is removed and
 no half-written skill in the list, no tombstone for something never approved. `.better-dev/bin/bd-skill-stage`
 owns the two steps that have to be machine-enforced rather than trusted to prose.
 
-1. **Stage.** `bd-skill-stage dir` prints a fresh staging dir; write the `SKILL.md` (and any script or
+1. **Stage.** `.better-dev/bin/bd-skill-stage dir` prints a fresh staging dir; write the `SKILL.md` (and any script or
    reference files) into it.
-2. **Check — this is the "test".** For a prose skill, `bd-skill-stage lint <dir>` is the gate: it fails on a
+2. **Check — this is the "test".** For a prose skill, `.better-dev/bin/bd-skill-stage lint <dir>` is the gate: it fails on a
    malformed or missing frontmatter, a name that isn't kebab-case, a description that doesn't state its
    trigger, a stray `version`/`license`, an `@`-link, or an oversized file. For a skill that ships a script,
    also run that script's own fixture and test inside the staging dir, with an assertion that checks real
@@ -90,13 +90,13 @@ owns the two steps that have to be machine-enforced rather than trusted to prose
    that could go wrong — and ask. In an autonomous run there's no human at the keyboard, so this stop is a
    `NEEDS_INPUT` state (the vocabulary is `/autonomous-loop`'s), not a failure; promotion resumes when
    approval comes.
-5. **Land or discard.** On a yes, `bd-skill-stage commit <dir> local` atomically moves a local skill into
+5. **Land or discard.** On a yes, `.better-dev/bin/bd-skill-stage commit <dir> local` atomically moves a local skill into
    this repo's project skills dir (`.claude/skills/<name>`, discovered only here), and
-   `bd-skill-stage commit <dir> global` moves a global one into your host's own global skills dir
+   `.better-dev/bin/bd-skill-stage commit <dir> global` moves a global one into your host's own global skills dir
    (`~/.claude/skills/<name>`, seen across your repos) — either way refusing to clobber an existing skill,
    follow a symlink, or land outside the target root. The folder is taken from the frontmatter `name`, so
    name and folder always match. On a no, or after the retries are spent,
-   `bd-skill-stage discard <dir>` clears the staging dir.
+   `.better-dev/bin/bd-skill-stage discard <dir>` clears the staging dir.
 
 ## 5. Verify and record
 
@@ -105,7 +105,7 @@ output the prototype produced. If it drifted, surface the discrepancy rather tha
 commit; the caller deserves to see it.
 
 Record what the run taught through the memory contract: `.better-dev/bin/bd-mem learn "<lesson>"` for a
-durable technique, and `bd-mem remember "authored <skill> for <capability>"` so the next time that gap
+durable technique, and `.better-dev/bin/bd-mem remember "authored <skill> for <capability>"` so the next time that gap
 surfaces the choice is reused instead of re-created. Separately and optionally, a skill that proves broadly
 useful can be shared to the wider ecosystem for others to source (`/tool-sourcing` in reverse) — a distinct,
 deliberate choice, never automatic and unrelated to the local/global scoping above.

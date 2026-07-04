@@ -39,7 +39,7 @@ The steps:
 
 1. **Keep the map.** `contract.md`, `progress.md`, and `receipts.md` stay — they live in the primary
    checkout, untouched by anything that happens in the feature worktree. Read what the stalled attempt
-   learned. Fold any durable lesson into `contract.md` and record it (`bd-mem learn "<lesson>"`) so the
+   learned. Fold any durable lesson into `contract.md` and record it (`.better-dev/bin/bd-mem learn "<lesson>"`) so the
    rebuild doesn't re-enter the same dead end. Append a line to `progress.md` naming the restart and
    why.
 

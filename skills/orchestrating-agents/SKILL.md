@@ -67,7 +67,7 @@ and is re-read every turn. Move artifacts as files instead:
   it can't re-derive, an explicit output spec, and — when the worker will write files — the repo's
   high-consequence denylist with the standing instruction to escalate rather than edit those paths (settle
   `NEEDS_INPUT`), so a fresh worker doesn't discover the rule only at review. Not your session history.
-  `bd-dispatch brief <work-item> <role>` writes a skeleton into the shared ledger and prints its path.
+  `.better-dev/bin/bd-dispatch brief <work-item> <role>` writes a skeleton into the shared ledger and prints its path.
 - **Report** — the worker writes its full report to a file and returns only its terminal state, commits,
   a one-line verify summary, and concerns. Name the report file in the brief.
 - **Review inputs** — the reviewer gets the same brief, the report file, a diff package, and the
@@ -119,11 +119,11 @@ wire no router.
 Conversation memory doesn't survive compaction, and a controller that loses its place re-dispatches
 finished work — the most expensive failure there is.
 
-- Record each dispatch as a ledger receipt: `bd-dispatch record <work-item> <role> <state> [note]`, using
+- Record each dispatch as a ledger receipt: `.better-dev/bin/bd-dispatch record <work-item> <role> <state> [note]`, using
   the canonical terminal states — `DONE`, `DONE_WITH_CONCERNS`, `BLOCKED`, `NEEDS_INPUT`, `EXHAUSTED`,
   `NO_PROGRESS`. The ledger lives in the primary checkout's `.better-dev/ledger/<work-item>/`, shared
   across worktrees; `bd-dispatch` pins it there so a worker in a feature worktree records to the same
-  place. After a compaction, `bd-dispatch pending <work-item>` lists what isn't finished — resume those,
+  place. After a compaction, `.better-dev/bin/bd-dispatch pending <work-item>` lists what isn't finished — resume those,
   re-dispatch nothing already done.
 - You own the progress surface; isolated workers can't touch your todo list. Flip a task to in-progress
   before you spawn, and to done the moment you parse its receipt. Exactly one in-progress at a time.

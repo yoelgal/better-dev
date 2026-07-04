@@ -135,7 +135,7 @@ without touching the cause:
 - **Infra red** — the failure is in the environment, not the code: a lost runner, a network or registry
   hiccup, an out-of-memory kill, a dependency service down. It clears by waiting or recovering, not by
   editing code. Before settling `BLOCKED` on one, recall a prior recovery for that failure-signature
-  (`bd-mem recall "<signature>"`); apply it and retry once. Only a signature with no known recovery,
+  (`.better-dev/bin/bd-mem recall "<signature>"`); apply it and retry once. Only a signature with no known recovery,
   still red after the retry, settles `BLOCKED`.
 - **Genuine defect** — a real assertion, compile, contract, or logic failure in the code. This is the
   only red that earns a fix pass.
