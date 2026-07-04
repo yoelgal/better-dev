@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# bd-mem — better-dev memory contract: init / remember / learn / recall / persist-override / read / ledger.
+# bd-mem - better-dev memory contract: init / remember / learn / recall / persist-override / read / ledger.
 #
 # The four operations skills use are remember, recall, persist(-override) and read; `learn`, `init`, and
 # `ledger` are helpers. The backend is swappable via BETTER_DEV_MEMORY:
@@ -8,13 +8,13 @@
 #   mcp:<server>   memory lives in an MCP server; skills call that tool directly (bd-mem just says so)
 #
 # .better-dev is resolved at the PRIMARY checkout so every git worktree shares one memory + one ledger
-# (a feature worktree is a separate working tree — a cwd-relative .better-dev there would be private and
+# (a feature worktree is a separate working tree - a cwd-relative .better-dev there would be private and
 # `git clean`-able). This is the single place that resolution lives; other helpers defer to it.
 #
 # Reimplemented for better-dev from understanding; no source files copied.
 set -euo pipefail
 
-# Absolute path to self — selftest cd's into a temp dir.
+# Absolute path to self - selftest cd's into a temp dir.
 case "$0" in /*) SELF="$0" ;; *) SELF="$PWD/$0" ;; esac
 die() { printf 'bd-mem: %s\n' "$*" >&2; exit 1; }
 
@@ -22,12 +22,12 @@ BACKEND="${BETTER_DEV_MEMORY:-files}"
 case "$BACKEND" in
   files | "") ;;
   cmd:*) exec ${BACKEND#cmd:} "$@" ;;
-  mcp:*) printf 'bd-mem: backend %s — call the MCP memory tool directly for "%s".\n' "$BACKEND" "${1:-}" >&2; exit 3 ;;
+  mcp:*) printf 'bd-mem: backend %s - call the MCP memory tool directly for "%s".\n' "$BACKEND" "${1:-}" >&2; exit 3 ;;
   *) die "unknown BETTER_DEV_MEMORY backend: $BACKEND" ;;
 esac
 
 # Resolve .better-dev: an explicit BETTER_DEV_DIR wins; else the primary checkout's .better-dev
-# (git-common-dir points every worktree at the main .git — its parent is the primary root, pwd -P
+# (git-common-dir points every worktree at the main .git - its parent is the primary root, pwd -P
 # canonicalized so a worktree and the primary resolve to the SAME path); else cwd when not in git.
 resolve_bd() {
   if [ -n "${BETTER_DEV_DIR:-}" ]; then printf '%s' "$BETTER_DEV_DIR"; return; fi
@@ -61,7 +61,7 @@ ensure() {
 # --- ledger: the one durable per-work-item loop record, in the primary checkout ---------------------
 ledger_dir() { printf '%s/ledger/%s' "$BD_DIR" "$(slug "$1")"; }
 
-# Portable sha256 of a file's bytes — pins a contract approval to that exact text.
+# Portable sha256 of a file's bytes - pins a contract approval to that exact text.
 hash_file() { if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1"; else shasum -a 256 "$1"; fi | awk '{print $1}'; }
 
 ledger() {
@@ -72,12 +72,12 @@ ledger() {
     init)  # scaffold contract/progress/receipts (never clobber an existing contract from a front-end)
       [ $# -ge 1 ] || die "ledger init <work-item>"
       local d; d="$(ledger_dir "$1")"; mkdir -p "$d"
-      [ -f "$d/contract.md" ]  || printf '# Contract — %s\n\nDone-criteria (observable, graded not asserted — from /plan-grill or /diagnose):\n\n- [ ] \n\nPremise verified: \nRed-capable signal (already run once): \n' "$1" >"$d/contract.md"
-      [ -f "$d/progress.md" ]  || printf '# Progress — %s\n\nAppend-only recovery map: one settled step per line, then the terminal state.\nOn resume, trust this and `git log` over recollection.\n\n' "$1" >"$d/progress.md"
-      [ -f "$d/receipts.md" ]  || printf '# Receipts — %s\n\nPer-iteration detail: tried / result / learned / plan-delta.\n' "$1" >"$d/receipts.md"
+      [ -f "$d/contract.md" ]  || printf '# Contract - %s\n\nDone-criteria (observable, graded not asserted - from /plan-grill or /diagnose):\n\n- [ ] \n\nPremise verified: \nRed-capable signal (already run once): \n' "$1" >"$d/contract.md"
+      [ -f "$d/progress.md" ]  || printf '# Progress - %s\n\nAppend-only recovery map: one settled step per line, then the terminal state.\nOn resume, trust this and `git log` over recollection.\n\n' "$1" >"$d/progress.md"
+      [ -f "$d/receipts.md" ]  || printf '# Receipts - %s\n\nPer-iteration detail: tried / result / learned / plan-delta.\n' "$1" >"$d/receipts.md"
       printf '%s\n' "$d" ;;
     resume) [ $# -ge 1 ] || die "ledger resume <work-item>"
-      local d; d="$(ledger_dir "$1")"; [ -d "$d" ] || die "no ledger for '$1' — run: bd-mem ledger init '$1'"
+      local d; d="$(ledger_dir "$1")"; [ -d "$d" ] || die "no ledger for '$1' - run: bd-mem ledger init '$1'"
       printf '=== contract ===\n'; cat "$d/contract.md" 2>/dev/null || true
       printf '\n=== progress (tail) ===\n'; tail -n 20 "$d/progress.md" 2>/dev/null || true
       printf '\n=== last receipt ===\n'; awk 'BEGIN{RS="\n## "} END{if(NR>1)printf "## %s",$0}' "$d/receipts.md" 2>/dev/null || true ;;
@@ -99,7 +99,7 @@ ledger() {
       [ -f "$d/.approved" ]   || { echo "not approved" >&2; exit 1; }
       [ -f "$d/contract.md" ] || { echo "no contract.md" >&2; exit 1; }
       [ "$(hash_file "$d/contract.md")" = "$(cat "$d/.approved")" ] && echo approved \
-        || { echo "contract edited since approval — gate re-opened" >&2; exit 1; } ;;
+        || { echo "contract edited since approval - gate re-opened" >&2; exit 1; } ;;
     *) die "ledger where|dir|init|resume|put|read|list|approve|check-approval" ;;
   esac
 }

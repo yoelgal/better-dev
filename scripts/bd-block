@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# bd-block — idempotently write a marker-bounded managed block into a file.
+# bd-block - idempotently write a marker-bounded managed block into a file.
 #
 # Replaces the content between "<!-- BEGIN <name> -->" and "<!-- END <name> -->"
 # with the block body read from stdin, appending a fresh block if none exists.
 # Text outside the markers is never touched, and re-running with the same body
 # leaves the file byte-identical. Used to write the better-dev discovery block
-# into CLAUDE.md / AGENTS.md and to mirror overrides — anywhere a self-describing
+# into CLAUDE.md / AGENTS.md and to mirror overrides - anywhere a self-describing
 # block must update in place without clobbering the operator's own edits.
 #
 #   printf '...body...' | bd-block <file> [block-name]      # name defaults to better-dev

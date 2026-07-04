@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# bd-review-package — pin a fixed point and pack the diff a reviewer reads in one call.
+# bd-review-package - pin a fixed point and pack the diff a reviewer reads in one call.
 #
 # Writes commit list + stat summary + the net diff with wide context into ONE file under
 # .better-dev/review/, so a separated reviewer sees exactly the change and never crawls the
 # codebase. Uses the recorded BASE (not HEAD~1, which silently drops all but the last commit).
-# Fails fast on a bad ref or an empty diff — before any reviewer is dispatched — so the failure
+# Fails fast on a bad ref or an empty diff - before any reviewer is dispatched - so the failure
 # lands here, not inside a fresh worker with no way to report it.
 #
 # The package dir sits in the working tree (not under .git/, which agents are denied writes to)
@@ -29,9 +29,9 @@ default_base() {
       git merge-base "$ref" HEAD && return 0
     fi
   done
-  # No integration branch found — fall back to the parent commit.
+  # No integration branch found - fall back to the parent commit.
   git rev-parse --verify --quiet HEAD~1 >/dev/null && { git rev-parse HEAD~1; return 0; }
-  die "no BASE given and no staging/main/HEAD~1 to derive one from — pass BASE explicitly"
+  die "no BASE given and no staging/main/HEAD~1 to derive one from - pass BASE explicitly"
 }
 
 package() {
@@ -42,8 +42,8 @@ package() {
   git rev-parse --verify --quiet "$base" >/dev/null || die "bad BASE: $base"
   git rev-parse --verify --quiet "$head" >/dev/null || die "bad HEAD: $head"
 
-  # Fail fast on an empty diff — nothing to review.
-  git diff --quiet "$base..$head" && die "empty diff: $base..$head — nothing to review"
+  # Fail fast on an empty diff - nothing to review.
+  git diff --quiet "$base..$head" && die "empty diff: $base..$head - nothing to review"
 
   dir="$(git rev-parse --show-toplevel)/$BD_DIR/review"
   mkdir -p "$dir"
@@ -100,7 +100,7 @@ selftest() {
   [ $rc = 0 ] && echo "selftest OK" || die "selftest FAILED"
 }
 
-# Absolute path to self — selftest runs from a temp dir.
+# Absolute path to self - selftest runs from a temp dir.
 case "$0" in /*) SELF="$0" ;; *) SELF="$PWD/$0" ;; esac
 
 case "${1:-}" in

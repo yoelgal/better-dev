@@ -1,5 +1,5 @@
 better-dev
-Copyright 2026 Yoel Gal — MIT (see LICENSE)
+Copyright 2026 Yoel Gal - MIT (see LICENSE)
 
 better-dev is built by REIMPLEMENTING patterns and methods from the projects below.
 Ideas, techniques, and system designs are not copyrightable, so reimplemented
@@ -7,19 +7,19 @@ components are original work and owe no attribution. This file (a) lists any exp
 we actually copied verbatim/substantially, which MIT requires us to attribute, and
 (b) credits, as a courtesy, the projects whose patterns informed better-dev.
 
-── Copied verbatim / substantially (MIT — attribution required) ──
-  (none yet — updated as the build proceeds; kept minimal by preferring reimplementation)
+── Copied verbatim / substantially (MIT - attribution required) ──
+  (none yet - updated as the build proceeds; kept minimal by preferring reimplementation)
 
 ── Pattern inspiration (courtesy credit, not legally required) ──
-  mattpocock/skills          — Matt Pocock       (MIT)
-  obra/superpowers           — Jesse Vincent     (MIT)
-  vercel-labs/skills         — Vercel            (MIT)
-  vercel-labs/agent-browser  — Vercel            (MIT)
-  garrytan/gstack            — Garry Tan         (MIT)
-  orrgal1/claude-plugins     — orrgal1           (MIT)
-  nousresearch/hermes-agent  — Nous Research     (MIT)
-  DietrichGebert/ponytail    — DietrichGebert    (MIT)
+  mattpocock/skills - Matt Pocock       (MIT)
+  obra/superpowers - Jesse Vincent     (MIT)
+  vercel-labs/skills - Vercel            (MIT)
+  vercel-labs/agent-browser - Vercel            (MIT)
+  garrytan/gstack - Garry Tan         (MIT)
+  orrgal1/claude-plugins - orrgal1           (MIT)
+  nousresearch/hermes-agent - Nous Research     (MIT)
+  DietrichGebert/ponytail - DietrichGebert    (MIT)
 
-── NOT copied — inspiration only, NOT redistributable ──
-  Andrej Karpathy — LOOPS.md v060726 ("personal use permitted"). Concepts reimplemented
+── NOT copied - inspiration only, NOT redistributable ──
+  Andrej Karpathy - LOOPS.md v060726 ("personal use permitted"). Concepts reimplemented
   in our own words; no prose copied.

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# bd-worktree-guard — fail-closed ownership proof before removing a git worktree.
+# bd-worktree-guard - fail-closed ownership proof before removing a git worktree.
 #
 # A worktree teardown that reaches for `git worktree remove --force` or `rm -rf` can delete
 # the wrong path if the caller's state is poisoned (a stale variable, a mis-resolved slug).
@@ -26,20 +26,20 @@ guard() {
   # Not-a-repo / primary tripwire: a *linked* worktree carries a `.git` FILE (gitdir pointer);
   # the primary checkout carries a `.git` DIRECTORY. Refuse to force-remove a real checkout.
   if [ -d "$p/.git" ]; then
-    echo "guard: refusing — $p holds a .git directory (primary checkout or nested repo, not a linked worktree)" >&2
+    echo "guard: refusing - $p holds a .git directory (primary checkout or nested repo, not a linked worktree)" >&2
     return 1
   fi
-  [ -f "$p/.git" ] || { echo "guard: refusing — $p has no .git pointer file (not a linked worktree)" >&2; return 1; }
+  [ -f "$p/.git" ] || { echo "guard: refusing - $p has no .git pointer file (not a linked worktree)" >&2; return 1; }
 
   # Structural proof: the path must be a registered worktree of THIS repo.
   if ! git worktree list --porcelain 2>/dev/null | grep -qxF "worktree $p"; then
-    echo "guard: refusing — $p is not in 'git worktree list' for this repo" >&2
+    echo "guard: refusing - $p is not in 'git worktree list' for this repo" >&2
     return 1
   fi
 
   # Never remove the primary root even if it somehow reached here.
   primary="$(git worktree list --porcelain 2>/dev/null | awk '/^worktree /{print $2; exit}')"
-  [ "$p" != "$primary" ] || { echo "guard: refusing — $p is the primary worktree" >&2; return 1; }
+  [ "$p" != "$primary" ] || { echo "guard: refusing - $p is the primary worktree" >&2; return 1; }
 
   return 0
 }

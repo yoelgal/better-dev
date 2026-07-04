@@ -1,6 +1,6 @@
 ---
 name: worktree-branching
-description: Use when a feature or fix work-item is about to start and needs its own isolated branch off the integration branch — before planning, diagnosis, or the autonomous loop runs — or when detecting whether such a worktree already exists. For removing one after merge, see this skill's teardown notes.
+description: Use when a feature or fix work-item is about to start and needs its own isolated branch off the integration branch - before planning, diagnosis, or the autonomous loop runs - or when detecting whether such a worktree already exists. For removing one after merge, see this skill's teardown notes.
 allowed-tools:
   - Bash
   - Read
@@ -12,11 +12,11 @@ One job: give a work-item exactly one isolated git worktree on its own `feature/
 branch off the integration branch, so work runs in parallel without touching the primary
 checkout. Detect an existing one before making a new one; never make two.
 
-Native `git worktree` is the whole mechanism — no wrapper is added where git already does the job.
+Native `git worktree` is the whole mechanism - no wrapper is added where git already does the job.
 
 ## Before anything: read the overrides
 
-A project may already have opinions here — a different branch prefix (`feat/` not `feature/`), a
+A project may already have opinions here - a different branch prefix (`feat/` not `feature/`), a
 different integration branch (`develop` not `staging`), a different placement. Read them first and
 let them win:
 
@@ -27,7 +27,7 @@ let them win:
 
 Detect the layout, don't impose one. What the repo already does is the default.
 
-## Step 0 — are you already isolated?
+## Step 0 - are you already isolated?
 
 Before creating anything, check whether this session is already inside a linked worktree:
 
@@ -37,15 +37,15 @@ GIT_COMMON=$(cd "$(git rev-parse --git-common-dir)" 2>/dev/null && pwd -P)
 BRANCH=$(git branch --show-current)
 ```
 
-If `GIT_DIR != GIT_COMMON` you are already in a worktree (or a submodule — the two look alike;
+If `GIT_DIR != GIT_COMMON` you are already in a worktree (or a submodule - the two look alike;
 `edge-cases.md` has the one-line submodule guard). When the branch already matches this work-item,
 this is a re-run: report the existing worktree and stop. Nothing to create. Hand straight to the
 next skill.
 
-If `GIT_DIR == GIT_COMMON` you are in the primary checkout — the place features branch *from*, not
+If `GIT_DIR == GIT_COMMON` you are in the primary checkout - the place features branch *from*, not
 *into*. Continue to Step 1.
 
-## Step 1 — resolve the branch and its base
+## Step 1 - resolve the branch and its base
 
 A work-item is a **feature** or a **fix**. The prefix decides the base branch:
 
@@ -57,28 +57,28 @@ A work-item is a **feature** or a **fix**. The prefix decides the base branch:
 | hotfix    | `hotfix/<slug>`  | `main`                  |
 
 Apply any override from the read above (e.g. prefix `feat/`, integration `develop`) before building
-the name. Derive the slug from the work-item title — lowercase, non-alphanumerics to single dashes,
+the name. Derive the slug from the work-item title - lowercase, non-alphanumerics to single dashes,
 trimmed:
 
 ```bash
 slug=$(printf '%s' "$title" | tr 'A-Z' 'a-z' | tr -cs 'a-z0-9' '-' | sed 's/^-//;s/-$//')
-branch="feature/$slug"        # or fix/ · chore/ · hotfix/ — honor the override prefix
+branch="feature/$slug"        # or fix/ · chore/ · hotfix/ - honor the override prefix
 base="staging"                # hotfix → main; honor the integration override
 ```
 
-Confirm the base branch actually exists in git before branching off it — a base named in prose isn't
+Confirm the base branch actually exists in git before branching off it - a base named in prose isn't
 real until `git` shows it (`git rev-parse --verify "$base"` or `origin/$base`). A missing integration
 branch is an onboarding gap, not something to invent here.
 
-## Step 2 — create the worktree
+## Step 2 - create the worktree
 
-**Prefer a native tool.** If the harness offers one — a tool named like `EnterWorktree` /
-`WorktreeCreate`, a `/worktree` command, or a `--worktree` flag — use it and skip the git commands.
+**Prefer a native tool.** If the harness offers one - a tool named like `EnterWorktree` /
+`WorktreeCreate`, a `/worktree` command, or a `--worktree` flag - use it and skip the git commands.
 Running `git worktree add` alongside a native tool leaves phantom state the harness can't see. Only
 fall through to git when there is no native tool.
 
 **Git fallback.** Place worktrees under `.worktrees/` at the repo root (gitignored, discoverable);
-a sibling `../<repo>-<slug>` layout is an override some repos prefer — see `edge-cases.md`. Guard the
+a sibling `../<repo>-<slug>` layout is an override some repos prefer - see `edge-cases.md`. Guard the
 placement, then branch off the *base*, not off HEAD:
 
 ```bash
@@ -91,9 +91,9 @@ git worktree add -b "$branch" "$path" "origin/$base" 2>/dev/null \
 
 If `$path` already exists or the branch is already checked out somewhere, this is a re-detect: point
 at the existing worktree rather than forcing a duplicate. If `git worktree add` fails on a sandbox
-permission error, say so and work in place — `edge-cases.md` covers that fallback.
+permission error, say so and work in place - `edge-cases.md` covers that fallback.
 
-## Step 3 — record it, then hand off
+## Step 3 - record it, then hand off
 
 Write the worktree's location into the ledger in the **primary checkout** (shared across worktrees,
 so a later session or a restart can find it):
@@ -105,7 +105,7 @@ printf 'branch: %s\nbase: %s\nworktree: %s\n' "$branch" "$base" "$(cd "$path" &&
 `bd-mem` resolves the primary checkout's ledger for you (the same path from any worktree), so there's
 no hand-rolled `git-common-dir` math to get subtly wrong.
 
-Now the interlock. When this skill **created** a new worktree, the work lives there — but the agent
+Now the interlock. When this skill **created** a new worktree, the work lives there - but the agent
 cannot move its own harness session into that directory. So it hands off and stops rather than
 pretending to continue:
 
@@ -122,8 +122,8 @@ the typed front-end, then `/autonomous-loop` to drive the work.
 ## Finishing up
 
 Removing a worktree after its PR merges is a destructive operation with a strict safe order and a
-fail-closed ownership check. Read `teardown.md` when the work-item is done — don't improvise a
+fail-closed ownership check. Read `teardown.md` when the work-item is done - don't improvise a
 `git worktree remove --force` or `rm -rf` from memory.
 
-For the trickier detection cases — submodules, detached HEAD, native-tool phantom state, the sibling
-placement override, sandbox denial — read `edge-cases.md`.
+For the trickier detection cases - submodules, detached HEAD, native-tool phantom state, the sibling
+placement override, sandbox denial - read `edge-cases.md`.

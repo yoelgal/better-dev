@@ -1,9 +1,9 @@
 # Driving a browser check with a CDP CLI
 
-A how-to for the `agent-browser`-style tool sourced in the main skill — a self-contained command-line browser
+A how-to for the `agent-browser`-style tool sourced in the main skill - a self-contained command-line browser
 that speaks Chrome DevTools Protocol, so a check is a handful of shell commands with no test framework to
 stand up. Commands below use `agent-browser` as the name; a differently-named CDP CLI exposes the same shape.
-For the exact flags of the tool you sourced, read its own `SKILL.md` or `--help` — this is the pattern, not a
+For the exact flags of the tool you sourced, read its own `SKILL.md` or `--help` - this is the pattern, not a
 frozen reference.
 
 First run needs a browser binary: `agent-browser install` downloads Chrome for Testing once (it also detects
@@ -12,7 +12,7 @@ each command below continues the same page.
 
 ## The core rhythm: snapshot, act by ref, observe
 
-The reliable loop is *snapshot the page, then act on what the snapshot named* — not guess selectors blind.
+The reliable loop is *snapshot the page, then act on what the snapshot named* - not guess selectors blind.
 
 ```
 agent-browser open http://localhost:3000/dashboard   # launch + navigate
@@ -23,7 +23,7 @@ agent-browser screenshot dashboard.png                # capture what a user woul
 agent-browser close
 ```
 
-Snapshot refs are stable within a page state but go stale after the DOM changes — re-snapshot after a
+Snapshot refs are stable within a page state but go stale after the DOM changes - re-snapshot after a
 navigation or a click that re-renders before using a new ref. A click fails early if another element (a
 consent banner, a modal) covers the target; dismiss the covering element the error names, re-snapshot, then
 retry.
@@ -36,12 +36,12 @@ selectors work too (`click "#submit"`).
 
 Match the assertion to what step 1 of the main skill named:
 
-- **Text or element present** — `get text <sel>`, or `is visible <sel>` / `is enabled <sel>` / `is checked
+- **Text or element present** - `get text <sel>`, or `is visible <sel>` / `is enabled <sel>` / `is checked
   <sel>` for a boolean.
-- **Reached a URL** — `get url`, or gate on it with `wait --url "**/success"`.
-- **Rendered content** — `read` with no URL returns the active tab's rendered DOM as agent-friendly text,
+- **Reached a URL** - `get url`, or gate on it with `wait --url "**/success"`.
+- **Rendered content** - `read` with no URL returns the active tab's rendered DOM as agent-friendly text,
   including client-side updates and auth state; good for asserting on copy without scraping HTML.
-- **Visual** — `screenshot [path]` (add `--full` for the full page, `--annotate` to number elements). A saved
+- **Visual** - `screenshot [path]` (add `--full` for the full page, `--annotate` to number elements). A saved
   image is the artifact a human or a visual-diff step checks; capture it into the ledger for the work item.
 
 Settle the page before asserting, so the check isn't racing a spinner: `wait --text "Welcome"`, `wait "#app"
@@ -49,7 +49,7 @@ Settle the page before asserting, so the check isn't racing a spinner: `wait --t
 
 ## Running the whole check in one shot
 
-`batch` runs several commands in one invocation, avoiding per-command startup — the natural form for a check
+`batch` runs several commands in one invocation, avoiding per-command startup - the natural form for a check
 the loop fires as a single step. `--bail` stops on the first failure, which is what you want for a
 pass/fail gate:
 
@@ -61,13 +61,13 @@ agent-browser batch --bail \
   "screenshot dashboard.png"
 ```
 
-## Modes — pick per the page under test
+## Modes - pick per the page under test
 
-- **Headless** (default) — no visible window, the right choice for CI and the loop's routine runs.
-- **Real Chrome with a profile** — drives an actual Chrome using a logged-in profile, so a page behind auth
+- **Headless** (default) - no visible window, the right choice for CI and the loop's routine runs.
+- **Real Chrome with a profile** - drives an actual Chrome using a logged-in profile, so a page behind auth
   renders with real cookies instead of a fresh anonymous session. This is the mode for verifying
   authenticated flows; it's the productized version of hand-rolling a cookie'd Playwright render.
-- **Cloud / remote** — a remote browser session, for parallel checks across dispatched workers or when the
+- **Cloud / remote** - a remote browser session, for parallel checks across dispatched workers or when the
   local machine shouldn't run the browser.
 
 Headless suits most done-criteria; reach for a real profile only when the check needs a logged-in state, and

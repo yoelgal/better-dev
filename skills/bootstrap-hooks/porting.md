@@ -12,7 +12,7 @@ The note is the same paragraph; the JSON envelope around it is not.
 - **SessionStart, Copilot / other SDK hosts:** top-level `{"additionalContext":"…"}`.
 - **SubagentStart, Claude Code:** the note is dropped unless wrapped in
   `{"hookSpecificOutput":{"hookEventName":"SubagentStart","additionalContext":"…"}}`. Raw stdout that
-  works for a session silently injects nothing here — the failure is invisible, so this shape is the
+  works for a session silently injects nothing here - the failure is invisible, so this shape is the
   single most important thing to get right when adding a subagent hook.
 - **SubagentStart, Codex:** same nested shape, plus a top-level `systemMessage`.
 
@@ -31,7 +31,7 @@ de-duplicating is why the scripts branch to emit exactly one, rather than emitti
   line; on macOS/Linux the direct `bash "…"` command in `hooks.json` is enough.
 - **Never read stdin.** A hook that blocks reading stdin can freeze the session, so detection uses the
   working directory, not the JSON the host would pipe in.
-- **Single-pass JSON escape.** Each `${s//old/new}` is one C-level pass — fast enough to run on every
+- **Single-pass JSON escape.** Each `${s//old/new}` is one C-level pass - fast enough to run on every
   session start without a perceptible delay.
 
 ## Adding a subagent hook for another host
@@ -39,5 +39,5 @@ de-duplicating is why the scripts branch to emit exactly one, rather than emitti
 A host earns per-worker re-injection only if it exposes a subagent-spawn hook. If it does: register a
 command that runs `bd-subagent-start`, and confirm the host reads a nested
 `hookSpecificOutput.additionalContext` (or find the field it does read and add a branch in `emit`).
-If it exposes no such event, leave it at session-level awareness — that note still lands on the parent
+If it exposes no such event, leave it at session-level awareness - that note still lands on the parent
 thread, and forcing a workaround isn't worth the complexity.

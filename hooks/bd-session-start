@@ -4,7 +4,7 @@
 # When a session starts inside a repo that has better-dev installed (a
 # `.better-dev/` scaffold), emit a short awareness note so the agent knows the
 # practices are here and where the project's overrides live. When better-dev is
-# not installed, this is a no-op — it never errors and never blocks the session.
+# not installed, this is a no-op - it never errors and never blocks the session.
 #
 # Reimplemented for better-dev from understanding of superpowers' session-start
 # (MIT, Jesse Vincent): the single-pass JSON escape, the three-way platform
@@ -28,7 +28,7 @@ find_bd_root() {
   return 1
 }
 
-# Single C-level pass per substitution — fast, and safe for embedding in JSON.
+# Single C-level pass per substitution - fast, and safe for embedding in JSON.
 escape_for_json() {
   local s="$1"
   s="${s//\\/\\\\}"
@@ -44,7 +44,7 @@ escape_for_json() {
 # (CLAUDE_PLUGIN_ROOT); if it isn't a git checkout with an upstream we say
 # nothing. A bounded fetch refreshes the count when we can time-box it; when we
 # can't (no `timeout`), we skip the fetch and report from the last-known
-# upstream rather than risk a hang. Never pulls — unless the project opted into
+# upstream rather than risk a hang. Never pulls - unless the project opted into
 # ff-only auto-update in overrides, which can only fast-forward, never clobber.
 update_nudge() {
   local overrides="$1" clone="${CLAUDE_PLUGIN_ROOT:-}" tobin behind
@@ -62,7 +62,7 @@ update_nudge() {
     printf ' better-dev: auto-updated %s commit(s) (ff-only).' "$behind"
     return 0
   fi
-  printf ' better-dev: update available (%s commit(s)) — git -C %s pull' "$behind" "$clone"
+  printf ' better-dev: update available (%s commit(s)) - git -C %s pull' "$behind" "$clone"
 }
 
 emit() {
@@ -71,7 +71,7 @@ emit() {
   # note never sends the agent to an empty file.
   note=""
   if [ -s "$root/.better-dev/overrides.md" ]; then
-    note=" This project records overrides in .better-dev/overrides.md that take precedence over any built-in default — read them before applying one."
+    note=" This project records overrides in .better-dev/overrides.md that take precedence over any built-in default - read them before applying one."
   fi
   context="better-dev practices are installed in this repo. The project's conventions and the list of available skills (onboard, plan-grill, diagnose, autonomous-loop, review, orchestrating-agents, worktree-branching, and more) live in a managed better-dev block in this project's CLAUDE.md or AGENTS.md; each skill self-describes through its description.${note}"
   context="${context}$(update_nudge "$root/.better-dev/overrides.md")"

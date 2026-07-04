@@ -1,7 +1,7 @@
-# Stuck-check — the rabbit-hole detector
+# Stuck-check - the rabbit-hole detector
 
 A read-only check that answers one question for the loop: still making progress, or spinning? It reads
-cheap signal only — the tail of `receipts.md`, `git log --oneline`, and `git diff --stat` since the
+cheap signal only - the tail of `receipts.md`, `git log --oneline`, and `git diff --stat` since the
 loop began. No deep re-reads; a long loop is not the same as a stuck one, and finding out shouldn't
 cost more than a pass.
 
@@ -22,14 +22,14 @@ more; a hard trip is what calls this check.
 |---|---|---|---|
 | Same failure signature repeats | ≥3 | 2 | wrong assumption |
 | Same file edited, result unchanged | ≥4 | 3 | oscillation / missing context |
-| Diff grows, pass-count flat | trend | — | bloat / wrong assumption |
+| Diff grows, pass-count flat | trend | - | bloat / wrong assumption |
 | No new learning recorded across iterations | ≥3 | 2 | spinning / missing context |
-| Search churn, no new files touched | trend | — | dead-end / missing context |
-| Decisions logged, no behavior moved | trend | — | over-deciding / unclear goal |
+| Search churn, no new files touched | trend | - | dead-end / missing context |
+| Decisions logged, no behavior moved | trend | - | over-deciding / unclear goal |
 
 ## Score the cause
 
-Score each root cause 0–3 against the evidence, then name the top one if it leads the next by at least
+Score each root cause 0-3 against the evidence, then name the top one if it leads the next by at least
 1. A tie is `ambiguous`.
 
 | Root cause | Evidence |
@@ -42,16 +42,16 @@ Score each root cause 0–3 against the evidence, then name the top one if it le
 
 ## Verdict
 
-- **confirmed** — top score ≥2, leads by ≥1, and a hard signal tripped. Settle `NO_PROGRESS`; the loop
+- **confirmed** - top score ≥2, leads by ≥1, and a hard signal tripped. Settle `NO_PROGRESS`; the loop
   restarts from the contract (`restart.md`).
-- **suspected** — top ≥2, or a soft signal tripped, with no hard trip. Keep going, and raise the
+- **suspected** - top ≥2, or a soft signal tripped, with no hard trip. Keep going, and raise the
   tripped signal's threshold by one so a benign streak isn't mistaken for a wall.
-- **none** — top ≤1 across the board. Keep going.
+- **none** - top ≤1 across the board. Keep going.
 
 ## Honesty
 
-The named finding is one concrete line — "assumes the token is set before the handler runs; the failure
+The named finding is one concrete line - "assumes the token is set before the handler runs; the failure
 says it never arrives," not "something's off." If the finding can only be stated vaguely, the verdict
 is lower than it looked. Soft signals never reach `confirmed` on their own; confirming takes a hard trip
-plus a cause that scores. High counters with no cause that fits are `none` — sometimes a loop is just
+plus a cause that scores. High counters with no cause that fits are `none` - sometimes a loop is just
 long. When in doubt, keep going and look again next signal; a false `confirmed` throws away good work.

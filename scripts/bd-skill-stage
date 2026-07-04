@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# bd-skill-stage — the test-before-promote machinery for a freshly authored skill.
+# bd-skill-stage - the test-before-promote machinery for a freshly authored skill.
 #
 # The /self-extension flow drafts a candidate SKILL.md in a throwaway staging dir, gates it with a
 # runnable check, and only lands it in the live skills tree on pass + approval. This helper owns the
 # two operations that must be enforced by a machine rather than trusted to prose: the lint gate (the
 # "test" for a prose skill) and the atomic commit (which refuses to clobber, follow a symlink, or land
-# outside the skills root — the same defenses that stop a stray recursive move from wiping a skills
+# outside the skills root - the same defenses that stop a stray recursive move from wiping a skills
 # tree). Staging is a temp dir; discard is a bounded rm. Nothing touches the live tree until `commit`.
 #
 #   bd-skill-stage dir                          # mint a staging dir, print its path
@@ -16,13 +16,13 @@
 #   bd-skill-stage selftest
 #
 # The commit target enforces the scope split. `local` lands the skill in this repo's own project skills
-# dir (.claude/skills/<name>), discovered only here — reversible and cheap. `global` lands it in the user's
-# own global host skills dir (~/.claude/skills/<name>), so every repo they work in sees it — still the
+# dir (.claude/skills/<name>), discovered only here - reversible and cheap. `global` lands it in the user's
+# own global host skills dir (~/.claude/skills/<name>), so every repo they work in sees it - still the
 # user's skill, sitting alongside the installed better-dev tool but never inside it (a tool `git pull` never
 # touches it), and never packaged into better-dev or pushed upstream.
 #
 # The landing folder is taken from the frontmatter `name`, so name == folder holds by construction.
-# The lint is a mechanical tripwire, not a restatement of the standard — the authoring rules live in
+# The lint is a mechanical tripwire, not a restatement of the standard - the authoring rules live in
 # the writing-skills skill; failures here point back to it.
 #
 # Reimplemented for better-dev from understanding; no source files copied.
@@ -80,17 +80,17 @@ lint() {
   if [ -z "$desc" ]; then add "frontmatter is missing 'description' (the only hard fail in writing-skills)"
   else
     [ "${#desc}" -le 1024 ] || add "description exceeds 1024 chars"
-    case "$desc" in "Use when"*) ;; *) add "description must state triggering conditions — start it with \"Use when …\"" ;; esac
+    case "$desc" in "Use when"*) ;; *) add "description must state triggering conditions - start it with \"Use when …\"" ;; esac
   fi
 
   printf '%s\n' "$fm" | grep -Eq '^(version|license):' \
-    && add "drop version/license from frontmatter — writing-skills keeps it to name + description"
+    && add "drop version/license from frontmatter - writing-skills keeps it to name + description"
 
   # No @-links / @-imports: an @ glued to a path token force-loads a file on every run.
   printf '%s\n' "$body" | grep -Eq '(^|[[:space:](])@[A-Za-z0-9._/-]+/' \
-    && add "body uses an @-link/import — reach siblings by a prose pointer, not @path"
+    && add "body uses an @-link/import - reach siblings by a prose pointer, not @path"
 
-  [ "$(wc -c <"$f")" -le 100000 ] || add "SKILL.md exceeds 100000 chars — split into sibling .md files"
+  [ "$(wc -c <"$f")" -le 100000 ] || add "SKILL.md exceeds 100000 chars - split into sibling .md files"
 
   if [ -n "$fails" ]; then
     printf 'lint FAILED for %s:\n%s' "$f" "$fails" >&2
@@ -111,7 +111,7 @@ commit() {
   esac
   local name; name="$(staged_name "$dir/SKILL.md")"
 
-  [ -L "$dir" ] && die "staged dir is a symlink — refusing to commit through it"
+  [ -L "$dir" ] && die "staged dir is a symlink - refusing to commit through it"
   [ -d "$dir" ] || die "staged path is not a directory: $dir"
 
   mkdir -p "$root"
@@ -119,7 +119,7 @@ commit() {
   dest="$realroot/$name"
   case "$dest" in "$realroot"/*) ;; *) die "destination escapes the skills root" ;; esac
   if [ -e "$dest" ] || [ -L "$dest" ]; then
-    die "a skill named '$name' already exists at $dest — pick a different name or remove it first"
+    die "a skill named '$name' already exists at $dest - pick a different name or remove it first"
   fi
   mv "$dir" "$dest"
   printf '%s\n' "$dest"
@@ -184,7 +184,7 @@ selftest() {
   ( cd "$td" && "$SELF" commit "$s2" local >/dev/null ) || { echo "FAIL: default local root"; return 1; }
   [ -f "$td/.claude/skills/sample-skill/SKILL.md" ] || { echo "FAIL: local default landed wrong"; return 1; }
 
-  # global lands in the user's global host skills dir (default $HOME/.claude/skills) — tested under a temp
+  # global lands in the user's global host skills dir (default $HOME/.claude/skills) - tested under a temp
   # HOME so it never touches the real one; still the user's skill, not the tool and not upstream.
   s3="$("$SELF" dir)"; good_skill >"$s3/SKILL.md"
   ghome="$(cd "$(mktemp -d)" && pwd -P)"

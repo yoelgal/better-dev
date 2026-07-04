@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # better-dev SubagentStart hook.
 #
-# SessionStart context reaches the parent thread only — a freshly dispatched
+# SessionStart context reaches the parent thread only - a freshly dispatched
 # subagent never sees it. So when a worker is spawned inside a better-dev repo,
 # re-inject a SHORT note that the practices (and any project overrides) still
 # apply to its task. A no-op when better-dev is not installed.
 #
 # The load-bearing difference from SessionStart: for a subagent, Claude Code
-# drops raw stdout — the context is only picked up when wrapped in
+# drops raw stdout - the context is only picked up when wrapped in
 # hookSpecificOutput.{hookEventName,additionalContext}. (Pattern understood from
 # ponytail's runtime.js, MIT, DietrichGebert; reimplemented in bash, not copied.)
 #
@@ -42,7 +42,7 @@ emit() {
   local root="$1" note context escaped
   note=""
   [ -s "$root/.better-dev/overrides.md" ] && note=" Honor .better-dev/overrides.md before any built-in default."
-  context="You're a worker dispatched in a better-dev repo. The project's practices still apply to your task — see /orchestrating-agents for how dispatch and file handoffs work.${note} Do the specific task you were briefed with; no need to re-run onboarding."
+  context="You're a worker dispatched in a better-dev repo. The project's practices still apply to your task - see /orchestrating-agents for how dispatch and file handoffs work.${note} Do the specific task you were briefed with; no need to re-run onboarding."
   escaped=$(escape_for_json "$context")
 
   # Codex reads a nested hookSpecificOutput too, but also surfaces a top-level

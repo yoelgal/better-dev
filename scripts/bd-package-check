@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# bd-package-check — validate the whole better-dev package before install or release.
+# bd-package-check - validate the whole better-dev package before install or release.
 #
 # Lints every skill (frontmatter minimal + name==folder + "Use when" description + no @-links + calm
 # voice), runs every helper's selftest, validates the JSON manifests, and checks that backtick-wrapped
 # /skill references resolve (to a shipped skill or a known host-optional builtin). Non-zero exit on any
-# failure — a release / CI gate, and what `/self-extension` runs before promoting a freshly authored skill.
+# failure - a release / CI gate, and what `/self-extension` runs before promoting a freshly authored skill.
 set -uo pipefail
 
 # Package root = the dir holding skills/ + scripts/ (run from anywhere in the dev repo).
@@ -19,7 +19,7 @@ bad() { printf '  \033[31m✗\033[0m %s\n' "$*"; fail=1; }
 # /refs a skill may compose from the host but better-dev does not ship.
 HOST_OPTIONAL="code-review security-review verify domain-modeling"
 
-# SKILL body with frontmatter, fenced code, inline code, and quoted spans removed — so a backticked
+# SKILL body with frontmatter, fenced code, inline code, and quoted spans removed - so a backticked
 # `@AGENTS.md` or a quoted "MUST" (naming a token to forbid it) doesn't read as a real violation.
 prose_of() {
   awk 'NR==1&&$0=="---"{f=1;next} f&&$0=="---"{f=0;b=1;next} b{print}' "$1" \
@@ -68,7 +68,7 @@ for j in .claude-plugin/plugin.json hooks/hooks.json; do
 done
 
 # Informational only: a backtick `/word` is used for real skill invocations, but also for illustrative
-# examples, placeholders (`/name`), URL paths (`/dashboard`), and flow names (`/learn`) — too ambiguous to
+# examples, placeholders (`/name`), URL paths (`/dashboard`), and flow names (`/learn`) - too ambiguous to
 # gate on. Surface unknowns for a human glance; don't fail the build.
 echo "== cross-skill /refs (informational) =="
 present="$(ls skills/ 2>/dev/null | tr '\n' ' ')"

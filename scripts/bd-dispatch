@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# orchestrating-agents-dispatch.sh — installs as .better-dev/bin/bd-dispatch.
+# orchestrating-agents-dispatch.sh - installs as .better-dev/bin/bd-dispatch.
 #
-# Prepare and RECORD subagent dispatches. It cannot spawn the host's agent — the
+# Prepare and RECORD subagent dispatches. It cannot spawn the host's agent - the
 # dispatch itself is prose the orchestrator runs through the host primitive
 # (Claude Code Task / Workflow, or an equivalent). This helper only owns the
 # file-handoff + ledger bookkeeping around a dispatch, so a run survives
@@ -29,7 +29,7 @@ case "$0" in /*) SELF="$0" ;; *) SELF="$PWD/$0" ;; esac
 die() { printf 'bd-dispatch: %s\n' "$*" >&2; exit 1; }
 
 # The shared .better-dev/ledger (primary-checkout rooted, worktree-safe, slug-normalized) is resolved
-# in ONE place — bd-mem, our sibling. bd-dispatch owns only the dispatch bookkeeping on top of it.
+# in ONE place - bd-mem, our sibling. bd-dispatch owns only the dispatch bookkeeping on top of it.
 BD_MEM="$(dirname "$SELF")/bd-mem"
 
 ledger_dir() {
@@ -57,20 +57,20 @@ case "$op" in
 <!-- One self-contained task. The worker starts with zero context: give absolute
      paths, inline excerpts for anything it cannot re-derive from the repo, and
      an explicit output spec. Do not paste session history or prior-task
-     summaries — a brief is one task, not the run's story so far. -->
+     summaries - a brief is one task, not the run's story so far. -->
 
 ## Task
 <one bounded task>
 
-## Context (inline — the worker cannot see your session)
+## Context (inline - the worker cannot see your session)
 - files / interfaces it touches:
 - excerpts it needs verbatim:
 - decisions from earlier work it cannot know:
 
-## Constraints (the reviewer's attention lens — copy binding values verbatim)
+## Constraints (the reviewer's attention lens - copy binding values verbatim)
 - exact values / formats / "same as X" relationships:
 EOF
-    # A file-writing role carries the repo's blast-radius denylist inline — a fresh worker
+    # A file-writing role carries the repo's blast-radius denylist inline - a fresh worker
     # can't see the repo's guardrails, so it escalates (settles NEEDS_INPUT) rather than
     # editing those paths. Read-only review roles don't write files, so they skip this slot.
     case "$role" in
@@ -80,7 +80,7 @@ EOF
 ## High-consequence paths (escalate, don't edit)
 <!-- Paste the recalled denylist below: .better-dev/bin/bd-mem recall "safety", with
      .better-dev/overrides.md adjustments applied (they win). If this task turns out to
-     touch one of these paths, settle NEEDS_INPUT with what you found and what you need —
+     touch one of these paths, settle NEEDS_INPUT with what you found and what you need -
      don't edit through it and don't work around it; the blast radius is a human's call. -->
 - recalled denylist (orchestrator pastes here):
 EOF

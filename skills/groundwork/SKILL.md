@@ -1,10 +1,10 @@
 ---
 name: groundwork
-description: Use when a greenfield project or a large new area/epic is starting and needs a shared foundation before feature work can safely fan out in parallel — the step above /plan-grill, which grills a single feature. For one feature reach for /plan-grill; for a bug, /diagnose.
+description: Use when a greenfield project or a large new area/epic is starting and needs a shared foundation before feature work can safely fan out in parallel - the step above /plan-grill, which grills a single feature. For one feature reach for /plan-grill; for a bug, /diagnose.
 argument-hint: "[project idea or epic name]"
 ---
 
-# groundwork — from idea to a parallelizable foundation
+# groundwork - from idea to a parallelizable foundation
 
 Take a project idea or a large new area/epic to the point where parallel feature work can safely
 begin. One job: design the **minimum shared foundation** the first wave of features would collide on,
@@ -12,7 +12,7 @@ land it first, and **carve the rest into disjoint work-items** that N worktrees 
 without stepping on each other.
 
 This is the step above `/plan-grill`. `/plan-grill` grills one feature into a done-contract; groundwork
-sits over it — it shapes the whole idea, builds the substrate, then hands each carved work-item down to
+sits over it - it shapes the whole idea, builds the substrate, then hands each carved work-item down to
 `/plan-grill` (feature) or `/diagnose` (fix). It runs after `/onboard` has wired the tool and the
 branching base, and before any single feature is grilled.
 
@@ -22,17 +22,17 @@ architecture conventions, or a house way of slicing work wins over any default b
 ## 1. Shape the idea
 
 Settle the *what* and the broad shape before the substrate: the stack, the broad architecture, and the
-core domain model — enough to know what the foundation has to hold, not the full design.
+core domain model - enough to know what the foundation has to hold, not the full design.
 
 If `/to-prd`, `/codebase-design`, or `/domain-modeling` are installed, compose them rather than
 re-deriving: `/to-prd` synthesizes the problem, solution, and user stories; `/codebase-design` gives the
 module/interface/seam/depth vocabulary for the boundaries you'll draw in step 2; `/domain-modeling` pins
 the glossary and any hard-to-reverse decision as it crystallizes. A clear gap one of them would fill is
-a `/tool-sourcing` candidate — never a blocker.
+a `/tool-sourcing` candidate - never a blocker.
 
 Otherwise run a lean built-in grill, reusing `/plan-grill`'s discipline: one question at a time, each
 carrying the answer you'd pick and why, exploring the codebase before spending the user's attention, and
-confirming each decision as it locks. The aim is a shared understanding of the idea's shape — the
+confirming each decision as it locks. The aim is a shared understanding of the idea's shape - the
 per-feature grilling happens later, in `/plan-grill`.
 
 ## 2. Design the minimum shared foundation
@@ -46,18 +46,18 @@ The foundation is the substrate later features would collide on. Design that, an
 - naming and domain vocabulary.
 
 The depth boundary is a bright line, and it runs the opposite way from a waterfall: design **only what
-the first wave of parallel features would fight over** — not an up-front architecture for the whole
+the first wave of parallel features would fight over** - not an up-front architecture for the whole
 system. The test for every candidate piece is one question: *would two parallel features collide on
 this?* Yes → it's foundation, settle it now. No → leave it; the loops discover it feature by feature. A
 shared `User` type two features both import is foundation; the internals of one feature's cache are not.
-Designing past the collision line is the waterfall this skill exists to avoid — the loops are better at
+Designing past the collision line is the waterfall this skill exists to avoid - the loops are better at
 the rest than a design done before any code exists.
 
 ## 3. Land the foundation first
 
 The foundation is itself the first work-item, and it lands on the integration branch before anything
-fans out. Take it through the normal pipeline — its own worktree off staging (`/worktree-branching`),
-grilled by `/plan-grill`, driven by `/autonomous-loop`, merged to staging — *before* any parallel work
+fans out. Take it through the normal pipeline - its own worktree off staging (`/worktree-branching`),
+grilled by `/plan-grill`, driven by `/autonomous-loop`, merged to staging - *before* any parallel work
 starts. Every carved work-item then bases off staging-with-foundation, so the shared substrate exists
 once, in one place, instead of being invented N different ways in N worktrees. This is the
 foundation-first order the branching model already anticipates (`/worktree-branching`).
@@ -66,21 +66,21 @@ foundation-first order the branching model already anticipates (`/worktree-branc
 
 This is the distinctive output. With the foundation settled, cut everything else into work-items that N
 worktrees can build in parallel without colliding. Each work-item gets a name and an explicit list of
-the files, directories, or modules it **owns** — and the ownership sets should barely overlap. The less
+the files, directories, or modules it **owns** - and the ownership sets should barely overlap. The less
 two work-items share, the less their worktrees fight at merge time.
 
 When two candidate items both want the same file, that shared thing is usually a signal it belonged in
-the foundation — push it down into step 2 rather than letting both items edit it. What can't be pushed
+the foundation - push it down into step 2 rather than letting both items edit it. What can't be pushed
 down gets **sequenced**: the dependent item runs in a later wave, off staging, once the item it depends
 on has merged. The output is a list of named work-items, each with its owned areas, its base, and
-whether it's a feature (`/plan-grill`) or a fix (`/diagnose`). For the fuller method — the file-ownership
+whether it's a feature (`/plan-grill`) or a fix (`/diagnose`). For the fuller method - the file-ownership
 map, the contention check across many items, the three ways to resolve a collision, and ordering items
-into waves — read `carving.md`.
+into waves - read `carving.md`.
 
 ## 5. Hand off, and record the groundwork
 
-Each carved work-item now goes down its own front-end — `/plan-grill` for a feature, `/diagnose` for a
-fix — and then to `/autonomous-loop`, exactly as if it had arrived on its own. Groundwork's job ends at
+Each carved work-item now goes down its own front-end - `/plan-grill` for a feature, `/diagnose` for a
+fix - and then to `/autonomous-loop`, exactly as if it had arrived on its own. Groundwork's job ends at
 the handoff; it doesn't grill each feature itself.
 
 Record the groundwork as the project's map so it survives a compaction and the fan-out stays
@@ -99,4 +99,4 @@ ties them together.
 
 Groundwork adds a front-end above `/plan-grill`; it never replaces it or the per-feature grilling. It
 composes the PRD, design-vocabulary, and domain-modeling skills when they're installed and falls back to
-a lean grill when they're not — additive either way. When you revise this skill, follow `/writing-skills`.
+a lean grill when they're not - additive either way. When you revise this skill, follow `/writing-skills`.

@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# bd-link — wire a repo's portable .better-dev/bin to the globally-installed better-dev scripts.
+# bd-link - wire a repo's portable .better-dev/bin to the globally-installed better-dev scripts.
 #
 # Skills reference helpers by the repo-relative path .better-dev/bin/bd-mem so one SKILL.md works in
 # every repo. This creates that per-machine bridge: .better-dev/bin -> the scripts dir of the better-dev
 # clone installed on THIS machine (a symlink, or a copy where symlinks don't refresh). The bridge is
-# per-machine, so onboard lists bin/ in .better-dev/.gitignore — it is never committed.
+# per-machine, so onboard lists bin/ in .better-dev/.gitignore - it is never committed.
 #
 #   bd-link link [repo]     wire <repo>/.better-dev/bin -> installed scripts dir (default repo: git root, else cwd)
 #   bd-link scripts-dir     print the resolved installed scripts dir
@@ -41,7 +41,7 @@ do_link() {
   local repo bin sd
   repo="$(repo_root "${1:-}")"
   sd="$(scripts_dir)"
-  [ -f "$sd/bd-mem" ] || die "scripts dir '$sd' has no bd-mem — is better-dev installed? (set BD_SCRIPTS_DIR)"
+  [ -f "$sd/bd-mem" ] || die "scripts dir '$sd' has no bd-mem - is better-dev installed? (set BD_SCRIPTS_DIR)"
   mkdir -p "$repo/.better-dev"
   bin="$repo/.better-dev/bin"
   link_or_copy "$sd" "$bin"
