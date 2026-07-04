@@ -11,9 +11,10 @@
 
 ---
 
-better-dev is a set of `SKILL.md` practices that make your existing agent do software development *well* —
-Claude Code, Codex, hermes, pi. It's **not an agent, framework, or provider layer.** It adds one opinionated
-method and gets out of the way of everything else you've installed:
+better-dev is a set of `SKILL.md` practices that make your existing agent — Claude Code, Codex, hermes, pi —
+do software development *well*, whether you're **starting a project from scratch** or working in an existing
+codebase. It's **not an agent, framework, or provider layer.** It adds one opinionated method and gets out of
+the way of everything else you've installed:
 
 > **idea → scope it into an observable contract → isolate it → drive a loop to *proven* done → ship** — and
 > when you're missing a tool, go source it.
@@ -62,12 +63,14 @@ Then your next message can just be *"here's a bug…"* or *"here's a feature…"
 
 ## The method
 
-A work item is a **feature** or a **fix** — both run one spine:
+Start a project **from scratch**, or land a feature or fix in an **existing codebase** — the work runs one spine:
 
+0. **New project, or a large epic?** `/groundwork` takes the idea to a **minimum shared foundation** — schema,
+   types, the interfaces between areas, the build/test/deploy pipeline — then carves the rest into **disjoint,
+   parallelizable work-items**, so several loops can run at once without colliding. (A single feature or fix in
+   an existing repo skips straight to step 1.)
 1. **Scope it.** `/plan-grill` (feature) or `/diagnose` (fix) settles an *observable* done-contract — a real
-   check that's red now and goes green exactly when the work is done — before any code. For a whole new
-   project or a large epic, **`/groundwork`** first designs the minimum shared foundation and carves the work
-   into disjoint, parallelizable pieces.
+   check that's red now and goes green exactly when the work is done — before any code.
 2. **Isolate it.** `/worktree-branching` puts the work in its own git worktree off the integration branch.
 3. **Drive it to proven done.** `/autonomous-loop` runs verify → one step → re-verify → log against the
    contract, dispatching fresh workers (`/orchestrating-agents`), grading with an independent `/review` that
