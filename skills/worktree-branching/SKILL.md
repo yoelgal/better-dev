@@ -108,8 +108,16 @@ permission error, say so and work in place - `edge-cases.md` covers that fallbac
 
 A fresh worktree has no installed deps, so run the project's setup and one baseline check here -
 that way the loop's first verify measures your work, not a missing `node_modules` misread as a
-failure. If this skill hands off immediately (the interlock in Step 3), `/autonomous-loop`'s
-ground-truth gate covers the same baseline at the other end.
+failure. Prefer the project's own named setup entry point (a documented setup or bootstrap script
+or task) over an ad-hoc install command composed here; a fixed, idempotent entry point is what a
+later session or a restart re-runs without guessing which command you used. If none exists, record
+it as a groundwork gap rather than papering over it with a one-off a future session can't find. If
+this skill hands off immediately (the interlock in Step 3), `/autonomous-loop`'s ground-truth gate
+covers the same baseline at the other end.
+
+A fresh worktree shares git history but not installed deps or build output. An install-or-build
+step needed only to make the tree runnable is expected setup, not a scope violation or a deviation;
+a review that re-runs the done-criteria in a fresh worktree does not flag it as one.
 
 ## Step 3 - record it, then hand off
 
