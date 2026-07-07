@@ -1,0 +1,23 @@
+name: checks
+on:
+  push:
+    branches: [main, staging]
+  pull_request:
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: git identity for selftests that commit in fixtures
+        run: |
+          git config --global user.email ci@better-dev.local
+          git config --global user.name better-dev-ci
+          git config --global init.defaultBranch main
+      - name: package gate
+        run: scripts/bd-package-check
+      - name: script and hook selftests
+        run: |
+          for s in scripts/bd-* hooks/bd-*; do
+            grep -q '"selftest"' "$s" || grep -q "selftest)" "$s" || continue
+            echo "== $s selftest"; "$s" selftest
+          done
