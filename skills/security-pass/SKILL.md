@@ -44,6 +44,14 @@ keep or drop.
   finding, but only while the code still matches the doc - once the cited code has drifted from the decision,
   the drift itself is the finding, and a stale doc does not silence it.
 
+One exception cuts across the scope line: **a live credential met anywhere in the work is flagged the
+moment you see it**, even though secrets-at-rest is never a *finding* here. A real-looking key, token,
+or secret in a log, fixture, pasted history, or env dump gets an immediate out-of-band note - name the
+class and the location ("a live payment-provider key in `test/fixtures/session.log`"), never quote any
+part of the value into chat, a report, or an evidence file, and urge rotation unconditionally, noting
+that rotation doesn't remove the plaintext copy from where it sits. Then return to the pass.
+Out-of-scope as a finding never means walking past it in silence.
+
 Three excuses a reviewer under deadline reaches for, and the line that beats each - these are where a real
 finding gets talked away:
 
