@@ -39,9 +39,11 @@ The steps:
 
 1. **Keep the map.** `contract.md`, `progress.md`, and `receipts.md` stay - they live in the primary
    checkout, untouched by anything that happens in the feature worktree. Read what the stalled attempt
-   learned. Fold any durable lesson into `contract.md` and record it (`.better-dev/bin/bd-mem learn "<lesson>"`) so the
-   rebuild doesn't re-enter the same dead end. Append a line to `progress.md` naming the restart and
-   why.
+   learned. Fold any durable lesson into `contract.md` and record it (`.better-dev/bin/bd-mem learn
+   "<lesson>" <confidence> "<signature-key>"`) so the rebuild doesn't re-enter the same dead end; a
+   failure diagnosed but not yet fixed goes in as a low-confidence open lesson under its signature key,
+   so the next session's recall surfaces it as unfinished rather than as settled fact. Append a line to
+   `progress.md` naming the restart and why.
 
 2. **Reset the feature worktree off the integration branch.** Discard the branch's stalled work and
    bring the worktree back to a clean base off the integration branch (`staging`, or whatever the
