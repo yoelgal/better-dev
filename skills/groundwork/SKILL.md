@@ -53,6 +53,27 @@ shared `User` type two features both import is foundation; the internals of one 
 Designing past the collision line is the waterfall this skill exists to avoid - the loops are better at
 the rest than a design done before any code exists.
 
+**Freeze the shared surface.** The types, schema, and cross-area interfaces that features import are the
+fan-out's real contract: once the foundation merges, they hold still under a running wave. Name them in the
+groundwork record as do-not-modify, so every work-item brief carries them as frozen. A feature that finds it
+*needs* to change a frozen interface is the signal to pause the wave and revise the foundation, not to widen
+it inside one worktree - there it breaks every sibling silently, with no file collision to catch it.
+
+**Decide the cross-cutting policy once, here.** Some choices are foundation because every feature inherits
+them, and left unstated each loop invents its own - or ships the happy path silently. Settle them now: the
+trust boundaries and auth model, the stance when an invariant fails (what the system does when the money
+doesn't add up, not just when it does), idempotency of anything re-runnable, units and currency, and the
+logging shape. Once settled here, the per-feature failure-behavior pass in `/plan-grill` inherits this policy
+instead of re-deciding it. If a threat-model or security skill is installed (`/security-pass`, or the host's
+`/security-review`), compose it to map the trust boundaries at design time; a foundation whose trust
+boundaries you can't name isn't ready to fan out on.
+
+**If the product has a UI, its design tokens are foundation.** Aesthetic direction and the token set are
+imported by every parallel UI feature, and two features styling the same primitive differently is the
+collision this skill exists to prevent. Pin them here - compose `/design-brief` (better-dev's design
+front-end), or reach for `/tool-sourcing` to find the installed design skill if it is absent - and freeze the
+token set like any other shared interface. groundwork marks this seam; it does not do design.
+
 ## 3. Land the foundation first
 
 The foundation is itself the first work-item, and it lands on the integration branch before anything
@@ -61,6 +82,11 @@ grilled by `/plan-grill`, driven by `/autonomous-loop`, merged to staging - *bef
 starts. Every carved work-item then bases off staging-with-foundation, so the shared substrate exists
 once, in one place, instead of being invented N different ways in N worktrees. This is the
 foundation-first order the branching model already anticipates (`/worktree-branching`).
+
+The foundation is ready to fan out on when three things hold: a fresh checkout builds and its pipeline runs
+green, the frozen surface is named in the record, and an independent reader could rebuild the same substrate
+from the record alone. Until all three hold, hold the wave - N loops on an unsettled foundation is N times the
+rework, invented N different ways.
 
 ## 4. Carve the remainder into disjoint work-items
 
@@ -85,7 +111,8 @@ the handoff; it doesn't grill each feature itself.
 
 Record the groundwork as the project's map so it survives a compaction and the fan-out stays
 coordinated. Write the foundation contract (its substrate spec from step 2) and the parallel work-item
-list into the ledger under the epic's name:
+list into the ledger under the epic's name. Write it strong enough that an engineer who never saw the
+discussion would rebuild the same substrate from it - the third condition of the ready-to-fan-out gate:
 
 ```bash
 .better-dev/bin/bd-mem ledger put "<epic>" groundwork.md -   # stdin: foundation contract + carved work-item list
