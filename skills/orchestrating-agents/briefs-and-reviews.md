@@ -27,8 +27,8 @@ What belongs in the brief:
   `.better-dev/bin/bd-mem recall "safety"`, then apply any `.better-dev/overrides.md` adjustments (which
   win), so the brief carries this repo's actual set rather than a generic one.
 - The report file path and the report skeleton the worker fills (the fields in `/orchestrating-agents`).
-  Ask for structured, capped output - a fixed skeleton, a named length bound - because a worker returns
-  fewer tokens when fewer were asked for.
+  Ask for structured, capped output - a fixed skeleton, a named length bound. A report with no bound
+  sprawls to fill the worker's patience, and every unrequested line is spend; a bound stops it.
 
 A dispatched worker does not inherit your security disposition. Any brief that has a worker read repo files
 or report on secrets carries, verbatim, the two load-bearing rules from `/security-pass`: a secret finding

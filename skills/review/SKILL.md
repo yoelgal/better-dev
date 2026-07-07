@@ -62,13 +62,13 @@ lightest weight judges the diff, not the report, and a Critical stays a Critical
 
 - **light** - one fresh reviewer reads the diff once against the contract: no channel fan-out, no verify
   pass, at most a handful of findings. For a docs-only, config, or small diff that touches no fingerprint
-  surface and stays under the scope gate.
+  surface and stays under the contract's scope tripwire.
 - **standard** (default) - the channel fan-out below (Spec and Standards as separate fresh workers, plus
   Security and Refuter where they apply), precision-biased: a finding you surface is one a maintainer would
   act on.
 - **deep** - standard, plus each channel over-surfaces candidates (recall-biased - err toward surfacing),
   and the verify pass below decides what survives. For a diff that touches a fingerprint surface (auth,
-  migration, money, concurrency, wire format, deletion), crosses the scope gate, or the whole-branch pass
+  migration, money, concurrency, wire format, deletion), crosses the scope tripwire, or the whole-branch pass
   before a PR into the integration branch. At the highest stakes, a second independent reviewer on the
   same diff - a fresh context, ideally a different capable model where the host has one - is a recall
   gain, never a requirement.

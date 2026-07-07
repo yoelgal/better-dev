@@ -134,9 +134,9 @@ surface as unguarded:
   dependency manifests and lockfiles. `/guardrails-install` is the authoritative home for the exact globs;
   a diff that edits one of these is a finding unless an approval is recorded for that edit.
 - **Human-gate change classes** - security/auth, payments/PII/money, infra/Terraform/prod config, and
-  dependency/version bumps land only behind a human gate; so does a scope-creep gate - a diff touching more
+  dependency/version bumps land only behind a human gate; so does the scope tripwire - a diff touching more
   than the recorded scope number of files (the `safety-scope` recall, ~10 by default, read not hardcoded).
-  A change in a gated class, or one that crosses the scope gate, with no recorded human gate, is a finding.
+  A change in a gated class, or one that crosses the scope tripwire, with no recorded human gate, is a finding.
 
 Confirm the gate before you flag: read the work-item's approvals log for a sign-off on this escalation -
 `.better-dev/bin/bd-mem ledger read <work-item> approvals.log`, using the slug the orchestrator handed you.

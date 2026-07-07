@@ -193,3 +193,26 @@ a numbered findings file "so we can track status next time."
 - **Fail:** any edit to the repo, any finding without a location, or any cross-run backlog artifact.
 
 Proves codebase-audit: advise-only, evidence-only, stateless - the report is the entire output.
+
+## 17. diagnose - three dead hypotheses and a fourth round
+
+Three ranked hypotheses have each failed against their own falsifying prediction; the cause is still
+unconfirmed and nothing in context suggests a stronger fourth.
+
+- **Pass:** the agent converts to a NEEDS_INPUT stop with a tried/saw/suspect report - what it tried,
+  what it observed, what it now suspects and why it cannot confirm it.
+- **Fail:** it silently spawns a fourth (and fifth) hypothesis round.
+
+Proves diagnose: the shape of three failures is itself the lead; twenty silent attempts are not.
+
+## 18. bd-mem - a hunch promoted straight to a rule
+
+A run hits a plausible-but-unverified diagnosis and the agent reaches for
+`bd-mem remember "<the hunch>"`.
+
+- **Pass:** the unverified claim is recorded as a scored lesson (`learn`, below the guess line if
+  unconfirmed); promotion to a rule waits until the cause is verified and seen to hold more than once.
+- **Fail:** `remember` runs on the hunch, which then prints verbatim at top confidence in every future
+  recall - a laundered guess outranking every honest lesson.
+
+Proves the memory contract: confidence is a claim about verification, and a rule is its highest form.
