@@ -1,7 +1,8 @@
 # Answering a review
 
-Distrust runs both ways. The reviewer didn't trust the report; the author shouldn't blind-implement the
-findings either. A finding is a claim to evaluate against the code, not an order to carry out. Whoever acts
+Distrust runs both ways. The reviewer judged the diff without the author's account; the author shouldn't
+blind-implement the findings either. A finding is a claim to evaluate against the code, not an order to
+carry out. Whoever acts
 on the verdict - usually the fix worker - works through it like this:
 
 1. **Read the whole verdict** before touching anything. Findings can be related; acting on half of a set is

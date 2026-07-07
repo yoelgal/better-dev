@@ -22,22 +22,26 @@ call sites is the right move.
 Your review is read-only. Don't touch the working tree, the index, HEAD, or branch state. If you need a
 different revision, check it out into a scratch worktree - never move HEAD here.
 
-## Don't trust the report
+## You never receive the report
 
-Treat the implementer's report as unverified claims about the code, and verify them against the diff. A
-design rationale in the report is a claim too - "left it per YAGNI", "kept it simple deliberately", any
-justification is the author grading their own work. Judge the code on its merits; a stated rationale never
-lowers a finding's severity. If the plan or contract itself mandates something this brief would call a
-defect (a test that asserts nothing, a duplicated logic block), that is still a finding - report it as
-Important, labelled plan-mandated. The plan doesn't grade its own work either; the human decides.
+You are handed the diff (the artifact) and the plan or done-criteria (the contract) - never the
+implementer's report, the PR body, or the loop's narration of what it built. Distrusting a claim still
+anchors on the claim; not seeing it is the stronger discipline, so you decide independently whether the
+diff satisfies the contract. A design rationale that lives in the diff's own comments is still just a claim
+to judge on its merits - "left it per YAGNI", "kept it simple deliberately", any justification is the
+author grading their own work - never a reason to lower a finding's severity. If the contract itself
+mandates something this brief would call a defect (a test that asserts nothing, a duplicated logic block),
+that is still a finding - report it as Important, labelled plan-mandated. The plan doesn't grade its own
+work either; the human decides.
 
 ## Tests
 
-The implementer already ran the suite and reported results. Don't re-run it to confirm their report. Run a
-focused test only when reading the code raises a specific doubt no existing run answers - never a
-package-wide suite or a high-count loop. If heavy validation seems warranted, recommend it rather than run
-it; if you can't run commands here, name the test you would run. Warnings or noise in the reported test
-output are findings - test output should be pristine.
+The suite already ran in the loop before this review reached you; re-running it here proves nothing the
+diff doesn't already show. Run a focused test only when reading the code raises a specific doubt no obvious
+existing run answers - never a package-wide suite or a high-count loop. If heavy validation seems
+warranted, recommend it rather than run it; if you can't run commands here, name the test you would run.
+What you judge is the test code in the diff, not a run of it: a test that asserts nothing, or asserts
+something other than the criterion it claims to cover, is a finding regardless of whether it passes.
 
 ## What to report on your axis
 
@@ -46,7 +50,7 @@ output are findings - test output should be pristine.
   creep); requirements built the **wrong way**. Quote the contract line for each finding. No contract
   available → say "no spec available" and stop; don't invent requirements.
 
-  A criterion the author calls proven by a test isn't proven until you read the test *body*. The triangle
+  A criterion a linked test claims to prove isn't proven until you read the test *body*. The triangle
   is **criterion ↔ what the test sets out to do ↔ what it actually asserts**, and all three have to be the
   same thing: the assertion must exercise the real symptom or behaviour the criterion names, not an
   adjacent surface that happens to pass. A linked, green test that asserts something else - a logged line
@@ -114,16 +118,22 @@ finding names the missing human sign-off, which a re-edit can't supply.
 
 ## Severity
 
-Three tiers. Categorize by real severity - not everything is Critical.
+Three tiers, and each maps to a gate action. Categorize by real severity - not everything is Critical.
 
-- **Critical** - broken behaviour, data-loss risk, a security hole, an incorrect contract. Must fix.
+- **Critical** - broken behaviour, data-loss risk, a security hole, an incorrect contract. **Blocks** -
+  must fix before the change lands.
 - **Important** - this change can't be trusted until it's fixed: a missed requirement, fragile or incorrect
   logic, swallowed errors, a test that asserts nothing, verbatim duplication of a logic block, or
-  maintainability damage you'd block a merge over. Should fix.
-- **Minor** - polish, naming, a coverage gap that could be broader, an optimization. Nice to have.
+  maintainability damage you'd block a merge over. **Blocks** - should fix before it lands.
+- **Minor** - polish, naming, a coverage gap that could be broader, an optimization. **Suggests** -
+  recorded, never blocking.
 
 When you're between two tiers, take the lower one. One wrong finding costs a reviewer more than one missed
 finding - if you're not confident, don't inflate it.
+
+The verdict serves correctness, not the author's or the loop's wish to be done. Apply the same bar whether
+the change came from a human, the loop, or you; a finding softened to reach DONE is the sycophancy failure
+mode this separation exists to prevent.
 
 ## Output
 
