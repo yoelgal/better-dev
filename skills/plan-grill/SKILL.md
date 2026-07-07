@@ -1,7 +1,7 @@
 ---
 name: plan-grill
-description: Use when a feature work-item is starting and its plan isn't yet watertight - before any implementation, to check the baseline, ideate and grill the design until decisions are settled, and pin the observable done-criteria the loop will drive to. For a bug fix, reach for /diagnose instead.
-argument-hint: "[feature-slug or rough intent]"
+description: Use when the user wants a new feature or capability built and it is not a one-to-two-step change - "I want to add X", "let's build a way to Y", "can we add", "new feature: Z", or a rough intent that needs a plan before code. Checks the baseline, ideates and grills the design watertight, and pins the observable done-criteria the loop drives to. For a bug or "X is broken" reach for /diagnose; for a whole new app or epic, /groundwork; for a trivial one-to-two-step change, just make it.
+argument-hint: "[feature-slug or rough intent] [depth: light|full]"
 ---
 
 # plan-grill - the feature front-end
@@ -35,23 +35,41 @@ full premise-extraction, cost-ordered observation pass, verdict taxonomy, and re
 If the intent is still rough, sketch two or three distinct ways to satisfy it - a sentence each,
 with the trade-off that separates them - and let the user pick one (or blend). Skip this when the
 user already arrives with a specific design; grilling *is* the work then. The point is to enter the
-grill with one candidate design, not a blank page.
+grill with one candidate design, not a blank page. For each option, name what it bets is true but
+hasn't been checked, and what would kill it - the bets become premises for the baseline check, and
+the discards become out-of-scope lines. That per-option assumption pass is where ideation usually
+fails when skipped.
+
+If the feature has UI surface and its visual direction isn't settled, run `/design-brief` before the
+grill closes - the design read and system choice belong in the plan, not discovered mid-implementation.
 
 ## 3. Grill - one question at a time
 
 Interview the design down every branch of its decision tree, resolving dependencies between
-decisions one by one, until you and the user share the same understanding.
+decisions one by one. At **full** depth (the default) you walk every branch; at **light** depth -
+passed as `[depth]` for a small, well-understood feature - you grill only the decisions the
+done-criteria will turn on and skip exhaustive branch-walking.
 
 - **One question, then wait.** A wall of questions is bewildering; ask, get the answer, ask the
   next. Order them so a decision that unblocks others comes first.
 - **Carry a recommended answer.** Every question ships with the answer you'd pick and why - the user
-  corrects a default faster than they fill a blank.
-- **Explore before asking.** If the codebase can settle a question, go read it instead of spending
-  the user's attention - this is where premise-checking pays off again.
+  corrects a default faster than they fill a blank. If the user answers "whatever you think," they
+  lack confidence too - don't take it as a blank cheque; re-ask as a choice between two concrete options.
+- **Ask only what you can't discover.** A fact about this repo or system is yours to find, not the
+  user's to answer - go read it (this is where premise-checking pays off again). Spend the user's
+  attention only on a genuine preference or tradeoff the code can't settle; on one of those, offer
+  two to four mutually exclusive options with the one you'd pick marked. If a preference question
+  goes unanswered, proceed on your default and record it as a named assumption in the contract rather
+  than stalling or guessing silently.
 - **Confirm as each decision locks.** When a decision settles, reflect it back in a line and move on
   once it holds. If a decision reads like a standing policy for this project (a convention, not a
   one-off), offer to persist it - "make this the default here?" - and on a yes record it with
   `.better-dev/bin/bd-mem persist-override "<line>"`. Don't persist transient facts.
+- **Know when the grill is done.** Before closing it, run one honesty check: *can you predict the
+  user's reaction to the next three questions you would ask?* If yes, the decisions are settled and
+  the plan is decision-complete - the implementer will make none. If no, you still have open
+  questions; keep going. Shared understanding is that prediction coming true, not a feeling that
+  you're finished.
 
 ## 4. Capture the done-contract
 
@@ -60,7 +78,20 @@ contract's spine is its **done-criteria**: each one is a *runnable check* (a com
 the **seam** it attaches to, phrased so it is red now and goes green exactly when the criterion is
 met. "Done" is a check going green, never a claim - this is what the loop drives to and refuses to
 fake. Prefer an existing seam, use the highest one that observes the behavior, and keep the count
-low; check the seams with the user before locking them.
+low; check the seams with the user before locking them. Those seams are the plan's test anchors:
+naming where each check bites *before* any implementation is what lets a check exist to go red first,
+then go green when code arrives.
+
+Done-criteria prove the goal works; the contract also has to say what it does when the goal doesn't.
+At contract seal run the failure-behavior pass over the eight categories, and where the feature
+crosses a trust boundary - auth, money, PII, an upload, an external fetch, or any untrusted input -
+the threat-surface pass beside it; both live in `done-contract.md`, and any load-bearing row they
+surface promotes to a done-criterion. Where the foundation already settled a category (the
+reconciliation stance, idempotency, units), inherit its policy rather than re-deciding. A scenario
+the contract leaves silent is a decision the loop will make for you at 2am. A visual property is a
+done-criterion too, phrased observably - renders at the target widths, uses the token set, passes the
+guideline audit - and proven by a screenshot plus an audit over what it shows (`/browser-capability`),
+never a self-report.
 
 Give the goal one clear shape (a capability, an end-state, an invariant, or a removal) so its proof
 is obvious, and keep the committed goal set small - a main goal plus at most two secondary end-states,
