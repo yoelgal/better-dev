@@ -4,7 +4,8 @@
 # Dry-run is the DEFAULT: it prints exactly what it would remove and leaves everything in place.
 # Pass --yes to act.
 #
-#   bd-uninstall global [--host claude|codex|auto] [--yes]         remove per-host links + the install marker
+#   bd-uninstall global [--host <name>|auto] [--yes]               remove per-host links + the install marker
+#                                                                  (<name> = any adapter file in hosts/)
 #   bd-uninstall repo [path] [--unblock] [--purge-data] [--yes]    unwire this repo (default path: git root, else cwd)
 #   bd-uninstall selftest
 #
@@ -42,11 +43,15 @@ repo_root() { git -C "${1:-$PWD}" rev-parse --show-toplevel 2>/dev/null || print
 # ── global ───────────────────────────────────────────────────────────────────
 do_global() {
   host="$1"; yes="$2"
-  case "$host" in
-    auto) hosts="claude codex" ;;
-    claude|codex) hosts="$host" ;;
-    *) die "unknown --host '$host' (expected claude, codex, or auto)" ;;
-  esac
+  # The hosts/ dir is the single registry (same rule as install.sh): every adapter file is a host.
+  avail=""
+  for a in "$HOSTS_DIR"/*; do [ -f "$a" ] && avail="$avail $(basename "$a")"; done
+  if [ "$host" = auto ]; then
+    hosts="$avail"
+  else
+    [ -f "$HOSTS_DIR/$host" ] || die "no adapter 'hosts/$host' (have:$avail)"
+    hosts="$host"
+  fi
   wd=""; [ "$yes" = 1 ] || wd="would "
   [ "$yes" = 1 ] && echo "== better-dev uninstall (global) ==" \
                  || echo "== better-dev uninstall (global) - DRY RUN (pass --yes to apply) =="
@@ -97,7 +102,7 @@ do_global() {
     touched=$((touched + 1))
   done
   echo
-  [ "$touched" -eq 0 ] && echo "No installed host found. (Try --host claude or --host codex.)"
+  [ "$touched" -eq 0 ] && echo "No installed host found. (Try --host <name>; adapters:$avail.)"
   [ "$yes" = 1 ] || echo "Nothing was changed. Re-run with --yes to apply."
 }
 
@@ -167,8 +172,9 @@ selftest() {
 
     # repo: bridge goes, data stays without --purge-data.
     repo="$d/repo"; mkdir -p "$repo/.better-dev/ledger"
-    BD_SCRIPTS_DIR="$SRC/scripts" "$SRC/scripts/bd-link" link "$repo" >/dev/null 2>&1 \
-      || ln -snf "$SRC/scripts" "$repo/.better-dev/bin"
+    # bd-link ships beside this script; a failure here should surface, so no raw-ln fallback
+    # (bd-package-check holds the no-link-site-outside-the-helpers invariant).
+    BD_SCRIPTS_DIR="$SRC/scripts" "$SRC/scripts/bd-link" link "$repo" >/dev/null 2>&1
     printf 'rule one\n' > "$repo/.better-dev/rules.md"
     printf 'over one\n' > "$repo/.better-dev/overrides.md"
     printf '# proj\n<!-- BEGIN better-dev -->\nblock\n<!-- END better-dev -->\nkeep\n' > "$repo/CLAUDE.md"

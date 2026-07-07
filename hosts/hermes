@@ -1,0 +1,11 @@
+# hosts/hermes - better-dev adapter for the Hermes CLI.
+#
+# Same depth-1 layout as every host: install.sh links each skill at <skills-dir>/<name>, discovered by
+# its SKILL.md. Sourced by install.sh, which reads these variables. Adding a host = drop a sibling file
+# like this. ~/.hermes/skills was observed on a real machine (2026-07-07); the dir policy stays
+# require-existing so install.sh links only into a directory hermes itself created, never one we invent.
+bd_host_name="hermes"
+bd_host_display="Hermes"
+bd_host_cli="hermes"                        # PATH probe for --host auto
+bd_host_skills_dir="$HOME/.hermes/skills"   # native global skills dir (observed on a real machine)
+bd_host_dir_policy="require-existing"       # never mkdir - decline and name the missing path instead
