@@ -41,7 +41,7 @@ Never put `version`, `license`, or prose in frontmatter.
   files. Shared knowledge lives inside the skill that owns it and is reached by invoking that skill.
 - Voice: firm and precise, never maximalist. State a gate as a plain declarative that names its
   consequence ("editing a committed test to reach green is out of bounds; it hides the very regression
-  the test exists to catch"), not a caps-locked wall of MUST / ALWAYS / CRITICAL - that shouting is the
+  the test exists to catch"), not a caps-locked wall of `MUST / ALWAYS / CRITICAL` - that shouting is the
   blocking tone principle 2 bans, and a firm sentence with a reason holds a gate where raised volume only
   adds noise. Do not soften a real gate into a hedge either: "please try to", "ideally", and "if possible"
   read as optional, and an optional gate is no gate. Say the rule once, at full strength, in a calm voice.
