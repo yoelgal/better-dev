@@ -41,7 +41,8 @@ Otherwise install it. Two paths:
   (`~/.claude/skills/<skill>`, `~/.codex/skills/<skill>`, and so on), since hosts only discover a skill
   at `<skills-dir>/<name>/SKILL.md`; it copies instead of linking where symlinks aren't available.
 
-Updating later is just `git pull` in the clone - the global link picks it up. You can't drive an
+Updating later is `git pull` in the clone - existing skill links pick it up instantly; re-run
+`./install.sh` after a pull that adds or removes skills, so new ones link and orphans prune. You can't drive an
 interactive plugin installer as the agent; when one is needed, hand the operator a paste-ready command
 and continue once they confirm.
 
@@ -66,6 +67,8 @@ conventions or your edits.
 
 - The tool is global and shared; a repo's `.better-dev/` carries only that repo's data and its link
   back to the tool. Update everything at once with a `git pull` in the clone.
+- Removing better-dev later: `/uninstall` (or `scripts/bd-uninstall`) - dry-run by default, removes
+  only what better-dev installed, keeps a repo's `.better-dev/` data unless you pass `--purge-data`.
 - Skills you mint later with `/self-extension` are **repo-scoped**: they're committed into this repo's
   own project skills directory (`.claude/skills/<name>` on Claude Code) and discovered only here.
   Promoting one to the global tool is a separate, deliberate step.
