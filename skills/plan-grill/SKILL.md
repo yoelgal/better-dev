@@ -68,6 +68,18 @@ done-criteria will turn on and skip exhaustive branch-walking.
   once it holds. If a decision reads like a standing policy for this project (a convention, not a
   one-off), offer to persist it - "make this the default here?" - and on a yes record it with
   `.better-dev/bin/bd-mem persist-override "<line>"`. Don't persist transient facts.
+- **An answer that contradicts a receipt gets the receipt, not a nod.** When an answer conflicts
+  with something the baseline pass already established, don't fold it into the contract and don't
+  argue in the abstract: concede what's right in their reasoning, put the `file:line` or command
+  output beside it, and re-ask. The user can still overrule deliberately - with the evidence in
+  front of them, and the override recorded in the contract - but a contradiction absorbed silently
+  plans fiction over your own receipt.
+- **Watch "done" grow inside the user's own answers.** Their answers are evidence too. When the
+  definition of done expands mid-grill - "works for our team" becomes "handles anything anyone
+  throws at it" within a sentence - name the growth out loud, pin which version this contract
+  commits to, and park the rest as out-of-scope or a follow-up item. Scope caught in the sentence
+  it grew in is a one-line correction; absorbed silently, it's how a three-goal contract becomes a
+  rewrite.
 - **Attack the plan before you close.** The grill so far argued *for* the design - it walked the
   tree and filled each node with your recommended answer. Spend one pass arguing against it: name the
   unknown you skated over, the single assumption the whole plan rests on that you never actually
