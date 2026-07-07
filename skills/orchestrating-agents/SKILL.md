@@ -99,6 +99,11 @@ in the ledger. A silent truncation reads as "covered everything" when it didn't;
 report, not an efficient one. The same honesty covers a fan-out that came back with holes: report the
 partial as partial, never a silent gap.
 
+**Vet before presenting.** Before you present or act on fan-out findings, confirm each at its cited
+location yourself - a worker's `file:line` is a lead, not a fact. Collapse duplicates across workers, and
+downgrade behavior a worker flagged that is by-design. Subagents over-report; the cheap pass that re-reads
+each surfaced finding at the source is what keeps a merged answer trustworthy.
+
 ## File handoffs
 
 Everything you paste into a dispatch, and everything a worker prints back, stays resident in your context
@@ -109,8 +114,18 @@ and is re-read every turn. Move artifacts as files instead:
   high-consequence denylist with the standing instruction to escalate rather than edit those paths (settle
   `NEEDS_INPUT`), so a fresh worker doesn't discover the rule only at review. Not your session history.
   `.better-dev/bin/bd-dispatch brief <work-item> <role>` writes a skeleton into the shared ledger and prints its path.
-- **Report** - the worker writes its full report to a file and returns only its terminal state, commits,
-  a one-line verify summary, and concerns. Name the report file in the brief.
+- **Report** - the worker writes its full report to a file and returns a compact filled skeleton, not
+  prose:
+  - **STATUS** - one of the terminal states (`DONE`, `DONE_WITH_CONCERNS`, `BLOCKED`, `NEEDS_INPUT`,
+    `EXHAUSTED`, `NO_PROGRESS`).
+  - **STEPS** - per step: done or skipped, plus the check's result.
+  - **STOPPED BECAUSE** - if not `DONE`: which stop condition, and what was observed.
+  - **FILES CHANGED** - the list.
+  - **NOTES** - deviations, surprises, judgment calls.
+
+  Name the report file in the brief. Before returning, the worker audits every claim in the report against
+  a session tool result (`/pr-and-verify` verify-runtime owns this disposition) - an unverified claim says
+  so plainly.
 - **Review inputs** - the reviewer gets the same brief, the report file, a diff package, and the
   work-item slug, all as files or plain values, never the diff pasted into the prompt. The slug resolves
   the shared ledger, so the reviewer can read the work-item's `approvals.log`
@@ -151,6 +166,12 @@ coordination context on re-diagnosing and re-dispatching, far past what it saved
 down when both hold: the spec is closed (zero judgment left to the worker) and a cheap mechanical check
 exists for the result. Two failures on a subtask means the spec is wrong, not the worker - pull it back
 and re-decompose rather than escalating the model a third time.
+
+The default tier is a starting point, not a ceiling. When a worker's output misses the bar, rerun it at a
+higher tier straight away - don't stop to ask permission to spend more. Pausing a run to approve a cost is
+itself a cost, and a mediocre result is the expensive outcome. Judge the output against the contract, not
+against what the worker cost. The two-failures rule above still bounds this, and `tiers.md`'s no-re-descend
+rule is its memory - once a class needs the higher tier, keep it there for the run.
 
 That rule sizes one worker for one subtask; a stage-to-tier band places whole stages. Name the bands by
 capability, never by vendor - "top tier" is the most capable model you have, which on a given day may be

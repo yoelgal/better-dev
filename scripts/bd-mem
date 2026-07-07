@@ -137,12 +137,20 @@ case "$op" in
   init)
     ensure; printf 'initialized %s\n' "$BD_DIR" ;;
   remember) # promote a durable rule (idempotent) and log it - grep-then-append is one locked section
+            # Gate on verification: promote only a fact you verified and watched hold more than once. A rule
+            # prints verbatim at top confidence in every recall, outranking every scored lesson forever, so an
+            # unverified claim promoted here is a laundered hunch the next session cannot tell from proof. Not
+            # yet verified into a fact? It stays a scored lesson (learn), never a rule.
     ensure; [ $# -ge 1 ] || die "remember <rule>"
     lock_acquire
     grep -qxF -- "- $1" "$RULES" || printf -- '- %s\n' "$1" >>"$RULES"
     printf '{"kind":"rule","text":%s}\n' "$(jstr "$1")" >>"$LEARN"
     lock_release; echo remembered ;;
   learn) # log a lesson with optional confidence (0..1) and an optional recall key (a stable fingerprint)
+         # Confidence is a claim about verification, not a vibe. Below 0.5: an unverified hunch - recall
+         # renders it "guess:" so the next reader treats it as one. 0.5 to 0.9: a cause you verified into a
+         # fact, once. Promotion to a rule (remember) is reserved for a fact verified and seen to hold more
+         # than once; never promote a hunch straight to a rule - the next session will obey it as law.
     ensure; [ $# -ge 1 ] || die "learn <lesson> [confidence] [key]"
     line="$(printf '{"kind":"lesson","text":%s,"confidence":%s,"key":%s}' "$(jstr "$1")" "${2:-1}" "$(jstr "${3:-}")")"
     lock_acquire; printf '%s\n' "$line" >>"$LEARN"; lock_release; echo logged ;;

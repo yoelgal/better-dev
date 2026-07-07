@@ -18,7 +18,12 @@ Each criterion is a check that can run, not a sentence to nod at:
 
 - a **runnable check** - a command or a test - that is **red now** and turns **green exactly when**
   the criterion is met,
-- the **seam** it attaches to - the point in the system where the behavior is observed.
+- the **seam** it attaches to - the point in the system where the behavior is observed,
+- the **observable it asserts** at that seam - the concrete thing the check turns on: the exact
+  status code, the returned value, the row that must exist, the log or output line that must appear.
+  A seam plus an adjective ("green when it works") is the gap a trivially-true check slips through.
+  The loop still writes the test body, but it writes it to *your* asserted observable, not a
+  stand-in it can wave green.
 
 Rules for the seam:
 
@@ -33,7 +38,14 @@ Rules for the seam:
   discover later.
 
 "Done" is a check going green. Never a claim, never "until it looks right." The loop reads these,
-drives them red-to-green, and refuses to mark done what it can't prove.
+drives them red-to-green, and refuses to mark done what it can't prove. Each criterion's status is a
+typed marker the loop flips - the checkbox carries met/unmet (`[ ]` -> `[x]`), a field a session sets,
+never a prose sentence it re-interprets each pass.
+
+Pinning the observable here is one layer of the self-authored-test defense: on creation the loop
+claims each loop-authored test into its protect-set (`/autonomous-loop`), and the reviewer scans for
+weakened or trivially-true tests (`/review`). Pin the observable so both have something concrete to
+guard and to check against.
 
 ### Right-size the criteria
 
@@ -76,6 +88,23 @@ reviewer can hold in their head. When the grill surfaces a fourth committed goal
 and split into focused work items - each its own contract, worktree, and PR - rather than carrying a
 contract nobody can review whole. Out-of-scope items don't count against the cap; they're the explicit
 record of what this feature won't do.
+
+### Boundaries bind only when co-located
+
+An out-of-scope line holds the loop only when it is explicit and sits beside the goal it borders. A
+boundary left as a bare list at the foot of the file is one the loop fills in for itself - it reads
+the unstated edge as license to tidy, refactor, or "while I was in there." State each boundary as a
+positive-and-negative pair next to the goal it touches: what this work-item does, and the adjacent
+thing it must not touch. "Adds the export endpoint; does not change the existing import path" holds; a
+trailing "out of scope: imports" at the foot of the file does not.
+
+### Scope tripwire
+
+The **scope tripwire** is the halt condition the boundaries arm. The loop halts and reports - it does
+not silently proceed - if it would edit a path in the forbidden set above, more than `<N>` files
+change outside the owned set, or a test that was green goes red. Set `<N>` to the owned-file count
+plus a small margin and name it in the contract. This file owns the term: the loop's scope-guard and
+the review scope gate reference this tripwire by that name.
 
 ## Failure behavior - the pass agents skip
 
@@ -142,8 +171,10 @@ A long, numbered list. Each: As a <actor>, I want <feature>, so that <benefit>.
 Cover the feature's aspects extensively.
 
 ## Done-criteria
-For each, a runnable check + its seam + red-now/green-when:
-- [ ] <criterion> - check: `<command or test>` at seam `<where>`; red now, green when <condition>.
+For each, a runnable check + its seam + the observable it asserts + red-now/green-when. The `[ ]`/`[x]`
+box is the typed status the loop flips, not prose to re-read:
+- [ ] <criterion> - check: `<command or test>` at seam `<where>`; asserts `<concrete observable>`;
+  red now, green when <condition>.
 
 How these prove the goal: <≤2 sentences tying the criteria set back to the goal's end-state>.
 
@@ -166,7 +197,18 @@ came from a prototype and trim to the decision. Any preference question the user
 recorded here as `Assumption: <chose X because Y>`, so the default is visible instead of buried.
 
 ## Out of scope
-What this feature deliberately does not do.
+Each boundary as a positive-and-negative pair beside the goal it borders: <what this does> - does not
+touch <the adjacent thing>. Not a bare trailing list; an unstated edge is one the loop fills in itself.
+
+## Scope tripwire
+Forbidden path set: <paths the loop must not edit>. N = <owned-file count + margin>. The loop halts
+and reports if it would edit a forbidden path, more than N files change outside the owned set, or a
+green test goes red.
+
+## Stop conditions
+<condition specific to this plan's real risk - "if X turns out to be load-bearing, stop and report">.
+Named to this feature's actual failure modes, not boilerplate a reviewer can't tell from filler. When
+reality doesn't match the plan, the loop stops here and reports rather than improvising a way through.
 
 ## Open concerns
 Anything unresolved. If one blocks the plan, the state is NEEDS_INPUT - stop, don't guess.
@@ -174,6 +216,21 @@ Anything unresolved. If one blocks the plan, the state is NEEDS_INPUT - stop, do
 ## Ground truth
 Verdict from the baseline check + link to ground-truth.md.
 ```
+
+## Pre-seal checklist
+
+Before you pin the contract, each line reads yes or the contract isn't ready:
+
+- A fresh context could execute this from the contract and the repo alone.
+- Every done-criterion is a command with an expected result, not a judgment ("make sure it works").
+- Every criterion names its concrete observable - a value, status, row, or output line.
+- The stop conditions are specific to this plan's real risks, not boilerplate.
+- No secret values appear anywhere - locations and credential types only.
+- The planned-at SHA is stamped.
+
+The right-size self-check (would removing a criterion miss a property the goal claims?) and the grill's
+predict-the-next-three-questions check already ran; this is the last read before the gate, not a re-run
+of them.
 
 ## Approval is pinned to the contract's content
 
@@ -185,6 +242,13 @@ happened. Before it drives, the loop runs `.better-dev/bin/bd-mem ledger check-a
 moved - the hash no longer matches, the check fails, and the approval gate re-opens: the loop reads the
 plan as un-agreed again and waits for a fresh confirmation. So it never advances on a silently-changed,
 stale sign-off.
+
+Stamp the **planned-at** short SHA in the ledger beside that content hash at approval - the commit the
+plan was written against. The content hash guards the contract text; the planned-at SHA guards the code
+under it. At loop entry `/autonomous-loop` drift-checks the touched area against this SHA and
+re-baselines before building if the code moved since the contract was sealed, rather than building on a
+stale premise. The contract stays prose-only: the SHA lives in the ledger, not as inlined code excerpts
+here.
 
 ## Optional: hand to a slice breakdown
 

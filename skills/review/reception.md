@@ -42,3 +42,12 @@ doesn't come undone silently. And a finding can't slide from *addressed* back to
 fixed it either stays gone or returns as regressed/reopened with its cause. A finding that simply vanishes
 between cycles is a bookkeeping failure, not a pass. Carry this per-cycle status through the memory
 contract (`.better-dev/bin/bd-mem`) so the next cycle and the end-of-branch pass both see it.
+
+## Documented deviations, judged on merit
+
+The claim-blind channels never see the worker's report, so a deviation is judged here, at reception,
+where the report is read - never inside the review channels. An in-scope adaptation the worker hit a real
+obstacle for and documented in its report is judged on merit, not reflex-blocked: keep it where the
+adaptation serves the contract's intent and stays in scope. An equivalent change with no such note is
+silent drift, and a finding. The merit is in the documenting, not in the deviating - an undocumented
+adaptation, however sensible, still drifted the plan without saying so.

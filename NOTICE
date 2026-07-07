@@ -30,12 +30,20 @@ we actually copied verbatim/substantially, which MIT requires us to attribute, a
   Eight-category edge-case pass - @nurijanian (George, prodmgmt.world) (X article, ideas)
   Human-simulating e2e QA - James Goldbach (@agentic.james) (IG reel, ideas)
   Fable-to-Opus skill capture - Ethan Stopperich (IG reel, ideas)
+  Archive228/loopkit - Archive228        (MIT)
+  shadcn/improve - shadcn            (MIT)
+  "Master Claude With Fable 5: 6 Rules" - @0xMoysei (Moysei) (X article, ideas)
+  "Como crear Loops en Fable 5" - @angeldot_ (angel) (X article, ideas)
+  Model-routing CLAUDE.md section - @theo (Theo) (X thread, ideas)
 
 ── NOT copied - inspiration only, NOT redistributable ──
   Andrej Karpathy - LOOPS.md v060726 ("personal use permitted"). Concepts reimplemented
   in our own words; no prose copied.
   Andrej Karpathy - "CLAUDE.md: Field Notes" one-pager ((c) 2026, personal use).
   Concepts reimplemented in our own words; no prose copied.
+  "Fable Mode" one-pager (author withheld) and "CLAUDE.md: Field Notes on Running
+  Claude Fable 5 Without Overpaying" one-pager (author unknown) - both personal-use
+  only. Concepts reimplemented in our own words; no prose copied.
   asgeirtj/system_prompts_leaks aggregates third-party proprietary system prompts.
   The aggregation is CC0, but the underlying prompts are not ours to copy: techniques
   studied and reimplemented as ideas only; no leaked prompt text ships in better-dev.

@@ -21,8 +21,20 @@ That prints `contract.md`, the tail of `progress.md`, and the last receipt. Prog
 disk precisely because a context window can't be trusted after a compaction - a missing entry is data
 (that step didn't settle), not an error. Compute the earliest step the contract still calls unmet, and
 carry on from there. Trust the ledger and `git log` over anything you think you remember; the commits
-named in `progress.md` exist in git whether or not the session recalls making them. Nothing is reset,
-nothing is thrown away.
+named in `progress.md` exist in git whether or not the session recalls making them. When `progress.md`
+and `git log` disagree, git wins: the ledger is rewritten each session and a crash can truncate it
+mid-write, while git history is append-only and a commit either exists or it doesn't - a step git shows
+committed counts as settled even if `progress.md` lost the line, and a step `progress.md` claims with no
+commit behind it did not settle.
+
+A recorded green is a claim like any other. Before taking new work on a resume, re-run the acceptance
+check for the most recently settled criterion - the last one `progress.md` marks settled. A criterion
+recorded green that now comes back red was never really done, and the loop has been building later steps
+on a floor that already gave way: reset that criterion to unmet, revert only the loop's own commit that
+claimed it (never a diff another actor added since - the concurrent-actor rule still binds), and fix it
+before picking up anything new. This runs on resume, not every pass - a mid-loop green is still fresh,
+but a green inherited from a session that may have crashed mid-write has to re-earn trust. Apart from
+that one re-check, resume resets nothing and throws nothing away.
 
 ## Restart - the work does not stand
 
@@ -45,7 +57,11 @@ The steps:
    so the next session's recall surfaces it as unfinished rather than as settled fact. Append a line to
    `progress.md` naming the restart and why.
 
-2. **Reset the feature worktree off the integration branch.** Discard the branch's stalled work and
+2. **Reset the feature worktree off the integration branch.** Before discarding, tag the stalled work
+   with a backup ref in the feature worktree (`git branch backup/<slug>-stalled`) - it costs nothing and
+   buys a free undo: a restart that turns out to have thrown away a nearly-working build is one
+   `git reset --hard backup/<slug>-stalled` from recovery instead of gone, the cheap insurance against a
+   wrong `confirmed`. Then discard the branch's stalled work and
    bring the worktree back to a clean base off the integration branch (`staging`, or whatever the
    project detected). This is the one point where the loop's standing rule against destructive git ops
    is deliberately set aside - and only here: only after a confirmed stuck, only inside the *feature*

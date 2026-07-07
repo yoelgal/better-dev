@@ -27,7 +27,8 @@ different revision, check it out into a scratch worktree - never move HEAD here.
 You are handed the diff (the artifact) and the plan or done-criteria (the contract) - never the
 implementer's report, the PR body, or the loop's narration of what it built. Distrusting a claim still
 anchors on the claim; not seeing it is the stronger discipline, so you decide independently whether the
-diff satisfies the contract. A design rationale that lives in the diff's own comments is still just a claim
+diff satisfies the contract. Your default posture is that the diff is broken until it proves otherwise -
+your job is to find where. A design rationale that lives in the diff's own comments is still just a claim
 to judge on its merits - "left it per YAGNI", "kept it simple deliberately", any justification is the
 author grading their own work - never a reason to lower a finding's severity. If the contract itself
 mandates something this brief would call a defect (a test that asserts nothing, a duplicated logic block),
@@ -48,7 +49,9 @@ something other than the criterion it claims to cover, is a finding regardless o
 - **Spec channel** - measure the diff against what was asked (the plan/contract you were handed, not the PR
   body): requirements **missing** or only partly done; behaviour **added** that nobody asked for (scope
   creep); requirements built the **wrong way**. Quote the contract line for each finding. No contract
-  available → say "no spec available" and stop; don't invent requirements.
+  available → say "no spec available" and stop; don't invent requirements. For a dispatched worker's
+  diff, every hunk traces to an in-scope file and a contract step - one out-of-scope hunk is a finding
+  against the contract's scope tripwire, however plausible it looks.
 
   A criterion a linked test claims to prove isn't proven until you read the test *body*. The triangle
   is **criterion ↔ what the test sets out to do ↔ what it actually asserts**, and all three have to be the
@@ -88,6 +91,34 @@ blast-radius check rests on who actually reaches it rather than a guess:
 This is a reflex, not a registry to work through. Where a surface fits, the check lands as a finding on
 your axis, or as a `⚠️` when you can't settle it from the diff. Where none fits, invent nothing.
 
+## Fake-done shortcuts - a scan list, not a stance
+
+"Distrust the claim" is a posture; this is the procedure. Walk the diff once against these named
+shortcuts an implementer under pressure reaches for - each is a concrete thing to look for, and where one
+fits, it lands as a finding on your axis:
+
+- **Weakened test** - an assertion loosened, deleted, or narrowed so a red goes green, a finding even
+  when the suite passes.
+- **Swallowed error** - a catch that hides the failure instead of handling it.
+- **Stub return** - a hardcoded value that satisfies the one test and nothing else.
+- **Comment-as-fix** - the defect is now a TODO or a comment, the behaviour unchanged.
+- **Invented API** - a method, field, or parameter called that does not exist in the source it targets.
+- **Pass-by-mock** - the test mocks the exact thing the criterion says it verifies.
+- **Happy-path only** - the error path, the empty input, the missing file left unhandled.
+- **Fake rename** - a symbol renamed and called fixed, behaviour identical (hand this to the Refuter).
+- **Silent decision** - a schema, auth, or contract choice made without flagging it.
+- **Off-spec done** - it builds and passes, but proves a goal other than the one asked.
+
+Most of these already have a home above - off-spec is the Spec channel, fake rename the Refuter, a
+weakened or assert-nothing test the Tests check, a swallowed error an Important finding on the ladder
+below; a stub return, a comment-as-fix, or an invented API is the kind this list catches that no other
+channel names. This list is the single place a reviewer confirms none slipped the gaps between channels;
+where none fits, invent nothing.
+
+This is the reviewer's layer of the self-authored-test defense: the contract pins each criterion's
+concrete observable (`/plan-grill`) and the protect-set claims loop-authored tests untouchable on
+creation (`/autonomous-loop`), and here you scan the diff for the shortcut that slipped past both.
+
 ## Blast-radius policy - a breach is a finding, not just a lens
 
 Some of those surfaces carry a bounded-blast-radius policy the loop is meant to honor, and crossing it is
@@ -103,9 +134,9 @@ surface as unguarded:
   dependency manifests and lockfiles. `/guardrails-install` is the authoritative home for the exact globs;
   a diff that edits one of these is a finding unless an approval is recorded for that edit.
 - **Human-gate change classes** - security/auth, payments/PII/money, infra/Terraform/prod config, and
-  dependency/version bumps land only behind a human gate; so does a scope-creep gate - a diff touching more
+  dependency/version bumps land only behind a human gate; so does the scope tripwire - a diff touching more
   than the recorded scope number of files (the `safety-scope` recall, ~10 by default, read not hardcoded).
-  A change in a gated class, or one that crosses the scope gate, with no recorded human gate, is a finding.
+  A change in a gated class, or one that crosses the scope tripwire, with no recorded human gate, is a finding.
 
 Confirm the gate before you flag: read the work-item's approvals log for a sign-off on this escalation -
 `.better-dev/bin/bd-mem ledger read <work-item> approvals.log`, using the slug the orchestrator handed you.

@@ -26,6 +26,12 @@ Not debugging - one pass, in order of cost, stopping when the verdict is support
    probe through the repo's wired tooling. Anything needing env spin-up or prod data is a named cost,
    not paid silently - that lands `EVIDENCE_LIMITED`.
 
+Read the area's decision docs before you propose - ADRs, design or intent docs, RFCs that bear on the
+feature. A plan that re-litigates a decision already recorded, or that misses that the code has drifted
+from one, fails its baseline. Cite any decision that touches the feature in the verdict; a recorded
+tradeoff is settled ground, and drift between the code and what the doc says is itself a finding to
+surface, not something the doc suppresses.
+
 ## Verdict
 
 Compare observed reality to the premise and pick one. The first three proceed to the grill; the last
@@ -48,7 +54,9 @@ to make with the evidence in front of them.
 
 Every verdict cites evidence - `file:line`, commands run and their output digest, the intent
 contract found. A verdict without receipts is invalid. When uncertain, say `EVIDENCE_LIMITED` rather
-than dress a guess as a finding. Observe the cause if it surfaces, but change no code and draft no
+than dress a guess as a finding. A `file:line` handed up by a recon worker or `/codebase-map` is a
+lead, not a fact - re-read it yourself before it enters a verdict or the contract; a wrong excerpt
+becomes a wrong plan. Observe the cause if it surfaces, but change no code and draft no
 plan yet - that's later work.
 
 ## Output shape

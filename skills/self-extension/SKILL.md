@@ -5,9 +5,12 @@ description: Use when sourcing an existing skill has come up empty and a capabil
 
 # Self-extension
 
-The last resort on a capability gap: author one new skill from what you understand, and only let it reach
-the live tree once it has passed a check and an explicit yes. There is no distillation engine - you gather
-the sources and write the `SKILL.md` with the tools you already have, so this runs the same on any harness.
+Two things bring you here: a capability gap that sourcing could not fill, or a session that went unusually
+well - a deliverable markedly better than usual is itself the signal to interrogate the run (what did you
+consider, how did you verify, why did this actually work) and mine it before its context is gone. Either
+way you author one new skill from what you understand, and only let it reach the live tree once it has
+passed a check and an explicit yes. There is no distillation engine - you gather the sources and write the
+`SKILL.md` with the tools you already have, so this runs the same on any harness.
 
 Creating is the fallback, not the first move. `/tool-sourcing` hands off here only after discovery,
 vetting, and try-before-adopt all came up empty; a proven, installed skill beats a fresh one every time.
@@ -56,6 +59,10 @@ asking.
 Prefer the exact commands, endpoints, and signatures that appear in the source over ones you half-recall,
 and don't invent a flag or path you never saw. A skill gets shared, so keep the host's or user's identity
 out of it - the skill names itself.
+
+On demand, your own recent sessions are a legitimate source for this step: clustering recurring findings
+across them to decide, per cluster, whether the answer is a new skill, an automation, a one-line fix, or
+nothing is diagnosis only - it writes nothing without the same approval gate below.
 
 ## 3. Author one SKILL.md
 

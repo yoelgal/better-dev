@@ -12,6 +12,15 @@ The band is a role, not a product, so the advice reads correctly whether your to
 flagship or the only tier you have. Read `.better-dev/overrides.md` first: a repo may already pin which
 tier it trusts for what.
 
+## Capability is more than one axis
+
+Capability is not a single ladder from cheap to smart. Two kinds of fitness pull apart: how hard a problem
+a model handles unsupervised, and its *taste* - the judgment visible in an interface, an API's shape,
+prose, and code a maintainer wants to keep. The model that reasons hardest is not always the one with the
+best taste. Recognize when a work-item is taste-graded - anything a user reads or a developer lives with -
+and where the host offers a choice, place it by taste. When the axes conflict on work that ships,
+correctness leads, taste second, cost last: cost breaks a tie, it never overrides a quality bar.
+
 ## Which stage sits in which band
 
 - **Top tier - judgment that cascades.** Decomposition and planning, grilling a plan against its
@@ -41,6 +50,21 @@ Two gates have to clear before a subtask drops to the cheap tier:
   test passes, a grep count matches, a diff has the expected shape, a schema validates. Unverifiable
   output never goes to a cheap tier.
 
+## Sizing the reasoning knob
+
+Separate from *which* model is *how much reasoning* you ask of it. The maximum is not the best: past a
+point, more reasoning second-guesses a sound answer into a worse one while costing more - a loss on both
+axes at once. A run that finishes correctly but takes far longer than the task warranted is the tell that
+the knob is set too high for that class of work; turn it down there. We advise the knob; the host owns the
+setting.
+
+## One vocabulary, three scales
+
+These scales stay distinct. `/review`'s light/standard/deep scales review *breadth* - how much of the
+change gets independently examined. The reasoning knob above scales one worker's reasoning *depth*. Neither
+is a coverage quota, and better-dev pins no fixed subagent-count table: the scale of a fan-out is picked
+per run by the pilot rule below, not read off a chart.
+
 ## Why the line sits where it does
 
 The cost of misjudging is not symmetric. Over-resourcing wastes a bounded, known amount of cheap worker
@@ -67,7 +91,9 @@ never runs below the tier that produced the work.
 A fan-out or a discovery loop can spawn dozens of workers before you see a single result. Before you
 commit that scale, pilot it: dispatch one worker over a small, representative slice, read what it actually
 costs and returns, then scale only the pattern that worked. A pilot that comes back wrong or expensive is
-a cheap correction; the same mistake multiplied across a large pool is not.
+a cheap correction; the same mistake multiplied across a large pool is not. Weigh what a worker *writes*
+more heavily than what it reads: output is the larger share of a run's cost, so a tight output spec moves
+the bill more than trimming the brief does.
 
 ## The guard this reference sits behind
 

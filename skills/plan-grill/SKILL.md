@@ -28,7 +28,8 @@ Land on a verdict backed by receipts (`file:line`, a command run and its output)
 maps as assumed, proceed. If the capability **already exists**, or a core assumption is plainly
 false, stop and reframe with the user rather than planning fiction - point at the evidence. For the
 full premise-extraction, cost-ordered observation pass, verdict taxonomy, and receipts rule, read
-`ground-truth.md`. This is observation, not debugging - no root-cause spiral.
+`ground-truth.md`. The deliverable of this pass is a verdict with receipts, not a change: no fix, no
+build, no code until the grill closes. This is observation, not debugging - no root-cause spiral.
 
 ## 2. Ideate - propose, then pick one to grill
 
@@ -38,7 +39,9 @@ user already arrives with a specific design; grilling *is* the work then. The po
 grill with one candidate design, not a blank page. For each option, name what it bets is true but
 hasn't been checked, and what would kill it - the bets become premises for the baseline check, and
 the discards become out-of-scope lines. That per-option assumption pass is where ideation usually
-fails when skipped.
+fails when skipped. "Not worth building" is a valid outcome here: if no option's bets survive the
+baseline or the cost plainly outweighs the payoff, record it with its one-line reason so the user
+knows it was weighed, and stop rather than manufacturing a design to justify the work.
 
 If the feature has UI surface and its visual direction isn't settled, run `/design-brief` before the
 grill closes - the design read and system choice belong in the plan, not discovered mid-implementation.
@@ -65,6 +68,15 @@ done-criteria will turn on and skip exhaustive branch-walking.
   once it holds. If a decision reads like a standing policy for this project (a convention, not a
   one-off), offer to persist it - "make this the default here?" - and on a yes record it with
   `.better-dev/bin/bd-mem persist-override "<line>"`. Don't persist transient facts.
+- **Attack the plan before you close.** The grill so far argued *for* the design - it walked the
+  tree and filled each node with your recommended answer. Spend one pass arguing against it: name the
+  unknown you skated over, the single assumption the whole plan rests on that you never actually
+  checked, and the one requirements change that would make this the wrong build. Each objection has to
+  resolve - it dies against evidence you can cite, or it promotes to an open concern or an out-of-scope
+  line, never just noted and dropped. If you can't mount one real objection, you don't yet understand
+  the design well enough to have attacked it; keep grilling. The contract records at least one attempted
+  refutation with its disposition (died-against-evidence / promoted-to-open-concern /
+  promoted-to-out-of-scope) - an empty Open-concerns section with no recorded refutation fails this.
 - **Know when the grill is done.** Before closing it, run one honesty check: *can you predict the
   user's reaction to the next three questions you would ask?* If yes, the decisions are settled and
   the plan is decision-complete - the implementer will make none. If no, you still have open

@@ -19,7 +19,7 @@ users' working trees; project-scoped only).
 ## 2. Principles
 
 1. **Agent-agnostic** - `SKILL.md` (agentskills.io) is the portable unit; no lock to one model/harness.
-2. **Composable, never blocking** - additive; complements installed skills/tools/MCP; never exclusive; no maximalist "MUST/STOP" tone.
+2. **Composable, never blocking** - additive; complements installed skills/tools/MCP; never exclusive; no maximalist "MUST/STOP" tone. Firmness is not blocking: a gate is a calm declarative naming its consequence; a hedged gate reads as optional and fails (D13; writing-skills owns the rule).
 3. **Self-describing** - a project's `CLAUDE.md`/`AGENTS.md` + each skill's `description` auto-teach usage.
 4. **Self-improving & self-extending** - one ordered flow on a gap: **source first** (`find-skills`), **create only as fallback** (hermes `/learn`). See §7.
 5. **Self-hostable / OSS-preferred; minimal deps** (bash-light).
@@ -34,7 +34,7 @@ stay model-invoked.
 ## 3. Core loop - work items are FEATURE **or** FIX
 
 1. **Bootstrap for parallelism** - set up the *minimum base* (main/staging, worktree conventions, guardrails). Adapt to what's there; don't impose.
-2. **Front-end (typed):** **feature → `plan-grill`** (ideate + grill the plan watertight); **fix → `diagnose`** (reproduce → red-capable signal → root-cause → falsifiable hypothesis).
+2. **Front-end (typed):** **feature → `plan-grill`** (ideate + grill the plan watertight); **fix → `diagnose`** (reproduce → red-capable signal → root-cause → falsifiable hypothesis); **no item yet → `codebase-audit`** (advise-only ranked findings on an existing codebase; the human picks, then the typed front-end runs - D13).
 3. **Autonomous implementation loop** - same loop for both; run to real done-criteria; a fix's contract = red-signal-goes-green + regression test. See §5-loop below.
 4. **Capability-gap → source the tool** (§7). Ships the *practice of sourcing*, not every tool.
 

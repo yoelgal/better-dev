@@ -35,10 +35,20 @@ Never put `version`, `license`, or prose in frontmatter.
 - Keep the body to what **every** run needs. Push the rest into sibling `.md` files reached by a **prose
   pointer** ("for the tricky cases, read `edge-cases.md`") - never an `@`-link or import, which force-load
   the file and spend context on every run whether it's needed or not.
+- Keep any always-loaded block lean - a skill body, a routing table, a discovery block is read on every
+  turn, so cut a row before you add one.
 - Depend on another skill by **naming it in prose** ("run `/grill` first"), never by reaching into its
   files. Shared knowledge lives inside the skill that owns it and is reached by invoking that skill.
-- Plain, calm voice. No "MUST / ALWAYS / CRITICAL" shouting - an always-blocking tone fights better-dev's
-  never-blocking principle. State the rule once; trust the reader.
+- Voice: firm and precise, never maximalist. State a gate as a plain declarative that names its
+  consequence ("editing a committed test to reach green is out of bounds; it hides the very regression
+  the test exists to catch"), not a caps-locked wall of `MUST / ALWAYS / CRITICAL` - that shouting is the
+  blocking tone principle 2 bans, and a firm sentence with a reason holds a gate where raised volume only
+  adds noise. Do not soften a real gate into a hedge either: "please try to", "ideally", and "if possible"
+  read as optional, and an optional gate is no gate. Say the rule once, at full strength, in a calm voice.
+- When you revise a skill rather than write one, cut before you add. Hardcoded process steps and defensive
+  repetition written for a weaker model cap a stronger one, so the fix for a skill that under-performs is
+  usually a deletion, not another rule. Every instruction you keep pairs with the failure it prevents; one
+  that names no failure is a candidate for the cut.
 
 ## Encode the judgment at the decision point
 
@@ -90,6 +100,10 @@ exact spot the excuse shows up.
   whatever the host ships"), compose better-dev's own skills by slug, and route real gaps through
   `/tool-sourcing`. The same discipline keeps host-specific commands (`pbcopy`, `gh`) framed as
   where-available, not assumed.
+- Any file the model both reads and rewrites - a contract's done-criteria, a progress ledger, a pass/fail
+  list - carries an explicit typed status field per item (a boolean or enum in a table or JSON shape), not
+  a prose bullet. A model tidies prose and leaves `"passes": false` alone. Surrounding prose may stay, but
+  free-form narrative belongs in an append-only file the model never rewrites.
 - Read `.better-dev/overrides.md` first and honor any project override before applying a default.
 - Record durable rules and lessons through the memory contract (`.better-dev/bin/bd-mem`), never by
   hand-writing state files. A lesson is one atomic insight with a recall key on the front, not a

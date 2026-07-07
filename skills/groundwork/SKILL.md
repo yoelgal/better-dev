@@ -42,7 +42,9 @@ The foundation is the substrate later features would collide on. Design that, an
 - schema, shared types, and dependencies,
 - module boundaries and the interfaces/contracts between areas,
 - the auth and routing skeleton,
-- the build / test / deploy pipeline,
+- the build / test / deploy pipeline, named as fixed idempotent entry points (setup, test, reset - the
+  project's own named scripts or tasks) so later sessions and worktrees re-run them without guessing;
+  don't invent a new entry-point name when the repo already has one,
 - naming and domain vocabulary.
 
 The depth boundary is a bright line, and it runs the opposite way from a waterfall: design **only what
