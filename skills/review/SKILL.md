@@ -69,7 +69,9 @@ lightest weight judges the diff, not the report, and a Critical stays a Critical
 - **deep** - standard, plus each channel over-surfaces candidates (recall-biased - err toward surfacing),
   and the verify pass below decides what survives. For a diff that touches a fingerprint surface (auth,
   migration, money, concurrency, wire format, deletion), crosses the scope gate, or the whole-branch pass
-  before a PR into the integration branch.
+  before a PR into the integration branch. At the highest stakes, a second independent reviewer on the
+  same diff - a fresh context, ideally a different capable model where the host has one - is a recall
+  gain, never a requirement.
 
 ### The channels
 
