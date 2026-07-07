@@ -48,10 +48,31 @@ something other than the criterion it claims to cover, is a finding regardless o
 
 - **Spec channel** - measure the diff against what was asked (the plan/contract you were handed, not the PR
   body): requirements **missing** or only partly done; behaviour **added** that nobody asked for (scope
-  creep); requirements built the **wrong way**. Quote the contract line for each finding. No contract
-  available → say "no spec available" and stop; don't invent requirements. For a dispatched worker's
-  diff, every hunk traces to an in-scope file and a contract step - one out-of-scope hunk is a finding
-  against the contract's scope tripwire, however plausible it looks.
+  creep); requirements built the **wrong way**. Quote the contract line for each finding. For a
+  dispatched worker's diff, every hunk traces to an in-scope file and a contract step - one out-of-scope
+  hunk is a finding against the contract's scope tripwire, however plausible it looks.
+
+  Walk every criterion in the contract, not just the ones the diff surfaces - the table is how you prove
+  you did. One row per criterion, exactly one marker each:
+
+  | Criterion (quoted) | Status | Evidence |
+  |---|---|---|
+  | the contract line | `DONE` / `PARTIAL` / `NOT_DONE` / `CHANGED` / `⚠️ cannot verify` | `file:line`, or the absence you checked for |
+
+  `DONE` takes clear evidence in the diff - the specific behaviour the criterion names, present; a
+  touched file is not evidence. `PARTIAL` names what is missing. `NOT_DONE` says what you looked for and
+  did not find. `CHANGED` means the goal is met by different means than the plan named - note the
+  difference; reception judges it as a documented deviation. `⚠️ cannot verify` names the manual check.
+  Be conservative with `DONE`, generous with `CHANGED`, honest with `⚠️` - five rows the orchestrator
+  must confirm beat five silently classified `DONE`. A `PARTIAL` or `NOT_DONE` row lands as a finding on
+  the severity ladder; the table is where it is discovered, not a second verdict. These are per-criterion
+  markers, one layer below the verdict - they never appear as a loop state.
+
+  With no contract findable (a standalone "review since X"), the completion audit is skipped - say "no
+  spec available", never invent requirements. The scope check still runs: the package's commit list is
+  the stated intent, and intent is a ceiling on scope, never proof of satisfaction - a claim can narrow
+  what was authorized; it cannot prove what was done. Report it as two lines plus the drift: `Intent:`
+  one line, `Delivered:` one line, then each change beyond the stated intent.
 
   A criterion a linked test claims to prove isn't proven until you read the test *body*. The triangle
   is **criterion ↔ what the test sets out to do ↔ what it actually asserts**, and all three have to be the
@@ -70,11 +91,19 @@ Cite `file:line` for every finding and for any check you'd otherwise answer with
 requirement can't be judged from this diff alone - it lives in unchanged code or spans changes - report it
 as a `⚠️ cannot verify from the diff` item and say what to check, rather than broadening your search.
 
+A finding earns the severity ladder by quoting the line(s) that motivate it - the verbatim text, not only
+the `file:line`. Claiming a field does not exist means quoting the class body where it would live;
+claiming a nil can flow means quoting the initialization; a race means quoting both sides. When the
+symbol is framework-generated (an ORM column, a decorator, a migration), quote the construct that
+generates it - a grep that found nothing is not a read. A finding you cannot quote for goes under
+`⚠️ cannot verify from the diff` with what to check - never onto the ladder with a hedged severity.
+
 ## Fingerprint what this diff touches
 
 On top of your axis, notice what *kind* of change this is - some surfaces carry sharp, recurring failure
-modes a general read slides past. Match the diff against this list, and where one fits, spend a focused
-check there - `/codebase-map` finds the callers and dependents of a changed or removed symbol, so a
+modes a general read slides past. Match the diff against this list, and where one fits, run that
+surface's checklist from `lenses.md` (a sibling of this brief) - the focused check is those items, not a
+vibe. `/codebase-map` finds the callers and dependents of a changed or removed symbol, so a
 blast-radius check rests on who actually reaches it rather than a guess:
 
 - **Auth / authz** - a check moved, weakened, or bypassed; a new entry point that skips one.
@@ -168,12 +197,16 @@ mode this separation exists to prevent.
 
 ## Output
 
-Begin directly with the axis verdict - no preamble, no process narration, no closing summary. Every line is
-a verdict, a finding with `file:line`, or a check you ran.
+The first line of your output is the axis verdict token, exactly one of `compliant` / `issues-found` /
+`cannot-verify`, alone on its line - it is read by a machine before a human. Then the detail: no preamble,
+no process narration, no closing summary. Every line is a verdict, a finding with `file:line`, or a check
+you ran.
 
 ```
+compliant | issues-found | cannot-verify
+
 ### <Axis> verdict
-- ✅ compliant  |  ❌ issues found  |  ⚠️ cannot verify from the diff: <what, and what to check>
+- one sentence; for `cannot-verify`: <what, and what to check>
 
 ### Strengths
 - <specific, so the fix worker trusts the rest>

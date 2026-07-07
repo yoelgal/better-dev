@@ -53,12 +53,12 @@ the same way the package is handed over.
 
 ## 3. Dispatch the channels - separately, on the diff alone
 
-### Pick the weight before dispatching
+### Pick the effort before dispatching
 
-Default weight is **standard**; the caller passes `[effort]`, or the loop infers it from the diff's blast
+Default effort is **standard**; the caller passes `[effort]`, or the loop infers it from the diff's blast
 radius - a fingerprint-surface touch, a scope-gate crossing, or a whole-branch pre-PR pass pulls it up; a
-docs-only or single-file diff pulls it down. The weight scales the work, never the separation: even the
-lightest weight judges the diff, not the report, and a Critical stays a Critical at every weight.
+docs-only or single-file diff pulls it down. The effort scales the work, never the separation: even the
+lightest effort judges the diff, not the report, and a Critical stays a Critical at every effort.
 
 - **light** - one fresh reviewer reads the diff once against the contract: no channel fan-out, no verify
   pass, at most a handful of findings. For a docs-only, config, or small diff that touches no fingerprint
@@ -69,9 +69,11 @@ lightest weight judges the diff, not the report, and a Critical stays a Critical
 - **deep** - standard, plus each channel over-surfaces candidates (recall-biased - err toward surfacing),
   and the verify pass below decides what survives. For a diff that touches a fingerprint surface (auth,
   migration, money, concurrency, wire format, deletion), crosses the scope tripwire, or the whole-branch pass
-  before a PR into the integration branch. At the highest stakes, a second independent reviewer on the
-  same diff - a fresh context, ideally a different capable model where the host has one - is a recall
-  gain, never a requirement.
+  before a PR into the integration branch. At deep effort, each fingerprint surface the diff touches also
+  gets its own fresh lens worker - the same brief, that surface's section of `lenses.md` as its focus,
+  findings on the same severity ladder, printed under its own heading in step 4. At the highest stakes, a
+  second independent reviewer on the same diff - a fresh context, ideally a different capable model where
+  the host has one - is a recall gain, never a requirement.
 
 ### The channels
 
@@ -88,8 +90,11 @@ and the channel's own focus:
   against the plan or contract from `/plan-grill` (or the fix contract from `/diagnose`), which is the
   ground truth - not the PR body or the implementer's report. A criterion a linked test claims to prove
   stays unproven until the test's *body* is read to confirm it exercises *that* criterion - the
-  brief carries this per-criterion check. If no spec is findable, the channel says "no spec available"
-  rather than inventing requirements.
+  brief carries this per-criterion check, and its completion table is how the channel proves it walked
+  every criterion, not just the ones the diff surfaces. If no spec is findable, the channel skips the
+  completion audit and says "no spec available" rather than inventing requirements - but the drift check
+  the brief defines still runs, with the package's commit list as the stated intent: intent is a ceiling
+  on scope, never proof of satisfaction.
 - **Standards** - does the diff follow this repo's documented conventions? Hand this channel any
   `CONTRIBUTING.md` / coding-standards file, and always the Fowler smell baseline in `standards-baseline.md` -
   a zero-setup rubric that holds even when the repo documents nothing. A documented repo standard wins
@@ -112,9 +117,9 @@ and the channel's own focus:
 Don't pre-judge in a brief. "Don't flag X", "at most Minor", "the plan chose this" all bias the worker -
 let it raise the finding and adjudicate afterward.
 
-### Verify each candidate (deep weight)
+### Verify each candidate (deep effort)
 
-At deep weight no candidate is a finding until a separate verifier settles it - this extends the Refuter's
+At deep effort no candidate is a finding until a separate verifier settles it - this extends the Refuter's
 adversarial stance from the author's absence-claims to the reviewer's own candidates. Hand the verifier the
 package path, the hunk in question, and one candidate; it returns exactly one verdict:
 
@@ -132,11 +137,31 @@ verify pass tunes recall, never the bar: it decides which candidates are real, n
 
 ## 4. Aggregate without merging
 
-Print each channel under its own heading (`## Spec`, `## Standards`, `## Security`, and `## Refuter` when
-it ran) with a one-line per-channel summary - count and worst finding within that axis. Do not merge the
-lists or pick a cross-axis winner: a change can pass one axis and fail the other, and that is signal worth
-keeping visible.
-No dedupe engine, no severity-normalizing table - just the channels, side by side.
+Print each channel under its own heading (`## Spec`, `## Standards`, `## Security`, `## Refuter` and each
+lens when they ran) with a one-line per-channel summary - count and worst finding within that axis. Do not
+merge the lists or pick a cross-axis winner: a change can pass one axis and fail the other, and that is
+signal worth keeping visible. No dedupe engine, no severity-normalizing table - just the channels, side
+by side.
+
+End the aggregated report with a fixed five-line **counts block** - the loop and `/pr-and-verify` read
+these lines, not the prose above them:
+
+```
+CRITICAL: <n>
+IMPORTANT: <n>
+MINOR: <n>
+CANNOT_VERIFY: <n>
+GATE_BREACH: <n>
+```
+
+`CANNOT_VERIFY` counts the `⚠️ cannot verify from the diff` items; `GATE_BREACH` counts blast-radius
+policy findings (step 5 routes them). The counts are the interface; the moves stay in step 5:
+`CRITICAL + IMPORTANT = 0` and `GATE_BREACH = 0` is the clean verdict (`DONE`, or `DONE_WITH_CONCERNS` when `MINOR` or
+`CANNOT_VERIFY` is non-zero); any blocking count routes to the fix worker; `GATE_BREACH > 0` is
+`NEEDS_INPUT` regardless of the rest. A counts block that disagrees with the prose is a reporting defect -
+fix the report, don't pick a line. When this review runs as a dispatched worker, the reply also ends with
+the report trailer `/orchestrating-agents` defines, its `STATUS` derived from these counts; the counts
+block is review's own record, not that trailer.
 
 ## 5. Verdict and hand-off
 
@@ -177,7 +202,9 @@ can confirm the change was reviewed without re-running the review:
 
 Key it to the reviewed HEAD. A later fix that changes the code doesn't inherit an older verdict - the PR
 stage checks the recorded sha against the HEAD it's about to open, so a verdict on stale code doesn't gate
-a newer push. A verdict carrying an open Critical or Important is never recorded clean; it goes back
+a newer push. A non-clean verdict is recorded too - the counts block keyed to the same sha
+(`<sha> CRITICAL=1 IMPORTANT=2 MINOR=0 CANNOT_VERIFY=1 GATE_BREACH=0`), cheap and auditable, so a resumed
+loop reads what blocked the last review instead of re-deriving it. It is never recorded clean; it goes back
 through the fix worker and is re-reviewed first.
 
 The author side of this - how findings are answered without performative agreement or blind implementation -
