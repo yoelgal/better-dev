@@ -38,8 +38,10 @@ Two shapes of tool fill this gap well, and the project's stack usually decides b
 - A **CDP browser CLI** such as `agent-browser` (Apache-2.0) - a self-contained command that opens a page,
   snapshots the accessibility tree, clicks and fills by ref, screenshots, and reads the rendered DOM, with no
   test framework to stand up. Good when there's no existing e2e harness and you want a check the loop can run
-  in a few commands. It runs headless by default, can drive real Chrome with a logged-in profile for
-  authenticated pages, and can use cloud remote browsers for parallel or sandboxed runs.
+  in a few commands. It runs headless by default, can drive a logged-in profile snapshot for authenticated
+  pages, and can use cloud remote browsers for parallel or sandboxed runs. gstack's browser (MIT,
+  `garrytan/gstack`) fills the same shape as a dedicated agent-controlled window with one-click cookie
+  import from the user's real browser.
 - A **Playwright- or Cypress-based skill** - the better fit when the repo already has that framework and a
   `test:e2e` script; the browser check then rides the harness the project already trusts.
 
@@ -49,6 +51,11 @@ and reuses it instead of re-sourcing, and swapping tools is a one-line memory up
 check.
 
 ## 3. Wire the check the loop will run
+
+Whichever tool is adopted, the browser it drives is its own dedicated window and session - never the user's
+working browser or live profile - named per agent session so re-runs and later commands reuse the one live
+window instead of spawning more, and parallel sessions don't clobber each other. Auth for a logged-in page
+is copied in (a cookie import or a read-only profile snapshot), not borrowed by driving the user's window.
 
 With a tool in hand, turn the step-1 line into a runnable check: launch the app (or point at the deploy URL),
 drive the browser to the state under test, and assert the observable - text present, element visible, a
