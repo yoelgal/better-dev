@@ -25,6 +25,11 @@ is the remedy - the install command, the config key, the env var, the retry - an
 or troubleshooting skill, phrased as "here's how to make it work." Never leave "this doesn't work" standing
 on its own; that's the version that bites.
 
+**Prune on contact, not on a schedule.** A lesson earns its place only while its premise holds. When a run
+proves an old lesson wrong, or the setup it described is gone, remove it in the same breath you would have
+re-read it. A stale lesson is not neutral - it is a wrong instruction the next session will trust. Don't
+wait for a cleanup pass: the moment you touch a lesson that no longer holds, delete or supersede it.
+
 **Route by who-versus-how.** Two different stores hold two different things, and mixing them is how each
 gets noisy:
 
