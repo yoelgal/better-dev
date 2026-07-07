@@ -52,21 +52,29 @@ check.
 
 With a tool in hand, turn the step-1 line into a runnable check: launch the app (or point at the deploy URL),
 drive the browser to the state under test, and assert the observable - text present, element visible, a
-screenshot captured for a human or a visual diff, a URL reached. Keep it to the few commands that prove the
-criterion; this isn't a full test suite, it's the one check the contract named.
+screenshot captured for a human or a visual diff, a URL reached. Keep it to the checks the contract named -
+one observable for a leaf criterion, or the branch-walk when the contract carries a scenario table - never a
+full regression suite the loop re-runs.
 
 For the concrete command surface of a CDP CLI like `agent-browser` - snapshot-then-act by ref, screenshotting,
-reading rendered text, waiting on state, batching steps, and the headless / real-profile / cloud modes - read
-`browser-checks.md` in this folder. For a framework-based tool, the check is just its own run command
-(`npx playwright test <file>`), so nothing extra is needed here.
+reading rendered text, waiting on state, batching steps, reading the console clean, walking the contract's
+scenario branches, and the headless / real-profile / cloud modes - read `browser-checks.md` in this folder.
+For a framework-based tool, the check is just its own run command (`npx playwright test <file>`), so nothing
+extra is needed here.
 
 ## 4. Feed it into done-criteria
 
 The point of wiring the check is that the loop can grade against it. Record it as part of the work item's
 observable done-criteria so `/autonomous-loop` treats a proven browser pass - not a claim - as what closes the
 item, and so `/pr-and-verify` drives the same check against the running UI end-to-end before the PR is
-considered verified. Done means the page was seen rendering, the flow was walked, the screenshot exists - the
-capability is proven against the running app, not asserted from code that never touched a browser.
+considered verified. Exit 0 on the check is the working signal; runtime observation is the acceptance - the
+full runtime rubric (surface, adversarial probe, verdict) lives in `/pr-and-verify` (`verify-runtime.md`),
+and this skill owns the browser-specific method.
+
+Done means the page was seen rendering and the flow walked - not asserted from code that never touched a
+browser. A visual criterion asks for one thing more: the screenshot is the artifact, not the verdict, so it
+is proven by the capture plus a pass over what it shows - a guideline / contrast / anti-slop audit
+(`web-design-guidelines` if wired, else sourced via `/tool-sourcing`). A PNG nobody audited is not a pass.
 
 If the browser check can't run yet (no dev server, no deploy URL, missing credentials for an authenticated
 page), that's a `NEEDS_INPUT` or `BLOCKED` state to surface, not a criterion to quietly drop. A done-criterion
