@@ -191,9 +191,17 @@ baseline - so the resolved policy is honored every run and stays this project's 
 
 CI only guards the integration branch if that branch *requires* it - without branch protection, a green
 workflow is a suggestion. better-dev cannot set protection on a real remote for you (that stays the
-operator's call), so surface the exact move and let them run it: on GitHub, a paste-ready `gh api` call or a
-pointer to Settings -> Branches to require the checks workflow and a PR review before a merge to
-`staging`/`main`. Emit it; do not assume it.
+operator's call), so surface the exact move and let them run it: on GitHub, a `gh api` call or a pointer
+to Settings -> Branches to require the checks workflow and a PR review before a merge to
+`staging`/`main`. Emit it; do not assume it - though an operator who then asks you to apply it, or tries
+it themselves and hands you the error, has made the call, and running it for them is the right response.
+
+Two mechanics keep a handed-over command from failing in their terminal: shape the protection call as
+JSON on stdin (`gh api -X PUT .../branches/<branch>/protection --input -` with a heredoc), never as
+`-f`/`-F` field flags - this endpoint takes typed booleans and nulls, and `-f` sends every value as a
+string, which the API rejects with a 422. And where the host allows it, put the command on the
+operator's clipboard (`pbcopy` / `xclip`) and say so, rather than relying on a clean copy-paste of a
+multi-line block.
 
 ## Optional integrity gates (offered, not imposed)
 
