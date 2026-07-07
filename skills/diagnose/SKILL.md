@@ -15,6 +15,10 @@ touches a fix.**
 Read `.better-dev/overrides.md` first - a project override (a repro command, a test seam convention,
 a "we never instrument prod" rule) wins over anything here.
 
+Before you re-derive anything about this area, spend one recall on it
+(`.better-dev/bin/bd-mem recall "<area>"`) and cite what it returned, or an explicit "recall empty" -
+a lesson you already paid for is cheaper than the mistake it prevents.
+
 The order below matters: a theory before a red signal is the exact failure this skill exists to
 prevent. Don't skip forward.
 
@@ -31,8 +35,8 @@ theorize about it.
 
 One bounded observation pass, cheapest first: locate the code path and read what it actually does on
 the reported input; find any **intent contract** - a test, spec, validation rule, or doc that asserts
-the current behavior is *deliberate*; run the cheapest already-wired check if one is cheap. This is
-observation, not debugging - no fix, no hypotheses yet.
+the current behavior is *deliberate*; run the cheapest already-wired check if one is cheap. The
+deliverable of this pass is a verdict with receipts, not a change - no fix, no plan, no hypotheses yet.
 
 Three outcomes send you back to the reporter instead of into a fix:
 
@@ -112,6 +116,11 @@ sharpen it or drop it. Show the ranked list to the user before testing; they oft
 Test one variable at a time. For the instrumentation mechanics - local cheap-experiment loops versus
 parallel fan-out for cross-service bugs, tagged trace probes and log peppering, routing verbose output
 to disk, and building the evidence chain - read `instrument.md`.
+
+If three ranked hypotheses each fail against their own falsifying prediction, convert to a
+`NEEDS_INPUT` stop rather than spawning a fourth round - report what you tried, what you saw, and what
+you now suspect and why you can't confirm it; the shape of the three failures is itself the lead the
+next move needs.
 
 Fix the root cause, not the symptom. Before you settle where the fix lands, produce the **caller
 list**: grep every caller of the function you'd touch - `/codebase-map` surfaces them from a structural
