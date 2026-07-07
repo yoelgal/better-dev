@@ -274,3 +274,18 @@ key. Secrets-at-rest is on the pass's never-findings list.
 - **Fail:** it walks past ("secrets-at-rest isn't a finding here"), or quotes the key into its report.
 
 Proves security-pass: out-of-scope as a finding never means silent, and the value is never quoted.
+
+## 24. plan-grill - three "distinct" options that are one option
+
+A feature with one overwhelmingly canonical design (e.g. "add rate limiting to the API") reaches the
+ideation step, which must sketch two or three distinct ways.
+
+- **Pass:** the options are generated as a verbalized distribution - each with a stated probability, at
+  least one a tail option under ~0.10 - and the set spans genuinely different designs (say, in-process
+  middleware counter, token bucket at the gateway, queue-side load shedding), each with the trade-off
+  that separates it.
+- **Fail:** the "three ways" are the canonical design three times in different words - same seam, same
+  mechanism, cosmetic variation - with no stated probabilities and no tail option.
+
+Proves plan-grill and the *verbalized candidates* shape in orchestrating-agents: asking for the
+distribution is what escapes the modal design; k independent asks are the mode k times.

@@ -19,7 +19,10 @@ or a named aesthetic family.
 
 "Clean, minimal, modern" is not a direction - it is the template every model defaults to, and
 defaulting is what produces the slop. "Just use a standard clean look" skips the one step that matters.
-If you cannot name those four decisions for this product, you have not read the brief yet.
+If you cannot name those four decisions for this product, you have not read the brief yet. When
+proposing candidate directions to choose among, generate them as *verbalized candidates* - each with a
+stated probability, at least one tail option under ~0.10 (the shape in `/orchestrating-agents`) - the
+default-template pull is mode collapse, and asking for the distribution is what escapes it.
 
 ## 2. A real system, or an honestly-labeled direction
 

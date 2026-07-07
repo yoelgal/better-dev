@@ -35,6 +35,8 @@ we actually copied verbatim/substantially, which MIT requires us to attribute, a
   "Master Claude With Fable 5: 6 Rules" - @0xMoysei (Moysei) (X article, ideas)
   "Como crear Loops en Fable 5" - @angeldot_ (angel) (X article, ideas)
   Model-routing CLAUDE.md section - @theo (Theo) (X thread, ideas)
+  "Verbalized Sampling" - Zhang, Yu, Chong, Sicilia, Tomz, Manning, Shi
+    (arXiv 2510.01171) (research paper; method reimplemented as guidance, cited)
 
 ── NOT copied - inspiration only, NOT redistributable ──
   Andrej Karpathy - LOOPS.md v060726 ("personal use permitted"). Concepts reimplemented
