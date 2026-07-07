@@ -46,6 +46,32 @@ the trigger 100×, parallelise it, add stress, narrow the timing window, inject 
 points. A 50%-flake bug is debuggable; a 1% one isn't - keep raising the rate until it is, then treat
 that harness as the signal.
 
+## When it won't reproduce yet
+
+A first miss is a clue about *why*, not a dead end. Triage the shape before you give up:
+
+- **Timing / concurrency** - widen the window: inject sleeps at the suspected race points, run the
+  trigger under load or in parallel, add timestamped markers around the suspect region.
+- **Environment** - diff the two environments: runtime and OS versions, env vars, and especially data
+  (empty vs populated store). A clean CI run often reproduces what a warm laptop hides.
+- **State / order** - run the scenario in isolation, then again after the operations that precede it in
+  the wild; hunt leaked globals, singletons, and shared caches.
+- **Regression** - if it worked at a known-good state, let `git bisect run <your signal>` find the
+  commit that broke it; the same automation bisects over a data or dependency version, not just commits.
+- **Truly random** - raise the rate (loop the trigger 100x, add stress) until it's debuggable; if it
+  stays below usefully-debuggable, add a narrow alert on the exact failure signature and capture the
+  next real occurrence rather than fabricating a clean one-shot.
+
+## When it's live in production and you have no local repro
+
+Two jobs, in order. First **stop the bleeding** - the fastest safe reversal is the fix for *now*: flip
+the feature flag off, roll back or revert the suspect deploy, drain the bad node. Record it; a rollback
+is a mitigation, not the diagnosis. Then treat **telemetry as the signal source** while you build a
+local one: pull the logs, traces, and error-tracker events around the failure instant, extract the
+exact inputs and the failure signature, and replay them through the code path in isolation (ladder rung
+5). The regression test still lands locally - production observation is how you get the repro, not a
+substitute for it.
+
 ## When you truly can't build one
 
 Stop and say so plainly. List what you tried. Then ask the reporter for exactly one of:

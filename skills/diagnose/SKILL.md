@@ -1,6 +1,6 @@
 ---
 name: diagnose
-description: Use when a bug, regression, crash, flaky test, or "X is broken / throwing / failing / slow" report needs diagnosing before any fix - the fix-side entry into the work-item loop, where a symptom becomes a reproducible red signal and a root cause.
+description: Use when a bug, regression, crash, flaky test, or a report that "X is broken / throwing / failing / slow", "why is prod down", or "make it faster" needs root-causing before any fix - the fix-side entry into the work-item loop, where a symptom becomes a reproducible red signal and a root cause.
 argument-hint: "[bug report, ticket URL, error, or log snippet]"
 ---
 
@@ -23,6 +23,11 @@ prevent. Don't skip forward.
 Before building anything, check that the bug is real and the expectation is sound. A bug claim has two
 parts: the **claimed-actual** (what the reporter says happens) and the **claimed-expected** (what they
 say should happen - often unstated in a symptom-only ticket; record it as `not stated`).
+
+The cheapest evidence in the whole skill is the artifact you already hold: read the **whole** error and
+the **full** stack trace, end to end - not just the top line. The failing frame, the message, the exit
+code, and the values they name localize most bugs before any file is opened. Read it before you
+theorize about it.
 
 One bounded observation pass, cheapest first: locate the code path and read what it actually does on
 the reported input; find any **intent contract** - a test, spec, validation rule, or doc that asserts
@@ -71,10 +76,14 @@ trace, throwaway harness, fuzz loop, bisection, differential run, and the human-
 resort), how to tighten it, and how to handle non-deterministic bugs, read `signal.md`.
 
 If you catch yourself reading code to build a theory before this command exists, that's the failure
-this phase prevents - come back and build the signal first. If you genuinely cannot build one, stop
-and say so: list what you tried and ask for env access, a captured artifact (HAR, log dump, core dump,
-timestamped recording), or permission to add temporary instrumentation (a `NEEDS_INPUT` / `BLOCKED`
-stop). Don't proceed to hypotheses without a loop.
+this phase prevents - come back and build the signal first. If a first attempt doesn't reproduce, don't
+jump to handing back - the *shape* of the non-reproduction is itself a lead: read `signal.md`'s
+non-reproducible triage (timing / environment / state / truly-random), and for a bug that is live in
+production its incident path (stabilize first, then read telemetry as the signal), before you conclude
+no loop exists. If you genuinely cannot build one after that, stop and say so: list what you tried and
+ask for env access, a captured artifact (HAR, log dump, core dump, timestamped recording), or
+permission to add temporary instrumentation (a `NEEDS_INPUT` / `BLOCKED` stop). Don't proceed to
+hypotheses without a loop.
 
 ## Phase 2 - Minimise the repro
 
@@ -86,9 +95,9 @@ in Phase 3 and becomes the clean regression test in Phase 4.
 ## Phase 3 - Root-cause via falsifiable hypotheses
 
 **Recall first.** Before generating any hypotheses, distill the red signal into a **failure
-signature** - the stable fingerprint of *this* failure, not the run that happened to expose it: the
-error class and message shape, the top frames of the stack, the failing assertion, the symptom in one
-line. Ask `.better-dev/bin/bd-mem recall "<signature>"` for a prior diagnosis of the same shape. A
+signature** - the stable fingerprint of *this* failure, drawn from the whole error and stack you read
+in Phase 0, not the run that happened to expose it: the error class and message shape, the top frames
+of the stack, the failing assertion, the symptom in one line. Ask `.better-dev/bin/bd-mem recall "<signature>"` for a prior diagnosis of the same shape. A
 confident match returns a known root cause and the fix that resolved it last time - apply it and
 re-run the Phase 1 signal to confirm it goes green here too, rather than re-deriving from scratch. A
 match that no longer holds (the signal stays red) isn't wasted: it rules out a candidate and tells you
@@ -104,11 +113,14 @@ Test one variable at a time. For the instrumentation mechanics - local cheap-exp
 parallel fan-out for cross-service bugs, tagged trace probes and log peppering, routing verbose output
 to disk, and building the evidence chain - read `instrument.md`.
 
-Fix the root cause, not the symptom. Before you settle on where the fix lands, grep every caller of the
-function you'd touch - `/codebase-map` surfaces them from a structural map when one's installed, plain
-grep when it isn't: one guard in the shared function all callers route through is a smaller, more
-correct change than a guard in the single path the ticket named - which leaves every sibling caller
-broken.
+Fix the root cause, not the symptom. Before you settle where the fix lands, produce the **caller
+list**: grep every caller of the function you'd touch - `/codebase-map` surfaces them from a structural
+map when one's installed, plain grep when it isn't - and record them in the evidence chain. One guard
+in the shared function all callers route through is a smaller, more correct change than a guard in the
+single path the ticket named - which leaves every sibling caller broken. Guarding at the surface -
+swallowing an unexpected null, de-duping in the view, wrapping the throw in a try/catch - hides the
+deviation instead of fixing it; if a value is unexpectedly null, the bug is wherever it was allowed to
+become null, not where it finally crashed.
 
 Land the diagnosis as an evidence chain: symptom observed → checked source → found evidence → confirmed
 by a second source → reproduced. That chain, plus the correct hypothesis, is the root cause.
@@ -145,4 +157,6 @@ proposes rather than writes; you're offering a candidate, not editing memory by 
 
 Diagnose adds; it never replaces an installed debugger, test runner, or observability skill - it
 sequences them. It's the fix-side twin of `/plan-grill` (the feature front-end); both feed the same
-`/autonomous-loop`. When revising this skill, follow `/writing-skills`.
+`/autonomous-loop`. A live production incident is diagnosed here first; once the fix lands through the
+loop and `/pr-and-verify`, `/release-promotion` carries the hotfix to both branches. When revising this
+skill, follow `/writing-skills`.
