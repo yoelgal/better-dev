@@ -117,6 +117,31 @@ it can't spawn the host's agent, so dispatch itself is prose the orchestrator ex
 dispatch. Harvest: superpowers `subagent-driven-development`, forge/devloop dispatch, frugal (route
 subtasks - a practice, not a provider spine). This is also how better-dev itself is built (dogfood).
 
+## D11 - Review gates the PR; the PR stage is automation only (2026-07-07, user directive)
+A pull request opens only after the change carries a clean independent review verdict recorded in the
+ledger and keyed to the reviewed HEAD sha (`bd-mem ledger read <work-item> review.md`). `/pr-and-verify`
+checks that verdict as an entry precondition and never runs review itself; its post-open job is CI
+truth-reading plus runtime verification. A CI-red fix pass is re-reviewed in the worktree and re-recorded
+before its commits push, so an open PR never waits on a reviewer.
+
+## D12 - Synthesis-wave additions (2026-07-07)
+- **Three new skills**: `security-pass` (owns the security knowledge + the canonical untrusted-output
+  rule; review's Security channel else-branches to it), `design-brief` (thin design front-end; composes
+  host design skills, hardcodes no stack or aesthetic), `uninstall` (human-triggered wrapper over
+  `bd-uninstall`; dry-run default, data sacred behind --purge-data). `feature-ideation` is NOT a skill -
+  plan-grill step 2 covers it.
+- **Shared-disposition pattern**: the load-bearing one-line counter inlines at each skill's decision
+  point (survives the skill being copied alone); ONE owning skill carries the full form; cross-references
+  are /skill prose. Applied to the untrusted-output rule (security-pass), the runtime-observation rubric
+  (pr-and-verify/verify-runtime.md), and the reward-hack clause (autonomous-loop's honesty invariants).
+- **Effort vocabulary**: review effort is `light / standard / deep`; tier guidance lives once in
+  `orchestrating-agents/tiers.md`, vendor-neutral, advise-never-route (D4 upheld).
+- **Eval scope**: prose + one shipped `docs/TRAPS.md` (behavioral trap scenarios) + writing-skills'
+  three-check proving bar. No eval harness, no per-skill fixtures.
+- **Named non-goals**: stacked PRs (one work-item, one PR - devloop's /restack pattern deliberately not
+  adopted); recurring/scheduled loop cadence (the host's /loop and /schedule own it; the loop stays a
+  bounded goal-runner).
+
 ## Tracer-bullet findings (2026-07-03, on the papers.town clone) - bind Phase 1
 Ran `onboard` + one feature slice → staging end-to-end on the real clone (locally, no push). Proven, plus:
 1. **Helpers → `.better-dev/bin/`** (bare `scripts/` collides with the project's own - see D0 install contract).

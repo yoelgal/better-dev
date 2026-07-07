@@ -130,7 +130,7 @@ deeply, then reimplement** (§12) - capture the actual mechanism, don't approxim
 | **release/promotion** | staging→main soak/promote, tags, hotfix double-merge (owned; no source) |
 | **guardrails-install** | onboard *installs* pre-commit/lint/CI, not just detects |
 | **pr-and-verify** | `gh pr create` into staging + end-to-end verify (drive the flow, not just tests) |
-| **feature-ideation** | propose options from rough intent (distinct from grilling a plan) |
+| **feature-ideation** | COVERED BY plan-grill step 2 (per-option assumption surfacing) - not a separate skill (D12) |
 | **browser-capability** | wire agent-browser as a sourced capability (web QA / iOS-sim) |
 
 ## 11. Build order & status
@@ -139,6 +139,15 @@ deeply, then reimplement** (§12) - capture the actual mechanism, don't approxim
 - **Phase 1 - core loop: ✅ built + integration-tested** - `worktree-branching`, `plan-grill`, `diagnose`, `orchestrating-agents`, `autonomous-loop`, `review` (fanned out via Workflow, each reimplemented from real opensrc source). Spine unified: `bd-mem` now resolves the primary checkout and owns the ledger (`bd-mem ledger dir|init|resume|put|read`); helpers normalized to the `bd-*` namespace (`bd-mem`, `bd-block`, `bd-dispatch`, `bd-worktree-guard`, `bd-review-package`), all self-tests + a cross-skill worktree integration test green.
 - **Phase 2 - self-improvement: ✅** `tool-sourcing` (rides find-skills CLI) + `self-extension` (hermes /learn fallback, `bd-skill-stage` test-before-promote).
 - **Phase 3 - ship: ✅** `bootstrap-hooks`, `pr-and-verify`, `release-promotion`, `guardrails-install`, `overrides`, `browser-capability`, and `packaging` (`install.sh` vendored install + `.claude-plugin/plugin.json` + `bd-package-check` release gate).
+
+**2026-07-07 synthesis wave landed:** a 17-dossier gap analysis over the July source corpus (see
+`raw/synthesis/master-plan.md`) drove a 14-branch rewrite: reward-hack invariants + rationalizations
+table + learning-law in the loop; claim-blind effort-graduated review; review-verdict-gates-the-PR
+(D11) + `verify-runtime.md`; failure-behavior + threat-surface passes in plan-grill; parallel-baseline
+hardening in groundwork; concurrent-actor + rollback discipline in worktree/release; keyed+locked
+`bd-mem`; utterance routing table in onboard's managed block; `bd-uninstall` + install reconcile;
+three new skills (D12: security-pass, design-brief, uninstall); disposition menu + proving bar in
+writing-skills; `docs/TRAPS.md`. 21 skills, `bd-package-check` green.
 
 **Build complete + quality-upgraded + install reworked.** 18 skills + 8 `bd-*` scripts + hooks; `bd-package-check` green. **Install model (D10):** the tool installs **globally per host** (`install.sh` + `hosts/` adapters + `bd-link`, or the Claude plugin); a repo's `.better-dev/` is **data only** + a per-machine `bin` symlink; repo-authored skills stay repo-local; one-paste `BOOTSTRAP.md` is the front door. **In flight:** `groundwork` (idea→foundation→parallelization front-end) and a loop-engineering audit. A forge+devloop audit (175 mechanisms; 59 already-covered, 15 skipped as plumbing) drove a quality pass - proof-realism (test-body-realizes-criterion), adversarial refutation for non-runnable claims, diff-fingerprint review scrutiny, red-triage (flake/infra/genuine), deslop-on-green, bounded wait-for, content-pinned contract approval (`bd-mem ledger approve`/`check-approval`) - plus `codebase-map` (sourced structural orientation, sibling to `browser-capability`). Remaining is human-only (see §13): publish, real-remote branch protection, live multi-harness runs.
 
