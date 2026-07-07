@@ -59,7 +59,10 @@ Adapt to whatever conventions already exist; ask me only on genuine ambiguity.
 
 </details>
 
-Then your next message can just be *"here's a bug…"* or *"here's a feature…"* and the method picks it up.
+Then your next message can just be *"here's a bug…"*, *"here's a feature…"*, or *"let's build an app
+that…"* - the wired repo carries an utterance-to-skill routing table, so you say what you want and the
+chain runs itself. Uninstall any time with `/uninstall` (or `scripts/bd-uninstall`): dry-run by default,
+removes only what better-dev installed, and never touches your `.better-dev/` data unless you ask.
 
 ## The method
 
@@ -73,11 +76,13 @@ Start a project **from scratch**, or land a feature or fix in an **existing code
    check that's red now and goes green exactly when the work is done - before any code.
 2. **Isolate it.** `/worktree-branching` puts the work in its own git worktree off the integration branch.
 3. **Drive it to proven done.** `/autonomous-loop` runs verify → one step → re-verify → log against the
-   contract, dispatching fresh workers (`/orchestrating-agents`), grading with an independent `/review` that
-   distrusts the report, triaging flakes/infra from real defects, escalating high-consequence changes, and
-   restarting from the contract if it stalls. **Done means proven, not asserted.**
-4. **Ship it.** `/pr-and-verify` opens the PR into staging and verifies end-to-end; `/release-promotion`
-   promotes to main after a soak.
+   contract, dispatching fresh workers (`/orchestrating-agents`), grading with a claim-blind `/review`
+   that never sees the author's report, triaging flakes/infra from real defects, refusing staged greens
+   (no hard-coded values, no weakened checks), escalating high-consequence changes, and restarting from
+   the contract if it stalls. **Done means proven, not asserted.**
+4. **Ship it.** A PR opens only after the change already carries a clean review verdict - the PR stage is
+   automation, not waiting on reviewers. `/pr-and-verify` drives CI plus runtime verification end-to-end;
+   `/release-promotion` promotes to main after a checkable soak.
 5. **Missing a tool?** `/tool-sourcing` finds an existing skill first; `/self-extension` writes one only as a
    fallback (staged, tested, then promoted).
 
@@ -90,12 +95,12 @@ shared skills are never rewritten to encode your preference.
 | Group | Skills |
 |---|---|
 | **Enter & set up** | `onboard` · `groundwork` · `guardrails-install` |
-| **Scope a work-item** | `plan-grill` (feature) · `diagnose` (fix) |
-| **Isolate & drive** | `worktree-branching` · `autonomous-loop` · `orchestrating-agents` · `review` |
+| **Scope a work-item** | `plan-grill` (feature) · `diagnose` (fix) · `design-brief` (UI direction) |
+| **Isolate & drive** | `worktree-branching` · `autonomous-loop` · `orchestrating-agents` · `review` · `security-pass` |
 | **Ship** | `pr-and-verify` · `release-promotion` |
 | **Self-improve** | `tool-sourcing` · `self-extension` |
 | **Sourced capabilities** | `codebase-map` (structural orientation) · `browser-capability` (UI proof) |
-| **Foundations** | `writing-skills` · `packaging` · `bootstrap-hooks` · `overrides` |
+| **Foundations** | `writing-skills` · `packaging` · `bootstrap-hooks` · `overrides` · `uninstall` |
 
 ## How it installs
 
@@ -117,7 +122,7 @@ Skills you later mint with `/self-extension` are **repo-scoped** by default - co
 
 | Path | What |
 |------|------|
-| `skills/` | the 19 practices (agentskills.io: `name` + `description`, progressive disclosure) |
+| `skills/` | the 21 practices (agentskills.io: `name` + `description`, progressive disclosure) |
 | `scripts/` | the `bd-*` spine - `bd-mem` (memory + ledger), `bd-block`, `bd-dispatch`, `bd-worktree-guard`, `bd-review-package`, `bd-skill-stage`, `bd-link`, `bd-package-check` |
 | `hooks/` · `hosts/` | SessionStart / SubagentStart injection · per-host install adapters |
 | `install.sh` · `BOOTSTRAP.md` · `.claude-plugin/` | installer · one-paste bootstrap · Claude Code plugin manifest |
