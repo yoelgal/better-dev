@@ -9,12 +9,13 @@
 # block must update in place without clobbering the operator's own edits.
 #
 #   printf '...body...' | bd-block <file> [block-name]      # name defaults to better-dev
+#   bd-block remove <file> [block-name]                     # strip the block; leave the rest byte-identical
 #
 # Reimplemented for better-dev from understanding; no source files copied.
 set -euo pipefail
 
 case "$0" in /*) SELF="$0" ;; *) SELF="$PWD/$0" ;; esac
-usage() { echo "usage: <body-on-stdin> | bd-block <file> [block-name]  (or: bd-block selftest)" >&2; exit 1; }
+usage() { echo "usage: <body-on-stdin> | bd-block <file> [block-name]  (or: bd-block remove <file> [name] | bd-block selftest)" >&2; exit 1; }
 
 write_block() {
   local file="$1" name="$2" begin end existed tb ta tmp
@@ -29,6 +30,24 @@ write_block() {
     cat "$tb"
     [ "$existed" = 0 ] && [ -s "$tb" ] && printf '\n'      # one separator only when first appending
     printf '%s\n%s\n%s\n' "$begin" "$body" "$end"
+    cat "$ta"
+  } >"$tmp"
+  mv "$tmp" "$file"
+  rm -f "$tb" "$ta"
+}
+
+remove_block() {
+  local file="$1" name="$2" begin end tb ta tmp
+  begin="<!-- BEGIN $name -->"; end="<!-- END $name -->"
+  [ -e "$file" ] || return 0
+  grep -qxF -- "$begin" "$file" || return 0             # no block: leave the file untouched
+  tb="$(mktemp)"; ta="$(mktemp)"; tmp="$file.bd-block.tmp"
+  awk -v b="$begin" '$0==b{exit} {print}' "$file" >"$tb"   # everything before the block
+  awk -v e="$end" 'f{print} $0==e{f=1}' "$file" >"$ta"     # everything after the block
+  # write_block inserts one blank separator before an appended block; drop a single trailing blank line
+  # (portable, no BSD/GNU sed split) so removing a freshly-appended block restores the file byte-for-byte.
+  {
+    awk '{ if (h) print p; p=$0; h=1 } END { if (h && p!="") print p }' "$tb"
     cat "$ta"
   } >"$tmp"
   mv "$tmp" "$file"
@@ -50,6 +69,17 @@ selftest() {
     ! grep -q "line two" f.md                               || { echo "FAIL: old body survived"; exit 1; }
     [ "$(grep -c '<!-- BEGIN better-dev -->' f.md)" = 1 ]   || { echo "FAIL: duplicate block"; exit 1; }
     grep -q "keep me" f.md                                  || { echo "FAIL: lost outside content on update"; exit 1; }
+
+    # remove: strip the block, restore the pre-block file byte-for-byte, keep outside content.
+    printf '# Title\n\nkeep me\n' >g.md
+    pre="$(cat g.md)"
+    printf 'block body\n' | "$SELF" g.md >/dev/null
+    "$SELF" remove g.md >/dev/null
+    [ "$pre" = "$(cat g.md)" ]                              || { echo "FAIL: remove not byte-identical to pre-block"; exit 1; }
+    ! grep -q "<!-- BEGIN better-dev -->" g.md              || { echo "FAIL: block survived remove"; exit 1; }
+    grep -q "keep me" g.md                                  || { echo "FAIL: remove clobbered outside content"; exit 1; }
+    "$SELF" remove g.md >/dev/null                          || { echo "FAIL: remove errored when no block"; exit 1; }
+    [ "$pre" = "$(cat g.md)" ]                              || { echo "FAIL: remove-when-absent changed the file"; exit 1; }
   ) && r=0 || r=1
   rm -rf "$d"
   [ $r = 0 ] && echo "selftest OK" || { echo "selftest FAILED" >&2; exit 1; }
@@ -58,5 +88,6 @@ selftest() {
 case "${1:-}" in
   "") usage ;;
   selftest) selftest ;;
+  remove) [ $# -ge 2 ] || usage; remove_block "$2" "${3:-better-dev}" ;;
   *) file="$1"; write_block "$file" "${2:-better-dev}" ;;
 esac
