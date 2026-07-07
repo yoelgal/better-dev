@@ -45,6 +45,34 @@ RULES="$BD_DIR/rules.md"; LEARN="$BD_DIR/learnings.jsonl"; OVER="$BD_DIR/overrid
 # JSON-encode $1 as a quoted string (dependency-free; rules/lessons are single-line).
 jstr() { printf '"%s"' "$(printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g')"; }
 
+# --- concurrency + atomic writes -------------------------------------------------------------------
+# The shared .better-dev lives at the primary checkout, so parallel worktree agents can write it at
+# once. Whole-file writes go through a same-dir mktemp + mv (an atomic rename, so a reader never sees
+# a half-written file); appends and grep-then-write critical sections serialize under one mkdir-based
+# lock (mkdir is atomic across processes; flock is not portable to macOS sh). The lock is broken if
+# its holder PID is gone (a crash) or after a stale timeout, so a dead run never wedges the store.
+# ponytail: one global lock covers all appends - fine at worktree-scale contention; split per-file
+# only if it ever measurably bottlenecks.
+BD_LOCK="$BD_DIR/.lock"
+
+atomic_write() { # atomic_write <target> : read stdin, write it to <target> via a same-dir temp + mv
+  local dir tmp; dir="$(dirname "$1")"
+  tmp="$(mktemp "$dir/.bd-tmp.XXXXXX")" || die "mktemp failed in $dir"
+  cat >"$tmp" && mv -f "$tmp" "$1" || { rm -f "$tmp"; die "atomic_write failed: $1"; }
+}
+
+lock_acquire() { # serialize an append / grep-then-write section; break a stale (dead-holder) lock
+  local i=0 h
+  while ! mkdir "$BD_LOCK" 2>/dev/null; do
+    h="$(cat "$BD_LOCK/pid" 2>/dev/null || true)"
+    if [ -n "$h" ] && ! kill -0 "$h" 2>/dev/null; then rm -rf "$BD_LOCK"; continue; fi   # holder gone
+    i=$((i + 1)); [ "$i" -ge 200 ] && { rm -rf "$BD_LOCK"; continue; }   # ~10s stale timeout, force-break
+    sleep 0.05 2>/dev/null || sleep 1
+  done
+  printf '%s\n' "$$" >"$BD_LOCK/pid" 2>/dev/null || true
+}
+lock_release() { rm -rf "$BD_LOCK" 2>/dev/null || true; }
+
 # Normalize a work-item name into a ledger slug: drop a branch prefix, lowercase, alnum + dash.
 slug() {
   printf '%s' "$1" | sed -E 's#^(feat|feature|fix|hotfix|chore)/##; s/[^A-Za-z0-9-]/-/g; s/-+/-/g' \
@@ -53,9 +81,9 @@ slug() {
 
 ensure() {
   mkdir -p "$BD_DIR/ledger"
-  [ -f "$RULES" ] || printf '# Project rules (promoted, human-readable)\n\n' >"$RULES"
-  [ -f "$OVER" ]  || printf '<!-- BEGIN better-dev overrides -->\n<!-- END better-dev overrides -->\n' >"$OVER"
-  : >>"$LEARN"
+  [ -f "$RULES" ] || printf '# Project rules (promoted, human-readable)\n\n' | atomic_write "$RULES"
+  [ -f "$OVER" ]  || printf '<!-- BEGIN better-dev overrides -->\n<!-- END better-dev overrides -->\n' | atomic_write "$OVER"
+  [ -f "$LEARN" ] || : | atomic_write "$LEARN"
 }
 
 # --- ledger: the one durable per-work-item loop record, in the primary checkout ---------------------
@@ -72,9 +100,9 @@ ledger() {
     init)  # scaffold contract/progress/receipts (never clobber an existing contract from a front-end)
       [ $# -ge 1 ] || die "ledger init <work-item>"
       local d; d="$(ledger_dir "$1")"; mkdir -p "$d"
-      [ -f "$d/contract.md" ]  || printf '# Contract - %s\n\nDone-criteria (observable, graded not asserted - from /plan-grill or /diagnose):\n\n- [ ] \n\nPremise verified: \nRed-capable signal (already run once): \n' "$1" >"$d/contract.md"
-      [ -f "$d/progress.md" ]  || printf '# Progress - %s\n\nAppend-only recovery map: one settled step per line, then the terminal state.\nOn resume, trust this and `git log` over recollection.\n\n' "$1" >"$d/progress.md"
-      [ -f "$d/receipts.md" ]  || printf '# Receipts - %s\n\nPer-iteration detail: tried / result / learned / plan-delta.\n' "$1" >"$d/receipts.md"
+      [ -f "$d/contract.md" ]  || printf '# Contract - %s\n\nDone-criteria (observable, graded not asserted - from /plan-grill or /diagnose):\n\n- [ ] \n\nPremise verified: \nRed-capable signal (already run once): \n' "$1" | atomic_write "$d/contract.md"
+      [ -f "$d/progress.md" ]  || printf '# Progress - %s\n\nAppend-only recovery map: one settled step per line, then the terminal state.\nOn resume, trust this and `git log` over recollection.\n\n' "$1" | atomic_write "$d/progress.md"
+      [ -f "$d/receipts.md" ]  || printf '# Receipts - %s\n\nPer-iteration detail: tried / result / learned / plan-delta.\n' "$1" | atomic_write "$d/receipts.md"
       printf '%s\n' "$d" ;;
     resume) [ $# -ge 1 ] || die "ledger resume <work-item>"
       local d; d="$(ledger_dir "$1")"; [ -d "$d" ] || die "no ledger for '$1' - run: bd-mem ledger init '$1'"
@@ -83,7 +111,7 @@ ledger() {
       printf '\n=== last receipt ===\n'; awk 'BEGIN{RS="\n## "} END{if(NR>1)printf "## %s",$0}' "$d/receipts.md" 2>/dev/null || true ;;
     put)  { [ $# -ge 2 ]; } || die "ledger put <work-item> <name> [<file>|-]"
       local d; d="$(ledger_dir "$1")"; mkdir -p "$d"
-      if [ $# -ge 3 ] && [ "$3" != - ]; then cp "$3" "$d/$2"; else cat >"$d/$2"; fi
+      if [ $# -ge 3 ] && [ "$3" != - ]; then atomic_write "$d/$2" <"$3"; else atomic_write "$d/$2"; fi
       printf '%s\n' "$d/$2" ;;
     read) [ $# -ge 1 ] || die "ledger read <work-item> [name]"
       local d; d="$(ledger_dir "$1")"
@@ -92,7 +120,7 @@ ledger() {
     approve) # pin approval to the current contract.md bytes
       [ $# -ge 1 ] || die "ledger approve <work-item>"
       local d; d="$(ledger_dir "$1")"; [ -f "$d/contract.md" ] || die "no contract.md to approve for '$1'"
-      hash_file "$d/contract.md" >"$d/.approved"; printf 'approved %s\n' "$(cat "$d/.approved")" ;;
+      hash_file "$d/contract.md" | atomic_write "$d/.approved"; printf 'approved %s\n' "$(cat "$d/.approved")" ;;
     check-approval) # exit 0 = contract unchanged since approval; non-zero = gate re-opened
       [ $# -ge 1 ] || die "ledger check-approval <work-item>"
       local d; d="$(ledger_dir "$1")"
@@ -108,20 +136,49 @@ op="${1:-}"; [ $# -gt 0 ] && shift || true
 case "$op" in
   init)
     ensure; printf 'initialized %s\n' "$BD_DIR" ;;
-  remember) # promote a durable rule (idempotent) and log it
+  remember) # promote a durable rule (idempotent) and log it - grep-then-append is one locked section
     ensure; [ $# -ge 1 ] || die "remember <rule>"
+    lock_acquire
     grep -qxF -- "- $1" "$RULES" || printf -- '- %s\n' "$1" >>"$RULES"
-    printf '{"kind":"rule","text":%s}\n' "$(jstr "$1")" >>"$LEARN"; echo remembered ;;
-  learn) # log a lesson with optional confidence (0..1)
-    ensure; [ $# -ge 1 ] || die "learn <lesson> [confidence]"
-    printf '{"kind":"lesson","text":%s,"confidence":%s}\n' "$(jstr "$1")" "${2:-1}" >>"$LEARN"; echo logged ;;
-  recall) # matching rules + lessons for a query
-    ensure; q="${1:-}"
-    { grep -i -- "$q" "$RULES" 2>/dev/null || true; grep -i -- "$q" "$LEARN" 2>/dev/null || true; } | sed '/^[[:space:]]*$/d' ;;
-  persist-override) # add a project override inside the managed block (idempotent)
+    printf '{"kind":"rule","text":%s}\n' "$(jstr "$1")" >>"$LEARN"
+    lock_release; echo remembered ;;
+  learn) # log a lesson with optional confidence (0..1) and an optional recall key (a stable fingerprint)
+    ensure; [ $# -ge 1 ] || die "learn <lesson> [confidence] [key]"
+    line="$(printf '{"kind":"lesson","text":%s,"confidence":%s,"key":%s}' "$(jstr "$1")" "${2:-1}" "$(jstr "${3:-}")")"
+    lock_acquire; printf '%s\n' "$line" >>"$LEARN"; lock_release; echo logged ;;
+  recall) # rules + lessons for a query: key-exact first, then substring, each ordered confidence-desc;
+          # a lesson under 0.5 confidence prints with a "guess:" prefix so an unverified note reads as one
+    ensure; q="${1:-}"; TAB="$(printf '\t')"
+    {
+      # rules.md: promoted and verified - substring tier, top confidence, printed verbatim
+      grep -i -- "$q" "$RULES" 2>/dev/null | sed '/^[[:space:]]*$/d' | awk -v t="$TAB" '{print "1" t "1.000" t $0}' || true
+      # learnings.jsonl lessons: parse text/confidence/key; key-exact outranks substring; low conf -> guess:
+      LC_ALL=C awk -v q="$q" -v t="$TAB" '
+        function lc(s){ return tolower(s) }
+        function after(s, m,   p){ p = index(s, m); return p ? substr(s, p + length(m)) : "" }
+        function upto(s, e,   p){ p = index(s, e); return p ? substr(s, 1, p - 1) : s }
+        function junesc(s){ gsub(/\\"/, "\"", s); gsub(/\\\\/, "\\", s); return s }   # reverse jstr
+        index($0, "\"kind\":\"lesson\"") == 0 { next }
+        {
+          text = junesc(upto(after($0, "\"text\":\""), "\",\"confidence\":"))
+          craw = after($0, ",\"confidence\":"); if (craw == "") craw = "1"
+          craw = upto(craw, ","); sub(/}.*$/, "", craw); conf = craw + 0
+          kr = after($0, ",\"key\":\""); if (kr != "") { sub(/"}$/, "", kr); key = junesc(kr) } else key = ""
+          if (q != "" && lc(key) == lc(q)) tier = 0
+          else if (q == "" || index(lc(text), lc(q)) || (key != "" && index(lc(key), lc(q)))) tier = 1
+          else next
+          printf "%d%s%.3f%s%s\n", tier, t, conf, t, (conf < 0.5 ? "guess: " text : text)
+        }
+      ' "$LEARN" 2>/dev/null || true
+    } | LC_ALL=C sort -t"$TAB" -k1,1n -k2,2rn -s | cut -f3- ;;
+  persist-override) # add a project override inside the managed block (idempotent), same-dir temp + mv, locked
     ensure; [ $# -ge 1 ] || die "persist-override <line>"
-    grep -qF -- "$1" "$OVER" || { t="$OVER.tmp"; awk -v l="- $1" '/<!-- END better-dev overrides -->/{print l} {print}' "$OVER" >"$t" && mv "$t" "$OVER"; }
-    echo "override persisted" ;;
+    lock_acquire
+    if ! grep -qF -- "$1" "$OVER"; then
+      t="$(mktemp "$BD_DIR/.bd-tmp.XXXXXX")"
+      awk -v l="- $1" '/<!-- END better-dev overrides -->/{print l} {print}' "$OVER" >"$t" && mv -f "$t" "$OVER" || { rm -f "$t"; lock_release; die "persist-override failed"; }
+    fi
+    lock_release; echo "override persisted" ;;
   ledger)
     ensure; ledger "$@" ;;
   read)
@@ -147,6 +204,35 @@ case "$op" in
       [ "$(grep -c typecheck .better-dev/rules.md)" = 1 ]     || { echo "FAIL: dedup"; exit 1; }
       grep -q "no new worktree" .better-dev/overrides.md      || { echo "FAIL: override"; exit 1; }
       grep -q webhook .better-dev/learnings.jsonl             || { echo "FAIL: learn"; exit 1; }
+
+      # --- recall: key-exact outranks a higher-confidence substring match (key-first ordering) ---
+      "$SELF" learn "exact handle wins" 0.5 topic-x >/dev/null
+      "$SELF" learn "topic-x appears inside this text body" 0.9 other-key >/dev/null
+      [ "$("$SELF" recall topic-x | head -1)" = "exact handle wins" ] || { echo "FAIL: key-exact not ranked first"; exit 1; }
+      # --- recall: within a tier, higher confidence sorts first ---
+      "$SELF" learn "banana high conf note" 0.9 >/dev/null
+      "$SELF" learn "banana low conf note"  0.6 >/dev/null
+      [ "$("$SELF" recall banana | head -1)" = "banana high conf note" ] || { echo "FAIL: confidence order"; exit 1; }
+      # --- recall: a lesson under 0.5 confidence renders with a guess: prefix, and only then ---
+      "$SELF" learn "shaky hypothesis about caches" 0.3 cache-guess >/dev/null
+      "$SELF" recall "shaky hypothesis" | grep -q '^guess: shaky hypothesis about caches' || { echo "FAIL: guess prefix missing"; exit 1; }
+      if "$SELF" recall "banana high" | grep -q '^guess:'; then echo "FAIL: high-confidence wrongly flagged guess"; exit 1; fi
+      # a key still recalls a lesson whose text does not contain the query (guardrails-style keying)
+      "$SELF" learn "the denylist and gated classes" 0.9 safety >/dev/null
+      "$SELF" recall safety | grep -q "denylist" || { echo "FAIL: key-substring recall"; exit 1; }
+      # backward-compat: an old keyless lesson line still recalls
+      printf '%s\n' '{"kind":"lesson","text":"legacy keyless note about flakes","confidence":0.7}' >>.better-dev/learnings.jsonl
+      "$SELF" recall flakes | grep -q "legacy keyless note" || { echo "FAIL: keyless lesson recall"; exit 1; }
+
+      # --- concurrency: two backgrounded appends both land as whole, unbroken JSON lines ---
+      "$SELF" learn "concurrent lesson alpha" 0.9 alpha-key >/dev/null &
+      "$SELF" learn "concurrent lesson beta"  0.9 beta-key  >/dev/null &
+      wait
+      grep -q "concurrent lesson alpha" .better-dev/learnings.jsonl || { echo "FAIL: concurrent append alpha lost"; exit 1; }
+      grep -q "concurrent lesson beta"  .better-dev/learnings.jsonl || { echo "FAIL: concurrent append beta lost"; exit 1; }
+      # every lesson line is a complete {...} object - a torn/interleaved write would fail this
+      bad=$(grep -c '"kind":"lesson"' .better-dev/learnings.jsonl); good=$(grep -c '^{"kind":"lesson".*}$' .better-dev/learnings.jsonl)
+      [ "$bad" = "$good" ] || { echo "FAIL: torn/interleaved lesson line"; exit 1; }
     ) && r=0 || r=1
     rm -rf "$d"
     [ $r = 0 ] || die "selftest FAILED"
