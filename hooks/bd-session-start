@@ -64,7 +64,7 @@ update_nudge() {
     printf ' better-dev: auto-updated %s commit(s) (ff-only).' "$behind"
     return 0
   fi
-  printf ' better-dev: update available (%s commit(s)) - git -C %s pull' "$behind" "$clone"
+  printf ' better-dev: update available (%s commit(s)) - git -C %s pull, then re-run its install.sh if the update added, removed, or renamed skills (it reconciles the links)' "$behind" "$clone"
 }
 
 emit() {
