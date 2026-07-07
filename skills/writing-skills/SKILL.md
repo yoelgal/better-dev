@@ -85,6 +85,11 @@ exact spot the excuse shows up.
 ## Composability & overrides
 
 - A skill **adds**; it never disables or replaces what the project already has installed.
+- Never name a specific third-party skill or plugin as if it were installed - the authoring
+  environment's tools leak into portable text that way. Detect by capability ("a code-graph skill,
+  whatever the host ships"), compose better-dev's own skills by slug, and route real gaps through
+  `/tool-sourcing`. The same discipline keeps host-specific commands (`pbcopy`, `gh`) framed as
+  where-available, not assumed.
 - Read `.better-dev/overrides.md` first and honor any project override before applying a default.
 - Record durable rules and lessons through the memory contract (`.better-dev/bin/bd-mem`), never by
   hand-writing state files. A lesson is one atomic insight with a recall key on the front, not a
