@@ -54,11 +54,20 @@ git merge-base --is-ancestor "$hotfix_sha" "origin/$integration" && echo "on int
 Both lines have to print. If integration is missing it, the back-merge didn't land - resolve it now,
 while the context is fresh, not at the next promote when the gate blocks and no one remembers why.
 
+Both lines printing is the git half of the proof. A hotfix's whole point is production behavior
+changing, so the proof finishes on the deployed surface: run the deploy-verify pass
+(`post-deploy.md`) against the release deploy and observe the incident symptom gone - driven, not
+inferred from the merge. A pipeline that silently no-ops (a paused auto-deploy) passes both
+ancestor checks while prod still runs the bug; the deploy wait catches exactly that, finding no
+run at the release sha, and the hotfix settles `UNVERIFIED` instead of resolved.
+
 ## Record it
 
 ```bash
-printf 'hotfix: %s\ncommit: %s\non: %s + %s\n' "$version" "$hotfix_sha" "$release" "$integration" \
+printf 'hotfix: %s\ncommit: %s\non: %s + %s\nlive: %s\n' \
+  "$version" "$hotfix_sha" "$release" "$integration" "$live_observation" \
   | .better-dev/bin/bd-mem ledger put "hotfix-$slug" hotfix.md -
+# live: what the deploy-verify observed, e.g. "symptom gone: /login 200, error banner absent"
 ```
 
 If the incident taught something durable - a gap in CI that let the bug through, a fragile path -
