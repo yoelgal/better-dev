@@ -23,9 +23,11 @@ Two extensionless bash scripts and a manifest, all under `hooks/`:
   directory sits inside a repo with a `.better-dev/` scaffold, it emits a one-paragraph pointer to
   the better-dev discovery block and, when the project has one, to `.better-dev/overrides.md` so the
   agent reads project overrides before applying any built-in default. It also appends a one-line
-  update nudge when the installed better-dev clone (its plugin root) is behind its origin - a bounded,
-  best-effort `git fetch` and behind-count that degrades to a silent no-op when the clone isn't a git
-  checkout, is offline, or can't be time-boxed. The nudge only suggests `git -C <clone> pull`; it never
+  update nudge when the installed better-dev clone (its plugin root) is behind its origin - a
+  best-effort `git fetch` bounded to 2 seconds, well inside the hook's own 5-second host timeout, so a
+  slow remote can cost the nudge but never starve the awareness note the hook exists to deliver. It
+  degrades to a silent no-op when the clone isn't a git checkout, is offline, or can't be time-boxed.
+  The nudge only suggests `git -C <clone> pull`; it never
   pulls on its own, honoring never-blocking. A project that wants hands-off updates can opt in with a
   `better-dev auto-update: ff-only` line in its overrides, which lets the clone fast-forward itself -
   and only fast-forward, so it can never clobber local work.
@@ -45,8 +47,10 @@ file, no mode, no per-session state to manage. Installing better-dev turns the h
 without it never hears from them.
 
 The scripts never read stdin (a hook that blocks on stdin can freeze a session), never write outside
-their own stdout, and swallow their own failures - a hook error must never surface as a session
-error. The one non-obvious mechanic worth knowing if you touch these: a subagent hook's raw stdout
+their own stdout, and swallow their own failures - a hook error must never surface as a session error.
+A top-level `trap 'exit 0' ERR` on the production path enforces that swallow, since `set -euo pipefail`
+alone would exit non-zero on an unexpected error before the trailing `exit 0` runs. The one non-obvious
+mechanic worth knowing if you touch these: a subagent hook's raw stdout
 is dropped by the host, so `bd-subagent-start` wraps its note in
 `hookSpecificOutput.{hookEventName,additionalContext}` where the session hook can emit the platform's
 plain field. The `selftest` subcommand on each script checks both the install-aware and no-op paths
