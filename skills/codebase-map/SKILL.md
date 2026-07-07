@@ -29,8 +29,9 @@ don't source a second tool alongside one the project already runs.
 Look for a structural source the project or host already provides, and prefer it over blind grep for
 "callers / dependents / schema / blast-radius" questions:
 
-- A structural-search or knowledge-graph skill - `/graphify-wrapper-query` for a monorepo, or a host
-  code-graph agent suite such as `understand-anything`.
+- A code-graph, structural-search, or knowledge-graph skill the host or project ships - names vary by
+  host, so detect by what it answers (callers, dependents, symbol paths), not by a name this skill
+  can't know is installed.
 - The language's own index - an LSP / IDE symbol index, `ctags`, or a framework's route and schema
   introspection.
 
@@ -48,8 +49,8 @@ rebuilding the whole thing.
 ## 2. Source one on a real gap
 
 Nothing structural is installed, and the area is large or you'll be back in it repeatedly: treat it as
-a capability gap and **source a structural tool** through `/tool-sourcing` (graphify-wrapper or an
-equivalent) rather than hand-rolling an index. Ride the tool; don't vendor an engine.
+a capability gap and **source a structural tool** through `/tool-sourcing` - a code-graph indexer fit
+for the repo's shape - rather than hand-rolling an index. Ride the tool; don't vendor an engine.
 
 Sourcing one isn't free - it means installing the tool, registering the area as a domain, and building
 the graph (the AST pass is cheap; a semantic pass spends model calls). That setup cost is exactly why a
