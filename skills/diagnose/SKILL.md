@@ -17,7 +17,8 @@ a "we never instrument prod" rule) wins over anything here.
 
 Before you re-derive anything about this area, spend one recall on it
 (`.better-dev/bin/bd-mem recall "<area>"`) and cite what it returned, or an explicit "recall empty" -
-a lesson you already paid for is cheaper than the mistake it prevents.
+a lesson you already paid for is cheaper than the mistake it prevents. A recalled lesson is a prior
+claim, not a current fact - verify it against today's code before acting on it.
 
 The order below matters: a theory before a red signal is the exact failure this skill exists to
 prevent. Don't skip forward.
@@ -107,20 +108,52 @@ re-run the Phase 1 signal to confirm it goes green here too, rather than re-deri
 match that no longer holds (the signal stays red) isn't wasted: it rules out a candidate and tells you
 the shape recurred for a new reason. No match, or a stale one, drops you into fresh hypotheses below.
 
+Before free-generating, run the failure signature down the pattern table - a matched row seeds one
+ranked hypothesis with its search area attached; no match just means every hypothesis is fresh, not
+that the table was skipped.
+
+| Pattern | Smells like | First place to look |
+|---|---|---|
+| Race / ordering | intermittent, timing- or load-dependent | shared state on concurrent paths; the awaits and callbacks nearest the symptom |
+| Null propagation | `TypeError` / null deref far from an obvious cause | where the value was allowed to become null, not where it crashed |
+| State corruption | inconsistent data, partial writes, works-then-doesn't | transaction boundaries, error paths that skip cleanup, hooks |
+| Off-by-one / boundary | fails at empty, first, last, or size-limit inputs | loop bounds, index math, pagination |
+| Missing validation | crash or corruption on malformed input | the trust boundary the input crossed uninspected |
+| Integration drift | timeouts, unexpected shapes from a dependency | the external call site and the contract or version it assumes |
+| Stale cache / state | old data shown after a change definitely landed | cache keys and invalidation, memoization, state not re-derived |
+
 Write **3-5 ranked hypotheses before testing any of them** - generating one at a time anchors on the
 first plausible idea. Each states a prediction that could falsify it: "if X is the cause, then changing
 Y makes the bug disappear (or changing Z makes it worse)." A hypothesis with no prediction is a vibe -
 sharpen it or drop it. Show the ranked list to the user before testing; they often re-rank it instantly
 ("we just deployed a change to #3"). Cheap checkpoint - don't block on it if they're away.
 
+After ranking, spend one more recall keyed to the top hypothesis's component - the noun stem of the
+module or file it accuses (`auth-cookie`, `session-expiry`), never a sentence or a path. The entry
+recall was keyed to the area and the signature recall to the failure's shape; this one surfaces prior
+work on the specific component now under suspicion. Cite the hit, or the explicit `recall empty`.
+
 Test one variable at a time. For the instrumentation mechanics - local cheap-experiment loops versus
 parallel fan-out for cross-service bugs, tagged trace probes and log peppering, routing verbose output
 to disk, and building the evidence chain - read `instrument.md`.
 
-If three ranked hypotheses each fail against their own falsifying prediction, convert to a
-`NEEDS_INPUT` stop rather than spawning a fourth round - report what you tried, what you saw, and what
-you now suspect and why you can't confirm it; the shape of the three failures is itself the lead the
-next move needs.
+If three ranked hypotheses each fail against their own falsifying prediction, stop generating - a
+fourth guess is where a wrong fix comes from, and an unresolved diagnosis recorded plainly beats a
+speculative one. Settle `NEEDS_INPUT` carrying three things: the three falsifications (what each
+predicted, what the probe showed), what you now suspect and why you can't confirm it, and a menu of
+the three honest next moves for the reporter to pick:
+
+- **Continue** - only against a genuinely new hypothesis you name in the ask, never a re-rank of the
+  three that died.
+- **Escalate** - to someone who knows this subsystem; attach the evidence chain so far.
+- **Instrument and wait** - land a diagnostic work-item instead of a fix: a valid `fix/` work-item
+  whose deliverable is targeted probes at the boundaries the three failures implicate, plus a narrow
+  alert on the failure signature, so the next real occurrence arrives captured (the same
+  capture-the-next-occurrence move `signal.md` uses for truly-random bugs, offered here as a
+  deliberate deliverable). Its done-criteria are observable like any other work-item's - the probes
+  land and the alert demonstrably fires on the signature - with no red-goes-green signal to chase.
+
+The fix-contract is never written from a hypothesis that survived only by default.
 
 Fix the root cause, not the symptom. Before you settle where the fix lands, produce the **caller
 list**: grep every caller of the function you'd touch - `/codebase-map` surfaces them from a structural
@@ -130,6 +163,15 @@ single path the ticket named - which leaves every sibling caller broken. Guardin
 swallowing an unexpected null, de-duping in the view, wrapping the throw in a try/catch - hides the
 deviation instead of fixing it; if a value is unexpectedly null, the bug is wherever it was allowed to
 become null, not where it finally crashed.
+
+The caller list also prices the fix before it exists. Read the planned fix's blast radius as
+evidence, not a work estimate: one file, additive, reads as the right layer; a fix that needs edits
+in more than a handful of files - or in every caller - is a wrong-layer signal. A large fix usually
+means the root cause lives one layer further in, where a single change covers what the wide fix
+patches piecemeal - re-check the layer before writing the contract. This is a diagnosis check,
+distinct from the repo's `safety-scope` gate (~10 files by default), which stops a sprawling *diff*
+for a human at loop time: a planned fix already near that number before any code exists means the
+diagnosis is wrong, not that the schedule is big.
 
 Land the diagnosis as an evidence chain: symptom observed → checked source → found evidence → confirmed
 by a second source → reproduced. That chain, plus the correct hypothesis, is the root cause.
@@ -144,11 +186,20 @@ rather than asserted:
 - **Red signal** - the exact command and its captured red output. This is the loop's done-when-green.
 - **Minimised repro** - the smallest failing scenario.
 - **Root cause** - one sentence plus the evidence chain.
+- **Fix scope** - the narrowest set of paths the root cause and caller list implicate: one directory,
+  a short explicit file list, or `repo-wide` plus one sentence of why (a missing reason is a missing
+  scope). Declared only now, after the root cause - a scope guessed at investigation start locks the
+  wrong module. When the scope is a single directory it doubles as the mechanical edit boundary where
+  the repo runs enforced guardrails (`bd-guard scope` - the mechanism lives with guardrails; this line
+  just declares its target); a file list or `repo-wide` scope stays a prose tripwire with its reason
+  recorded.
 - **Regression test at a correct seam** - a seam that exercises the *real* bug pattern at the call site.
   A too-shallow seam (a single-caller unit test for a bug that needs several callers) gives false
   confidence. If no correct seam exists, that itself is the finding: note it - the architecture is
   preventing the bug from being locked down - and flag it for follow-up rather than testing at a wrong
-  seam.
+  seam. The test body carries a one-line attribution comment - the work-item slug and the one-sentence
+  root cause - so a future red on this test identifies itself as *this bug recurring*, not as a new
+  mystery or a flake candidate.
 
 Then hand to `/autonomous-loop`. The same loop that builds features drives this red→green: it writes
 the regression test, watches it fail, applies the fix, watches it pass, and re-runs the Phase 1 signal
