@@ -80,6 +80,14 @@ dispatch verb arranged for a job, not a new mechanism:
 - **Judge panel** - for a wide-open design or fix, generate a few independent attempts from different
   angles, score them with parallel judges, and synthesize from the winner while grafting the best of the
   rest. Beats one attempt iterated when the solution space is broad.
+- **Verbalized candidates** - when a shape needs k genuinely different candidates (a judge panel's
+  attempts, ideation options, design directions), don't collect them as k independent asks: an aligned
+  model's independent answers collapse toward its one modal answer, and a plain "give me k options" list
+  spreads only across that modal region. Ask one generator for k candidates *each with a stated
+  probability*, and require at least one tail candidate (stated probability under ~0.10). Verbalizing
+  the probabilities is the load-bearing part: it measurably recovers diversity that alignment suppressed,
+  at equal quality, and stronger models gain more (Verbalized Sampling, arXiv 2510.01171). Compose with
+  the judge panel - verbalized generation, then independent judges.
 - **Loop-until-dry** - for discovery of unknown size (bugs, edge cases, dead code), keep spawning finders
   until K consecutive rounds surface nothing new. A fixed count (`while found < N`) stops before the tail
   and reports a partial sweep as complete. Dedup each round against everything *seen*, not against what's

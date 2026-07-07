@@ -34,7 +34,10 @@ build, no code until the grill closes. This is observation, not debugging - no r
 ## 2. Ideate - propose, then pick one to grill
 
 If the intent is still rough, sketch two or three distinct ways to satisfy it - a sentence each,
-with the trade-off that separates them - and let the user pick one (or blend). Skip this when the
+with the trade-off that separates them - and let the user pick one (or blend). Sketch them as a
+verbalized distribution - each option with a stated probability that a typical solution lands there,
+at least one under ~0.10 - or the "distinct ways" arrive as the default design plus paraphrases of
+it (the *verbalized candidates* shape in `/orchestrating-agents`). Skip this when the
 user already arrives with a specific design; grilling *is* the work then. The point is to enter the
 grill with one candidate design, not a blank page. For each option, name what it bets is true but
 hasn't been checked, and what would kill it - the bets become premises for the baseline check, and
