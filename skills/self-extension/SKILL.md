@@ -47,6 +47,12 @@ it is the caller telling you what they want from that source. Gather each source
 (read files and search for local paths, fetch for URLs, this conversation for a workflow you just ran); if
 scope is ambiguous, make a reasonable choice and note it rather than stalling.
 
+When the source is a workflow you just ran or the user's own way of working, it lives in their head and the
+transcript, not on disk - don't guess it into a plausible-sounding procedure. Interview one question at a
+time about how they do it, what good output looks like, and the edge cases that trip it, folding each answer
+into the draft before you ask the next; if a question is answerable from the codebase, look there instead of
+asking.
+
 Prefer the exact commands, endpoints, and signatures that appear in the source over ones you half-recall,
 and don't invent a flag or path you never saw. A skill gets shared, so keep the host's or user's identity
 out of it - the skill names itself.
@@ -68,12 +74,17 @@ owns the two steps that have to be machine-enforced rather than trusted to prose
 
 1. **Stage.** `.better-dev/bin/bd-skill-stage dir` prints a fresh staging dir; write the `SKILL.md` (and any script or
    reference files) into it.
-2. **Check - this is the "test".** For a prose skill, `.better-dev/bin/bd-skill-stage lint <dir>` is the gate: it fails on a
+2. **Check - lint, then prove.** `.better-dev/bin/bd-skill-stage lint <dir>` is the structural gate: it fails on a
    malformed or missing frontmatter, a name that isn't kebab-case, a description that doesn't state its
-   trigger, a stray `version`/`license`, an `@`-link, or an oversized file. For a skill that ships a script,
-   also run that script's own fixture and test inside the staging dir, with an assertion that checks real
-   output, not just that it didn't throw. If the check fails, fix it in place and retry at most twice,
-   showing the diff each time; if it still fails, discard and stop rather than lower the bar.
+   trigger, a stray `version`/`license`, an `@`-link, or an oversized file. Passing lint means well-formed,
+   not working - so before promoting, prove the skill does its job. Run one realistic input with the
+   candidate loaded and confirm the agent actually does what the skill promises, judged on the trace (the
+   tool calls, the diff), not the narration. For a fragile or judgment-heavy skill, use a trap - an input a
+   skill-less agent gets wrong - and confirm the skill catches it; a failed trap means the body is too vague,
+   so make the weak step procedural and re-run. For a skill that ships a script, also run that script's own
+   fixture and test inside the staging dir, asserting on real output, not just that it didn't throw. On a
+   lint failure fix in place and retry at most twice, showing the diff each time; if the proof still fails,
+   discard and stop rather than lower the bar.
 3. **Classify the scope - local or global.** Decide where the proven skill belongs before you commit it. A
    skill that only makes sense *here* - it names this repo's tools, paths, domain, or conventions - is
    **local**: it belongs to this repo alone and shouldn't surface in your other repos. A general,
