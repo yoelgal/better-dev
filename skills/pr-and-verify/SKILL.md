@@ -64,7 +64,10 @@ purpose, plus a `⚠️` line for each concern carried in from a `DONE_WITH_CONC
 causal reading order - the entry point, then the core change, then the ripple it forces - so a reviewer
 reads *why this, then what it touches* rather than a file-ordered dump. That reading-ordered walkthrough is
 `/review`'s to construct; compose the brief from the walkthrough it produces, grounded in the contract and
-the diff, never from the loop's session history. Splice it into a bounded region so re-running never
+the diff, never from the loop's session history. Before a security finding, a credential location, or a
+vulnerability description crosses into the brief on a public surface - a public PR body or a public issue -
+check the repo's visibility and get explicit confirmation first; a public PR publishes whatever the brief
+names. Splice it into a bounded region so re-running never
 clobbers the rest of the body and an unchanged brief writes nothing:
 
 ```
@@ -97,7 +100,8 @@ CI green is necessary and not sufficient - it proves the suite runs, not that th
 re-running the suite here proves the same thing over again. The acceptance check is runtime observation:
 drive the change to where it executes on the surface a user meets it, and capture what you see. Where the
 host ships `/verify`, compose it as the executor; where it doesn't, run the same discipline inline. The
-surface table, the mandatory probe past the happy path, the SKIP-don't-fabricate rule, and the
+surface table, the mandatory probe past the happy path, the SKIP-don't-fabricate rule, the claim-audit
+reporting gate (every reported claim points to a session tool result or is marked unverified), and the
 PASS/FAIL/BLOCKED/SKIP verdict rubric are in `verify-runtime.md` - read it before settling any criterion.
 Where the change branches into distinct user flows, walk the ones this diff reaches, not one happy path. A
 criterion with no runtime surface (docs-only, a type-only change) settles **SKIP** with the reason, never a

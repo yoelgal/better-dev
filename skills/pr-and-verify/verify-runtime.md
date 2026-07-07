@@ -4,7 +4,8 @@ The acceptance check for a done-criterion is what the change *does* when it runs
 is the discipline `/pr-and-verify` step 3 runs, that `/autonomous-loop` points at for its end-to-end
 handoff, and that a GUI check narrows onto its own surface. Where the host ships `/verify`, compose it as
 the executor; where it doesn't (Codex, pi, a bare host), this is the rubric to run inline. Same standard
-either way.
+either way. Runtime and UI verification benefit from a context separate from the one that produced the
+diff - the maker's context inherits the maker's blind spots.
 
 ## Observe the runtime, don't re-run the suite
 
@@ -56,6 +57,16 @@ No partial pass: "3 of 4 scenarios passed" is FAIL until the fourth passes or is
 output is FAIL with the raw capture attached - don't interpret it into a pass. When in doubt, FAIL: a false
 PASS ships broken code, a false FAIL costs one more look. The observation is the evidence; a criterion with
 no capture behind it is unproven, not passed.
+
+## Every claim points to a tool result
+
+The SKIP rule keeps one claim honest; this holds the whole report to the same line. Before handing back any
+status - a verdict, a progress note, a PR brief - audit each claim in it against a tool result from this
+session. Report only what you can point at: a command and its exit code, a captured output tail, a runtime
+behavior you observed. A claim with no session evidence behind it is marked unverified in the same breath -
+not dropped, not dressed up as done. A check that failed is stated with its output; a step that was skipped
+is said to be skipped. A plausible summary with nothing behind it is the fabricated status this gate exists
+to catch.
 
 ## Destructive paths and shared state
 
