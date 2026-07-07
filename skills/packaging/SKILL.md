@@ -12,10 +12,11 @@ allowed-tools:
 better-dev ships in two layers, and packaging owns getting both in cleanly and proving the package is
 shippable before a release.
 
-- **The tool - global, once per machine.** The skills, `bd-*` helpers, and hooks live in one clone and
-  link into the host's global skills directory one level deep, one symlink per skill
+- **The tool - global, once per machine.** The skills and `bd-*` helpers live in one clone; `install.sh`
+  links each skill into the host's global skills directory one level deep, one symlink per skill
   (`~/.claude/skills/<skill>`, `~/.codex/skills/<skill>`, and so on), gstack-style: every repo on the
-  machine shares one copy.
+  machine shares one copy. The awareness hooks ship in the same clone but the installer does not wire them
+  (see the hook caveat below).
   Nothing is ever vendored per repo; updating is a `git pull` in the clone.
 - **A repo's `.better-dev/` - data only.** A project carries just its own data (`rules.md`,
   `overrides.md`, `learnings.jsonl`, and a gitignored loop `ledger/`) plus `.better-dev/bin`, a
@@ -30,9 +31,16 @@ shippable before a release.
   same skills and `hooks/hooks.json` as a plugin. Skills are discovered from `skills/` and hooks from
   `hooks/hooks.json` by convention - no per-skill list to maintain in the manifest.
 
+**Hook caveat.** The SessionStart/SubagentStart awareness hooks are wired only by the Claude Code plugin
+(via `hooks/hooks.json`). `install.sh` links skills, not hooks, so a clone install gets the practices but
+not the session nudge; wire hooks with the plugin or the `/bootstrap-hooks` skill when you want them.
+
 Either way, `/onboard` then wires a repo's `.better-dev/` data and its `bin` symlink. The one-paste
 front door - `BOOTSTRAP.md` - sequences the whole thing (detect host, install globally, onboard the
 repo) for a user who just pastes a prompt.
+
+`install.sh` also carries `--dry-run` (print the link/skip/prune plan), `--list` (current state per
+host), and `--verify` (assert every better-dev link resolves and the package gate passes).
 
 Repo-authored skills stay out of the global tool: a skill minted by `/self-extension` is committed into
 that repo's own project skills directory (`.claude/skills/<name>` on Claude Code) and discovered only
@@ -47,7 +55,23 @@ voice), every helper and hook passes its `selftest`, the JSON manifests parse, a
 failure. Run it before tagging a release, in CI, and - via `/self-extension` - before promoting a freshly
 authored skill. A green check is the definition of shippable.
 
-Bump the `version` in `.claude-plugin/plugin.json` per release; tag through `/release-promotion`.
+Bump the `version` in `.claude-plugin/plugin.json` per release; tag through `/release-promotion`. The
+gate also refuses an empty manifest `version`, holds the no-em/en-dash rule over shipped text, and runs an
+install/uninstall roundtrip in a throwaway `HOME` so a broken installer can't ship green.
+
+## Updating and breaking changes
+
+`git pull` in the clone is the update. Re-running `install.sh` reconciles the links: it prunes a skill
+removed upstream and reclaims a moved clone's stale links, so a pull that renames or drops a skill leaves
+no orphan. There is no per-skill version pinning - latest wins - so a `bd-package-check` after a pull is
+the safety net that catches a skill a new version broke.
+
+## Uninstalling
+
+`/uninstall` removes better-dev cleanly: unwire this repo (drop the `.better-dev/bin` bridge, optionally
+the managed `CLAUDE.md`/`AGENTS.md` block) or remove the global per-host install. It is dry-run by default
+and never deletes a foreign same-named skill. Your `.better-dev/` data - `rules.md`, `overrides.md`,
+`learnings.jsonl`, and the loop `ledger/` - survives unless you pass `--purge-data`.
 
 ## Adding or removing a skill
 
