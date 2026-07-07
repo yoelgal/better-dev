@@ -1,0 +1,222 @@
+#!/usr/bin/env sh
+# bd-uninstall - remove better-dev cleanly. Removes ONLY what better-dev installed; never touches a
+# foreign skill of the same name, and never your .better-dev/ data unless you pass --purge-data.
+# Dry-run is the DEFAULT: it prints exactly what it would remove and leaves everything in place.
+# Pass --yes to act.
+#
+#   bd-uninstall global [--host claude|codex|auto] [--yes]         remove per-host links + the install marker
+#   bd-uninstall repo [path] [--unblock] [--purge-data] [--yes]    unwire this repo (default path: git root, else cwd)
+#   bd-uninstall selftest
+#
+# global: for each host skills dir, drop an entry only when it is ours by the same test install.sh uses -
+#   a symlink whose target names one of our skills (any clone, so a moved clone still cleans up) or a
+#   copy-mode dir carrying the .better-dev-skill sentinel. Foreign skills are left and named in the report.
+# repo: drop the per-machine .better-dev/bin bridge (gitignored, always safe). --unblock also strips the
+#   managed CLAUDE.md/AGENTS.md discovery block. Your rules/overrides/learnings/ledger stay put unless you
+#   pass --purge-data.
+#
+# Reimplemented for better-dev from understanding; no source files copied.
+set -eu
+
+case "$0" in /*) SELF="$0" ;; *) SELF="$PWD/$0" ;; esac
+# Resolve through the repo's .better-dev/bin symlink (pwd -P) so SRC is the real clone, not the bridge.
+SCRIPTS_DIR="$(cd "$(dirname "$SELF")" && pwd -P)"
+SRC="$(cd "$SCRIPTS_DIR/.." && pwd -P)"
+HOSTS_DIR="$SRC/hosts"
+BD_BLOCK="$SCRIPTS_DIR/bd-block"
+die() { printf 'bd-uninstall: %s\n' "$*" >&2; exit 1; }
+
+# is host entry $1 (skill name $2) a better-dev install (ours)? Mirror of install.sh's ours-test.
+is_ours() {
+  _d="$1"; _n="$2"
+  { [ -e "$_d" ] || [ -L "$_d" ]; } || return 1
+  if [ -L "$_d" ]; then
+    case "$(readlink "$_d" 2>/dev/null)" in */skills/"$_n"|*/skills/"$_n"/) return 0 ;; esac
+  fi
+  [ -f "$_d/.better-dev-skill" ] && return 0
+  return 1
+}
+
+repo_root() { git -C "${1:-$PWD}" rev-parse --show-toplevel 2>/dev/null || printf '%s' "${1:-$PWD}"; }
+
+# ── global ───────────────────────────────────────────────────────────────────
+do_global() {
+  host="$1"; yes="$2"
+  case "$host" in
+    auto) hosts="claude codex" ;;
+    claude|codex) hosts="$host" ;;
+    *) die "unknown --host '$host' (expected claude, codex, or auto)" ;;
+  esac
+  wd=""; [ "$yes" = 1 ] || wd="would "
+  [ "$yes" = 1 ] && echo "== better-dev uninstall (global) ==" \
+                 || echo "== better-dev uninstall (global) - DRY RUN (pass --yes to apply) =="
+  touched=0
+  for h in $hosts; do
+    adapter="$HOSTS_DIR/$h"; [ -f "$adapter" ] || continue
+    bd_host_cli=""; bd_host_display=""; bd_host_skills_dir=""
+    . "$adapter"
+    dir="$bd_host_skills_dir"
+    [ -d "$dir" ] || continue
+    removed=""; kept=""
+    # 1. Each shipped skill name: remove its host entry iff it is ours.
+    for skill in "$SRC"/skills/*/; do
+      [ -f "${skill}SKILL.md" ] || continue
+      nm="$(basename "$skill")"; dst="$dir/$nm"
+      { [ -e "$dst" ] || [ -L "$dst" ]; } || continue
+      if is_ours "$dst" "$nm"; then
+        removed="$removed $nm"; [ "$yes" = 1 ] && rm -rf "$dst"
+      else
+        kept="$kept $nm"
+      fi
+    done
+    # 2. Orphans: a broken symlink whose target still names a /skills/<name> (a since-removed skill).
+    for entry in "$dir"/*; do
+      [ -L "$entry" ] && [ ! -e "$entry" ] || continue
+      nm="$(basename "$entry")"
+      [ -f "$SRC/skills/$nm/SKILL.md" ] && continue   # already handled in pass 1
+      case "$(readlink "$entry" 2>/dev/null)" in
+        */skills/"$nm"|*/skills/"$nm"/) removed="$removed $nm(orphan)"; [ "$yes" = 1 ] && rm -f "$entry" ;;
+      esac
+    done
+    # 3. Legacy whole-dir link.
+    old="$dir/better-dev"
+    if [ -L "$old" ]; then
+      case "$(readlink "$old" 2>/dev/null)" in
+        */skills|*/skills/) removed="$removed better-dev(legacy)"; [ "$yes" = 1 ] && rm -f "$old" ;;
+      esac
+    fi
+    # 4. Install marker.
+    marker=""
+    if [ -f "$dir/.better-dev-install" ]; then
+      marker=" +marker"; [ "$yes" = 1 ] && rm -f "$dir/.better-dev-install"
+    fi
+    echo "  $bd_host_display ($dir/):"
+    [ -n "$removed" ] && echo "    ${wd}remove$([ "$yes" = 1 ] && echo d):$removed$marker" \
+                      || echo "    nothing of ours here$marker"
+    [ -n "$kept" ] && echo "    left foreign skill(s) (not ours):$kept"
+    touched=$((touched + 1))
+  done
+  echo
+  [ "$touched" -eq 0 ] && echo "No installed host found. (Try --host claude or --host codex.)"
+  [ "$yes" = 1 ] || echo "Nothing was changed. Re-run with --yes to apply."
+}
+
+# ── repo ─────────────────────────────────────────────────────────────────────
+do_repo() {
+  path="$1"; unblock="$2"; purge="$3"; yes="$4"
+  repo="$(repo_root "$path")"
+  wd=""; [ "$yes" = 1 ] || wd="would "
+  [ "$yes" = 1 ] && echo "== better-dev uninstall (repo: $repo) ==" \
+                 || echo "== better-dev uninstall (repo: $repo) - DRY RUN (pass --yes to apply) =="
+  removed=""
+  # The per-machine bridge is gitignored runtime state - always safe to drop.
+  bin="$repo/.better-dev/bin"
+  if [ -e "$bin" ] || [ -L "$bin" ]; then
+    removed="$removed .better-dev/bin"; [ "$yes" = 1 ] && rm -rf "$bin"
+  fi
+  # The managed discovery block, only on request.
+  if [ "$unblock" = 1 ]; then
+    for f in "$repo/CLAUDE.md" "$repo/AGENTS.md"; do
+      [ -f "$f" ] || continue
+      if grep -q "BEGIN better-dev" "$f" 2>/dev/null; then
+        removed="$removed $(basename "$f")-block"
+        [ "$yes" = 1 ] && "$BD_BLOCK" remove "$f" >/dev/null 2>&1
+      fi
+    done
+  fi
+  # Data is sacred: removed only under --purge-data.
+  if [ "$purge" = 1 ]; then
+    for d in rules.md overrides.md learnings.jsonl ledger; do
+      t="$repo/.better-dev/$d"
+      [ -e "$t" ] && { removed="$removed .better-dev/$d"; [ "$yes" = 1 ] && rm -rf "$t"; }
+    done
+  fi
+  [ -n "$removed" ] && echo "  ${wd}remove$([ "$yes" = 1 ] && echo d):$removed" \
+                    || echo "  nothing of better-dev's found in this repo."
+  if [ "$purge" = 1 ]; then
+    echo "  --purge-data set: your rules/overrides/learnings/ledger are included above."
+  else
+    echo "  left .better-dev/ data (rules, overrides, learnings, ledger) untouched - pass --purge-data to remove it too."
+  fi
+  echo
+  [ "$yes" = 1 ] || echo "Nothing was changed. Re-run with --yes to apply."
+}
+
+# ── selftest ─────────────────────────────────────────────────────────────────
+selftest() {
+  d="$(mktemp -d)"
+  ( set -e
+    hm="$d/home"; mkdir -p "$hm"
+    sk="$hm/.claude/skills"
+    # A foreign skill sharing a shipped name, planted before install so install leaves it.
+    mkdir -p "$sk/review"; printf 'not ours\n' > "$sk/review/SKILL.md"
+    HOME="$hm" "$SRC/install.sh" --host claude >/dev/null
+    [ -L "$sk/packaging" ]                || { echo "FAIL: install did not link a skill"; exit 1; }
+    [ -f "$sk/.better-dev-install" ]      || { echo "FAIL: install marker missing"; exit 1; }
+    [ ! -L "$sk/review" ] && [ -d "$sk/review" ] || { echo "FAIL: foreign skill was overwritten by install"; exit 1; }
+
+    # Dry-run (default) must not remove anything.
+    HOME="$hm" "$SELF" global --host claude >/dev/null
+    [ -L "$sk/packaging" ]                || { echo "FAIL: dry-run removed a link"; exit 1; }
+
+    # --yes removes ours, keeps the foreign skill, drops the marker.
+    HOME="$hm" "$SELF" global --host claude --yes >/dev/null
+    [ ! -e "$sk/packaging" ]              || { echo "FAIL: ours link survived --yes"; exit 1; }
+    [ ! -f "$sk/.better-dev-install" ]    || { echo "FAIL: marker survived --yes"; exit 1; }
+    [ -f "$sk/review/SKILL.md" ]          || { echo "FAIL: foreign skill was removed"; exit 1; }
+
+    # repo: bridge goes, data stays without --purge-data.
+    repo="$d/repo"; mkdir -p "$repo/.better-dev/ledger"
+    BD_SCRIPTS_DIR="$SRC/scripts" "$SRC/scripts/bd-link" link "$repo" >/dev/null 2>&1 \
+      || ln -snf "$SRC/scripts" "$repo/.better-dev/bin"
+    printf 'rule one\n' > "$repo/.better-dev/rules.md"
+    printf 'over one\n' > "$repo/.better-dev/overrides.md"
+    printf '# proj\n<!-- BEGIN better-dev -->\nblock\n<!-- END better-dev -->\nkeep\n' > "$repo/CLAUDE.md"
+    HOME="$hm" "$SELF" repo "$repo" --unblock --yes >/dev/null
+    [ ! -e "$repo/.better-dev/bin" ]      || { echo "FAIL: bridge survived repo uninstall"; exit 1; }
+    [ -f "$repo/.better-dev/rules.md" ]   || { echo "FAIL: rules.md removed without --purge-data"; exit 1; }
+    [ -d "$repo/.better-dev/ledger" ]     || { echo "FAIL: ledger removed without --purge-data"; exit 1; }
+    grep -q "keep" "$repo/CLAUDE.md"      || { echo "FAIL: --unblock clobbered outside content"; exit 1; }
+    grep -q "BEGIN better-dev" "$repo/CLAUDE.md" && { echo "FAIL: managed block survived --unblock"; exit 1; }
+
+    # --purge-data removes the data too.
+    HOME="$hm" "$SELF" repo "$repo" --purge-data --yes >/dev/null
+    [ ! -e "$repo/.better-dev/rules.md" ] || { echo "FAIL: rules.md survived --purge-data"; exit 1; }
+    [ ! -e "$repo/.better-dev/ledger" ]   || { echo "FAIL: ledger survived --purge-data"; exit 1; }
+  ) && r=0 || r=1
+  rm -rf "$d"
+  [ $r = 0 ] && echo "selftest OK" || { echo "selftest FAILED" >&2; exit 1; }
+}
+
+# ── dispatch ─────────────────────────────────────────────────────────────────
+[ -d "$SRC/skills" ] && [ -d "$HOSTS_DIR" ] || die "cannot find the better-dev clone from $SELF"
+
+cmd="${1:-}"; [ $# -gt 0 ] && shift || true
+case "$cmd" in
+  global)
+    host="auto"; yes=0
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --host) host="${2:-}"; shift 2 ;;
+        --host=*) host="${1#--host=}"; shift ;;
+        --yes|-y) yes=1; shift ;;
+        *) die "unknown argument '$1' for global" ;;
+      esac
+    done
+    do_global "$host" "$yes" ;;
+  repo)
+    path=""; unblock=0; purge=0; yes=0
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --unblock) unblock=1; shift ;;
+        --purge-data) purge=1; shift ;;
+        --yes|-y) yes=1; shift ;;
+        -*) die "unknown option '$1' for repo" ;;
+        *) path="$1"; shift ;;
+      esac
+    done
+    do_repo "$path" "$unblock" "$purge" "$yes" ;;
+  selftest) selftest ;;
+  ""|-h|--help) awk 'NR>1 && /^#/{sub(/^# ?/,""); print; next} NR>1{exit}' "$SELF"; exit 0 ;;
+  *) die "unknown command '$cmd' (global | repo | selftest)" ;;
+esac
