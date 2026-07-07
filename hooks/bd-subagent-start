@@ -73,6 +73,9 @@ if [ "${1:-}" = "selftest" ]; then
   exit 0
 fi
 
+# Best-effort from here: a hook failure must never surface as a subagent error,
+# which set -e alone can't promise before the trailing exit 0. Enforce the swallow.
+trap 'exit 0' ERR
 bd_root="$(find_bd_root)" || exit 0
 emit "$bd_root"
 exit 0
