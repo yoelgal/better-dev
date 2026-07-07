@@ -79,5 +79,53 @@ done
 [ -z "$unknown" ] && ok "every backtick /ref is a shipped or host-optional skill" \
   || printf '  \033[33m•\033[0m illustrative/placeholder /refs (not gated):%s\n' "$unknown"
 
+echo "== em/en dash gate =="
+# Standing repo rule: no em (U+2014) or en (U+2013) dashes in shipped text. Match the raw UTF-8 bytes
+# under LC_ALL=C so this holds on BSD grep (no -P) as well as GNU. Covers the shipped surfaces.
+em="$(printf '\342\200\224')"; en="$(printf '\342\200\223')"
+dash_hits=""
+for f in $(find skills scripts docs hooks -type f 2>/dev/null; ls install.sh README.md BOOTSTRAP.md 2>/dev/null); do
+  LC_ALL=C grep -lq -e "$em" -e "$en" "$f" 2>/dev/null && dash_hits="$dash_hits $f"
+done
+[ -z "$dash_hits" ] && ok "no em/en dashes in shipped text" || bad "em/en dash in:$dash_hits"
+
+echo "== manifest version =="
+v="$(jq -r '.version // empty' .claude-plugin/plugin.json 2>/dev/null)"
+[ -n "$v" ] && ok "plugin.json version present ($v)" || bad "plugin.json has no non-empty version"
+
+echo "== entry-skill utterances =="
+# Each entry skill's description should carry at least one phrase a real user would type for that need,
+# so natural-language activation routes without a skill name. Any-of match, case-insensitive.
+utt() {
+  sk="$1"; shift
+  d="$(sed -n 's/^description: *//p' "skills/$sk/SKILL.md" 2>/dev/null | head -1 | tr 'A-Z' 'a-z')"
+  for p in "$@"; do case "$d" in *"$p"*) return 0 ;; esac; done
+  bad "entry skill '$sk': description names no canonical user phrasing (want one of: $*)"
+}
+utt plan-grill    "feature" "build" "new feature"
+utt diagnose      "bug" "broken" "failing" "crash" "flaky" "slow" "regression"
+utt groundwork    "greenfield" "new project" "from scratch" "foundation"
+utt pr-and-verify "pull request" "open a pr" " pr "
+[ $fail = 0 ] && ok "entry skills carry canonical user phrasings" || true
+
+echo "== install/uninstall roundtrip =="
+# Prove the two lifecycle deliverables stay honest together: a clean HOME installs, links resolve, a
+# planted foreign skill is left alone, and bd-uninstall removes only ours.
+rt="$(mktemp -d)"
+mkdir -p "$rt/.claude/skills/review"; printf 'not ours\n' > "$rt/.claude/skills/review/SKILL.md"
+if HOME="$rt" "$ROOT/install.sh" --host claude >/dev/null 2>&1 \
+   && [ -L "$rt/.claude/skills/packaging" ] \
+   && [ -f "$rt/.claude/skills/.better-dev-install" ] \
+   && [ ! -L "$rt/.claude/skills/review" ] \
+   && HOME="$rt" "$ROOT/scripts/bd-uninstall" global --host claude --yes >/dev/null 2>&1 \
+   && [ ! -e "$rt/.claude/skills/packaging" ] \
+   && [ ! -f "$rt/.claude/skills/.better-dev-install" ] \
+   && [ -f "$rt/.claude/skills/review/SKILL.md" ]; then
+  ok "install links resolve, uninstall cleans ours, foreign skill survives"
+else
+  bad "install/uninstall roundtrip"
+fi
+rm -rf "$rt"
+
 echo
 [ $fail = 0 ] && echo "package-check: PASS ($(ls skills/ | wc -l | tr -d ' ') skills)" || { echo "package-check: FAIL"; exit 1; }
