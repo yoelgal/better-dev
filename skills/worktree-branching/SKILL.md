@@ -27,6 +27,15 @@ let them win:
 
 Detect the layout, don't impose one. What the repo already does is the default.
 
+## You are not the only actor here
+
+This repo runs parallel worktrees, and other agents or the operator may be working in it while you
+are. If you notice changes in the working tree or index you did not make, they are not yours to
+undo - do not revert, stash, or "clean up" after another actor. Keep going if the changes don't
+touch your files; if they do, or you cannot tell whose they are, surface exactly what you see and
+ask before proceeding. `git checkout --`, `git reset --hard`, and `git clean` aimed at work you
+didn't author are how a parallel model loses someone else's data.
+
 ## Step 0 - are you already isolated?
 
 Before creating anything, check whether this session is already inside a linked worktree:
@@ -84,14 +93,23 @@ placement, then branch off the *base*, not off HEAD:
 ```bash
 git check-ignore -q .worktrees || { printf '.worktrees/\n' >> .gitignore && git add .gitignore; }
 path=".worktrees/$slug"
+git worktree prune   # clear a stale registration if $path was removed but still listed
 git fetch origin "$base" 2>/dev/null || true
 git worktree add -b "$branch" "$path" "origin/$base" 2>/dev/null \
   || git worktree add -b "$branch" "$path" "$base"
 ```
 
+`git worktree prune` only clears entries whose directory is gone, so it's safe alongside a live
+concurrent run - a worktree still in use keeps its directory and survives the prune.
+
 If `$path` already exists or the branch is already checked out somewhere, this is a re-detect: point
 at the existing worktree rather than forcing a duplicate. If `git worktree add` fails on a sandbox
 permission error, say so and work in place - `edge-cases.md` covers that fallback.
+
+A fresh worktree has no installed deps, so run the project's setup and one baseline check here -
+that way the loop's first verify measures your work, not a missing `node_modules` misread as a
+failure. If this skill hands off immediately (the interlock in Step 3), `/autonomous-loop`'s
+ground-truth gate covers the same baseline at the other end.
 
 ## Step 3 - record it, then hand off
 

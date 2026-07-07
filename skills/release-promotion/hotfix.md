@@ -24,6 +24,12 @@ Branch names come from the overrides read in the main body (`release` defaults t
    git tag -a "$version" -m "hotfix $version" && git push origin "$release" "$version"
    ```
 
+   Incident pressure is exactly when `--no-verify` and `--force` start to look reasonable; they
+   aren't. A hook that fails or a push that's rejected here is a gate catching something while you
+   move fast - read it, don't bypass it. And if a step goes wrong and you realize you've lost data or
+   shipped the wrong sha, say so immediately rather than quietly patching over it; an honest report
+   lets the operator recover while the trail is warm.
+
 4. **Back-merge into integration - the step that's easy to forget.** Bring the release branch's new
    history into integration so the fix survives the next promote:
 
