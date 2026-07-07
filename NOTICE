@@ -19,7 +19,22 @@ we actually copied verbatim/substantially, which MIT requires us to attribute, a
   orrgal1/claude-plugins - orrgal1           (MIT)
   nousresearch/hermes-agent - Nous Research     (MIT)
   DietrichGebert/ponytail - DietrichGebert    (MIT)
+  addyosmani/agent-skills - Addy Osmani       (MIT)
+  davidondrej/skills - David Ondrej      (MIT)
+  Leonxlnx/taste-skill - Leonxlnx          (MIT)
+  ruvnet/ruflo - ruvnet            (MIT)
+  asgeirtj/system_prompts_leaks - asgeirtj  (CC0-1.0; see caveat below)
+  "Getting started with loops" - delba_oliveira / ClaudeDevs (X article, ideas)
+  Fable-extraction playbooks - @EXM7777 (Machina), @alex_prompter (X articles, ideas)
+  Eight-category edge-case pass - @nurijanian (George, prodmgmt.world) (X article, ideas)
+  Human-simulating e2e QA - James Goldbach (@agentic.james) (IG reel, ideas)
+  Fable-to-Opus skill capture - Ethan Stopperich (IG reel, ideas)
 
 ── NOT copied - inspiration only, NOT redistributable ──
   Andrej Karpathy - LOOPS.md v060726 ("personal use permitted"). Concepts reimplemented
   in our own words; no prose copied.
+  Andrej Karpathy - "CLAUDE.md: Field Notes" one-pager ((c) 2026, personal use).
+  Concepts reimplemented in our own words; no prose copied.
+  asgeirtj/system_prompts_leaks aggregates third-party proprietary system prompts.
+  The aggregation is CC0, but the underlying prompts are not ours to copy: techniques
+  studied and reimplemented as ideas only; no leaked prompt text ships in better-dev.
