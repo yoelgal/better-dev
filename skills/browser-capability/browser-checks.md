@@ -88,14 +88,41 @@ agent-browser batch --bail \
   "screenshot dashboard.png"
 ```
 
+## Window discipline: a dedicated window, one per agent session
+
+The check never drives the user's working browser - not their window, not their live profile. A headed run
+opens its own dedicated window, and the tool's daemon keeps that one window alive across commands, so the
+whole check runs in a single window instead of spawning a new one per step.
+
+Concurrent agent sessions each get their own named session, derived rather than invented so a re-run lands
+back in the same window instead of opening another:
+
+```
+SESSION="$(agent-browser session id --scope worktree --prefix bd)"
+agent-browser --session "$SESSION" open http://localhost:3000/dashboard
+```
+
+Every later command passes the same `--session` (or exports `AGENT_BROWSER_SESSION`), which reuses the
+live window when one is already open and creates it only when not - idempotent about windows by
+construction. Two work items in parallel worktrees get two isolated sessions with separate cookies,
+storage, and history, not a fight over one page. `close` at the end of the check tears the window down;
+until then the session persists, which is what makes multi-command checks cheap.
+
+For a logged-in page (X, Instagram, anything behind auth), copy the auth into the dedicated session
+rather than borrowing the user's browser: snapshot a real profile read-only (`--profile Default`), or save
+state once from a logged-in Chrome and reuse it (`--auto-connect state save auth.json`, then `--state
+auth.json open …`). The cookies travel; the user's own window is never the automation target.
+
 ## Modes - pick per the page under test
 
-- **Headless** (default) - no visible window, the right choice for CI and the loop's routine runs.
-- **Real Chrome with a profile** - drives an actual Chrome using a logged-in profile, so a page behind auth
+- **Headless** (default) - no visible window, the right choice for CI and the loop's routine runs. The
+  named session still applies; headless sessions collide on state just like headed ones.
+- **Headed** (`--headed`) - a visible dedicated window, for watching a flow or debugging a failing check.
+- **Real Chrome with a profile** - a read-only snapshot of a logged-in profile, so a page behind auth
   renders with real cookies instead of a fresh anonymous session. This is the mode for verifying
   authenticated flows; it's the productized version of hand-rolling a cookie'd Playwright render.
 - **Cloud / remote** - a remote browser session, for parallel checks across dispatched workers or when the
   local machine shouldn't run the browser.
 
 Headless suits most done-criteria; reach for a real profile only when the check needs a logged-in state, and
-prefer seeding auth through storage or cookies over checking a personal profile into the loop.
+prefer seeding auth through saved state or cookies over checking a personal profile into the loop.

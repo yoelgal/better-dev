@@ -202,10 +202,11 @@ for your host, not vendored here). Say what you want; the right skill enters, an
 | "who calls this / what breaks if I change X" | `/codebase-map` | orientation, changes nothing |
 | "just push to the PR / use feat/ / skip the grill" | `/overrides` | records the standing default |
 | "remove better-dev" | `/uninstall` | unwires this repo, keeps your data |
-| a one-to-two-step change | no front-end - just make it | verify before calling it done |
+| a one-to-two-step change | no front-end - just make it | still in a worktree; verify before done |
 
 You name the entry, not every step: each front-end hands to `/autonomous-loop`, which hands a DONE
-result to `/pr-and-verify`, which hands a green PR to `/release-promotion`. Each feature or fix runs in
+result to `/pr-and-verify`, which hands a green PR to `/release-promotion`. Every change - even a
+trivial one that skips the front-ends - runs in
 its own git worktree, off `<integration-branch>` (`/worktree-branching` sets it up first); branching is
 `<detected convention>`.
 
