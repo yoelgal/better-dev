@@ -84,6 +84,25 @@ set -eu
 `chmod +x .git/hooks/pre-commit`. A native hook is not committed with the repo, so pair it with a CI check
 so the gate survives a fresh clone.
 
+## Secret-content scan (stack-agnostic)
+
+The one line every pre-commit hook gets, including the native fallback - it needs no repo tooling. Prefer a
+scanner the repo already has, else a grep over the staged diff for high-signal shapes:
+
+```sh
+# prefer a real scanner if the repo carries one:
+#   gitleaks protect --staged   |   trufflehog git file://. --since-commit HEAD --only-verified   |   detect-secrets-hook
+# otherwise a stack-agnostic grep over the staged diff:
+if git diff --cached -U0 | grep -nE '(api[_-]?key|secret|password|token)[[:space:]]*[:=]|-----BEGIN [A-Z ]*PRIVATE KEY-----|AKIA[0-9A-Z]{16}' ; then
+  echo "guardrails: possible secret in staged diff (line above) - remove it, or rotate the key if already pushed" >&2
+  exit 1
+fi
+```
+
+It matches on shape, so it false-positives on a variable literally named `token`; that is the safe
+direction. A hit blocks the commit, not the file - unstage it or, if the secret already reached a remote,
+rotate the key (a committed secret is compromised; deleting the line is not enough).
+
 ## CI check
 
 One workflow running the same detected commands on push / PR. GitHub form
@@ -99,12 +118,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       # setup step for the stack (actions/setup-node, setup-python, setup-go, …)
+      - run: <frozen-lockfile install: npm ci | pnpm i --frozen-lockfile | poetry install --sync | cargo build --locked>
       - run: <detected lint command>
       - run: <detected typecheck command>
       - run: <detected test command>
+      - run: <ecosystem audit: npm audit --omit=dev | pip-audit | cargo audit>   # supply-chain gate, its own step
 ```
 
-Add it only when no workflow already runs these checks. An existing CI file is off-limits.
+Add it only when no workflow already runs these checks. An existing CI file is off-limits. The frozen-lockfile
+install and the audit step are the supply-chain gate: a run resolves the committed tree, not a drifted one,
+and a known-vulnerable dependency fails the gate rather than shipping green.
 
 ## Agent-side git safety (Claude Code)
 
@@ -116,3 +139,16 @@ target settings (`.claude/settings.json` for this project, `~/.claude/settings.j
 `hooks.PreToolUse` with a `Bash` matcher, **merging** into any existing hooks array rather than replacing it.
 Ask which patterns the operator wants before writing, and confirm the scope. Other hosts express the same
 idea through their own pre-execution hook, or go without - `/worktree-branching` already isolates the risk.
+
+The same hook can refuse the obfuscated-shell injection class - a command that hides or assembles another
+command - which is the real prompt-injection vector, distinct from a straight destructive command. High-signal
+shapes to add to the blocked list (these are near-always injection, rarely legitimate):
+
+```sh
+# refuse: parameter-transform / indirection / eval-like construction
+grep -qE '\$\{[A-Za-z_][A-Za-z0-9_]*@P\}|\$\{![A-Za-z_]|\beval\b|\|[[:space:]]*(ba)?sh\b' <<<"$COMMAND"
+```
+
+Keep the message short and the exit non-zero. For a real-world irreversible side effect the hook cannot see
+(a remote resource delete, a prod write), the discipline lives in the loop and `/security-pass`, not the
+hook: confirm that specific action, and a prior approval does not extend to the next one.
