@@ -26,6 +26,8 @@ its own git worktree, off `staging` (`/worktree-branching` sets it up first); br
 
 - Durable rules and lessons: `.better-dev/bin/bd-mem` (backend: files). Project overrides in
   `.better-dev/overrides.md` **win over defaults**, so read them first.
+- `/guardrails-install` records this repo's real verify command and safety baseline; on a greenfield
+  project, `/groundwork` takes the idea to a shared foundation and parallelizable work-items.
 - Hit a capability gap? Source an existing skill with `/tool-sourcing` before building anything; author
   one with `/self-extension` only when discovery genuinely comes up empty. A skill you author here is
   repo-scoped: it lands in this repo's own project skills dir, not the global tool.

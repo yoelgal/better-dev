@@ -194,6 +194,7 @@ for your host, not vendored here). Say what you want; the right skill enters, an
 | "ship it", "open a PR", "let's land this" | `/pr-and-verify` | -> `/release-promotion` on green |
 | "release this", "promote to main", "hotfix prod" | `/release-promotion` | tags and double-merges the hotfix |
 | "make it look good", "design the page" | `/design-brief` | -> `/plan-grill` or the loop |
+| "is this safe", a security pass on a risky diff | `/security-pass` | composed by `/review` automatically |
 | "is there a tool or skill for X" | `/tool-sourcing` | -> `/self-extension` only if discovery is empty |
 | "who calls this / what breaks if I change X" | `/codebase-map` | orientation, changes nothing |
 | "just push to the PR / use feat/ / skip the grill" | `/overrides` | records the standing default |
