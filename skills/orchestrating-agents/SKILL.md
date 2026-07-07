@@ -46,6 +46,12 @@ and keeps the worker focused on its one task.
 
 ## Three shapes
 
+A fan-out or a discovery loop can spawn dozens of workers and a large token bill, so the scale is
+something you pick deliberately, not a default the work infers for you: match the finder pool and the vote
+count to what the task asks for, and request that scale rather than assume it. Before committing a large
+run, pilot it - dispatch one worker over a small representative slice, read what it costs and returns, then
+scale the pattern that worked (`tiers.md`).
+
 1. **Single worker** (`Task`) - isolate one self-contained slice, or any task whose detail would bloat
    your coordination context.
 2. **Fan-out** (`Workflow`, or several `Task` calls in one turn) - independent subtasks at once. Only
@@ -56,7 +62,42 @@ and keeps the worker focused on its one task.
    command and a protect-set, consume its terminal verdict, and don't micromanage its iterations.
 
 Fan-out doesn't nest - a worker shouldn't fan out again beneath you. Keep orchestration one level deep;
-if a stage genuinely needs its own fan-out, run it inside that dedicated stage.
+if a stage genuinely needs its own fan-out, run it inside that dedicated stage. A debate among hypotheses
+is still yours to run, one level deep: the shapes below compose *at* your level, never by a worker
+spawning its own workers.
+
+## Composing the shapes
+
+The three primitives compose into a handful of named shapes worth reaching for by name. Each is the same
+dispatch verb arranged for a job, not a new mechanism:
+
+- **Adversarial verify** - the refuter from "Verify independently" scaled to a panel: per finding,
+  dispatch several independent skeptics, each told to *refute* it, and keep it only if a majority fail to.
+  One refuter is a spot-check; a panel is closer to proof.
+- **Perspective-diverse verify** - when a finding can fail more than one way, give each verifier a distinct
+  lens (correctness, security, performance, does-it-reproduce) instead of identical refuters. Diversity
+  catches failure modes that redundancy just repeats past.
+- **Judge panel** - for a wide-open design or fix, generate a few independent attempts from different
+  angles, score them with parallel judges, and synthesize from the winner while grafting the best of the
+  rest. Beats one attempt iterated when the solution space is broad.
+- **Loop-until-dry** - for discovery of unknown size (bugs, edge cases, dead code), keep spawning finders
+  until K consecutive rounds surface nothing new. A fixed count (`while found < N`) stops before the tail
+  and reports a partial sweep as complete. Dedup each round against everything *seen*, not against what's
+  been *confirmed* - dedup against confirmed lets a judge-rejected finding reappear every round, and the
+  loop never converges.
+- **Completeness critic** - close a broad sweep with one worker whose only job is "what's missing - an
+  angle not run, a claim unverified, a file unread?" What it surfaces is the next round.
+- **Competing hypotheses** - for a diagnosis with several mutually-exclusive root causes, dispatch one
+  investigator per hypothesis, each trying to *disprove* the others; the one that survives is the likely
+  cause. On a host whose workers can message each other this runs as a live debate; on a subagent-only
+  host it degrades to sequential dispatch, where you carry each investigator's counter-evidence into the
+  next brief. Either way the point holds: one agent picks the first plausible theory and stops - several
+  arguing don't.
+
+**No silent caps.** When a shape bounds coverage - a top-N, a no-retry, a sample - record what it dropped
+in the ledger. A silent truncation reads as "covered everything" when it didn't; that is a dishonest
+report, not an efficient one. The same honesty covers a fan-out that came back with holes: report the
+partial as partial, never a silent gap.
 
 ## File handoffs
 
@@ -110,6 +151,29 @@ coordination context on re-diagnosing and re-dispatching, far past what it saved
 down when both hold: the spec is closed (zero judgment left to the worker) and a cheap mechanical check
 exists for the result. Two failures on a subtask means the spec is wrong, not the worker - pull it back
 and re-decompose rather than escalating the model a third time.
+
+That rule sizes one worker for one subtask; a stage-to-tier band places whole stages. Name the bands by
+capability, never by vendor - "top tier" is the most capable model you have, which on a given day may be
+your only frontier tier:
+
+- **Top tier - judgment that cascades.** Planning and grilling a plan, the adversarial evaluator's
+  verdict, root-cause diagnosis, and the final synthesis across many workers' output. A wrong call here
+  poisons every downstream stage, so it earns the best model available.
+- **Mid tier - bounded building.** A closed-spec implementation slice, a mechanical refactor, test
+  scaffolding, a doc pass - the bulk of fan-out work, where the spec is settled and a cheap check catches
+  a miss.
+- **Cheap tier - mechanical and classifying.** Extraction, formatting, and a grader or classifier worker
+  checking one artifact against one rubric. High-volume, low-stakes, independently checkable.
+
+A verifier is the exception to "more-capable-is-safer": what an independent grader buys is *independence*,
+not raw power. A worker grading its own output sees its own reasoning and favors the conclusion it already
+reached; a separate worker sees only the artifact and the criterion. So a cheap independent grader can
+settle a deterministic check - a test passes, a score clears a threshold - even below the maker's tier;
+keep "at or above the tier that did the work" for judgment-heavy verification, where capability itself is
+doing the work.
+
+The full stage table, the confidence-envelope routing question, the pilot-small-then-scale rule, and the
+no-re-descend and calibration rules for a tier that keeps missing a task class live in `tiers.md`.
 
 better-dev advises how to shape and place work; it doesn't route models - the host owns model choice, so
 wire no router.

@@ -91,6 +91,25 @@ same worker to retry unchanged:
 - `DONE_WITH_CONCERNS` - read the concerns first. If they touch correctness or scope, address them before
   review; if they're observations, note them and proceed.
 
+## When a worker comes back empty, or a fan-out has holes
+
+A worker can error and return nothing at all - not `BLOCKED`, not `DONE`, just no claim. In a parallel
+fan-out, one worker erroring doesn't fail the batch; it leaves a *null hole* in the results while the rest
+resolve. Filter the holes out before you merge, then treat each one as its own re-dispatch: a worker that
+returned nothing is not a worker that returned "done," and mapping over the batch as if every slot were
+filled quietly bakes a gap into the merged result. Relay honestly what came back short - a silent hole in
+a merged answer is the same dishonesty as a silent cap on coverage.
+
+## Retry vs relaunch
+
+Re-dispatching an unchanged brief to the same worker just reruns the same failure - change something first
+(more context, a smaller slice, a more capable worker, per the terminal-state table above). And a
+*relaunch* is a fresh spawn, not a continuation: it doesn't inherit the tier, the tools, or the
+constraints of the run it resumes. Re-pin the model tier and the constraints explicitly on every relaunch.
+A resumed worker silently dropping to a weaker default is a real and expensive failure - it looks exactly
+like a capability regression, so you waste a cycle re-diagnosing a "worse" worker that was only
+under-pinned.
+
 ## Fix dispatches carry the implementer contract
 
 A fix worker re-runs the tests covering its change and reports the command and its output - name the

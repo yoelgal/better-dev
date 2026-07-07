@@ -40,7 +40,10 @@ table `Z`. Carry the answer into whatever you're doing with `file:line` receipts
 
 A structural map reflects its last build, not the live working tree, so treat its answer as a lead to
 confirm at the source, not gospel - and if a symbol looks moved or renamed, refresh the index before
-you trust it. The receipts are what keep a lagging graph honest.
+you trust it. The receipts are what keep a lagging graph honest. If the tool records the commit each graph
+was built at, that's a concrete freshness signal: compare it to `HEAD` to see whether the graph is current
+or behind, and when it's behind, refresh only the areas the diff since then actually touched rather than
+rebuilding the whole thing.
 
 ## 2. Source one on a real gap
 
@@ -53,6 +56,16 @@ the graph (the AST pass is cheap; a semantic pass spends model calls). That setu
 small one-off doesn't justify it: the fallback below is cheaper than the build. In autonomous mode,
 adopting the tool passes the same risk-gate as any sourced tool before it's added - `/tool-sourcing`
 owns that gate.
+
+On a large repo, scoping is the real decision. Rather than index everything, split it into a handful of
+coherent domains - each a name and a repo-relative subtree, none nested inside another - so each graph
+stays small and a query stays focused, and spend the semantic pass only on the domains you'll actually ask
+architecture questions about. Then name what you're leaving unindexed and why: vendored dependencies,
+generated code, build output, fixtures, docs. That explicit "here's what this map does *not* cover" is the
+honest front door; a silently partial index reads as complete and sends the next query hunting in a map
+that never held the answer. In a fresh worktree, seed the branch's graph from the main worktree's
+already-built one and reconcile only the branch diff, if the tool supports it, rather than rebuilding from
+scratch (`/worktree-branching`).
 
 ## 3. Fall back to disciplined search
 
@@ -74,6 +87,5 @@ Orientation is an input to other practices, not a phase of its own:
   touch.
 - `/diagnose` - the callers and dependents that seat the root cause at the correct seam.
 - `/review` - the blast radius of the diff: who the changed or removed symbols reach.
-- `/worktree-branching` - a rough sense of what the work touches before isolating it.
 
 It adds to whatever search and tooling you already have, and never replaces them.
