@@ -128,7 +128,7 @@ if [ "${1:-}" = "selftest" ]; then
   printf '%s' "$out" | grep -q "update available" && fail "nudged when clone is not a git repo"
 
   # Update nudge: a clone one commit behind its origin gets a pull nudge.
-  origin="$tmp/origin"; git init -q --bare "$origin"
+  origin="$tmp/origin"; git init -q --bare -b main "$origin"   # pin the branch: the fixture pushes to main, and a machine's init.defaultBranch may differ
   seed="$tmp/seed"; git clone -q "$origin" "$seed"
   ( cd "$seed" && git config user.email a@b.c && git config user.name t \
       && echo one > f && git add f && git commit -qm one && git push -q origin HEAD:main ) >/dev/null 2>&1
