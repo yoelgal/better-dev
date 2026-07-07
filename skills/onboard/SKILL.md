@@ -178,6 +178,9 @@ the block in place and never touches the operator's own text:
 printf '%s\n' "$BLOCK" | .better-dev/bin/bd-block CLAUDE.md better-dev
 ```
 
+The block is written in place and byte-stable across re-runs (bd-block replaces, never appends), which
+keeps the prompt cache below it valid - preserve that property when changing the block shape.
+
 Fill the block from what you actually detected (branching, memory backend). Shape:
 
 ```markdown

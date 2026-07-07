@@ -187,6 +187,14 @@ read-first `.better-dev/overrides.md` (e.g. "safety scope-gate is 20 files", "do
 here") wins over the recalled baseline. The loop and `/review` read that overrides layer first, then the
 baseline - so the resolved policy is honored every run and stays this project's to adjust.
 
+One standing rule beyond the blast-radius policy travels the same way. The repo's always-loaded context -
+CLAUDE.md and the managed blocks - is read on every turn, so it is a per-turn tax; carry it lean or it
+compounds. Record the discipline through the same memory contract:
+
+```bash
+.better-dev/bin/bd-mem remember "context-hygiene: the repo's standing context (CLAUDE.md + always-loaded blocks) is a per-turn tax - keep it lean, prune stale lines on each release, and rewrite instructions written for an older model rather than carrying them forward."
+```
+
 ## Make CI a gate, not a suggestion (advice, host-specific)
 
 CI only guards the integration branch if that branch *requires* it - without branch protection, a green
@@ -219,6 +227,17 @@ by default. Offer them; do not install them uninvited.
 - **Monotone-baseline ratchet** - for retrofitting existing lint/type-error debt without a big-bang cleanup:
   store the current violation *count* in a baseline file, fail CI if the count rises above it, and re-lock a
   lower floor after a fix. The count can only go down.
+
+## Optional format-on-write hook (offered, host-specific)
+
+The pre-commit hook formats staged files at commit time. A repo that wants a written file formatted the
+moment it lands - never carried dirty through the working tree - can add a post-write hook alongside it:
+after the agent writes a file, run the repo's own formatter on that one file. It is host-specific (Claude
+Code expresses it as a `PostToolUse` Edit|Write hook) and offered as an upgrade, never wired by default.
+Detect the formatter the same way the pre-commit gate does - the `format` script or the stack's formatter
+the repo already carries - and gate the hook on that detection: no formatter found, no hook, the same
+never-guess-a-command discipline the rest of the skill holds. A repo without one is never handed a
+formatter it does not have.
 
 ## Agent-side git safety (optional, host-specific)
 
