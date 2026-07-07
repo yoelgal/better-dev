@@ -51,4 +51,6 @@ retry with force; the isolation simply isn't available in that environment.
 
 When Step 0 lands you already inside the target worktree and there are uncommitted changes, don't
 reset or recreate anything - surface the dirty state and let the operator decide whether to commit or
-stash. A re-run fills only what's missing; it never discards work sitting in the tree.
+stash. A re-run fills only what's missing; it never discards work sitting in the tree. And a diff you
+did not author isn't a re-run to fill in at all - it's the concurrent-actor case from the skill body:
+leave it, don't fold it into your commit, don't reset it away.

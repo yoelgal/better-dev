@@ -35,6 +35,18 @@ for this repo. Any doubt refuses: a wrongly-refused removal costs a re-run, a wr
 a working tree. Never remove a worktree this skill didn't create - a harness-owned or detached-HEAD
 workspace belongs to the platform; leave it and let a workspace-exit tool handle it.
 
+## Confirm each destructive step on its own
+
+Removal, `git branch -D`, `rm -rf`, and force-removing a tree are destructive and hard to reverse.
+Before running one, state exactly what you're about to run and why, and get confirmation for that
+specific action. A yes you got for one destructive step doesn't carry to the next - each `--force`,
+each branch delete, each discard is its own gate. The clean test for what needs the gate: anything
+you couldn't undo with a `git revert` or a re-clone.
+
+If you realize you already caused data loss - removed the wrong tree, deleted an unmerged branch -
+say so immediately and plainly. A quiet repair hides the blast radius; an honest report lets the
+operator recover from reflog or a backup while the trail is still warm.
+
 ## The finish menu
 
 When the work-item is done and tests are green, offer the choice rather than assuming:

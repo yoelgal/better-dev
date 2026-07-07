@@ -57,9 +57,14 @@ Check the head commit of the integration branch, not a stale local copy. Every g
   *unknown* run: no status is not a green status.
 - **No open blockers.** No open issue or PR marked as a release blocker for this cut. If the project
   has no blocker convention, say so and let the operator confirm rather than assuming zero.
-- **It has soaked.** The integration head has sat stable for the agreed soak window since the last
-  merge, with verification passing on it - not a commit that landed sixty seconds ago. Check the age
-  of the head commit and confirm the window has elapsed.
+- **It has soaked.** Read the soak window from overrides (`bd-mem recall "soak window"`); with none
+  set, default to 24h of wall-clock since the last merge, or one full green CI cycle where the repo
+  runs no time-based window. "Stable" means a named verify-receipt in the ledger recorded against
+  *this* integration head - the sha you're about to promote - not a general sense that things look
+  fine (`bd-mem ledger read` the work-item that last shipped into integration, and confirm the
+  receipt names this sha). Check the head commit's age against the window, then confirm the receipt.
+  No receipt on the current head is a `NEEDS_INPUT`, not a pass; a receipt on an older sha with
+  merges since means it hasn't soaked at this head.
 - **Release contains everything already released.** `main` must be an ancestor of `staging`:
 
   ```bash
@@ -87,10 +92,16 @@ git switch "$release" && git merge --ff-only "origin/$integration"
 
 Then tag the release at that commit. Take the version from the project's scheme (a bumped
 `package.json`, a `VERSION` file, the last tag's successor) - read it, don't invent one. If no scheme
-is discoverable, that's a `NEEDS_INPUT`: ask for the version rather than guessing:
+is discoverable, that's a `NEEDS_INPUT`: ask for the version rather than guessing. Guard the tag
+before creating it: an existing `$version` tag means this promote already ran, or the version was
+never bumped - either way, stop and reconcile rather than moving or overwriting a published tag:
 
 ```bash
-git tag -a "$version" -m "release $version" && git push origin "$release" "$version"
+if git rev-parse -q --verify "refs/tags/$version" >/dev/null; then
+  echo "tag $version already exists - promote already ran, or the version wasn't bumped; stop and reconcile"
+else
+  git tag -a "$version" -m "release $version" && git push origin "$release" "$version"
+fi
 ```
 
 Record the promote so a later session can see what shipped:
@@ -101,8 +112,56 @@ printf 'released: %s\nfrom: %s@%s\nto: %s\n' \
   | .better-dev/bin/bd-mem ledger put "release-$version" release.md -
 ```
 
-A normal push here, never `--force`: the release branch is protected, and a forced update to it is
-the exact accident this skill exists to prevent.
+Push normally here - never `--force`, and never `--no-verify` to slip past a failing hook. A
+protected release branch that rejects your push is reporting that a gate failed, not inviting you to
+force through it; bypassing a hook is the same mistake wearing a different flag. That holds past this
+one push: before any force-push, history rewrite, branch delete, tag move, or `rm -rf` across the
+release surface, state exactly what you're about to run and why and get confirmation for that
+specific action - a yes to one destructive step doesn't carry to the next. And if you realize you've
+already lost data or pushed the wrong sha, say so at once rather than quietly repairing it.
+
+## Distill the loop's memory
+
+Promotion is a natural threshold - a release cycle's worth of lessons has piled up, so this is where
+the loop consolidates them instead of letting `rules.md` only ever grow. It runs at this checkpoint,
+not on a clock. Do it as a review pass, not an edit: read the lessons against the current rules and
+propose a diff for the operator to confirm.
+
+```bash
+.better-dev/bin/bd-mem read learnings   # the append-only lesson stream
+.better-dev/bin/bd-mem read rules       # the promoted rules
+```
+
+Read one against the other and propose, per lesson or rule, one of four moves - the reconcile verbs
+a memory-consolidation pass uses:
+
+- **ADD** - a lesson that recurred across two or more work-items, or that a verified fix confirmed,
+  has earned a rule: `bd-mem remember "<rule>"`. The negative-lesson filter still binds - promote the
+  durable cause-and-fix, never a transient "X is broken" (a one-off timeout, a flake, a
+  machine-specific path).
+- **UPDATE** - a rule a later lesson refined; propose the sharper wording.
+- **DELETE** - a rule no recall has matched across the last several work-items is stale; surface it
+  for the operator to retire. This is the one place rules get pruned, so nothing else has to.
+- **NOOP** - most lessons; leave them where they are.
+
+Two things keep this honest. Present the moves as a reviewable diff and light-confirm before applying
+any of them - propose, never auto-edit someone's memory. And never rewrite `learnings.jsonl` in
+place: it's append-only, so consolidation happens by promoting into `rules.md` and retiring stale
+rules there, not by editing the lesson stream. Nothing recurred or went stale? That's a clean
+NOOP - the pass isn't obliged to change anything.
+
+## If a release goes bad
+
+What users already pulled is out, but the release branch itself is recoverable - so recover it
+forward, never by force-resetting a pushed branch. Revert the commits that shipped: a fast-forward
+promote carried a range, so revert that range (`git revert --no-commit <prev-tag>..<release>`, or
+`git revert <bad-sha>` for a single culprit); a merge-commit promote or a hotfix merge is
+`git revert -m 1 <merge-sha>`. Re-run verification on the revert, tag it as a new patch release, and
+push - a new tag forward, never a moved or deleted one. Then back-merge the revert into integration
+so the two histories stay reconciled, the same both-branches discipline a hotfix uses; skip that and
+the next promote silently re-ships the bad commit. If the release sits behind a feature flag, killing
+the flag is the faster rollback - record the flag's path in the release receipt so the next operator
+finds it without spelunking.
 
 ## Hotfixes
 
