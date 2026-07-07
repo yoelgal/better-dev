@@ -60,6 +60,10 @@ Resolver script routes to a backend set by `BETTER_DEV_MEMORY` (default `files`;
 - `.better-dev/learnings.jsonl` - append-only, confidence-scored (gstack-style)
 - `.better-dev/overrides.md` - the #7 overrides layer (managed block; also mirrored to a CLAUDE.md block)
 - `.better-dev/ledger/<feature>/` - loop state (contract.md, progress ledger, per-iteration receipts)
+- **Typed-status amendment (2026-07-07, user-ratified, D13):** any record the model both reads and
+  rewrites (contract done-criteria, ledger steps, worker reports) carries an explicit typed status
+  marker (enum/checkbox), never a prose sentence a later session re-interprets; free-form narrative
+  belongs in append-only receipts. writing-skills owns the authoring rule.
 
 ## D3 · Restart-from-contract (owned, karpathy-inspired, never quoted)
 On `NO_PROGRESS` confirmed by stuck-check → **reset the feature worktree off `staging`, replay
@@ -141,6 +145,23 @@ before its commits push, so an open PR never waits on a reviewer.
 - **Named non-goals**: stacked PRs (one work-item, one PR - devloop's /restack pattern deliberately not
   adopted); recurring/scheduled loop cadence (the host's /loop and /schedule own it; the loop stays a
   bounded goal-runner).
+
+## D13 - Harvest-batch additions (2026-07-07 evening; rulings user-ratified)
+- **One new skill**: `codebase-audit` - the advise-only "point at a codebase, tell me what's worth
+  doing" front-end. Ephemeral by design: one-shot ranked findings with evidence, the human picks one
+  item and enters `/plan-grill` or `/diagnose`; it writes nothing but its report and keeps no state.
+- **Voice rule clarified (how principle 2 reads)**: a gate is a calm declarative naming its
+  consequence; caps-lock walls AND hedge verbs are both banned - firm-with-consequence is not
+  blocking. Owner: writing-skills.
+- **Typed-status rule** (see D2 amendment): machine-rewritten records carry typed status markers.
+- **Named non-goals added**: a persistent audit backlog + reconcile cadence (shadcn/improve's `plans/`
+  shape) - collides with the one-work-item loop and the no-recurring-cadence stance, and the issue
+  tracker owns triage; the method stays preserved in raw/ for a future reopen. The cross-vendor
+  thin-wrapper dispatch pattern - rejected-for-now (adds surface with no owner need yet).
+- **Eval-numbers policy**: shipped skills carry the mechanism and its reason, never a third-party eval
+  percentage; numbers stay citable in raw/ working papers and commit messages.
+- **Licensing note**: the two 2026-07 paper-styled one-pagers ("Fable Mode"; "Running Fable 5 Without
+  Overpaying") are personal-use-only like LOOPS.md - ideas reimplemented, never their sentences.
 
 ## Tracer-bullet findings (2026-07-03, on the papers.town clone) - bind Phase 1
 Ran `onboard` + one feature slice → staging end-to-end on the real clone (locally, no push). Proven, plus:
