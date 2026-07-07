@@ -165,8 +165,11 @@ budget is ever a successful one - the change moves toward the criteria, never th
 change:
 
 - **`DONE`** - CI green, every done-criterion proven, the entry verdict clean and still current. The PR is
-  mergeable into the integration branch. Merge it (honoring branch protection and any override that gates
-  merging to a release step), or hand the green mergeable PR to `/release-promotion` for the promote-and-tag.
+  mergeable into the integration branch. Merge it without asking further permission - the loop's gates were
+  the approval, and a second sign-off re-reviews what the review already settled. A human holds the merge
+  only where something recorded says so: branch protection on the base, a `merge-policy` rule from
+  `/guardrails-install`, or an override gating merges to a release step. Then hand the merged (or green
+  mergeable) PR to `/release-promotion` for the promote-and-tag.
 - **`DONE_WITH_CONCERNS`** - the same, with non-blocking flags named in the PR body.
 - **`BLOCKED`** - an external block. When it is a single waitable condition (a base going green, an infra
   incident clearing, a dependency landing), the bounded wait-for gate (`watch.md`) watches it and resumes

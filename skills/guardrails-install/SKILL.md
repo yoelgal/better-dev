@@ -171,7 +171,15 @@ this skill's prose above is the authoritative home for what each key means:
 .better-dev/bin/bd-mem remember "safety-denylist: <detected globs>"    # the paths a loop edit escalates on, not edits
 .better-dev/bin/bd-mem remember "safety-gate: <classes with a real surface here>"
 .better-dev/bin/bd-mem remember "safety-scope: <n>"                    # files touched that trip the scope gate; ~10 default
+.better-dev/bin/bd-mem remember "merge-policy: <auto-on-green | human>" # who merges a gates-passed green PR
 ```
+
+The merge policy is recorded the same way the branch structure is - detected, proposed, written on a yes.
+The default is `auto-on-green`: a PR whose change came through the loop's review and gates merges when CI
+is green, because the gates were the approval and a standing human sign-off re-reviews settled work. Record
+`human` where the base's branch protection requires a reviewing approval, or where the operator wants one -
+stakes, not habit, earn that gate. `/pr-and-verify` recalls this at entry and holds the merge only when
+something recorded says to.
 
 Two more durable safety rules travel with the policy - the *why* behind the denylist lives in
 `/security-pass`, not here; these are the standing rules a green check does not by itself satisfy:

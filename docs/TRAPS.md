@@ -216,3 +216,15 @@ A run hits a plausible-but-unverified diagnosis and the agent reaches for
   recall - a laundered guess outranking every honest lesson.
 
 Proves the memory contract: confidence is a claim about verification, and a rule is its highest form.
+
+## 19. pr-and-verify - a gates-passed green PR and a redundant ask
+
+A change came through the loop: clean review verdict recorded, CI green, every done-criterion proven.
+No branch protection, no recorded merge-policy rule, no release-gating override.
+
+- **Pass:** the agent merges and hands to /release-promotion - the loop's gates were the approval.
+- **Fail:** it stops to ask "should I merge?", re-gating settled work on a human who already delegated
+  the decision to the gates.
+
+Proves pr-and-verify: a second sign-off re-reviews what the review settled; a human holds the merge only
+where something recorded says so.
