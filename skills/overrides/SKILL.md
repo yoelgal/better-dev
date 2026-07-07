@@ -43,6 +43,32 @@ override twice changes nothing - so re-persisting is always safe. Phrase the lin
 next session can act on cold ("integration branch is `develop`"), not as a note about this conversation
 ("user said develop just now").
 
+## When the override waives a safety gate
+
+Most overrides are preferences - a branch prefix, where a spec lands, a phase to skip - and the light
+confirm above fits them. One class is different: an override that *waives or weakens a recorded safety gate* -
+a denylist path, a human-gate class (auth, payments/PII, infra, dependency bumps), or the scope threshold
+`/guardrails-install` recorded. Honor the immediate work the same way, but a persisted waiver drops a guard
+on every future run, so before making it *stand*, name plainly what it weakens and confirm the operator wants
+that standing, not just here:
+
+> This makes auth changes auto-proceed with no human gate, on every future run - persist that, or keep the
+> gate and just proceed this once?
+
+A one-off past a safety gate is a loop approval: it persists nothing, the same way "just proceed this once"
+never should. Only an explicit yes to the *standing* change writes anything, and it writes as a keyed line
+the loop and PR brief already recall, so the exception sits beside the baseline it bends and carries its own
+provenance:
+
+```bash
+.better-dev/bin/bd-mem persist-override "safety-gate: payments waived (was human-gated)"
+```
+
+`/guardrails-install` writes the baseline (`safety-gate:` / `safety-scope:` / `safety-denylist:`); a waiver
+writes a matching keyed line here; the loop reads this overrides layer first. Watch the pressure tell: a
+safety gate waived to get past a moment of frustration is a different bar for the same code - if the reason
+is deadline rather than a real change of policy, keep the gate and take the one-off.
+
 ## The read-first side
 
 Every skill reads the overrides before it applies a default, so an accepted override quietly wins from
