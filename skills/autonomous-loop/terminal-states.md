@@ -10,7 +10,7 @@ came from. The loop records the settled state as the last line of `progress.md`.
 | `DONE_WITH_CONCERNS` | Proven, with non-blocking flags worth naming. | Hand off; carry the flags into the PR body. |
 | `BLOCKED` | An external blocker - something outside the loop must move first (red base, infra, a dependency). | An infra red first gets a recovery-signature recall and one retry (see the loop's "Triage the red"); if still red, surface the blocker, wait it out or route it, then resume. |
 | `NEEDS_INPUT` | A human decision, missing context, or an approval is required. | Ask the one question; resume once answered. |
-| `EXHAUSTED` | A budget or iteration limit the operator set was reached. | Report honestly; the operator raises the budget or narrows scope. |
+| `EXHAUSTED` | A budget or iteration limit was reached - the operator's, or the hard turn/wall-clock ceiling an unattended or scheduled run carries so it can't bill without limit. | Report honestly; the operator raises the budget or narrows scope. |
 | `NO_PROGRESS` | Stagnated - a stuck-check `confirmed` it. | Restart-from-contract (read `restart.md`). |
 
 ## The hard rule
@@ -49,7 +49,8 @@ outside the loop (wait) or a decision only the human holds (ask).
 
 The blast-radius stops land on the ask side of that same split: a step that would edit a high-consequence
 denylist path, or a diff in a human-gate change class (security/auth, payments/PII/money,
-infra/Terraform/prod config, a dependency bump) or past the scope-creep threshold, settles `NEEDS_INPUT` -
+infra/Terraform/prod config, a dependency bump, or anything a `git revert` wouldn't walk back - a
+deletion, a destructive migration, a deploy) or past the scope-creep threshold, settles `NEEDS_INPUT` -
 a human's call, not an external blocker, so never `BLOCKED`. `/autonomous-loop` defines the denylist
 and the classes.
 
