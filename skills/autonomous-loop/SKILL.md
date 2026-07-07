@@ -180,8 +180,10 @@ against these same three.
 ## Clean on the first green
 
 The loop isn't done when the check first goes green - it's done when the green code is also clean. On
-that first green, run one behavior-preserving cleanup pass over the diff: strip AI slop, dead code, and
-over-engineering, so a passing implementation doesn't reach review carrying it. The pass obeys the same
+that first green, run one behavior-preserving cleanup pass over the diff: strip AI slop, dead code,
+over-engineering, and comments that narrate the change or argue its correctness to a reviewer - a
+comment earns its place only by stating a constraint the code can't show - so a passing implementation
+doesn't reach review carrying any of it. The pass obeys the same
 protect-set as the loop - it never touches a test body or a contract artifact, whose exact text is
 load-bearing for the signal - and it only removes; behavior is preserved. Then re-verify: the cleanup
 has to leave the check green, and one that reddens it is reverted, not shipped. This runs every time the
@@ -194,14 +196,17 @@ its own check. Acceptance has two parts the loop doesn't self-grade: a fresh rev
 report and reads the diff, not the claims (`/review`), and runtime observation - the change driven to
 where it executes and watched past its happy path (`/pr-and-verify`). Exit 0 is the working signal,
 runtime observation is the acceptance; a passing command is not yet a driven flow. Critical and Important
-findings go back as a fix pass, then re-review. Only a clean independent verdict turns a green loop into
-`DONE`.
+findings go back as a fix pass, then re-review. Match the review's effort to the diff's blast radius:
+a change that crossed a human-gate class or the scope gate calls for `/review` at deep effort, a small
+in-scope diff earns light. Only a clean independent verdict turns a green loop into `DONE`.
 
 ## Where it settles
 
 Exactly one of six terminal states, and an error or a spent budget is never among the successful ones:
 `DONE · DONE_WITH_CONCERNS · BLOCKED · NEEDS_INPUT · EXHAUSTED · NO_PROGRESS`. Every harvested loop's
-verdict maps onto these - `terminal-states.md` has the map and the next move for each. In short:
+verdict maps onto these - `terminal-states.md` has the map and the next move for each. Before settling,
+read the report you are about to hand back: if its closing line is a plan, a question you could answer
+yourself, or a promise of work not yet done, the loop is not settled - do that work, then settle. In short:
 `DONE` / `DONE_WITH_CONCERNS` hand off to the PR-into-staging gate (`/pr-and-verify`), the recorded green
 (the command and its exit-0 output) travelling with them as evidence a reviewer reads rather than a
 promise, concerns carried into the PR; a confirmed `NO_PROGRESS` restarts from the contract
