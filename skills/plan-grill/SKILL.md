@@ -33,11 +33,20 @@ build, no code until the grill closes. This is observation, not debugging - no r
 
 ## 2. Ideate - propose, then pick one to grill
 
+Before sketching options, put the premise itself on trial in two lines: the outcome this feature
+serves - and whether the feature is the most direct path to it or a proxy - and what it costs to
+build nothing. A proxy with a cheaper direct path, or a do-nothing cost nobody can name, is the
+"not worth building" outcome below: record the one-line reason and stop.
+
 If the intent is still rough, sketch two or three distinct ways to satisfy it - a sentence each,
 with the trade-off that separates them - and let the user pick one (or blend). Sketch them as a
 verbalized distribution - each option with a stated probability that a typical solution lands there,
 at least one under ~0.10 - or the "distinct ways" arrive as the default design plus paraphrases of
-it (the *verbalized candidates* shape in `/orchestrating-agents`). Skip this when the
+it (the *verbalized candidates* shape in `/orchestrating-agents`). Of the sketched options, one is
+the minimal build that satisfies the intent and one is the ambitious build that would make it
+excellent - both present, equal weight, your pick stated with its reason. The user's choice sets
+the scope posture the rest of the grill holds; any expansion surfaced later is offered individually
+and opted into, never absorbed - the scope-growth rule in step 3 polices the drift. Skip this when the
 user already arrives with a specific design; grilling *is* the work then. The point is to enter the
 grill with one candidate design, not a blank page. For each option, name what it bets is true but
 hasn't been checked, and what would kill it - the bets become premises for the baseline check, and
@@ -57,20 +66,33 @@ passed as `[depth]` for a small, well-understood feature - you grill only the de
 done-criteria will turn on and skip exhaustive branch-walking.
 
 - **One question, then wait.** A wall of questions is bewildering; ask, get the answer, ask the
-  next. Order them so a decision that unblocks others comes first.
+  next. Order them so a decision that unblocks others comes first. One at a time is the interactive
+  rule with the user present; questions surfacing from parallel workers batch through the
+  orchestrator's question budget instead (`/orchestrating-agents`).
 - **Carry a recommended answer.** Every question ships with the answer you'd pick and why - the user
   corrects a default faster than they fill a blank. If the user answers "whatever you think," they
   lack confidence too - don't take it as a blank cheque; re-ask as a choice between two concrete options.
 - **Ask only what you can't discover.** A fact about this repo or system is yours to find, not the
   user's to answer - go read it (this is where premise-checking pays off again). Spend the user's
   attention only on a genuine preference or tradeoff the code can't settle; on one of those, offer
-  two to four mutually exclusive options with the one you'd pick marked. If a preference question
-  goes unanswered, proceed on your default and record it as a named assumption in the contract rather
-  than stalling or guessing silently.
+  two to four mutually exclusive options with the one you'd pick marked; with five or more real
+  options, chain a second question rather than dropping or merging options to fit. If a preference
+  question goes unanswered, proceed on your default and record it as a named assumption in the
+  contract rather than stalling or guessing silently. That path is for two-way doors only -
+  decisions a later edit reverses. A one-way door - a schema or data-model fork, a destructive or
+  irreversible action, a security or trust-boundary choice, an addition to the committed goal set -
+  never proceeds on an invented default: with no answer from the user and no recorded override
+  answering that question, the state is `NEEDS_INPUT`. An override can carry the user's standing
+  answer to a one-way question - that is an answer, deliberately given once - but no override makes
+  one-way doors auto-decidable in general.
 - **Confirm as each decision locks.** When a decision settles, reflect it back in a line and move on
   once it holds. If a decision reads like a standing policy for this project (a convention, not a
   one-off), offer to persist it - "make this the default here?" - and on a yes record it with
-  `.better-dev/bin/bd-mem persist-override "<line>"`. Don't persist transient facts.
+  `.better-dev/bin/bd-mem persist-override "<line>"`. Don't persist transient facts. Keep the
+  settled decisions on disk, not in conversation: as each decision locks, append its one-line form
+  to a running `decisions.md` in the work-item's ledger
+  (`.better-dev/bin/bd-mem ledger put <work-item> decisions.md`). Step 4 synthesizes from that
+  file - a grill long enough to compact loses nothing.
 - **An answer that contradicts a receipt gets the receipt, not a nod.** When an answer conflicts
   with something the baseline pass already established, don't fold it into the contract and don't
   argue in the abstract: concede what's right in their reasoning, put the `file:line` or command
@@ -84,9 +106,10 @@ done-criteria will turn on and skip exhaustive branch-walking.
   it grew in is a one-line correction; absorbed silently, it's how a three-goal contract becomes a
   rewrite.
 - **Attack the plan before you close.** The grill so far argued *for* the design - it walked the
-  tree and filled each node with your recommended answer. Spend one pass arguing against it: name the
-  unknown you skated over, the single assumption the whole plan rests on that you never actually
-  checked, and the one requirements change that would make this the wrong build. Each objection has to
+  tree and filled each node with your recommended answer. Spend one pass arguing against it, through
+  the four lenses in `lenses.md` - worth, engineering, design, and developer experience; the last two
+  run only when the feature has that surface, and each skipped lens says so in one line. Each lens is
+  a short block of checkable questions, not a persona to perform. Each objection has to
   resolve - it dies against evidence you can cite, or it promotes to an open concern or an out-of-scope
   line, never just noted and dropped. If you can't mount one real objection, you don't yet understand
   the design well enough to have attacked it; keep grilling. The contract records at least one attempted
