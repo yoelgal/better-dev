@@ -2,19 +2,33 @@
 ## better-dev is wired here
 
 This repo uses **better-dev**: portable dev practices that run inside your agent (installed globally
-for your host, not vendored here). On non-trivial work, drive it through these skills:
+for your host, not vendored here). Say what you want; the right skill enters, and the chain runs itself:
 
-- **Feature**: `/plan-grill` to forge an observable done-contract, then `/autonomous-loop` to drive it
-  to proven-done, then `/pr-and-verify` to land it. **Bug or fix**: `/diagnose` first, then the loop.
-- Each feature or fix runs in its **own git worktree** via `/worktree-branching`, off `staging`;
-  branching is `feat/*` (`fix/*`), merged to `staging`, promoted to `main` on release.
+| You say... | Enters | Then, on its own |
+|---|---|---|
+| "add / build feature X", "I want Y" (non-trivial) | `/plan-grill` | -> `/autonomous-loop` -> `/pr-and-verify` |
+| "X is broken / failing / slow", "why is prod down" | `/diagnose` | -> `/autonomous-loop` -> `/pr-and-verify` |
+| "let's build an app that does Y", a new project or epic | `/groundwork` | sets the foundation, then per-item front-ends |
+| "ship it", "open a PR", "let's land this" | `/pr-and-verify` | -> `/release-promotion` on green |
+| "release this", "promote to main", "hotfix prod" | `/release-promotion` | tags and double-merges the hotfix |
+| "make it look good", "design the page" | `/design-brief` | -> `/plan-grill` or the loop |
+| "is this safe", a security pass on a risky diff | `/security-pass` | composed by `/review` automatically |
+| "is there a tool or skill for X" | `/tool-sourcing` | -> `/self-extension` only if discovery is empty |
+| "who calls this / what breaks if I change X" | `/codebase-map` | orientation, changes nothing |
+| "just push to the PR / use feat/ / skip the grill" | `/overrides` | records the standing default |
+| "remove better-dev" | `/uninstall` | unwires this repo, keeps your data |
+| a one-to-two-step change | no front-end - just make it | verify before calling it done |
+
+You name the entry, not every step: each front-end hands to `/autonomous-loop`, which hands a DONE
+result to `/pr-and-verify`, which hands a green PR to `/release-promotion`. Each feature or fix runs in
+its own git worktree, off `staging` (`/worktree-branching` sets it up first); branching is
+`feat/*` (`fix/*`), merged to `staging`, promoted to `main` on release.
+
 - Durable rules and lessons: `.better-dev/bin/bd-mem` (backend: files). Project overrides in
   `.better-dev/overrides.md` **win over defaults**, so read them first.
 - Hit a capability gap? Source an existing skill with `/tool-sourcing` before building anything; author
   one with `/self-extension` only when discovery genuinely comes up empty. A skill you author here is
   repo-scoped: it lands in this repo's own project skills dir, not the global tool.
-- `/guardrails-install` records this repo's real verify command and safety baseline; on a greenfield
-  project, `/groundwork` takes the idea to a shared foundation and parallelizable work-items.
 - `.better-dev/` holds better-dev data (rules, overrides, learnings); in **this** repo the whole dir is
   gitignored as local runtime state (`bin/` and `ledger/` are per-machine regardless). A fresh clone
   re-runs `/onboard` to rebuild the `bin` bridge.
