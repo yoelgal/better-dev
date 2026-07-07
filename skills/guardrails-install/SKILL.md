@@ -85,7 +85,9 @@ the evidence instead of writing:
 
 **Human-gate change classes** - a change landing in one of these is a `NEEDS_INPUT` for a human even on a
 green, clean check: security/auth, payments/PII/money, infra/Terraform/prod config, and dependency/version
-bumps. Record which have a real surface here; a class the repo has no code for needs no gate.
+bumps. Record which have a real surface here; a class the repo has no code for needs no gate. A new or bumped
+dependency is also a typosquat/postinstall check, not just a version diff - `/security-pass`'s supply-chain
+row is what a human weighs there.
 
 **Scope-creep gate** - a diff touching more than ~10 files stops for a human rather than auto-proceeding.
 Ten is the default; record the repo's own number where its norms differ.
@@ -119,6 +121,18 @@ stays exactly as the operator wrote it.
 - **CI check** (absent) - one workflow that runs the same real commands on push / PR, so the gate holds
   even for a commit made with the hook bypassed. Match the host: a `.github/workflows/` file for GitHub,
   the equivalent where the remote lives. Keep it to the checks you detected.
+- **Secret-content scan** (a gate in its own right, distinct from the denylist above) - the denylist stops a
+  *loop edit* from touching `.env`; nothing there stops any commit from *introducing* a live key pasted into
+  a normal source file. Every pre-commit hook - Node, Python, or the native fallback - gets one stack-agnostic
+  line that needs no tooling: a scan of the staged diff that refuses a commit shaped like a credential.
+  Prefer a real scanner the repo already carries (`gitleaks`, `trufflehog`, `detect-secrets`); otherwise a
+  pattern grep over the staged diff for high-signal shapes, blocking with a one-line message naming the file.
+  This is the one check even the "anything else" native hook always gets. `stacks.md` holds the grep recipe.
+- **Supply-chain gate** (CI) - commit the lockfile, and have CI install with the frozen-lockfile form
+  (`npm ci`, `pnpm i --frozen-lockfile`, `poetry install --sync`, `cargo build --locked`) so a run cannot
+  silently resolve a different tree, then run the ecosystem audit as its own gate (`npm audit --omit=dev`,
+  `pip-audit`, `cargo audit`). A deferred advisory is documented with a reason and a review date, not
+  silently ignored. Detected-command discipline still applies - report a gap rather than inventing a command.
 
 Full commit-time coverage costs the least when the hook stays fast: format only the staged files, run
 lint / typecheck / a quick test. Leave a slow full test suite to CI unless the operator asks otherwise.
@@ -159,11 +173,44 @@ this skill's prose above is the authoritative home for what each key means:
 .better-dev/bin/bd-mem remember "safety-scope: <n>"                    # files touched that trip the scope gate; ~10 default
 ```
 
+Two more durable safety rules travel with the policy - the *why* behind the denylist lives in
+`/security-pass`, not here; these are the standing rules a green check does not by itself satisfy:
+
+```bash
+.better-dev/bin/bd-mem remember "safety-secret-leak: a committed secret is compromised - revoke and reissue the key first, then purge history; deleting the line is not enough."
+.better-dev/bin/bd-mem remember "safety-gate-integrity: a red check is fixed, never silenced - do not disable a lint rule, skip or weaken a test, or lower a threshold to reach green."
+```
+
 A recorded default, never a hardcode and never a permanent hard-fail - each entry is an escalation a human
 answers, not a wall. A project waives, narrows, or widens any of it through `/overrides`: a line in the
 read-first `.better-dev/overrides.md` (e.g. "safety scope-gate is 20 files", "don't gate dependency bumps
 here") wins over the recalled baseline. The loop and `/review` read that overrides layer first, then the
 baseline - so the resolved policy is honored every run and stays this project's to adjust.
+
+## Make CI a gate, not a suggestion (advice, host-specific)
+
+CI only guards the integration branch if that branch *requires* it - without branch protection, a green
+workflow is a suggestion. better-dev cannot set protection on a real remote for you (that stays the
+operator's call), so surface the exact move and let them run it: on GitHub, a paste-ready `gh api` call or a
+pointer to Settings -> Branches to require the checks workflow and a PR review before a merge to
+`staging`/`main`. Emit it; do not assume it.
+
+## Optional integrity gates (offered, not imposed)
+
+Three cheap ratchets for a repo that wants more than pass/fail - each is bash-light, opt-in, and never wired
+by default. Offer them; do not install them uninvited.
+
+- **Anti-fabrication grep** - a pre-commit or CI grep over the *product* diff (test files exempt) that fails
+  when a metric is faked or work is marked done without running: a `confidence`/`score`/`accuracy` assigned
+  from `Math.random`, a `sleep`/`setTimeout` standing in for real work, or a leftover `mock*`/`fake*`/`stub*`
+  / `TODO: implement` / `not implemented`. It is the mechanical complement to the loop's honesty invariant -
+  the loop won't do it, this catches it if it slips.
+- **Witness-marker guard** - a `fixes.jsonl` of `{id, file, marker}` where `marker` is a substring a specific
+  fix created, plus one grep-loop in CI that fails if a marker has vanished from the tree. A cheap regression
+  ratchet that catches a silently reverted fix a deleted test would miss. No crypto, no signing.
+- **Monotone-baseline ratchet** - for retrofitting existing lint/type-error debt without a big-bang cleanup:
+  store the current violation *count* in a baseline file, fail CI if the count rises above it, and re-lock a
+  lower floor after a fix. The count can only go down.
 
 ## Agent-side git safety (optional, host-specific)
 
@@ -173,6 +220,14 @@ hook that refuses destructive git commands (`push`, `reset --hard`, `clean -fd`,
 Bash hook - so offer it as an upgrade, wired per host, never imposed. `stacks.md` sketches the Claude Code
 form. `/worktree-branching` already keeps feature work on its own worktree, which covers most of the risk;
 this hook is belt-and-suspenders for operators who want a hard stop.
+
+Extend the same hook, where it exists, past destructive-but-honest git to the injection class a leaked agent
+refuses: an obfuscated shell construct that builds or hides a command - the `${var@P}` parameter transform,
+chained assignments that progressively assemble a substitution, `${!var}` and eval-like indirection - is
+refused rather than run, since that is the actual prompt-injection vector, not a straight `rm`. And for a
+real-world irreversible side effect (a remote delete, a prod write, a data drop), confirm that specific
+action before it runs: a prior approval does not extend to the next destructive op, and if data loss already
+happened, say so immediately rather than quietly repairing it.
 
 ## Composability
 
