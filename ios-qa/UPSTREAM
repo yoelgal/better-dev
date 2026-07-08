@@ -5,3 +5,18 @@ vendored: 2026-07-07
 license: MIT (see LICENSE-upstream)
 not-vendored: SKILL.md, SKILL.md.tmpl (gstack's orchestration prompt; the practice
   skill in this repo is skills/ios-capability/, and the operational guide is README.md here)
+
+# Security-relevant files tracked for upstream drift, read by scripts/check-upstream.sh.
+#   pin <sha256> <local path>  hash is of the vendored file at the pinned commit (kept
+#                              byte-identical to upstream at vendor time). A changed
+#                              upstream file here is the cherry-pick priority.
+# Local paths mirror upstream under ios-qa/: local daemon/src/X <-> upstream ios-qa/daemon/src/X.
+# The auth/allowlist/session surface: identity mint, self-service and owner-grant, the
+# in-memory session store, and the tailnet -> USB proxy that enforces the checks.
+pin 50cc3a889e8d1f3a91c5a54aec2dd9a7c9e3f99db006c5983d6b052b443c8242 daemon/src/allowlist.ts
+pin 41a13f5627fe25f2bc8566d69f5151d0731f0c1b1e5dc43e8477bf7a2f703483 daemon/src/auth-mint.ts
+pin 78fee52b526a132aa15fb15245da4b45ee47fb67ff0c367322f91a63e7745f8a daemon/src/session-tokens.ts
+pin 92f649ac9c1cb686332af0c2d3f1ff365680a167dfb2d9c1ea6822cce896cd91 daemon/src/proxy.ts
+pin 01866c25cff1e03137c02f12d99fbb6b37ec3e0e5ea00e75a4b75c43c4b3fcb1 daemon/src/cli-mint.ts
+pin ce591c1e90deca14d2636f00850489987bd80f50e88db1a30b1de90d86cb2bb2 daemon/src/tailscale-localapi.ts
+pin db5347adb2055b3824c7d35434b8148fc7abf72b3ab327f4d02de899019980ed daemon/src/tunnel-bootstrap.ts

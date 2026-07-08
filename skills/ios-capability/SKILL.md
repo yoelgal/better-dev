@@ -24,7 +24,8 @@ time, not rounded at verify time.
 
 ## 2. Wire the tool
 
-For a real device, this repo vendors the tool: `ios-qa/` at the repo root - a Mac-side daemon
+For a real device, the tool is `ios-qa/` in the better-dev install (better-dev's vendored cut of
+gstack's MIT ios-qa; provenance in `ios-qa/UPSTREAM`) - a Mac-side daemon
 that bridges USB to a Debug-only bridge compiled into the app's own build, exposing screenshot,
 element-tree, state-snapshot, and touch endpoints. Wire it per `ios-qa/README.md`. Two facts
 shape the adoption: it needs macOS, Xcode, and a paired USB iPhone to run at all; and its bridge

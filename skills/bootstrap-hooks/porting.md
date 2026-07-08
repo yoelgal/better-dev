@@ -46,6 +46,13 @@ as the `SubagentStart` shape above). Add the host's envelope as a branch in the 
 and prove both decisions land: pipe one destructive fixture through `check-bash` and one out-of-boundary
 edit through `check-edit`, and confirm the host asks and denies rather than proceeding.
 
+Unlike the awareness hooks above, these two read the tool call on stdin - that is how they see the
+command or the file path to judge. So the host must pipe the tool-input JSON to the hook; a host that
+registers them without feeding stdin stalls every tool call to the hook timeout (the `INPUT="$(cat)"`
+read blocks with nothing to read). Confirm the host pipes tool input before registering them, and keep
+the timeout short (the `hooks.json` entries set one) so a misconfigured host fails to a bounded delay
+rather than a hang.
+
 A host with no pre-execution hook gets prose policy: record it
 (`.better-dev/bin/bd-mem remember "safety-enforcement: prose"`) and say so - a named coverage limit,
 not a failure. The loop's escalation discipline carries the same policy alone there.

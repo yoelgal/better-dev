@@ -261,8 +261,13 @@ verify-runtime owns the disposition). In short:
 (the command and its exit-0 output) travelling with them as evidence a reviewer reads rather than a
 promise, concerns carried into the PR; a confirmed `NO_PROGRESS` restarts from the contract
 (`restart.md`); `BLOCKED`, `NEEDS_INPUT`, and `EXHAUSTED` stop honestly, each naming the one thing that
-has to change. Settling any terminal state also lifts the edit boundary (`.better-dev/bin/bd-guard off`)
-- a boundary that outlives its work-item is a stale gate the next task in this tree trips over.
+has to change. A terminal state that ends the work-item - `DONE`, `DONE_WITH_CONCERNS` - lifts the edit
+boundary (`.better-dev/bin/bd-guard off`), since a boundary that outlives its work-item is a stale gate
+the next task in this tree trips over. A resumable stop leaves the boundary standing: `BLOCKED`,
+`NEEDS_INPUT`, `EXHAUSTED`, and `NO_PROGRESS` all expect this same work-item to continue, so the
+boundary that scoped it must still hold when it resumes - lifting it here would let the resumed run
+edit unbounded, and in the denylist case would drop the very guard whose deny is awaiting an answer.
+Teardown removes the boundary with the worktree once the item is truly done (`/worktree-branching`).
 
 ## What makes it a loop and not a slot machine
 

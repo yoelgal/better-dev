@@ -26,7 +26,7 @@ gh run list --commit "$(git rev-parse "origin/$release")" --json status,conclusi
 
 A push-deploy platform with neither gets one fixed propagation wait (60s) before probing. Wait on
 the host's monitor primitive, not a tight poll, with a 20-minute default budget
-(`bd-mem recall "deploy budget"` for an override). Two exits here are not green:
+(`bd-mem recall "deploy-budget"` for a recorded override; the default holds when none is set). Two exits here are not green:
 
 - A run that concludes `failure` goes straight to the rollback section - there is nothing to
   verify yet.
@@ -53,7 +53,7 @@ off a live system - read paths and idempotent writes only.
 
 ## The bounded post-deploy watch
 
-Five checks at 60-second intervals (defaults; `bd-mem recall "deploy watch"` for an override).
+Five checks at 60-second intervals (defaults; `bd-mem recall "deploy-watch"` for a recorded override).
 Each check: fetch the probed pages, read the console errors, read the load time.
 
 Grade each check against the **baseline** - the previous release receipt's `health:` line. With a

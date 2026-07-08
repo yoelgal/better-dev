@@ -1,7 +1,7 @@
 # Lenses - the attack pass, four ways a plan is wrong
 
-A lens is what `skills/review/lenses.md` defines - a named perspective with its own checkable
-question block; that file states the definition once, this one applies it to plans.
+A lens is what `/review` defines - a named perspective with its own checkable question block; that
+skill states the definition once, this one applies it to plans.
 
 Run all four in order; worth goes first because it can kill the plan cheapest. Each lens's
 objections resolve like any attack-pass objection: died-against-evidence, promoted-to-open-concern,

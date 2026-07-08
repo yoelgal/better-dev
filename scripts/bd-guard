@@ -47,8 +47,11 @@ emit_decision() { # emit_decision ask|deny <message>
   printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"%s","permissionDecisionReason":"%s"}}\n' "$1" "$msg"
 }
 
-# Primary checkout's .better-dev (git-common-dir parent, same resolution as bd-mem); outside git,
-# walk up from cwd. Prints the path; the caller tests -d for the repo gate.
+# Primary checkout's .better-dev (git-common-dir parent); outside git, walk up from cwd. This is a
+# deliberate in-process copy of bd-mem's resolve_bd, not a drifted second implementation: the check-*
+# hooks run on every single tool call, so bd_dir stays a shell function rather than paying a
+# `bd-mem where` subprocess spawn per hook. It is the one sanctioned duplicate of that resolver
+# (bd-mem's `where` subcommand is the shared canonical path). Prints the path; the caller tests -d.
 bd_dir() {
   local common d
   if common="$(git rev-parse --git-common-dir 2>/dev/null)"; then
@@ -64,13 +67,16 @@ bd_dir() {
   return 1
 }
 
-# Extract a string field from the hook's stdin JSON (in $INPUT): grep/sed for the common case,
-# python3 for escaped quotes. Empty on failure - the caller allows (fail open).
+# Extract a string field from the hook's stdin JSON (in $INPUT). python3 is the correct parser
+# (it handles escaped quotes like "echo \"hi\" && rm -rf src"); the grep/sed path only stops at the
+# first bare " and would truncate such a value, so it is the FALLBACK, used only when python3 is
+# absent. Empty on failure - the caller allows (fail open).
 extract_field() {
   local v
-  v="$(printf '%s' "$INPUT" | grep -o "\"$1\"[[:space:]]*:[[:space:]]*\"[^\"]*\"" | head -1 | sed 's/.*:[[:space:]]*"//;s/"$//' || true)"
-  if [ -z "$v" ]; then
+  if command -v python3 >/dev/null 2>&1; then
     v="$(printf '%s' "$INPUT" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("tool_input",{}).get(sys.argv[1],""))' "$1" 2>/dev/null || true)"
+  else
+    v="$(printf '%s' "$INPUT" | grep -o "\"$1\"[[:space:]]*:[[:space:]]*\"[^\"]*\"" | head -1 | sed 's/.*:[[:space:]]*"//;s/"$//' || true)"
   fi
   printf '%s' "$v"
 }
@@ -107,18 +113,28 @@ check_bash() {
   fi
 
   # Safe rm targets (build artifacts) pass silently - an always-on hook that interrogates every
-  # build clean gets turned off within a day.
+  # build clean gets turned off within a day. The allowlist applies ONLY to a single, unchained rm:
+  # command chaining (&&, ||, ;, |, newline) or a second rm falls through to the ask, so
+  # `rm -rf /important && rm -rf node_modules` is never allowed on the strength of its last clause -
+  # a greedy .*rm strip that classified only the trailing target was the bug this guards.
   if printf '%s' "$cmd" | grep -qE 'rm[[:space:]]+(-[a-zA-Z]*r[a-zA-Z]*[[:space:]]+|--recursive[[:space:]]+)'; then
-    local safe_only=true args t
-    args="$(printf '%s' "$cmd" | sed -E 's/.*rm[[:space:]]+(-[a-zA-Z]+[[:space:]]+)*//; s/--recursive[[:space:]]*//')"
-    for t in $args; do
-      case "$t" in
-        */node_modules|node_modules|*/.next|.next|*/dist|dist|*/__pycache__|__pycache__|*/.cache|.cache|*/build|build|*/.turbo|.turbo|*/coverage|coverage) ;;
-        -*) ;;
-        *) safe_only=false; break ;;
-      esac
-    done
-    [ "$safe_only" = true ] && { emit_allow; return 0; }
+    local chained=false rmcount nl safe_only args t
+    nl='
+'
+    case "$cmd" in *';'*|*'|'*|*'&&'*|*"$nl"*) chained=true ;; esac
+    rmcount="$(printf '%s' "$cmd" | grep -oE '(^|[^[:alnum:]_])rm([^[:alnum:]_]|$)' | wc -l | tr -d '[:space:]')"
+    if [ "$chained" = false ] && [ "$rmcount" = 1 ]; then
+      safe_only=true
+      args="$(printf '%s' "$cmd" | sed -E 's/.*rm[[:space:]]+(-[a-zA-Z]+[[:space:]]+)*//; s/--recursive[[:space:]]*//')"
+      for t in $args; do
+        case "$t" in
+          */node_modules|node_modules|*/.next|.next|*/dist|dist|*/__pycache__|__pycache__|*/.cache|.cache|*/build|build|*/.turbo|.turbo|*/coverage|coverage) ;;
+          -*) ;;
+          *) safe_only=false; break ;;
+        esac
+      done
+      [ "$safe_only" = true ] && { emit_allow; return 0; }
+    fi
   fi
 
   warn=""
@@ -126,7 +142,7 @@ check_bash() {
     warn="recursive delete (rm -r) permanently removes files"
   elif printf '%s' "$lower" | grep -qE 'drop[[:space:]]+(table|database)'; then
     warn="SQL DROP permanently deletes database objects"
-  elif printf '%s' "$lower" | grep -qE '(^|[^a-z])truncate([^a-z]|$)'; then
+  elif printf '%s' "$lower" | grep -qE 'truncate[[:space:]]+table'; then
     warn="SQL TRUNCATE deletes every row in a table"
   elif printf '%s' "$cmd" | grep -qE 'git[[:space:]]+push[[:space:]]+.*(-f([^a-zA-Z0-9]|$)|--force)'; then
     warn="git force-push rewrites remote history; other contributors may lose work"
@@ -159,10 +175,13 @@ check_edit() {
   case "$path" in /*) ;; *) path="$PWD/$path" ;; esac
   path="$(normalize "$path")"
 
-  # Always-allowed bookkeeping: the primary checkout's .better-dev (ledger, memory) and
-  # temp/scratch space. Without this a scoped loop cannot write its own receipts from a worktree.
+  # Always-allowed bookkeeping: the primary checkout's ledger receipts and the learnings stream,
+  # plus temp/scratch space - without this a scoped loop cannot write its own receipts from a
+  # worktree. NOT the whole .better-dev: rules.md and overrides.md are the policy source the
+  # denylist and overrides are read from, so they fall through to the normal boundary + denylist
+  # checks (a scoped session must not edit the policy to then reach a formerly-denied path).
   case "$path" in
-    "$bd"/*|/tmp/*|/private/tmp/*) emit_allow; return 0 ;;
+    "$bd"/ledger/*|"$bd"/learnings.jsonl|/tmp/*|/private/tmp/*) emit_allow; return 0 ;;
   esac
   if [ -n "${TMPDIR:-}" ]; then
     case "$path" in "${TMPDIR%/}"/*) emit_allow; return 0 ;; esac
@@ -190,6 +209,9 @@ check_edit() {
   rules="$bd/rules.md"
   if [ -f "$rules" ]; then
     globs="$(grep -m1 -o 'safety-denylist:.*' "$rules" 2>/dev/null | sed 's/^safety-denylist:[[:space:]]*//' || true)"
+    # A recorded rule may prefix the globs with prose ("no canonical dirs exist - .env*, ..."):
+    # strip up to and including the LAST ' - ' so the comma list after it is enforced, not skipped.
+    case "$globs" in *' - '*) globs="${globs##* - }" ;; esac
     if [ -n "$globs" ]; then
       oldifs="$IFS"; IFS=','; set -f
       # shellcheck disable=SC2086
@@ -197,7 +219,7 @@ check_edit() {
       set +f; IFS="$oldifs"
       for field in "$@"; do
         g="$(printf '%s' "$field" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
-        case "$g" in *' '*|'') continue ;; esac   # a field with spaces is prose, not a glob
+        case "$g" in ''|*' '*) continue ;; esac   # empty, or prose that survived the strip (internal space)
         g="$(printf '%s' "$g" | sed 's/\*\*/\*/g')"
         case "$path" in
           $g|*/$g)
@@ -287,14 +309,30 @@ selftest() {
   printf '%s' "$out" | grep -q 'Destructive' || fail "ask message missing Destructive"
   out="$(cd "$repo" && jbash 'git push --force origin main' | "$SELF" check-bash)"
   printf '%s' "$out" | grep -q '"permissionDecision":"ask"' || fail "force-push not asked"
-  out="$(cd "$repo" && jbash 'mysql -e TRUNCATE users' | "$SELF" check-bash)"
-  printf '%s' "$out" | grep -q '"permissionDecision":"ask"' || fail "TRUNCATE not asked"
+  out="$(cd "$repo" && jbash 'mysql -e TRUNCATE TABLE users' | "$SELF" check-bash)"
+  printf '%s' "$out" | grep -q '"permissionDecision":"ask"' || fail "SQL TRUNCATE TABLE not asked"
+  # ...but the coreutils `truncate` command is not SQL: it must not draw the SQL TRUNCATE message.
+  out="$(cd "$repo" && jbash 'truncate -s 0 app.log' | "$SELF" check-bash)"
+  printf '%s' "$out" | grep -q 'SQL TRUNCATE' && fail "coreutils truncate mis-flagged as SQL TRUNCATE"
+  [ "$out" = "{}" ] || fail "coreutils truncate did not pass silently"
 
   # Safe rm targets pass silently; a mixed list still asks.
   out="$(cd "$repo" && jbash 'rm -rf node_modules dist' | "$SELF" check-bash)"
   [ "$out" = "{}" ] || fail "safe rm targets were interrogated"
+  out="$(cd "$repo" && jbash 'rm -rf node_modules' | "$SELF" check-bash)"
+  [ "$out" = "{}" ] || fail "bare safe rm was interrogated"
   out="$(cd "$repo" && jbash 'rm -rf node_modules src-old' | "$SELF" check-bash)"
   printf '%s' "$out" | grep -q '"permissionDecision":"ask"' || fail "mixed rm list passed"
+
+  # A chained rm never rides on its last clause: the safe trailing target must not silence the
+  # dangerous leading one (greedy .*rm strip bug).
+  out="$(cd "$repo" && jbash 'rm -rf src && rm -rf node_modules' | "$SELF" check-bash)"
+  printf '%s' "$out" | grep -q '"permissionDecision":"ask"' || fail "chained rm allowed via its safe last clause"
+
+  # Escaped quotes in the command must parse (python3 path), so the rm inside still asks - a
+  # truncated grep parse would have emitted {} and silently allowed it.
+  out="$(cd "$repo" && printf '%s' '{"tool_input":{"command":"echo \"hi\" && rm -rf src"}}' | "$SELF" check-bash)"
+  printf '%s' "$out" | grep -q '"permissionDecision":"ask"' || fail "escaped-quote command not parsed / rm not asked"
 
   # Obfuscated shell draws a deny, not an ask.
   out="$(cd "$repo" && jbash 'eval $PAYLOAD' | "$SELF" check-bash)"
@@ -324,9 +362,13 @@ selftest() {
   out="$(cd "$repo" && jedit "$repo/src/app.ts" | "$SELF" check-edit)"
   [ "$out" = "{}" ] || fail "worktree boundary leaked into the primary checkout"
 
-  # Ledger allowlist: a scoped session still writes the primary's .better-dev.
+  # Ledger allowlist: a scoped session still writes the primary's ledger receipts...
   out="$(cd "$wt" && jedit "$repo/.better-dev/ledger/item/receipts.md" | "$SELF" check-edit)"
   [ "$out" = "{}" ] || fail "ledger write denied from a scoped worktree"
+  # ...but the policy source itself is NOT auto-allowed: an edit to rules.md from a scoped worktree
+  # falls through to the boundary check and is denied (no editing policy to reach a denied path).
+  out="$(cd "$wt" && jedit "$repo/.better-dev/rules.md" | "$SELF" check-edit)"
+  printf '%s' "$out" | grep -q '"permissionDecision":"deny"' || fail "policy source rules.md was auto-allowed from a scoped worktree"
 
   # status / off round trip (from inside the bounded worktree).
   ( cd "$wt" && "$SELF" status ) | grep -q "scope boundary: $wt" || fail "status missing the boundary"
@@ -356,6 +398,12 @@ selftest() {
   printf '%s' "$out" | grep -q '"permissionDecision":"ask"' || fail "**/secrets/** glob not matched"
   out="$(cd "$repo" && jedit "$repo/src/app.ts" | "$SELF" check-edit)"
   [ "$out" = "{}" ] || fail "non-denylist edit was interrogated"
+
+  # A prose-prefixed denylist line still enforces its globs: strip up to the last ' - ', then match.
+  printf -- '- safety-denylist: no canonical dirs exist - .env*, **/secrets/**, *.pem\n' > "$repo/.better-dev/rules.md"
+  out="$(cd "$repo" && jedit "$repo/.env.production" | "$SELF" check-edit)"
+  printf '%s' "$out" | grep -q '"permissionDecision":"ask"' || fail "prose-form denylist did not enforce .env*"
+  printf '%s' "$out" | grep -q '\.env\*' || fail "prose-form denylist ask does not name the glob"
 
   rm -rf "$d"
   echo "bd-guard selftest: ok"

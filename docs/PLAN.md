@@ -16,6 +16,13 @@ router (**no provider spine** - model choice is the host's; we may *advise* tier
 do **not** copy forge's `frugal`) · a cross-project brain (**no GBrain** - gstack's memory daemon deleted
 users' working trees; project-scoped only).
 
+The practices are the product; they are still skills, not a framework. Two optional daemons ride along as
+**sourced capabilities, not the spine** - `browse/` (headless-browser QA) and `ios-qa/` (on-device iOS QA),
+vendored from gstack under MIT and compiled only on first need (D14). A repo that never runs a browser or
+device check never touches them, and the skill layer degrades to the `/tool-sourcing` path when they are
+absent - so "not a framework" holds: the daemons are tools the practices reach for, never a runtime you
+install instead of your own.
+
 ## 2. Principles
 
 1. **Agent-agnostic** - `SKILL.md` (agentskills.io) is the portable unit; no lock to one model/harness.

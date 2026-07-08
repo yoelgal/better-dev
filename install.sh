@@ -113,7 +113,7 @@ host_apply() {
       [ "$dry" = 1 ] || mkdir -p "$dir"
     else
       echo "  $bd_host_display: skills dir $dir absent - this host's convention is unverified; create it (or confirm the real path) and re-run. Not scaffolding blind."
-      installed=$((installed + 1))
+      declined=$((declined + 1))
       return 0
     fi
   fi
@@ -199,6 +199,7 @@ host_verify() {
 }
 
 installed=0
+declined=0
 verify_fail=0
 [ "$MODE" = list ] && echo "== better-dev install state =="
 for h in $hosts; do
@@ -233,8 +234,12 @@ fi
 
 echo
 if [ "$installed" -eq 0 ]; then
-  echo "install: no supported host found (no CLI on PATH and no host home dir; adapters available:$avail)."
-  echo "  Re-run with --host <name> to install for one anyway."
+  if [ "$declined" -gt 0 ]; then
+    echo "install: nothing linked - $declined host(s) declined for an absent skills dir (named above). Create the real dir or pass --host, then re-run."
+  else
+    echo "install: no supported host found (no CLI on PATH and no host home dir; adapters available:$avail)."
+    echo "  Re-run with --host <name> to install for one anyway."
+  fi
   exit 0
 fi
 

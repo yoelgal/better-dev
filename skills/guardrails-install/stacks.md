@@ -93,17 +93,22 @@ scanner the repo already has, else a grep over the staged diff for high-signal s
 # prefer a real scanner if the repo carries one:
 #   gitleaks protect --staged   |   trufflehog git file://. --since-commit HEAD --only-verified   |   detect-secrets-hook
 # otherwise a stack-agnostic grep over the staged diff:
-if git diff --cached -U0 | grep -inE '(api[_-]?key|secret|password|token)[[:space:]]*[:=][[:space:]]*["'\'']?[A-Za-z0-9+/_.-]{12,}["'\'']?[[:space:],;]*$|-----BEGIN [A-Z ]*PRIVATE KEY-----|AKIA[0-9A-Z]{16}' ; then
+if git diff --cached -U0 | grep -inE '[a-z0-9_]*(api[_-]?key|secret|password|token)[a-z0-9_]*[[:space:]]*[:=][[:space:]]*["'\'']?[A-Za-z0-9+/_=-]{12,}["'\'']?|-----BEGIN [A-Z ]*PRIVATE KEY-----|AKIA[0-9A-Z]{16}' ; then
   echo "guardrails: possible secret in staged diff (line above) - remove it, or rotate the key if already pushed" >&2
   exit 1
 fi
 ```
 
 It matches on value shape: an assignment of a 12-plus-character literal to a key-named variable, a PEM
-block, or an AWS key id. A type declaration or header-parsing line (`session_token: string;`,
-`auth.slice('Bearer '.length)`) does not fire - code that names tokens is not a credential; code that
-carries one is. A hit blocks the commit, not the file - unstage it or, if the secret already reached a
-remote, rotate the key (a committed secret is compromised; deleting the line is not enough).
+block, or an AWS key id. The key word may sit inside a compound identifier (`SECRET_KEY`,
+`AWS_SECRET_ACCESS_KEY`), and the value class covers base64 padding (`==`), so a padded key still fires;
+there is no end-of-line anchor, so an inline secret with a trailing comment fires too. It does not fire on
+a type declaration (`session_token: string;` - the value is too short) or a member-access reference
+(`token: session.token,`, `auth.slice('Bearer '.length)` - a dotted identifier is a reference, and a dot
+is not key material here, so the run is under the length floor). Code that names tokens is not a
+credential; code that carries one is. A hit blocks the commit, not the file - unstage it or, if the secret
+already reached a remote, rotate the key (a committed secret is compromised; deleting the line is not
+enough).
 
 ## CI check
 
