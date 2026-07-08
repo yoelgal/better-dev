@@ -50,6 +50,9 @@ review-before-DONE gate over the current diff, and re-enter here once a clean ve
 record. Review is never run from here; this skill only checks that it happened. That is what keeps the PR
 stage to CI and end-to-end verification, and keeps an open PR from ever waiting on a review.
 
+One check rides beside the verdict: `.better-dev/bin/bd-mem ledger check-approval <work-item>` exits 0 - a
+PR never opens on a contract whose approval gate re-opened.
+
 ## 1. Open or refresh the PR
 
 Push the worktree branch, then open the PR into the integration branch, or refresh it if one already
@@ -104,8 +107,9 @@ surface table, the mandatory probe past the happy path, the SKIP-don't-fabricate
 reporting gate (every reported claim points to a session tool result or is marked unverified), and the
 PASS/FAIL/BLOCKED/SKIP verdict rubric are in `verify-runtime.md` - read it before settling any criterion.
 Where the change branches into distinct user flows, walk the ones this diff reaches, not one happy path. A
-criterion with no runtime surface (docs-only, a type-only change) settles **SKIP** with the reason, never a
-re-run of the suite to fill the space. A criterion that genuinely can't be driven from here is unproven,
+criterion with no runtime surface (docs-only, a type-only change) settles **SKIP** with the reason (SKIP
+grades the runtime probe only - docs currency was the loop's docs sweep, already settled before the review
+verdict), never a re-run of the suite to fill the space. A criterion that genuinely can't be driven from here is unproven,
 and unproven is not green - it settles `NEEDS_INPUT`, naming what has to run, not a guess that it would pass.
 
 ## 4. Drive red back to the loop - never patch it here
@@ -189,8 +193,25 @@ that already landed:
 .better-dev/bin/bd-mem ledger put <work-item> pr.md - <<<'PR #<n> → <state>: <one line>'
 ```
 
-On merge or close, run the close-out: record the one keyed lesson this PR's verification taught
-(`.better-dev/bin/bd-mem learn "<lesson>" <confidence> "<key>"`) or write an explicit `no durable lesson`
-line - an event of this run ("PR merged cleanly") is a receipt, not a lesson. Promote to a rule
-(`bd-mem remember`) only per the confidence law in `bd-mem`. When you revise this skill, follow
-`/writing-skills`.
+On merge or close, run the close-out - four lines, each written explicitly. The negative form is a line,
+never an omission; a close-out with a line missing is unfinished:
+
+- **Lesson** - the one keyed lesson this PR's verification taught (`.better-dev/bin/bd-mem learn
+  "<lesson>" <confidence> "<key>"`), or `no durable lesson: <why>` - an event of this run ("PR merged
+  cleanly") is a receipt, not a lesson. Promote to a rule (`bd-mem remember`) only per the confidence
+  law in `bd-mem`.
+- **Shared-behavior change** - if the diff renamed a pattern, altered a default others rely on, or added
+  a step every future change in this area must take, record the convention as a rule
+  (`.better-dev/bin/bd-mem remember "<rule>"`) and add one heads-up line to the PR body's brief naming
+  the behavior that changed - the rule reaches the next session, the PR line reaches the colleague.
+  Otherwise write `no shared-behavior change`.
+- **Originating report** - when the contract traces to an issue or ticket, the PR body carries its
+  closing keyword (`Fixes #<n>`) before merge, and the observation that settled the criterion (the
+  captured symptom-gone or feature-works line) is posted to that issue rather than letting the auto-close
+  speak for itself. Otherwise write `no originating report`. Any message beyond the repo's own issue - a
+  customer email, a status page - is the operator's to send; hand them the observation line.
+- **Parked follow-ups** - each follow-up or out-of-scope line the contract parked gets a disposition:
+  `filed: #<n>`, `handed to operator: <line>`, or `dropped: <one-line reason>`. A contract with none
+  parked writes `no parked follow-ups`.
+
+When you revise this skill, follow `/writing-skills`.
