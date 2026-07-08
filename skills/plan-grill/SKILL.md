@@ -55,6 +55,15 @@ fails when skipped. "Not worth building" is a valid outcome here: if no option's
 baseline or the cost plainly outweighs the payoff, record it with its one-line reason so the user
 knows it was weighed, and stop rather than manufacturing a design to justify the work.
 
+Two arrival shapes get named before any option is sketched. An intent that arrives as a fix or an
+upgrade to an existing mechanism gets the requirement interrogated before the implementation: name
+the requirement the mechanism serves, and when the honest answer is a case that doesn't exist, the
+plan is to cut the requirement, not to build its code better. And an intent that arrives just after
+the previous goal was reached - a rewrite or a vision upgrade of a thing that only just started
+working - gets the growth named out loud and one question asked: which user does the expansion
+serve? A rewrite of a working product rests on a user-visible justification; reaching the goal is
+not, by itself, a reason to raise it.
+
 If the feature has UI surface and its visual direction isn't settled, run `/design-brief` before the
 grill closes - the design read and system choice belong in the plan, not discovered mid-implementation.
 

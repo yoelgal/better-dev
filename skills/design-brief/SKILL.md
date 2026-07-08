@@ -24,6 +24,12 @@ proposing candidate directions to choose among, generate them as *verbalized can
 stated probability, at least one tail option under ~0.10 (the shape in `/orchestrating-agents`) - the
 default-template pull is mode collapse, and asking for the distribution is what escapes it.
 
+When the read is blank, or an existing render reads as generic, don't reason from an empty page:
+source a specific admired reference - a real product this brief's audience would call premium - and
+diff against it. Adopt its layout, structure, and information hierarchy; re-skin them in this
+project's own palette and assets. Steal the structure and twist the skin - never clone the surface,
+never invent the structure from nothing.
+
 ## 2. A real system, or an honestly-labeled direction
 
 There are two honest states. Pick one and be plain about which:
@@ -70,6 +76,21 @@ the contract as first-class done-criteria (`/plan-grill` step 4).
 screenshot is the artifact, not the verdict - a captured PNG nobody audited is not a pass. A visual
 criterion is proven the same way any end-to-end criterion is: the render is driven and audited via
 `/browser-capability`, never asserted from the author's eye.
+
+Four method rules travel to any aesthetic, and each enters the contract as a checkable criterion,
+not advice:
+
+- **Real assets or none.** An unrequested placeholder - a stock gradient, lorem copy, a stand-in
+  icon or hero - is a defect, not a stopgap. Generate or source the real asset now, in its final
+  format and aspect ratio, or design honestly for its absence.
+- **Art is never distorted.** The container adapts to the asset, never the asset to the container -
+  no cropped or stretched hero. A loading transition is invisible, or the element is absent until
+  ready; nothing beats a flicker.
+- **Mobile is a dedicated pass, not a resize check.** Every visual criterion carries a
+  mobile-viewport twin, driven and captured like its desktop one; on mobile, omitting a heavy
+  ornament entirely beats degrading it.
+- **Motion is earned and bounded.** An animation signals a state change, plays once, and stays
+  subtle; motion with no state to signal is decoration the criterion refuses.
 
 ## 5. Tell-bans - seed list plus per-project additions
 

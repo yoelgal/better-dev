@@ -28,6 +28,12 @@ is unresolved.
   one-way, beside its rollback path or the sentence "none - irreversible".
 - State the worst-case blast radius in files and systems if the plan's central assumption is
   wrong.
+- Restate the flow the feature serves in plain words, a few sentences, and weigh the plan against
+  it - a plan that plainly outweighs its flow's description is over-built, and the excess names the
+  cut.
+- When you can't tell whether the design is over-built, diff it against the closest respected prior
+  art - more complex than the reference with no nameable reason means simplify toward the
+  reference's shape.
 
 ## Design - what does the user see (gated: UI surface)
 
