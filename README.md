@@ -99,7 +99,7 @@ shared skills are never rewritten to encode your preference.
 | **Isolate & drive** | `worktree-branching` · `autonomous-loop` · `orchestrating-agents` · `review` · `security-pass` |
 | **Ship** | `pr-and-verify` · `release-promotion` |
 | **Self-improve** | `tool-sourcing` · `self-extension` |
-| **Sourced capabilities** | `codebase-map` (structural orientation) · `browser-capability` (UI proof) |
+| **Sourced capabilities** | `codebase-map` (structural orientation) · `browser-capability` (UI proof, owned daemon in `browse/`) · `ios-capability` (on-device proof, daemon in `ios-qa/`) |
 | **Foundations** | `writing-skills` · `packaging` · `bootstrap-hooks` · `overrides` · `uninstall` |
 
 ## How it installs
@@ -122,12 +122,13 @@ Skills you later mint with `/self-extension` are **repo-scoped** by default - co
 
 | Path | What |
 |------|------|
-| `skills/` | the 21 practices (agentskills.io: `name` + `description`, progressive disclosure) |
-| `scripts/` | the `bd-*` spine - `bd-mem` (memory + ledger), `bd-block`, `bd-dispatch`, `bd-worktree-guard`, `bd-review-package`, `bd-skill-stage`, `bd-link`, `bd-package-check` |
-| `hooks/` · `hosts/` | SessionStart / SubagentStart injection · per-host install adapters |
+| `skills/` | the 24 practices (agentskills.io: `name` + `description`, progressive disclosure) |
+| `scripts/` | the `bd-*` spine - `bd-mem` (memory + ledger), `bd-block`, `bd-dispatch`, `bd-guard` (enforced guardrails), `bd-worktree-guard`, `bd-review-package`, `bd-skill-stage`, `bd-link`, `bd-package-check`, `bd-uninstall` |
+| `hooks/` · `hosts/` | session awareness + PreToolUse guard hooks · per-host install adapters (declarative, enumerated) |
+| `browse/` · `ios-qa/` | vendored daemons (gstack, MIT - see `NOTICE`): headless-browser QA · on-device iOS QA; compiled on first need, never in CI |
 | `install.sh` · `BOOTSTRAP.md` · `.claude-plugin/` | installer · one-paste bootstrap · Claude Code plugin manifest |
 | [`docs/`](docs/) · [`NOTICE`](NOTICE) | design plan + decisions · attribution |
 
 ---
 
-<p align="center"><sub>MIT · built by reimplementing patterns from ~100 sources (see <a href="NOTICE">NOTICE</a>), no code redistributed</sub></p>
+<p align="center"><sub>MIT · built by reimplementing patterns from ~100 sources (see <a href="NOTICE">NOTICE</a>); one exception by design: the optional <code>browse/</code> and <code>ios-qa/</code> daemons vendor gstack's MIT code, attributed in NOTICE</sub></p>

@@ -163,6 +163,35 @@ before its commits push, so an open PR never waits on a reviewer.
 - **Licensing note**: the two 2026-07 paper-styled one-pagers ("Fable Mode"; "Running Fable 5 Without
   Overpaying") are personal-use-only like LOOPS.md - ideas reimplemented, never their sentences.
 
+## D14 - gstack harvest (2026-07-07/08; four rulings user-ratified, landing user-reviewed)
+Full rulings R1-R15 in `raw/synthesis/2026-07-07-gstack-harvest/master-plan.md`; the load-bearing ones:
+- **Vendored daemons (licensing exception on record)**: `browse/` and `ios-qa/` vendor gstack's MIT code
+  substantially verbatim (user-ratified over a separate repo) - upstream license + commit pin per dir,
+  `check-upstream.sh` red on security-file drift, compiled on first need, never CI-gated. New thin skill
+  `ios-capability`; `browser-capability` runs a three-rung preference order (override > owned daemon >
+  sourced). The reimplement-first default is unchanged for everything else.
+- **Enforced guardrails**: `bd-guard` + two PreToolUse hook entries turn recorded safety policy into
+  enforcement where the host has hooks; `safety-enforcement: hook | prose` recorded by guardrails-install;
+  worktree-branching is the single boundary writer; `bd-guard off` is the escape hatch. The pre-commit
+  secret scan requires a value shape, case-insensitive (precision fix, user-approved).
+- **One report trailer** (`STATUS`/`VERIFY`/`COMMITS`/`BLOCKER`/`CONCERNS`/`QUESTIONS`, `STATUS` = D1
+  states) owned by orchestrating-agents; review's severity counts are a "counts block", never a trailer.
+- **Blast radius = the fix-scope contract line** (dir / file list / repo-wide + reason, written after root
+  cause); no rating enum; `safety-scope` stays the only recorded number.
+- **D2 amendments**: lessons carry `ts` + `source` (`observed | user-stated | inferred`); recall is
+  latest-wins-per-key with provenance; `bd-mem prune --apply` may rewrite `learnings.jsonl` only at a
+  release checkpoint, operator-confirmed, under lock. writing-skills owns the close-out disposition.
+- **Vocabulary**: soak (pre-promote) / deploy verify / post-deploy watch ("canary" retired); hyphenated
+  `deploy-*` rules; a "lens" is a named perspective with a checkable question block; second-layer typed
+  enums are record markers, never loop states.
+- **Host roster**: claude/codex/hermes shipped (premise-verified); adapters enumerated from `hosts/*`
+  with `bd_host_dir_policy`; the rest wait on verification (issue #9).
+- **Named non-goals (examined, rejected)**: tournament/best-of-N builds with self-scored winners; numeric
+  1-10 confidence axes; per-project trend DBs and health-score dashboards; model overlays and any
+  generated-skill pipeline; `WIP:` checkpoint commits; engineer-celebrity taste personas; cross-project
+  memory; gstack's duplicated mega-preamble. Deferred to issues: eval harness (#6), cross-model second
+  opinion (#7), remaining hosts (#9), self-extension quarantine lifecycle (#10).
+
 ## Tracer-bullet findings (2026-07-03, on the papers.town clone) - bind Phase 1
 Ran `onboard` + one feature slice → staging end-to-end on the real clone (locally, no push). Proven, plus:
 1. **Helpers → `.better-dev/bin/`** (bare `scripts/` collides with the project's own - see D0 install contract).
@@ -189,7 +218,8 @@ Build by **reimplementing patterns from understanding**. Ideas, methods, and sys
 copyrightable, so reimplemented components are our original work and owe **no attribution**. Copy verbatim
 only when a snippet is too trivial to bother reimplementing - and minimize even that. Order of preference
 per source: **reimplement > adapt > verbatim**.
-- `NOTICE` credits **only** expression actually copied (currently ~none); pattern inspiration is courtesy, not required.
+- `NOTICE` credits **only** expression actually copied (today: the vendored `browse/` and `ios-qa/`
+  daemons plus bd-guard's adapted pattern set - the D14 exception); pattern inspiration is courtesy, not required.
 - Rewriting someone's file with an AI ≠ making it ours - that's a derivative work. We reimplement from the
   *idea*, not by paraphrasing their file.
 - **Never redistribute** `karpathy:LOOPS.md` (personal-use) - reimplement, never quote.

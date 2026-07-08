@@ -10,7 +10,7 @@ for your host, not vendored here). Say what you want; the right skill enters, an
 | "X is broken / failing / slow", "why is prod down" | `/diagnose` | -> `/autonomous-loop` -> `/pr-and-verify` |
 | "let's build an app that does Y", a new project or epic | `/groundwork` | sets the foundation, then per-item front-ends |
 | "ship it", "open a PR", "let's land this" | `/pr-and-verify` | -> `/release-promotion` on green |
-| "release this", "promote to main", "hotfix prod" | `/release-promotion` | tags and double-merges the hotfix |
+| "release this", "did the deploy land", "is prod healthy" | `/release-promotion` | tags, verifies the release live, double-merges the hotfix |
 | "make it look good", "design the page" | `/design-brief` | -> `/plan-grill` or the loop |
 | "is this safe", a security pass on a risky diff | `/security-pass` | composed by `/review` automatically |
 | "is there a tool or skill for X" | `/tool-sourcing` | -> `/self-extension` only if discovery is empty |

@@ -12,8 +12,8 @@ item's contract carries a criterion like that and the agent has no browser to dr
 *tool*, not a missing line of code.
 
 This skill is one concrete instance of a general practice: on a capability gap, source the tool rather than
-hand-roll it. Needing a browser for web QA is the same shape as needing an iOS-simulator harness for a mobile
-app or a load generator for a perf check - name the gap, source a tool that fills it, vet it, and wire a small
+hand-roll it. Needing a browser for web QA is the same shape as needing an on-device iOS harness for a mobile
+app (`/ios-capability` is that instance) or a load generator for a perf check - name the gap, source a tool that fills it, vet it, and wire a small
 how-to so the loop can run the check. The practice ships; the specific tool stays swappable.
 
 Read `.better-dev/overrides.md` first. A repo often already settles this - it may pin Playwright, a

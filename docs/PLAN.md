@@ -101,9 +101,12 @@ pointers to sibling `.md`**, never `@`-links; cross-skill deps as `/skill` prose
 Build by **reimplementing patterns from understanding**. Ideas/methods/designs aren't copyrightable →
 reimplemented components are original work, **owe no attribution**. Order of preference: **reimplement >
 adapt > verbatim**; minimize verbatim. Rewriting someone's file with an AI = a derivative work - reimplement
-from the *idea*, not by paraphrasing their file. `NOTICE` credits **only** expression actually copied
-(currently ~none). **Never redistribute** `karpathy:LOOPS.md` (personal-use). **Never copy** superpowers'
-"MUST/STOP" tone. See `NOTICE`, `LICENSE` (MIT, © 2026 Yoel Gal).
+from the *idea*, not by paraphrasing their file. `NOTICE` credits **only** expression actually copied.
+**One exception on record (2026-07-07, user-ratified, D14):** the `browse/` and `ios-qa/` daemons vendor
+gstack's MIT code substantially verbatim - infrastructure too large to reimplement without losing
+fidelity; attributed in `NOTICE`, upstream license and commit pin ride in each dir; the reimplement-first
+default is unchanged for everything else. **Never redistribute** `karpathy:LOOPS.md` (personal-use).
+**Never copy** superpowers' "MUST/STOP" tone. See `NOTICE`, `LICENSE` (MIT, © 2026 Yoel Gal).
 
 ## 10. Components → reimplement from (condensed; full detail in the harvest manifest, §14)
 
