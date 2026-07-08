@@ -33,9 +33,9 @@ pass. Each tell is something a screenshot or the markup can answer:
 18. A decorative CSS panel standing where the brief implies real imagery, and any image URL that
     does not resolve at render time.
 
-Imagery is also a criterion, not only a tell: when the brief implies imagery, imagery ships - zero
-images is a bug, not a design choice - and every referenced image URL resolves at render time; a
-guessed ID that 404s ships as a broken placeholder.
+Imagery is also a criterion, not only a tell: step 4's "Real assets or none" rule owns the
+placeholder ban; this audit adds the mechanical tail - every referenced image URL resolves at
+render time, and a guessed ID that 404s ships as a broken placeholder.
 
 ## The guessability test - two altitudes, both fail
 

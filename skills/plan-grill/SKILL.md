@@ -23,16 +23,13 @@ Gate: the intent arrives as relayed language - stakeholder feedback, user feedba
 a ticket quoting someone else ("make it simpler", "we need a chatbot", "users say X feels slow").
 First-person intent from the user at the keyboard skips this step in one line.
 
-Record the brief verbatim before restating it: the requester's exact words in quotes, with who said
-them, carried into the contract above its `## Problem` section. The specific word chosen is
-evidence the decode reads - "clunky" and "dated" are different problems - and a paraphrase destroys
-it. Then decode per `brief-decode.md`: the trigger event behind the adjective, written candidate
-meanings per subjective word, the outcome behind any named solution, and a draft problem sentence
-whose every number is a receipt or a `TBD(<owner>)` - never invented. The decode ends in one
-measurable problem sentence plus an in-scope and an out-of-scope line; those seed the contract's
-Problem, Goal, and Out-of-scope, and the trigger's factual claims become premises for step 1. A
-trigger event that turns out to be a defect routes to `/diagnose`; a decode that uncovers an epic
-routes to `/groundwork`.
+Record the brief verbatim before restating it - the requester's exact words in quotes, with who
+said them, carried into the contract above its `## Problem` section; the specific word chosen is
+evidence, and a paraphrase destroys it. Then run the six decode moves in `brief-decode.md`. The
+decode ends in one measurable problem sentence plus an in-scope and an out-of-scope line; those
+seed the contract's Problem, Goal, and Out-of-scope, and the trigger's factual claims become
+premises for step 1. A trigger event that turns out to be a defect routes to `/diagnose`; a decode
+that uncovers an epic routes to `/groundwork`.
 
 ## 1. Check the baseline before planning on it
 

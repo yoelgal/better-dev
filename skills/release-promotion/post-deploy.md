@@ -35,8 +35,8 @@ the host's monitor primitive, not a tight poll, with a 20-minute default budget
 
 ## Verify, depth keyed to what the release changed
 
-Where the release ships behind a feature flag (the contract, the PR body, or a recorded
-`deploy-flag` rule names one), the flag state is part of the verify: read the flag's actual state
+Where anything shows the release is flag-gated - the contract, the PR body, the diff, or a
+recorded `deploy-flag` rule - the flag state is part of the verify: read the flag's actual state
 before driving any surface, and drive the surface in the state users get. Record
 `flag: <name>=<state>` in the receipt. A release whose contract expected activation but whose flag
 reads off is a finding at the same severity as a failed check - the deploy landed, the feature

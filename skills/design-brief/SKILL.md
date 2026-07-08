@@ -20,7 +20,8 @@ and reinventing what the repo already settles is a finding.
 Decide the register next: this surface either *is* the product (marketing, landing, portfolio - the
 design is the message) or *serves* the product (app UI, dashboard, settings - the design is the tool).
 The registers carry opposite defaults for type, color, and motion, and opposite failure tests - a face
-surface fails when its look is guessable from the product category alone; a tool surface fails when a
+surface fails when its look is guessable from the product category alone (the same test
+`slop-and-checks.md` runs as the guessability test's first altitude - one check, cleared once); a tool surface fails when a
 user fluent in the category's best tools would pause at an off component. Record the register on the
 direction card; the tell audit in step 5 filters by it.
 
@@ -73,7 +74,7 @@ the token source; the contract lives in code, where it cannot drift from what sh
 A token set is pinned when the token source defines a value for each slot: the font or fonts and the
 weights in use, a type scale with a named base size, color roles named by function (such as subtle /
 default / strong / border / selected-background), the spacing scale, the radius values, and the icon
-set with its stroke width. Around fifteen tokens covers a real product. A slot with no value is an
+set with its stroke width. A slot with no value is an
 open decision the next feature will improvise - walk the slots when recording the set, and an empty
 slot is a finding, not a default. A pinned font or icon set also names its license, and the license
 permits the deployment target; an asset whose license forbids the target is a finding at pin time,

@@ -83,7 +83,8 @@ rather than moving the goalposts), plus the repo's high-consequence path denylis
 authored: a later pass may make it pass, never weaken it. Pin it as it joins: re-emit the pinned list with
 the new row added - `ledger put` replaces the file, so write the existing rows plus the new one
 (`(.better-dev/bin/bd-mem ledger read <work-item> protect.hashes 2>/dev/null; shasum <test-file>) |
-.better-dev/bin/bd-mem ledger put <work-item> protect.hashes -`). At settle,
+.better-dev/bin/bd-mem ledger put <work-item> protect.hashes -`); a justified re-pin replaces that
+path's existing row rather than adding a second one, so each pinned path holds one current hash. At settle,
 re-hash the pinned set: a pinned file whose hash moved is re-pinned only by a pass whose receipt records
 the red-then-green that justified the edit; a moved hash with no such receipt settles `NEEDS_INPUT`
 naming the file - the goalpost-move this set exists to stop, surfaced as a comparison instead of trusted

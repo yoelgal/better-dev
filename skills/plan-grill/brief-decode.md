@@ -14,11 +14,10 @@ contract or the receipts - it keeps no side ledger.
   check instead of picking one silently. Check: the decode names one confirmed trigger event or the
   candidate triggers as listed premises.
 - **Candidate meanings per vague word.** For each subjective word, write two to three concrete
-  readings down where they can be pointed at. Type each reading fork by the key step 3 owns: a
-  must-ask fork consumes one of the capped questions below, or goes `NEEDS_INPUT` if it blocks and
-  no answer comes; a picked fork lands as a named assumption in the contract, with the readings
-  seen in the receipts. Check: every subjective word in the quoted brief has either a named
-  assumption or a question tied to it.
+  readings down where they can be pointed at. Type each reading fork by the key step 3 owns - its
+  dispositions apply unchanged; a must-ask fork consumes one of the capped questions below, and the
+  readings seen land in the receipts. Check: every subjective word in the quoted brief has either a
+  named assumption or a question tied to it.
 - **Smuggled-solution translation.** A brief that names an artifact ("chatbot", "dashboard",
   "redesign") is a solution dressed as a requirement: write two to three candidate outcomes it
   could serve, each with its cheapest build in one line. The picked outcome - not the named

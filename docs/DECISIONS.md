@@ -192,8 +192,8 @@ Full rulings R1-R15 in `raw/synthesis/2026-07-07-gstack-harvest/master-plan.md`;
   memory; gstack's duplicated mega-preamble. Deferred to issues: eval harness (#6), cross-model second
   opinion (#7), remaining hosts (#9), self-extension quarantine lifecycle (#10).
 
-## D15 - links-harvest additions (2026-07-08; rulings user-ratified, full plan in
-`raw/synthesis/2026-07-08-links-harvest/master-plan.md`)
+## D15 - links-harvest additions (2026-07-08; rulings user-ratified)
+Full plan: `raw/synthesis/2026-07-08-links-harvest/master-plan.md`.
 - **Fixer continuity (user-ratified)**: a fix round reuses the implementing worker's live session -
   it already holds the files, suite state, and cache; independence binds the re-reviewer, never the
   fixer. Fresh fixer on a dead session (re-pin tier + constraints) or when the worker defended the
@@ -206,8 +206,8 @@ Full rulings R1-R15 in `raw/synthesis/2026-07-07-gstack-harvest/master-plan.md`;
   capture into the contract, trigger-event-not-adjective, fork-typed candidate meanings,
   smuggled-solution translation, TBD(owner) over invented numbers, capped question batch beside a
   draft). NOT a skill - D12's feature-ideation precedent applies; sibling `brief-decode.md`.
-- **One graded contradiction rule** (autonomous-loop owns): tool results contradict the BRIEF ->
-  surface a question naming both sides; a receipt contradicts a CONTRACT criterion -> gap stop,
+- **One graded contradiction rule** (autonomous-loop owns): tool results contradict the BRIEF →
+  surface a question naming both sides; a receipt contradicts a CONTRACT criterion → gap stop,
   settle `NEEDS_INPUT` with {contract line, contradiction, re-runnable evidence} - never drive a
   criterion green that a receipt shows is wrong. `DONE_WITH_CONCERNS` never absorbs a wrong target.
 - **Contract-pin call sites**: `check-approval` re-runs before settling DONE/DONE_WITH_CONCERNS and
