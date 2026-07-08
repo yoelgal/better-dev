@@ -192,6 +192,57 @@ Full rulings R1-R15 in `raw/synthesis/2026-07-07-gstack-harvest/master-plan.md`;
   memory; gstack's duplicated mega-preamble. Deferred to issues: eval harness (#6), cross-model second
   opinion (#7), remaining hosts (#9), self-extension quarantine lifecycle (#10).
 
+## D15 - links-harvest additions (2026-07-08; rulings user-ratified, full plan in
+`raw/synthesis/2026-07-08-links-harvest/master-plan.md`)
+- **Fixer continuity (user-ratified)**: a fix round reuses the implementing worker's live session -
+  it already holds the files, suite state, and cache; independence binds the re-reviewer, never the
+  fixer. Fresh fixer on a dead session (re-pin tier + constraints) or when the worker defended the
+  defect as by-design. Amends the §5-loop fresh-worker-per-task line; owned by orchestrating-agents.
+- **Both tiering directions**: tiers.md names delegate-down (orchestrator) AND escalate-up (a
+  cheaper session buys a bounded top-tier consult at fixed moments: after orientation before the
+  first substantive write, before settling done, on a stuck signal; output-capped; deliverable
+  durable first). A non-top-tier session consulting up is the sanctioned move for top-band stages.
+- **Brief-decode entry step**: plan-grill step 0 decodes somebody-else's-words briefs (verbatim
+  capture into the contract, trigger-event-not-adjective, fork-typed candidate meanings,
+  smuggled-solution translation, TBD(owner) over invented numbers, capped question batch beside a
+  draft). NOT a skill - D12's feature-ideation precedent applies; sibling `brief-decode.md`.
+- **One graded contradiction rule** (autonomous-loop owns): tool results contradict the BRIEF ->
+  surface a question naming both sides; a receipt contradicts a CONTRACT criterion -> gap stop,
+  settle `NEEDS_INPUT` with {contract line, contradiction, re-runnable evidence} - never drive a
+  criterion green that a receipt shows is wrong. `DONE_WITH_CONCERNS` never absorbs a wrong target.
+- **Contract-pin call sites**: `check-approval` re-runs before settling DONE/DONE_WITH_CONCERNS and
+  as a `/pr-and-verify` entry precondition (the pin existed; only entry ran it). Loop-authored
+  tests hash-pin into the ledger; a moved hash without a justifying red-then-green receipt settles
+  `NEEDS_INPUT`. Every authored test shows a recorded red or one negative control before `DONE`.
+- **Docs move with the diff** (autonomous-loop, at first green - the one legal edit point, since
+  the review verdict is sha-keyed): delta-bounded sweep of tracked docs, split by "could this
+  correction be wrong while the diff is right?"; factual fixes land, risky edits become PR-body
+  concerns; new surface with no doc hit is a named concern; never generates. Event, never cadence.
+- **Post-merge outward close-out** (pr-and-verify): four typed lines - lesson, shared-behavior
+  change, originating report (`Fixes #n` + posted observation), parked-follow-up dispositions -
+  each with an explicit negative form. Flag state is a deploy-verify target; the standing watch is
+  offered (`standing-watch: offered | armed | declined`), never scheduled.
+- **Reasoning-exposure rule (verified 2026-07-08)**: briefs never request raw chain-of-thought; on
+  some hosts the request is refused and silently answered by a substitute model - on a quality
+  drop, verify which model answered. Degraded fan-out runs disclose mode in the report's first line.
+- **Design hardening**: token-set completeness slots (form only - values are never shipped, and the
+  operator's personal taste stays personal per the no-persona ruling); pinned fonts/icons carry a
+  license-portability check; brand/product register split with per-register slop tests; two-altitude
+  guessability; existing-system read before direction; iteration never expands the token set
+  silently; identity lock + family pass on variants.
+- **Authoring standard**: least-privilege `allowed-tools` procedure (advise-only skills grant no
+  Write/Edit); pinned output shapes are shown once as a filled example. Shown-format lint recorded
+  as a `bd-skill-stage` candidate, not built.
+- **Named non-goals (examined, rejected)**: pdd's freeze pipeline, skeleton emission, obligation
+  graph, typed discharge enum, reconstruct-and-diff review, mutation testing proper, gap-stop
+  skill; /fableloso and /brief-to-problem as skills; announce slice (tag + recorded release-notes
+  rule carry it; user-ratified drop); impeccable's command vocabulary, slop-detector skill (source
+  via /tool-sourcing), DESIGN.md parallel contract, per-model conditional blocks (model-overlays
+  non-goal, D14), shipped font/palette bans; Diataxis quadrants, diagram-drift rule,
+  CHANGELOG/VERSION machinery, docs-sync skill, doc-health table; 50-line SKILL.md cap; `paths`
+  frontmatter (unverified, host-specific); week-later log scheduler (D12); Carmack pride persona
+  (D14); plan-time press-release step.
+
 ## Tracer-bullet findings (2026-07-03, on the papers.town clone) - bind Phase 1
 Ran `onboard` + one feature slice → staging end-to-end on the real clone (locally, no push). Proven, plus:
 1. **Helpers → `.better-dev/bin/`** (bare `scripts/` collides with the project's own - see D0 install contract).
