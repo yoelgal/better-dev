@@ -28,6 +28,34 @@
           }
         ]
       }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/bd-guard\" check-bash",
+            "commandWindows": "if (Get-Command bash -ErrorAction SilentlyContinue) { bash \"$env:CLAUDE_PLUGIN_ROOT\\scripts\\bd-guard\" check-bash }",
+            "async": false,
+            "timeout": 5,
+            "statusMessage": "Checking guardrails..."
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/bd-guard\" check-edit",
+            "commandWindows": "if (Get-Command bash -ErrorAction SilentlyContinue) { bash \"$env:CLAUDE_PLUGIN_ROOT\\scripts\\bd-guard\" check-edit }",
+            "async": false,
+            "timeout": 5,
+            "statusMessage": "Checking guardrails..."
+          }
+        ]
+      }
     ]
   }
 }

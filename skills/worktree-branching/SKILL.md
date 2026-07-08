@@ -131,6 +131,21 @@ printf 'branch: %s\nbase: %s\nworktree: %s\n' "$branch" "$base" "$(cd "$path" &&
 `bd-mem` resolves the primary checkout's ledger for you (the same path from any worktree), so there's
 no hand-rolled `git-common-dir` math to get subtly wrong.
 
+Then set the mechanical edit boundary. This skill is the boundary's one writer - it scopes the new
+worktree at creation, and the loop only verifies the boundary is set, never re-sets it:
+
+```bash
+.better-dev/bin/bd-guard scope "$(cd "$path" && pwd -P)" --ttl 0
+```
+
+The state lives in the worktree's own git dir (`.git/worktrees/<name>/bd-scope`), which is what makes
+the auto-activation survive the handoff interlock below: the boundary is per-target-worktree, not
+per-session, so the session that picks up the handoff starts already bounded to its own tree, and
+parallel worktrees never share a boundary. Where no enforcement hook is wired
+(`.better-dev/bin/bd-mem recall "safety-enforcement"` says prose) the state is inert - write it anyway,
+so a later hook install starts enforcing without a re-setup. If the boundary ever blocks legitimate
+work, `.better-dev/bin/bd-guard off` lifts it in one command.
+
 Now the interlock. When this skill **created** a new worktree, the work lives there - but the agent
 cannot move its own harness session into that directory. So it hands off and stops rather than
 pretending to continue:

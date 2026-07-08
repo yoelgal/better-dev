@@ -34,6 +34,22 @@ de-duplicating is why the scripts branch to emit exactly one, rather than emitti
 - **Single-pass JSON escape.** Each `${s//old/new}` is one C-level pass - fast enough to run on every
   session start without a perceptible delay.
 
+## Porting the enforcement hooks
+
+The awareness hooks inject a note; the enforcement pair (`bd-guard check-bash`, `bd-guard check-edit`)
+vetoes or asks before a tool runs, so a host earns them only if it exposes a pre-tool-execution hook
+that can return a deny/ask decision. If it does: register `check-bash` on the Bash-equivalent tool and
+`check-edit` on the edit/write tools, then confirm the host's decision envelope - `bd-guard` emits
+Claude Code's nested `hookSpecificOutput.{permissionDecision, permissionDecisionReason}` shape, and a
+host that reads a different field ignores the decision without an error (the same silent-failure trap
+as the `SubagentStart` shape above). Add the host's envelope as a branch in the script's `emit_decision`
+and prove both decisions land: pipe one destructive fixture through `check-bash` and one out-of-boundary
+edit through `check-edit`, and confirm the host asks and denies rather than proceeding.
+
+A host with no pre-execution hook gets prose policy: record it
+(`.better-dev/bin/bd-mem remember "safety-enforcement: prose"`) and say so - a named coverage limit,
+not a failure. The loop's escalation discipline carries the same policy alone there.
+
 ## Adding a subagent hook for another host
 
 A host earns per-worker re-injection only if it exposes a subagent-spawn hook. If it does: register a
