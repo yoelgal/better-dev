@@ -283,8 +283,14 @@ selftest() {
   fail() { echo "bd-guard selftest FAIL: $1" >&2; exit 1; }
   jbash() { printf '{"tool_input":{"command":"%s"}}' "$1"; }
   jedit() { printf '{"tool_input":{"file_path":"%s"}}' "$1"; }
-  local d repo wt out sfile
-  d="$(cd "$(mktemp -d)" && pwd -P)"   # physical path: scope/normalize record resolved paths
+  local d repo wt out sfile base
+  # The fixture must sit outside two things at once: the temp allowlist (check-edit always-allows /tmp,
+  # /private/tmp, and $TMPDIR, so a fixture there makes every boundary assertion short-circuit to allow -
+  # Linux `mktemp -d` lands under /tmp), AND any real git repo carrying .better-dev (else the no-scaffold
+  # cases resolve to the host repo's own .better-dev and fire). ~/.cache is neither: not an allowlisted
+  # temp root, not a versioned tree. mktemp inside it keeps the run unique and self-cleaning.
+  base="${XDG_CACHE_HOME:-$HOME/.cache}"; mkdir -p "$base"
+  d="$(cd "$(mktemp -d "$base/bd-guard-selftest.XXXXXX")" && pwd -P)"
 
   # Fixture: a git repo carrying .better-dev, plus a linked worktree.
   repo="$d/repo"
