@@ -205,11 +205,16 @@ anything. `/pr-and-verify`'s DONE state owns the full merge condition; an unset 
 merge for the operator.
 
 Where `auto-on-green` is recorded and the host has a permission config, wire the allowance so the
-merge command actually runs without a prompt or classifier at the moment it is earned: on the Claude
-family that is the merge command in the project's `.claude/settings.local.json` allow list (a
-gitignored personal grant - `/worktree-branching` mirrors it into fresh worktrees; propose the write,
-never add it silently). A host with no permission config needs no wiring - the recorded rule is the
-whole allowance, and the host's own approval flow stays whatever it is.
+merge command actually runs without a prompt at the moment it is earned: on the Claude family that is
+the merge command in the project's `.claude/settings.local.json` allow list (a gitignored personal
+grant - `/worktree-branching` mirrors it into fresh worktrees). A permission-widening write is judged
+by the host's action classifier on the tool call in front of it; consent given mid-batch, several
+calls earlier, does not travel. So the grant is its own question at a **turn boundary**: finish
+everything else, ask, and write only on the operator's direct reply - that adjacent message is the
+consent a classifier can see. A denial that still lands is the host working, not an error: hand over
+a paste-ready snippet (offered to the clipboard where the host has one) as the fallback, never as the
+first resort. A host with no permission config needs no wiring - the recorded rule is the whole
+allowance, and the host's own approval flow stays whatever it is.
 
 Two more durable safety rules travel with the policy - the *why* behind the denylist lives in
 `/security-pass`, not here; these are the standing rules a green check does not by itself satisfy:
@@ -318,6 +323,13 @@ Two disciplines the hook cannot see stay with the loop and `/security-pass`, not
 irreversible side effect (a remote delete, a prod write, a data drop) is confirmed as that specific
 action before it runs - a prior approval does not extend to the next destructive op - and data loss
 that already happened is reported immediately, never quietly repaired.
+
+## Close honestly
+
+End with what was installed and, as the headline, what still waits on the operator's own hands (a
+permission grant, branch protection) - each with its exact move. "Armed", "ready", or "fully wired"
+is claimable only when that list is empty; a pending operator action leads the recap, never trails a
+victory banner.
 
 ## Composability
 

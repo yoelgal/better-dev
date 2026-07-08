@@ -53,6 +53,7 @@ in-session); do file ops yourself after confirming.
 A read-only sweep. Report each as *observed value + where*, then move on:
 
 ```bash
+setopt no_nomatch 2>/dev/null || true                     # zsh aborts on an unmatched glob; make it inert like sh
 ls CLAUDE.md AGENTS.md 2>/dev/null                        # entry file(s)
 grep -l '@AGENTS.md' CLAUDE.md 2>/dev/null                # which imports which
 ls -d .better-dev .better-dev/bin .mcp.json 2>/dev/null   # prior data scaffold? bin bridge? MCP?
@@ -130,6 +131,7 @@ skills; resolve them and let `bd-link` create the per-machine symlink (or a copy
 refresh):
 
 ```bash
+setopt no_nomatch 2>/dev/null || true   # zsh: an unmatched glob must fall through to the -f test, not abort the loop
 sd=""
 # Glob, don't name hosts: any adapter's convention leaves the marker at <skills-dir>/.better-dev-install.
 for m in "$HOME"/.*/skills/.better-dev-install "$HOME"/.config/*/skills/.better-dev-install; do
@@ -172,15 +174,21 @@ signals rest on something recorded rather than assumed.
 
 ### Phase 4 - Self-describe
 
-Write the discovery block into the **entry file** from Phase 1 with the shared writer - it replaces
-the block in place and never touches the operator's own text:
+Write the discovery block into the **entry file** from Phase 1, between the markers the shared writer
+uses - `<!-- BEGIN better-dev -->` / `<!-- END better-dev -->` - replacing any existing block in place
+and never touching the operator's own text.
+
+In an interactive session, make that write with the host's **file-edit tool**, not a shell pipe: an
+opaque heredoc piped into the always-loaded entry file is the exact shape a host's action classifier
+reads as instruction injection and denies, while a native edit shows a reviewable diff and lands. The
+shared writer stays the mechanism for non-interactive contexts (hooks, scripts, a re-run inside CI):
 
 ```bash
-printf '%s\n' "$BLOCK" | .better-dev/bin/bd-block CLAUDE.md better-dev
+printf '%s\n' "$BLOCK" | .better-dev/bin/bd-block CLAUDE.md better-dev   # scripted contexts only
 ```
 
-The block is written in place and byte-stable across re-runs (bd-block replaces, never appends), which
-keeps the prompt cache below it valid - preserve that property when changing the block shape.
+Either path leaves the same marker-bounded block, byte-stable across re-runs (replace, never append),
+which keeps the prompt cache below it valid - preserve that property when changing the block shape.
 
 Fill the block from what you actually detected (branching, memory backend). Shape:
 
@@ -235,7 +243,9 @@ and the block reads correctly in the entry file.
 
 Recap what changed, then list any phase the operator skipped or deferred (tool not yet installed
 globally, no integration branch, a memory backend left on files, an unmapped test command) so they can
-come back with `/onboard <phase>`.
+come back with `/onboard <phase>`. Anything still waiting on the operator's own hands **leads** the
+recap - "ready", "armed", or "fully wired" is claimable only when that list is empty; a pending
+operator action is the headline, not a footnote under a victory banner.
 
 If Phase 1 found a remote, note once - advisory, not a blocker - whether the host can reach it before
 the first remote-dependent step (`/pr-and-verify`, `/release-promotion`, branch protection): a
