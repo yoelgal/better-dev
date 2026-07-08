@@ -46,6 +46,15 @@ fails when skipped. "Not worth building" is a valid outcome here: if no option's
 baseline or the cost plainly outweighs the payoff, record it with its one-line reason so the user
 knows it was weighed, and stop rather than manufacturing a design to justify the work.
 
+Two arrival shapes get named before any option is sketched. An intent that arrives as a fix or an
+upgrade to an existing mechanism gets the requirement interrogated before the implementation: name
+the requirement the mechanism serves, and when the honest answer is a case that doesn't exist, the
+plan is to cut the requirement, not to build its code better. And an intent that arrives just after
+the previous goal was reached - a rewrite or a vision upgrade of a thing that only just started
+working - gets the growth named out loud and one question asked: which user does the expansion
+serve? A rewrite of a working product rests on a user-visible justification; reaching the goal is
+not, by itself, a reason to raise it.
+
 If the feature has UI surface and its visual direction isn't settled, run `/design-brief` before the
 grill closes - the design read and system choice belong in the plan, not discovered mid-implementation.
 
@@ -86,7 +95,12 @@ done-criteria will turn on and skip exhaustive branch-walking.
 - **Attack the plan before you close.** The grill so far argued *for* the design - it walked the
   tree and filled each node with your recommended answer. Spend one pass arguing against it: name the
   unknown you skated over, the single assumption the whole plan rests on that you never actually
-  checked, and the one requirements change that would make this the wrong build. Each objection has to
+  checked, and the one requirements change that would make this the wrong build. Two cheap attacks
+  belong in every pass: restate the flow the feature serves in plain words, a few sentences, and
+  weigh the plan against it - a plan that plainly outweighs its flow's description is over-built,
+  and the excess names the cut; and when you can't tell whether the design is over-built, diff it
+  against the closest respected prior art - more complex than the reference with no nameable reason
+  means simplify toward the reference's shape. Each objection has to
   resolve - it dies against evidence you can cite, or it promotes to an open concern or an out-of-scope
   line, never just noted and dropped. If you can't mount one real objection, you don't yet understand
   the design well enough to have attacked it; keep grilling. The contract records at least one attempted
