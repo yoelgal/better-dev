@@ -169,7 +169,18 @@ survives byte-for-byte, these entries append to it; **per-repo consent** - `.cla
 machine config, so the write happens once per repo on an explicit yes, and a re-run that finds the
 entries already present writes nothing; **verify the envelope** - `bd-guard` emits Claude Code's nested
 `hookSpecificOutput.permissionDecision` shape, and a wrong envelope fails silently (the same trap
-`bootstrap-hooks/porting.md` records for `SubagentStart`), so after wiring, pipe one destructive
-fixture through `check-bash` and confirm the host actually asks. Other hosts express the same idea
-through their own pre-execution hook, or record `safety-enforcement: prose` and go without -
-`/worktree-branching` already isolates most of the risk.
+`bootstrap-hooks/porting.md` records for `SubagentStart`), so after wiring, run one destructive
+fixture through `check-bash` and confirm the host actually asks. By then the guard is live on your own
+shell calls: a pipe-shaped test construct hits its obfuscated-shell deny, and even a `printf` of the
+fixture trips the ask, because the destructive pattern sits in the raw command string. So create the
+fixture with the host's **file-edit tool** - `.better-dev/ledger/guard-probe.json` (transient,
+gitignored) containing `{"tool_input":{"command":"rm -rf src"}}` - then run only the redirect form
+from the shell:
+
+```bash
+bash .better-dev/bin/bd-guard check-bash < .better-dev/ledger/guard-probe.json   # expect permissionDecision "ask"
+rm -f .better-dev/ledger/guard-probe.json
+```
+
+Other hosts express the same idea through their own pre-execution hook, or record
+`safety-enforcement: prose` and go without - `/worktree-branching` already isolates most of the risk.
