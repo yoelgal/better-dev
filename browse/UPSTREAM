@@ -1,0 +1,22 @@
+# Upstream pin for the vendored browse/ tree. Read by scripts/check-upstream.sh.
+# Line formats:
+#   repo: <git url>            upstream repository
+#   commit: <sha>              upstream commit this vendor was cut from
+#   version: <string>          upstream VERSION at that commit
+#   vendored: <date>           date the port landed in better-dev
+#   pin <sha256> <local path>  security-relevant file tracked for upstream drift;
+#                              hash is of the UPSTREAM file at the pinned commit
+#                              (kept byte-identical locally at vendor time).
+repo: https://github.com/garrytan/gstack
+commit: 11de390be1be6849eb9a15f91ff4922dd16c589a
+version: 1.58.5.0
+vendored: 2026-07-07
+
+# Upstream paths mirror ours under browse/: local src/X <-> upstream browse/src/X.
+pin b9bc0b2b3a6d3cfde7562d7117e0c4faa18335eb3508ae8fec1a4b55cc8a6133 src/cdp-allowlist.ts
+pin 21f83175f81b662e9117506f57b9e35d2fe78c9111b5abd243d1cc24838ed38a src/content-security.ts
+pin 6c99c793ba3f54b3014fb526ff49c6d92d985d10a1d60677daceef6c9e36d6e3 src/sanitize.ts
+pin e57dfa78ad04d38d7631175bd8009659a1de7c9b14769c85ed7cf5092d7876d1 src/security.ts
+pin f05d8f05eeb8dc1715c6a17bd5c0beaa43465478b54a6e9dd09304b2b13fe0b1 src/cookie-import-browser.ts
+pin 88473dbd8a7dae4de5c30b0f71d0134c01d2fd731dcc735cc1e33a5e85754f18 src/cookie-picker-routes.ts
+pin 1fc229f6b70d273ded5178c1add73a32e10cce966d0adb4229938b57c8ecf85b src/cookie-picker-ui.ts
