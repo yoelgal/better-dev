@@ -160,7 +160,9 @@ than re-deriving them, and let `/security-pass` own the depth.
 # Done-contract - <work-item>
 
 ## Problem
-<the problem, from the user's perspective>
+<one measurable sentence - who experiences what, with baseline and target each a receipt or
+TBD(<owner>); when the intent arrived as an external brief, the requester's verbatim words sit
+above it in quotes, attributed>
 
 ## Solution
 <the solution, from the user's perspective>
@@ -235,6 +237,8 @@ Before you pin the contract, each line reads yes or the contract isn't ready:
 - A fresh context could execute this from the contract and the repo alone.
 - Every done-criterion is a command with an expected result, not a judgment ("make sure it works").
 - Every criterion names its concrete observable - a value, status, row, or output line.
+- Every number in Problem and Goal carries a named source or a `TBD(<owner>)` marker - an unsourced
+  number is an invented one.
 - The stop conditions are specific to this plan's real risks, not boilerplate.
 - No secret values appear anywhere - locations and credential types only.
 - Every promoted objection and lens finding has its matching contract line - an open concern, an
