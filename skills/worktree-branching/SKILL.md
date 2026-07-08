@@ -106,6 +106,12 @@ If `$path` already exists or the branch is already checked out somewhere, this i
 at the existing worktree rather than forcing a duplicate. If `git worktree add` fails on a sandbox
 permission error, say so and work in place - `edge-cases.md` covers that fallback.
 
+A fresh worktree also has none of the primary checkout's gitignored local settings, so a session
+rooted in it loses the operator's recorded permission grants (a `.claude/settings.local.json`
+allowlist, or the host's equivalent) and falls back to prompting or a classifier on actions the
+operator already approved. Mirror that file from the primary checkout into the new worktree when it
+exists - it is personal, gitignored state, so the copy never enters a PR.
+
 A fresh worktree has no installed deps, so run the project's setup and one baseline check here -
 that way the loop's first verify measures your work, not a missing `node_modules` misread as a
 failure. Prefer the project's own named setup entry point (a documented setup or bootstrap script
