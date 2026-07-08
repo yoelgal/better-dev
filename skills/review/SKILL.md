@@ -2,6 +2,13 @@
 name: review
 description: Use when a diff or branch needs an independent verdict inside the better-dev loop - the loop's gate after an implementer reports done, a whole-branch pass before a PR into the integration branch, or "review since X" against a fixed point. It is the loop's spec+standards evaluator; for a quick working-diff scan the host /code-review is fine, and for a GitHub PR the host /review.
 argument-hint: "[effort] [base] [head]"
+allowed-tools:
+  - Bash
+  - Read
+  - Grep
+  - Glob
+  - Task
+  - Agent
 ---
 
 # Review

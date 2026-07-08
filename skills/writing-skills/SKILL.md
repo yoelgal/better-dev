@@ -30,7 +30,10 @@ Optional - add only when a skill actually needs it:
   read-and-run tools and no Write/Edit: a reviewer that can edit the code it judges is one
   rationalization away from doing so. Set the grant from the finished body, not from intent - a grant
   narrower than the body's own steps kills the run mid-skill, which is worse than no grant. A host
-  that doesn't honor the key ignores it, so a correct grant costs nothing.
+  that doesn't honor the key ignores it, so a correct grant costs nothing. When the body dispatches
+  host subagents, the dispatcher's name varies by host - grant every name the host family uses
+  (`Task`, `Agent`); an unknown name in an allowlist is inert, while an omitted dispatcher kills
+  the fan-out.
 
 Never put `version`, `license`, or prose in frontmatter.
 

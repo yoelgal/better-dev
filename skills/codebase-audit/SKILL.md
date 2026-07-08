@@ -1,6 +1,13 @@
 ---
 name: codebase-audit
 description: Use when someone points at an existing codebase, or one area of it, and wants to know what is worth doing before any single item is chosen - "audit this repo", "where's the leverage here", "what should we improve", "what's worth doing in this code". It ranks findings by leverage, hands the human one item, and builds nothing itself. For a chosen feature go to /plan-grill, for a reported symptom /diagnose, for structural orientation alone /codebase-map.
+allowed-tools:
+  - Bash
+  - Read
+  - Grep
+  - Glob
+  - Task
+  - Agent
 ---
 
 # Audit a codebase into a ranked what-to-do list
