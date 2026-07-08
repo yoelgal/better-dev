@@ -80,8 +80,10 @@ absorbing it), the verify command from the contract, and a **protect-set** - the
 edit. It holds the tests and the contract artifacts (so the loop fixes the code
 rather than moving the goalposts), plus the repo's high-consequence path denylist - the policy
 `/guardrails-install` records. A test the loop writes this pass joins the protect-set the moment it is
-authored: a later pass may make it pass, never weaken it. Pin it as it joins: append the file's path and
-content hash to the ledger (`.better-dev/bin/bd-mem ledger put <work-item> protect.hashes -`). At settle,
+authored: a later pass may make it pass, never weaken it. Pin it as it joins: re-emit the pinned list with
+the new row added - `ledger put` replaces the file, so write the existing rows plus the new one
+(`(.better-dev/bin/bd-mem ledger read <work-item> protect.hashes 2>/dev/null; shasum <test-file>) |
+.better-dev/bin/bd-mem ledger put <work-item> protect.hashes -`). At settle,
 re-hash the pinned set: a pinned file whose hash moved is re-pinned only by a pass whose receipt records
 the red-then-green that justified the edit; a moved hash with no such receipt settles `NEEDS_INPUT`
 naming the file - the goalpost-move this set exists to stop, surfaced as a comparison instead of trusted

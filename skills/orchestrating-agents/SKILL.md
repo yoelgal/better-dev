@@ -26,7 +26,9 @@ Break the work into subtasks that are each self-contained: one clear task, enume
 deterministic output shape, one obvious approach. If a subtask still needs "investigate," "figure out,"
 or "as appropriate," it isn't decomposed yet - that ambiguity is yours to resolve, not a worker's. Keep
 the judgment work in your own hands: decomposition, ambiguous design, user interaction, destructive
-actions, and the final synthesis. Workers get the bounded pieces.
+actions, and the final synthesis. Workers get the bounded pieces. (When a judgment stage sits above your
+session's own band, "your own hands" means buying the bounded consult `tiers.md` defines - never making
+the top-band call at a lower tier.)
 
 Fan out from a clean slate. Parallel work never starts over an unfinished background operation - a
 still-running worker, an unmerged lane, an unread report - because two actors over unknown state is how
