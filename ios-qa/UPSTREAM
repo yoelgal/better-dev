@@ -1,0 +1,7 @@
+repo: https://github.com/garrytan/gstack
+path: ios-qa/
+commit: 11de390be1be6849eb9a15f91ff4922dd16c589a
+vendored: 2026-07-07
+license: MIT (see LICENSE-upstream)
+not-vendored: SKILL.md, SKILL.md.tmpl (gstack's orchestration prompt; the practice
+  skill in this repo is skills/ios-capability/, and the operational guide is README.md here)
