@@ -12,8 +12,8 @@ item's contract carries a criterion like that and the agent has no browser to dr
 *tool*, not a missing line of code.
 
 This skill is one concrete instance of a general practice: on a capability gap, source the tool rather than
-hand-roll it. Needing a browser for web QA is the same shape as needing an iOS-simulator harness for a mobile
-app or a load generator for a perf check - name the gap, source a tool that fills it, vet it, and wire a small
+hand-roll it. Needing a browser for web QA is the same shape as needing an on-device iOS harness for a mobile
+app (`/ios-capability` is that instance) or a load generator for a perf check - name the gap, source a tool that fills it, vet it, and wire a small
 how-to so the loop can run the check. The practice ships; the specific tool stays swappable.
 
 Read `.better-dev/overrides.md` first. A repo often already settles this - it may pin Playwright, a
@@ -28,27 +28,32 @@ wide," "the form submit lands on `**/success`." That line is both the search que
 done-criterion the work item is graded against later - so it names a URL, an element or text, and what a pass
 looks like, not just "test the page."
 
-## 2. Source a browser tool through `/tool-sourcing`
+## 2. Wire a browser, in this order
 
-Hand that gap line to `/tool-sourcing` and let it run its course - discover, vet, try ephemerally, risk-gate,
-adopt. Don't reimplement any of that here; sourcing owns the judgment and the safety gate.
+1. **The repo already settled it** - `.better-dev/overrides.md` or an existing e2e harness (Playwright or
+   Cypress with a `test:e2e` script) pins the tool. Use that and skip to step 3; never wire a second browser
+   beside one the project already runs.
+2. **The owned daemon** - `browse/` in the better-dev install (better-dev's vendored cut of gstack's MIT
+   browser; provenance in `browse/UPSTREAM`). If its binary or a running daemon exists, use it. If not and
+   the machine can take it (bun installable, network available, user not declining), compile it on first
+   need: `bun install && bun run build` inside `browse/` yields `browse/dist/browse` (~55MB, self-contained);
+   `bun run src/cli.ts` works uncompiled while iterating. A Chromium must exist too - a detected Chrome, or
+   `bunx playwright install chromium` (~170MB) once. First call starts the per-workspace daemon (~3s); every
+   call after runs in ~100-200ms with cookies, tabs, and logins persisting across the whole check. Record
+   the adoption in memory like any sourced tool.
 
-Two shapes of tool fill this gap well, and the project's stack usually decides between them:
+   One hard rule rides with it: **cookie import needs explicit first-use approval.** Before the first
+   `cookie-import-browser` in a project, ask the user - it decrypts their real browser's cookies via the
+   macOS Keychain, which is a trust decision, not a convenience default. Ask once, record the answer, and
+   never run it unprompted.
+3. **Source a fallback** - hand the gap line to `/tool-sourcing` when the owned daemon cannot install or run
+   here (no bun, no network, non-macOS cookie needs, or the user declines). It runs its course - discover,
+   vet, try ephemerally, risk-gate, adopt - and a CDP CLI such as `agent-browser` (Apache-2.0) or the repo's
+   own Playwright harness fills the same shape. Don't reimplement sourcing's judgment or safety gate here.
 
-- A **CDP browser CLI** such as `agent-browser` (Apache-2.0) - a self-contained command that opens a page,
-  snapshots the accessibility tree, clicks and fills by ref, screenshots, and reads the rendered DOM, with no
-  test framework to stand up. Good when there's no existing e2e harness and you want a check the loop can run
-  in a few commands. It runs headless by default, can drive a logged-in profile snapshot for authenticated
-  pages, and can use cloud remote browsers for parallel or sandboxed runs. gstack's browser (MIT,
-  `garrytan/gstack`) fills the same shape as a dedicated agent-controlled window with one-click cookie
-  import from the user's real browser.
-- A **Playwright- or Cypress-based skill** - the better fit when the repo already has that framework and a
-  `test:e2e` script; the browser check then rides the harness the project already trusts.
-
-Prefer the one that matches what's installed. Once `/tool-sourcing` adopts a tool, it records the choice in
-memory; that record is what keeps the tool swappable - a later run reads "sourced `<tool>` for browser QA"
-and reuses it instead of re-sourcing, and swapping tools is a one-line memory update, not a rewrite of every
-check.
+Whichever rung won, record it once ("wired `<tool>` for browser QA"); a later run reads that record and
+reuses the same tool instead of re-deciding, and swapping tools is a one-line memory update, not a rewrite
+of every check.
 
 ## 3. Wire the check the loop will run
 
@@ -63,9 +68,10 @@ screenshot captured for a human or a visual diff, a URL reached. Keep it to the 
 one observable for a leaf criterion, or the branch-walk when the contract carries a scenario table - never a
 full regression suite the loop re-runs.
 
-For the concrete command surface of a CDP CLI like `agent-browser` - snapshot-then-act by ref, screenshotting,
-reading rendered text, waiting on state, batching steps, reading the console clean, walking the contract's
-scenario branches, and the headless / real-profile / cloud modes - read `browser-checks.md` in this folder.
+For the concrete command surface of a CDP CLI - snapshot-then-act by ref, screenshotting, reading rendered
+text, waiting on state, batching steps, reading the console clean, walking the contract's scenario branches,
+the headless / real-profile / cloud modes, and how the owned daemon behaves operationally - read
+`browser-checks.md` in this folder.
 For a framework-based tool, the check is just its own run command (`npx playwright test <file>`), so nothing
 extra is needed here.
 

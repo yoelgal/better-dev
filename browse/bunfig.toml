@@ -1,0 +1,4 @@
+[test]
+# Upstream gstack repo-root bunfig, carried with the vendored tree: restore
+# PATH after every test so per-file env mutations don't leak across files.
+preload = ["./test-setup.ts"]

@@ -86,12 +86,27 @@ EOF
 EOF
       ;;
     esac
+    # A retry brief (index > 1) carries the prior attempt's lessons so the retried worker
+    # closes each as addressed or recurred instead of re-hitting the same wall.
+    if [ "$n" -gt 1 ]; then cat >>"$f" <<EOF
+
+## Prior attempts - do not re-enter
+<!-- Attempt $((n - 1)) report: $d/reports/$role-$((n - 1)).md - paste its BLOCKER and the last
+     receipt's learned lines here. The worker's report closes each: addressed or recurred. -->
+EOF
+    fi
     cat >>"$f" <<EOF
 
 ## Report
 Write the full report to: $d/reports/$role-$n.md
-Return only: terminal state (DONE|DONE_WITH_CONCERNS|BLOCKED|NEEDS_INPUT|EXHAUSTED|NO_PROGRESS),
-commits, a one-line verify summary, and concerns.
+End your reply with the report trailer (last lines, one key per line - /orchestrating-agents
+defines it; the STATUS value goes to bd-dispatch record unedited):
+STATUS: DONE|DONE_WITH_CONCERNS|BLOCKED|NEEDS_INPUT|EXHAUSTED|NO_PROGRESS
+VERIFY: <command> -> exit <code>   (or: not run - why)
+COMMITS: <shas or none>
+BLOCKER: <one line - required unless DONE or DONE_WITH_CONCERNS>
+CONCERNS: <one line or none>
+QUESTIONS: <count or none - question lines go in the report file>
 EOF
     printf '%s\n' "$f" ;;
 
@@ -126,8 +141,14 @@ EOF
       B="$("$SELF" brief feat-x implementer)"
       [ -f "$B" ] && grep -q "zero context" "$B"           || { echo "FAIL brief skeleton"; exit 1; }
       grep -q "reports/implementer-1.md" "$B"              || { echo "FAIL brief report path"; exit 1; }
-      [ "$("$SELF" brief feat-x implementer)" = "$d/primary/.better-dev/ledger/feat-x/briefs/implementer-2.md" ] \
+      grep -q "^STATUS: DONE|" "$B" && grep -q "^QUESTIONS:" "$B" \
+                                                           || { echo "FAIL brief trailer keys"; exit 1; }
+      if grep -q "Prior attempts" "$B"; then echo "FAIL prior-attempts slot on first brief"; exit 1; fi
+      B2="$("$SELF" brief feat-x implementer)"
+      [ "$B2" = "$d/primary/.better-dev/ledger/feat-x/briefs/implementer-2.md" ] \
                                                            || { echo "FAIL brief not indexed"; exit 1; }
+      grep -q "Prior attempts - do not re-enter" "$B2"     || { echo "FAIL prior-attempts slot missing on retry"; exit 1; }
+      grep -q "reports/implementer-1.md" "$B2"             || { echo "FAIL retry slot misses prior report"; exit 1; }
       "$SELF" record feat-x implementer BLOCKED "waiting on schema" >/dev/null
       "$SELF" pending feat-x | grep -q "implementer.BLOCKED" || { echo "FAIL pending shows blocked"; exit 1; }
       "$SELF" record feat-x implementer DONE "5/5 pass" >/dev/null

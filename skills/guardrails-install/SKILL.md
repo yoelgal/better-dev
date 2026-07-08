@@ -1,6 +1,6 @@
 ---
 name: guardrails-install
-description: Use when a repo needs its guardrails installed or recorded - a missing commit-time or CI gate (no pre-commit hook, no lint/typecheck gate, no CI workflow), or the autonomous loop's blast-radius policy (the high-consequence paths it should escalate rather than auto-edit, the change classes that gate a human, the scope threshold). Invoked by /onboard while bootstrapping the minimum base, or run directly to fill a guardrail gap or record the safety policy without touching what the repo already has.
+description: Use when a repo needs its guardrails installed or recorded - a missing commit-time or CI gate (no pre-commit hook, no lint/typecheck gate, no CI workflow), the autonomous loop's blast-radius policy (the high-consequence paths it should escalate rather than auto-edit, the change classes that gate a human, the scope threshold), the enforcement wiring that mechanically checks that policy (bd-guard hooks, recorded as safety-enforcement), or the deploy surface /release-promotion reads (deploy-* rules or deploy-surface: none). Invoked by /onboard while bootstrapping the minimum base, or run directly to fill a guardrail gap or record the safety policy without touching what the repo already has.
 allowed-tools:
   - Bash
   - Read
@@ -156,6 +156,25 @@ After wiring, record each check you mapped as a durable rule so the rest of bett
 The autonomous loop and `/pr-and-verify` recall these to run the same checks the hook and CI enforce -
 one detection, reused everywhere, no guessing downstream.
 
+**Record the deploy surface.** Deploy commands travel exactly like the verify commands above - detected
+once, premise-verified, recorded, never guessed downstream. Detect the platform from files that exist
+(`fly.toml`, `render.yaml`, `vercel.json` / `.vercel/`, `netlify.toml`, `Procfile`, `railway.json` /
+`railway.toml`) and a deploy workflow from `.github/workflows/*` whose name or triggers match deploy /
+release / production. Verify each value before recording it: fetch the health URL once and read the
+status code; run the status command once and read its exit code. A probe that fails is recorded as a
+gap with what you observed, not written as a fact - a README claiming "deployed on Vercel" with no
+`vercel.json` and no `.vercel/` is a claim that failed premise-verify, not a platform.
+
+```bash
+.better-dev/bin/bd-mem remember "deploy-platform: <platform or workflow file, observed at file:line>"
+.better-dev/bin/bd-mem remember "deploy-url: <production URL, operator-confirmed>"
+.better-dev/bin/bd-mem remember "deploy-status: <status command, or 'http'>"
+.better-dev/bin/bd-mem remember "deploy-health: <health URL or command>"
+```
+
+A repo with no deploy surface (a library, a CLI) records `deploy-surface: none` - a recorded no is a
+fact `/release-promotion` reads and settles on, where a missing key is a question it has to re-ask.
+
 ## Record the blast-radius policy
 
 The surface detected above earns the same confirm-first flow: show the operator the resolved policy - the
@@ -247,22 +266,47 @@ the repo already carries - and gate the hook on that detection: no formatter fou
 never-guess-a-command discipline the rest of the skill holds. A repo without one is never handed a
 formatter it does not have.
 
-## Agent-side git safety (optional, host-specific)
+## Enforcement - wire the hook where the host has one
 
-The guardrails above protect the repo. A second, separate guardrail protects it from the *agent*: a host
-hook that refuses destructive git commands (`push`, `reset --hard`, `clean -fd`, `branch -D`,
-`checkout .`) before they run. This one is host-specific - Claude Code expresses it as a `PreToolUse`
-Bash hook - so offer it as an upgrade, wired per host, never imposed. `stacks.md` sketches the Claude Code
-form. `/worktree-branching` already keeps feature work on its own worktree, which covers most of the risk;
-this hook is belt-and-suspenders for operators who want a hard stop.
+The policy above is what the loop escalates on; enforcement is what checks it even when a model under
+pressure would not. The mechanism is one spine script, `bd-guard`: `check-bash` asks on a destructive
+command (recursive rm outside the build-artifact allowlist, SQL `DROP`/`TRUNCATE`, git force-push /
+`reset --hard` / working-tree discards, `kubectl delete`, docker prune) and denies an obfuscated shell
+construct outright - an assembled or hidden command is the injection vector, never a judgment call;
+`check-edit` denies a write outside the active scope boundary and asks on a `safety-denylist` glob. Both
+fire only in repos carrying `.better-dev/`, fail open on parse failure, and stay silent otherwise.
 
-Extend the same hook, where it exists, past destructive-but-honest git to the injection class a leaked agent
-refuses: an obfuscated shell construct that builds or hides a command - the `${var@P}` parameter transform,
-chained assignments that progressively assemble a substitution, `${!var}` and eval-like indirection - is
-refused rather than run, since that is the actual prompt-injection vector, not a straight `rm`. And for a
-real-world irreversible side effect (a remote delete, a prod write, a data drop), confirm that specific
-action before it runs: a prior approval does not extend to the next destructive op, and if data loss already
-happened, say so immediately rather than quietly repairing it.
+Detect, in order, which delivery this repo already has:
+
+- **The better-dev plugin's hooks are registered** (the plugin `hooks.json` carries the two `PreToolUse`
+  entries) - nothing to do; enforcement is already always-on. A plugin install never writes host
+  settings.
+- **A clone install on a host with a pre-execution hook** - offer to wire `bd-guard check-bash` and
+  `bd-guard check-edit` into the host's settings (Claude Code: `.claude/settings.json`
+  `hooks.PreToolUse`, merging into any existing array, never replacing it - an existing hooks array
+  survives byte-for-byte). A settings write is machine config: confirm it per repo, on an explicit yes.
+  `stacks.md` holds the exact settings shape.
+- **A host with no pre-execution hook** - the policy stands as prose and the loop's escalation
+  discipline carries it alone. A named coverage limit, not a failure.
+
+Record which, so downstream skills know what kind of gate they have:
+
+```bash
+.better-dev/bin/bd-mem remember "safety-enforcement: hook (claude, PreToolUse bash+edit)"   # or
+.better-dev/bin/bd-mem remember "safety-enforcement: prose"
+```
+
+One vocabulary, one policy layer: `bd-guard` reads `safety-denylist` and the scope state at check time -
+it carries no path list of its own, so widening the denylist is one `bd-mem remember`, never a hook
+edit. `safety-enforcement` records the mechanism's existence, not a second copy of the policy; exactly
+one line under the `safety-` prefix family, and a re-run that finds the wiring already present writes
+nothing. The boundary stops accidents, not attacks - a Bash `sed` can still write outside it; the
+denylist ask and `/security-pass` cover what a boundary cannot.
+
+Two disciplines the hook cannot see stay with the loop and `/security-pass`, not here: a real-world
+irreversible side effect (a remote delete, a prod write, a data drop) is confirmed as that specific
+action before it runs - a prior approval does not extend to the next destructive op - and data loss
+that already happened is reported immediately, never quietly repaired.
 
 ## Composability
 

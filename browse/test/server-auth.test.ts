@@ -1,0 +1,277 @@
+/**
+ * Server auth security tests — verify security remediation in server.ts
+ *
+ * Tests are source-level: they read server.ts and verify that auth checks,
+ * CORS restrictions, and token removal are correctly in place.
+ */
+
+import { describe, test, expect } from 'bun:test';
+import * as fs from 'fs';
+import * as path from 'path';
+
+const SERVER_SRC = fs.readFileSync(path.join(import.meta.dir, '../src/server.ts'), 'utf-8');
+const CLI_SRC = fs.readFileSync(path.join(import.meta.dir, '../src/cli.ts'), 'utf-8');
+
+// Helper: extract a block of source between two markers
+function sliceBetween(source: string, startMarker: string, endMarker: string): string {
+  const startIdx = source.indexOf(startMarker);
+  if (startIdx === -1) throw new Error(`Marker not found: ${startMarker}`);
+  const endIdx = source.indexOf(endMarker, startIdx + startMarker.length);
+  if (endIdx === -1) throw new Error(`End marker not found: ${endMarker}`);
+  return source.slice(startIdx, endIdx);
+}
+
+describe('Server auth security', () => {
+  // Test 1: /health serves token conditionally (headed mode or chrome extension only)
+  test('/health serves token only in headed mode (extension clause removed in vendored cut)', () => {
+    const healthBlock = sliceBetween(SERVER_SRC, "url.pathname === '/health'", "url.pathname === '/token'");
+    // Token must be conditional, not unconditional
+    expect(healthBlock).toContain('token: authToken');
+    expect(healthBlock).toContain('headed');
+    expect(healthBlock).not.toContain('chrome-extension://');
+  });
+
+  // Test 1b: /health does not expose sensitive browsing state
+  test('/health does not expose currentUrl or currentMessage', () => {
+    const healthBlock = sliceBetween(SERVER_SRC, "url.pathname === '/health'", "url.pathname === '/token'");
+    expect(healthBlock).not.toContain('currentUrl');
+    expect(healthBlock).not.toContain('currentMessage');
+  });
+
+  // Test 1c: newtab must check domain restrictions (CSO finding #5)
+  // Domain check for newtab is now unified with goto in the scope check section:
+  // (command === 'goto' || command === 'newtab') && args[0] → checkDomain
+  test('newtab enforces domain restrictions', () => {
+    const scopeBlock = sliceBetween(SERVER_SRC, "Scope check (for scoped tokens)", "Pin to a specific tab");
+    expect(scopeBlock).toContain("command === 'newtab'");
+    expect(scopeBlock).toContain('checkDomain');
+    expect(scopeBlock).toContain('Domain not allowed');
+  });
+
+  // Test 2: /refs endpoint requires auth via validateAuth
+  test('/refs endpoint requires authentication', () => {
+    const refsBlock = sliceBetween(SERVER_SRC, "url.pathname === '/refs'", "url.pathname === '/activity/history'");
+    expect(refsBlock).toContain('validateAuth');
+  });
+
+  // Test 3: /refs has no wildcard CORS header
+  test('/refs has no wildcard CORS header', () => {
+    const refsBlock = sliceBetween(SERVER_SRC, "url.pathname === '/refs'", "url.pathname === '/activity/history'");
+    expect(refsBlock).not.toContain("'*'");
+  });
+
+  // Test 4: /activity/history requires auth via validateAuth
+  test('/activity/history requires authentication', () => {
+    const historyBlock = sliceBetween(SERVER_SRC, "url.pathname === '/activity/history'", 'Batch endpoint');
+    expect(historyBlock).toContain('validateAuth');
+  });
+
+  // Test 5: /activity/history has no wildcard CORS header
+  test('/activity/history has no wildcard CORS header', () => {
+    const historyBlock = sliceBetween(SERVER_SRC, "url.pathname === '/activity/history'", 'Batch endpoint');
+    expect(historyBlock).not.toContain("'*'");
+  });
+
+  // Test 7: /command accepts scoped tokens (not just root)
+  // This was the Wintermute bug — /command was BELOW the blanket validateAuth gate
+  // which only accepts root tokens. Scoped tokens got 401'd before reaching getTokenInfo.
+  test('/command endpoint sits ABOVE the blanket root-only auth gate', () => {
+    const commandIdx = SERVER_SRC.indexOf("url.pathname === '/command'");
+    const blanketGateIdx = SERVER_SRC.indexOf("Auth-required endpoints (root token only)");
+    // /command must appear BEFORE the blanket gate in source order
+    expect(commandIdx).toBeGreaterThan(0);
+    expect(blanketGateIdx).toBeGreaterThan(0);
+    expect(commandIdx).toBeLessThan(blanketGateIdx);
+  });
+
+  // Test 7b: /command uses getTokenInfo (accepts scoped tokens), not validateAuth (root-only)
+  test('/command uses getTokenInfo for auth, not validateAuth', () => {
+    const commandBlock = sliceBetween(SERVER_SRC, "url.pathname === '/command'", "Auth-required endpoints");
+    expect(commandBlock).toContain('getTokenInfo');
+    expect(commandBlock).not.toContain('validateAuth');
+  });
+
+  // Test 10: tab ownership check happens before command dispatch
+  test('tab ownership check runs before command dispatch for scoped tokens', () => {
+    const handleBlock = sliceBetween(SERVER_SRC, "async function handleCommand", "Block mutation commands while watching");
+    expect(handleBlock).toContain('checkTabAccess');
+    expect(handleBlock).toContain('Tab not owned by your agent');
+  });
+
+  // Test 10a: tab gate is gated on own-only, not on isWrite
+  // Regression test for v1.20.0.0 footgun fix. Pre-fix the gate fired for
+  // any write command from any non-root token, which 403'd local skill
+  // spawns trying to drive the user's natural (unowned) tabs. The bundled
+  // hackernews-frontpage skill failed identically. The fix narrows the
+  // gate to `tabPolicy === 'own-only'` so pair-agent tunnel tokens stay
+  // strict while local shared-policy tokens (skill spawns) get unblocked.
+  test('tab gate predicate is own-only-scoped, not write-scoped', () => {
+    const handleBlock = sliceBetween(SERVER_SRC, "async function handleCommand", "Block mutation commands while watching");
+    // The gate condition must include the own-only check.
+    expect(handleBlock).toContain("tabPolicy === 'own-only'");
+    // It must NOT depend on WRITE_COMMANDS in the gate predicate (only inside
+    // the checkTabAccess call's isWrite arg, which is informational). The
+    // surrounding `if (...) {` for the gate must use `tabPolicy === 'own-only'`
+    // as the trigger, not `WRITE_COMMANDS.has(command) || ...`.
+    const gateLine = handleBlock.split('\n').find(l =>
+      l.includes("command !== 'newtab'") &&
+      l.includes('tokenInfo') &&
+      l.includes('tabPolicy')
+    );
+    expect(gateLine).toBeTruthy();
+    expect(gateLine).not.toMatch(/WRITE_COMMANDS\.has\(command\)\s*\|\|/);
+  });
+
+  // Test 10b: chain command pre-validates subcommand scopes
+  test('chain handler checks scope for each subcommand before dispatch', () => {
+    const metaSrc = fs.readFileSync(path.join(import.meta.dir, '../src/meta-commands.ts'), 'utf-8');
+    const chainBlock = metaSrc.slice(
+      metaSrc.indexOf("case 'chain':"),
+      metaSrc.indexOf("case 'diff':")
+    );
+    expect(chainBlock).toContain('checkScope');
+    expect(chainBlock).toContain('Chain rejected');
+    expect(chainBlock).toContain('tokenInfo');
+  });
+
+  // Test 10c: handleMetaCommand accepts tokenInfo parameter
+  test('handleMetaCommand accepts tokenInfo for chain scope checking', () => {
+    const metaSrc = fs.readFileSync(path.join(import.meta.dir, '../src/meta-commands.ts'), 'utf-8');
+    const sig = metaSrc.slice(
+      metaSrc.indexOf('export async function handleMetaCommand'),
+      metaSrc.indexOf('): Promise<string>')
+    );
+    expect(sig).toContain('tokenInfo');
+  });
+
+  // Test 10d: server passes tokenInfo to handleMetaCommand
+  // v1.35.0.0: shutdown is now factory-scoped; the call site uses shutdownFn,
+  // a thin wrapper that delegates to activeShutdown (set by buildFetchHandler).
+  test('server passes tokenInfo to handleMetaCommand', () => {
+    expect(SERVER_SRC).toContain('handleMetaCommand(command, args, browserManager, shutdownFn, tokenInfo,');
+  });
+
+  // Test 10e: activity attribution includes clientId
+  test('activity events include clientId from token', () => {
+    const commandStartBlock = sliceBetween(SERVER_SRC, "Activity: emit command_start", "try {");
+    expect(commandStartBlock).toContain('clientId: tokenInfo?.clientId');
+  });
+
+  // ─── Batch endpoint security ─────────────────────────────────
+
+  // Test 12a: /batch endpoint sits ABOVE the blanket root-only auth gate (same as /command)
+  test('/batch endpoint sits ABOVE the blanket root-only auth gate', () => {
+    const batchIdx = SERVER_SRC.indexOf("url.pathname === '/batch'");
+    const blanketGateIdx = SERVER_SRC.indexOf("Auth-required endpoints (root token only)");
+    expect(batchIdx).toBeGreaterThan(0);
+    expect(blanketGateIdx).toBeGreaterThan(0);
+    expect(batchIdx).toBeLessThan(blanketGateIdx);
+  });
+
+  // Test 12b: /batch uses getTokenInfo (accepts scoped tokens), not validateAuth (root-only)
+  test('/batch uses getTokenInfo for auth, not validateAuth', () => {
+    const batchBlock = sliceBetween(SERVER_SRC, "url.pathname === '/batch'", "url.pathname === '/command'");
+    expect(batchBlock).toContain('getTokenInfo');
+    expect(batchBlock).not.toContain('validateAuth');
+  });
+
+  // Test 12c: /batch enforces max command limit
+  test('/batch enforces max 50 commands per batch', () => {
+    const batchBlock = sliceBetween(SERVER_SRC, "url.pathname === '/batch'", "url.pathname === '/command'");
+    expect(batchBlock).toContain('commands.length > 50');
+    expect(batchBlock).toContain('Max 50 commands per batch');
+  });
+
+  // Test 12d: /batch rejects nested batches
+  test('/batch rejects nested batch commands', () => {
+    const batchBlock = sliceBetween(SERVER_SRC, "url.pathname === '/batch'", "url.pathname === '/command'");
+    expect(batchBlock).toContain("cmd.command === 'batch'");
+    expect(batchBlock).toContain('Nested batch commands are not allowed');
+  });
+
+  // Test 12e: /batch skips per-command rate limiting (batch counts as 1 request)
+  test('/batch skips per-command rate limiting', () => {
+    const batchBlock = sliceBetween(SERVER_SRC, "url.pathname === '/batch'", "url.pathname === '/command'");
+    expect(batchBlock).toContain('skipRateCheck: true');
+  });
+
+  // Test 12f: /batch skips per-command activity events (emits batch-level events)
+  test('/batch emits batch-level activity, not per-command', () => {
+    const batchBlock = sliceBetween(SERVER_SRC, "url.pathname === '/batch'", "url.pathname === '/command'");
+    expect(batchBlock).toContain('skipActivity: true');
+    // Should emit batch-level start and end events
+    expect(batchBlock).toContain("command: 'batch'");
+  });
+
+  // Test 12g: /batch validates command field in each command
+  test('/batch validates each command has a command field', () => {
+    const batchBlock = sliceBetween(SERVER_SRC, "url.pathname === '/batch'", "url.pathname === '/command'");
+    expect(batchBlock).toContain("typeof cmd.command !== 'string'");
+    expect(batchBlock).toContain('Missing "command" field');
+  });
+
+  // Test 12h: /batch passes tabId through to handleCommandInternal
+  test('/batch passes tabId to handleCommandInternal for multi-tab support', () => {
+    const batchBlock = sliceBetween(SERVER_SRC, "url.pathname === '/batch'", "url.pathname === '/command'");
+    expect(batchBlock).toContain('tabId: cmd.tabId');
+    expect(batchBlock).toContain('handleCommandInternal');
+  });
+
+  // ─── Pair-agent regression tests ──────────────────────────
+
+  // Regression: connect command crashed with "domains is not defined" because
+  // a stray `domains,` variable was in the status fetch body (cli.ts:852).
+  test('connect command status fetch body has no undefined variable references', () => {
+    const connectBlock = sliceBetween(CLI_SRC, 'Launching headed Chromium', 'Connect failed');
+    // The status fetch should use a clean JSON body
+    expect(connectBlock).toContain("command: 'status'");
+    // Must NOT contain a bare `domains` reference in the fetch body
+    // (it would be `domains,` on its own line, not part of a key like `domains:`)
+    const bodyMatch = connectBlock.match(/body:\s*JSON\.stringify\(\{([^}]+)\}\)/);
+    expect(bodyMatch).not.toBeNull();
+    if (bodyMatch) {
+      // The body should only contain command and args, no stray variables
+      expect(bodyMatch[1]).not.toMatch(/\bdomains\b/);
+    }
+  });
+
+  // Regression (pair-agent variant removed in the vendored cut): the headed
+  // connect server must not self-terminate when the CLI exits.
+  test('connect disables parent PID monitoring via BROWSE_PARENT_PID=0', () => {
+    const connectBlock = sliceBetween(CLI_SRC, 'Launching headed Chromium', 'Connect failed');
+    expect(connectBlock).toContain("const serverEnv");
+    expect(connectBlock).toContain("BROWSE_PARENT_PID: '0'");
+  });
+
+  // Regression: newtab returned 403 for scoped tokens because the tab ownership
+  // check ran before the newtab handler, checking the active tab (owned by root).
+  test('newtab is excluded from tab ownership check', () => {
+    const ownershipBlock = sliceBetween(SERVER_SRC, 'Tab ownership check (own-only tokens / pair-agent isolation)', 'newtab with ownership for scoped tokens');
+    // The ownership check condition must exclude newtab
+    expect(ownershipBlock).toContain("command !== 'newtab'");
+  });
+
+  // CVE fix: cookie-picker HTML must NOT inline the auth token.
+  // getCookiePickerHTML() must not accept an authToken parameter.
+  test('cookie-picker UI does not accept or inline auth token', () => {
+    const uiSrc = fs.readFileSync(path.join(import.meta.dir, '../src/cookie-picker-ui.ts'), 'utf-8');
+    // Function signature must not include authToken
+    expect(uiSrc).not.toMatch(/getCookiePickerHTML\([^)]*authToken/);
+    // No AUTH_TOKEN interpolation in template
+    expect(uiSrc).not.toContain("AUTH_TOKEN = '${authToken");
+    expect(uiSrc).not.toContain("AUTH_TOKEN = '${auth");
+  });
+
+  // CVE fix: cookie-picker route handler uses one-time code exchange, not open access.
+  test('cookie-picker HTML route requires code or session cookie', () => {
+    const routeSrc = fs.readFileSync(path.join(import.meta.dir, '../src/cookie-picker-routes.ts'), 'utf-8');
+    // Must have code validation
+    expect(routeSrc).toContain('pendingCodes');
+    expect(routeSrc).toContain('validSessions');
+    // Must NOT pass authToken to getCookiePickerHTML
+    expect(routeSrc).not.toMatch(/getCookiePickerHTML\([^)]*authToken/);
+    // Must set HttpOnly session cookie
+    expect(routeSrc).toContain('HttpOnly');
+    expect(routeSrc).toContain('SameSite=Strict');
+  });
+});

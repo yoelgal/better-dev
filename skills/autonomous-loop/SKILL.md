@@ -87,13 +87,17 @@ the denylist, the gated classes, and the scope number together), then read `.bet
 whose waivers and narrowings win over the recalled baseline. Only when recall comes back empty, fall back
 to the canonical defaults `/guardrails-install` documents - secrets, DB migrations, auth/authz,
 payments/PII, infra and prod config, dependency manifests and lockfiles - rather than re-listing the full
-class definitions here. Add a budget only if the operator set one - an attended loop stops on no
+class definitions here. Verify the mechanical edit boundary while you're here: `/worktree-branching`
+scoped this worktree at creation - it is the boundary's one writer - so `.better-dev/bin/bd-guard status`
+names this tree. A missing boundary is a setup step that got skipped, restored through
+`/worktree-branching`, never by the loop scoping one itself. Add a budget only if the operator set one - an attended loop stops on no
 measurable progress, not an invented cap. A run handed to an unattended or scheduled cadence is the
 exception: it carries a hard turn or wall-clock ceiling, because an uncapped background loop bills
 without limit. That ceiling is a cost floor, not a progress limit - it settles `EXHAUSTED`, never a
 `DONE`. Before re-deriving anything about this area, spend one recall on it (`.better-dev/bin/bd-mem
 recall "<area>"`) - a lesson you already paid for is cheaper than the mistake it prevents, and the first
-receipt cites that recall or an explicit `recall empty`. Run the verify once for a baseline. A red baseline is triaged before any fix points at it (read "Triage the red" below); if it
+receipt cites that recall or an explicit `recall empty`. A recalled lesson is a prior claim, not a
+current fact - verify it against today's code before acting on it. Run the verify once for a baseline. A red baseline is triaged before any fix points at it (read "Triage the red" below); if it
 already exits 0, clean the diff once (read "Clean on the first green") and settle `DONE` ("nothing to
 do") without iterating.
 
@@ -108,13 +112,21 @@ Then each pass:
    saying what to do, an input no scenario covers - that's a contract gap, not a place to pick a
    plausible default: settle `NEEDS_INPUT` with the branch and its options, or route it back to the
    front-end. A guess dressed as a sensible default is the failure this loop exists to prevent.
+   For a fix work-item, read the contract's fix-scope line here, before any dispatch: a broad scope - a
+   file list spanning layers, or `repo-wide` - is wrong-layer suspicion, because a large fix usually
+   means the root cause sits somewhere other than where it's being patched, so re-derive the smallest
+   change at the right seam before writing the brief. A shape that survives that re-derivation gets now
+   what an observed sprawl would get later: the scope tripwire's stop, settled `NEEDS_INPUT` with the
+   predicted shape as the evidence.
 3. **Implement** it, test-first where a test can actually fail for the right reason - for a fix, the
    reproduction is that test: watch it fail, then write the minimal code to pass, one behavior at a time.
    Where a slice has no real behavioral seam, don't add a ceremonial test that passes on arrival; the
    contract's red-capable signal is the proof, and a test that can't fail is scaffolding, not evidence.
    Dispatch a fresh worker for the task (`/orchestrating-agents`, which also sizes the stage's tier - a
    judgment call like triaging a red or the reviewer's verdict earns the top tier, a closed-spec slice
-   runs cheaper); a worker that hits a missing fact asks rather than guessing.
+   runs cheaper); a worker that hits a missing fact asks rather than guessing, and its reply ends in the
+   report trailer `/orchestrating-agents` defines - the trailer's `STATUS`, not the prose around it, is
+   what the pass settles on.
 4. **Re-verify.** Capture the exit code and the failure signature.
 5. **Record.** Append a receipt - tried / result / learned / plan-delta - to `receipts.md`, the *result*
    being the captured command, its exit code, and the output tail rather than a paraphrase of them, and
@@ -135,9 +147,16 @@ untrusted-output rule). Honor the protect-set by escalating rather than editing 
 halves escalating differently: a step that could only pass by editing a test or contract artifact
 settles `BLOCKED` - that fix belongs in the spec, not the loop - while a step that would touch a denylist
 path settles `NEEDS_INPUT` with the evidence, because the blast radius is a human's call, not the loop's.
+Where enforcement is wired (the recorded `safety-enforcement` says hook), the `bd-guard` hook checks the
+same policy mechanically, and a deny or ask it raises is handled the same way: settle `NEEDS_INPUT` with
+the hook's message as the evidence - never retry the write, never lift the boundary to push through.
 And watch for motion that mimics progress: a fix cascading into files it wasn't scoped to, or a refactor
 widening past what the contract asked - catch it mid-pass and re-pick the smallest change that satisfies
-the contract, rather than let it run out to the contract's scope tripwire that would stop it anyway.
+the contract, rather than let it run out to the contract's scope tripwire that would stop it anyway. For
+a fix work-item the contract's fix-scope line makes this checkable, not a vibe: an edit landing outside
+the declared scope is re-picked smaller, or - when the fix genuinely cannot land inside it - settled
+`NEEDS_INPUT` naming the file and the declared scope, because a fix that outgrows its diagnosed scope is
+evidence the root cause sits at a different layer, not permission to widen.
 
 Before settling a pass as done, read `rationalizations.md` - the excuses a stuck loop talks itself into
 and the counter to each.
@@ -182,7 +201,15 @@ without touching the cause:
   it>" 0.8 "<signature>"`) so the next loop's recall isn't empty - that recall pays off only if some loop
   wrote the entry. Only a signature with no known recovery, still red after the retry, settles `BLOCKED`.
 - **Genuine defect** - a real assertion, compile, contract, or logic failure in the code. This is the
-  only red that earns a fix pass.
+  only red that earns a fix pass - and the pass starts with one root-cause look, not an edit: name where
+  the bad value or state was born before touching where it crashed. A guard at the crash site that
+  leaves the origin wrong is a symptom patch the next pass pays for; a defect that resists one look gets
+  diagnosed, not hammered (`/diagnose` owns the full discipline).
+
+One red arrives pre-triaged: an attributed regression test - one whose body carries the attribution
+comment `/diagnose`'s contract requires, naming a past work-item and its root cause - going red is the
+original bug back at its original severity. It is never triaged flake, never deleted; its fix pass
+starts from that work-item's recorded diagnosis, not from scratch.
 
 The bright line: a code, contract, or test failure is never relabelled infra to dodge it - when the
 failing check is the code's own red, it's a defect, not a wait. `/pr-and-verify` classifies CI red
@@ -207,7 +234,9 @@ its own check. Acceptance has two parts the loop doesn't self-grade: a fresh rev
 report and reads the diff, not the claims (`/review`), and runtime observation - the change driven to
 where it executes and watched past its happy path (`/pr-and-verify`). Exit 0 is the working signal,
 runtime observation is the acceptance; a passing command is not yet a driven flow. Critical and Important
-findings go back as a fix pass, then re-review. Cap that cycle: after a small fixed number of rounds
+findings go back as a fix pass, then re-review; the fix pass answers every blocking finding per the
+accept-or-rebut table `/review`'s reception owns - `ACCEPTED` with the fix or `REBUTTED` in one line, and
+a finding answered with silence re-blocks at re-review. Cap that cycle: after a small fixed number of rounds
 (default 2) that don't clear the same findings, stop re-dispatching and settle `EXHAUSTED` with the
 standing findings - two failed rounds means the plan or the seam is wrong, not that a third try lands it.
 Match the review's effort to the diff's blast radius:
@@ -215,7 +244,8 @@ a change that crossed a human-gate class or the scope tripwire calls for `/revie
 in-scope diff earns light. (The adversarial spec-and-standards review is judgment - top tier. A mechanical
 grade - a rubric check, a claim-to-evidence audit, a diff-shape match - is cheap-tier verification per
 `/orchestrating-agents`; size to the kind of check, not the word "review".) Only a clean independent
-verdict turns a green loop into `DONE`.
+verdict - read from the review report's counts block, never reconstructed from its prose - turns a green
+loop into `DONE`.
 
 ## Where it settles
 
@@ -231,7 +261,13 @@ verify-runtime owns the disposition). In short:
 (the command and its exit-0 output) travelling with them as evidence a reviewer reads rather than a
 promise, concerns carried into the PR; a confirmed `NO_PROGRESS` restarts from the contract
 (`restart.md`); `BLOCKED`, `NEEDS_INPUT`, and `EXHAUSTED` stop honestly, each naming the one thing that
-has to change.
+has to change. A terminal state that ends the work-item - `DONE`, `DONE_WITH_CONCERNS` - lifts the edit
+boundary (`.better-dev/bin/bd-guard off`), since a boundary that outlives its work-item is a stale gate
+the next task in this tree trips over. A resumable stop leaves the boundary standing: `BLOCKED`,
+`NEEDS_INPUT`, `EXHAUSTED`, and `NO_PROGRESS` all expect this same work-item to continue, so the
+boundary that scoped it must still hold when it resumes - lifting it here would let the resumed run
+edit unbounded, and in the denylist case would drop the very guard whose deny is awaiting an answer.
+Teardown removes the boundary with the worktree once the item is truly done (`/worktree-branching`).
 
 ## What makes it a loop and not a slot machine
 
@@ -257,6 +293,8 @@ something durable and left no note is unfinished. On `DONE`/`DONE_WITH_CONCERNS`
 core keyed for recall - `.better-dev/bin/bd-mem learn "<lesson>" <confidence> "<signature-key>"` - or
 write an explicit `no durable lesson` line saying why; promote a recurring one with `.better-dev/bin/bd-mem
 remember "<rule>"`. Keep the WHAT filter: capture signature, root cause, and fix, never the transient run
-(a one-off timeout, a flake seed, a machine path). The same law fires earlier too - a root cause a
+(a one-off timeout, a flake seed, a machine path). A recalled lesson a pass applied is cited in that
+pass's receipt as `prior lesson applied: <key> (confidence <c>, from <date>)`, so the operator can audit
+what the store contributed. The same law fires earlier too - a root cause a
 stuck-check named before a restart, the infra recovery recorded under "Triage the red" - so a lesson
 lands where it's learned, not only at the finish. When you revise this skill, follow `/writing-skills`.

@@ -2,7 +2,8 @@
 
 The acceptance check for a done-criterion is what the change *does* when it runs, observed directly. This
 is the discipline `/pr-and-verify` step 3 runs, that `/autonomous-loop` points at for its end-to-end
-handoff, and that a GUI check narrows onto its own surface. Where the host ships `/verify`, compose it as
+handoff, that a GUI check narrows onto its own surface, and that `/release-promotion`'s deploy-verify
+pass runs against the deployed surface. Where the host ships `/verify`, compose it as
 the executor; where it doesn't (Codex, pi, a bare host), this is the rubric to run inline. Same standard
 either way. Runtime and UI verification benefit from a context separate from the one that produced the
 diff - the maker's context inherits the maker's blind spots.
@@ -24,6 +25,7 @@ an internal function is not a surface, so trace its caller out to one of these r
 | CLI / TUI | the terminal | type the command, capture the pane |
 | Server / API | the socket | send the request, read the response body |
 | GUI | the pixels | drive it under Playwright / computer-use, screenshot and actually look |
+| Mobile app | the device or simulator screen | install the build, drive the flow by touch, screenshot and actually look |
 | Library | the public export | exercise the package boundary, never `import ./src/...` |
 | Migration / data | the store | run it, read the rows and the resulting schema back |
 | Prompt / agent config | the agent | run it and capture what it does |

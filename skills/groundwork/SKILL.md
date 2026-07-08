@@ -22,7 +22,10 @@ architecture conventions, or a house way of slicing work wins over any default b
 ## 1. Shape the idea
 
 Settle the *what* and the broad shape before the substrate: the stack, the broad architecture, and the
-core domain model - enough to know what the foundation has to hold, not the full design.
+core domain model - enough to know what the foundation has to hold, not the full design. Put the
+idea's premise on trial first, in two lines: the outcome the epic serves and whether this build is
+the most direct path to it, and what it costs to build nothing - an epic that fails either line
+reframes with the user before any foundation is designed.
 
 If `/to-prd`, `/codebase-design`, or `/domain-modeling` are installed, compose them rather than
 re-deriving: `/to-prd` synthesizes the problem, solution, and user stories; `/codebase-design` gives the

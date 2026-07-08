@@ -1,0 +1,26 @@
+{
+  "name": "bd-browse",
+  "version": "0.1.0",
+  "description": "better-dev's vendored cut of gstack's browse/ - persistent localhost Chromium daemon for agent-driven browser checks. Upstream: garrytan/gstack (MIT), see UPSTREAM and LICENSE-upstream.",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun run src/cli.ts",
+    "server": "bun run src/server.ts",
+    "build": "bun build --compile --external sharp --external chromium-bidi src/cli.ts --outfile dist/browse && git rev-parse HEAD > dist/.version && chmod +x dist/browse",
+    "check": "bun build --target=bun --external sharp --external chromium-bidi src/cli.ts src/server.ts --outdir /tmp/bd-browse-check",
+    "test": "bun test test/"
+  },
+  "dependencies": {
+    "diff": "^7.0.0",
+    "playwright": "^1.58.2",
+    "socks": "^2.8.8"
+  },
+  "engines": {
+    "bun": ">=1.0.0"
+  },
+  "devDependencies": {
+    "sharp": "^0.35.3"
+  }
+}

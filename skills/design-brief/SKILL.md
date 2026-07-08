@@ -31,14 +31,23 @@ There are two honest states. Pick one and be plain about which:
 - The read maps to a system with an official package (Material, Radix, shadcn, a GOV.UK or USWDS
   obligation). Install and use that package. Don't hand-recreate its CSS, don't import its tokens then
   override most of them, don't restyle its primitives ad hoc. One system per project.
-- No official package fits. Then you are choosing an aesthetic direction, not adopting a system. Name
-  it, build it on the project's own stack, and say plainly in a comment what is borrowed inspiration
-  versus real material.
+- No official package fits. Then you are choosing an aesthetic direction, not adopting a system.
+  Record it as a direction card, three parts: the name, the three-to-five principles the direction
+  commits to, and what its audit prioritizes - the two or three questions a reviewer of this direction
+  asks first. "Matches the stated direction" is checkable only against this card; a bare label is a
+  vibe with a name. Build it on the project's own stack, and say plainly in a comment what is borrowed
+  inspiration versus real material.
 
 Either way, record the choice so the next feature inherits it instead of reinventing it: the token set
 and the named direction go into `.better-dev/overrides.md` (via `.better-dev/bin/bd-mem
 persist-override "<line>"`). This is the frozen shared interface `/groundwork` pins for a UI product - a
 design decided per-feature is two worktrees styling the same button differently.
+
+The recorded token set names one token source in the repo - CSS custom properties, a Tailwind theme, a
+tokens module - and that file is the visual contract. The loop inherits one deviation criterion from
+it: every color, spacing, and radius value in the diff resolves to the token source, and a raw hex or
+magic pixel value outside it is a finding, greppable, not a taste call. The override line points at
+the token source; the contract lives in code, where it cannot drift from what ships.
 
 ## 3. Compose the host's design skill; source one on a gap
 
@@ -53,7 +62,8 @@ skill ships the practice, not a taste.
 
 A visual property becomes a done-criterion only when it names something observable: renders at the
 target widths without overflow, uses the recorded token set rather than ad-hoc values, passes a
-guideline or contrast audit over a captured screenshot, matches the stated direction. Feed those into
+guideline or contrast audit over a captured screenshot, matches the stated direction per its card,
+and comes up clean on the tell audit and trunk test in `slop-and-checks.md`. Feed those into
 the contract as first-class done-criteria (`/plan-grill` step 4).
 
 "Looks polished" is not a criterion, and "it looks good to me" is a self-report, not a check. A
@@ -61,14 +71,14 @@ screenshot is the artifact, not the verdict - a captured PNG nobody audited is n
 criterion is proven the same way any end-to-end criterion is: the render is driven and audited via
 `/browser-capability`, never asserted from the author's eye.
 
-## 5. Per-project tell-bans - derive them, don't inherit a list
+## 5. Tell-bans - seed list plus per-project additions
 
-An "AI tell" is a checkable ban, not a taste. The method: for this project, derive a short list of tells
-to ban as things you can count or measure, not adjectives - "at most one uppercase-tracked eyebrow per
-three sections," "the palette is the token set, no ad-hoc hex," not "avoid a generic look." The repo's
-em-dash ban is already one such rule. Record the list in `.better-dev/overrides.md` so the audit in
-step 4 checks the render against it. Don't bake a universal ban list into this skill - the specific
-tells are per-project; only the method travels.
+An "AI tell" is a checkable ban, not a taste. The seed tells - the model-default patterns every
+unguided generation reaches for - ship with this skill; the full list, the clean-or-flag audit form,
+and the trunk test live in `slop-and-checks.md` beside this file. Per project: add tells you can
+count or measure ("the palette is the token set, no ad-hoc hex" - the repo's em-dash ban is the same
+species) and prune seed items that do not apply, recording additions in `.better-dev/overrides.md`.
+The audit in step 4 checks the render against the combined list, item by item.
 
 ## 6. Redesign mode - audit against the brief, name what can't change silently
 
@@ -76,6 +86,13 @@ On an existing UI, classify the mode first: preserve the current direction or ov
 Misreading that is the biggest source of a bad redesign. Then audit the render against the brief and
 emit ranked violations - worst first, each naming the tell it breaks and the direction it should match -
 not a flat "make it nicer."
+
+Redesign mode captures a baseline before any fix: screenshot the affected pages and run the step-4
+audit once - the ranked violations are readings against that baseline. Every claimed fix is proven by
+an after screenshot audited by the same checklist as its before, and the final pass re-runs the full
+audit; a final result worse than the baseline is a named regression in the report, never absorbed. The
+ranked violations close with a gap statement: one paragraph naming what the top of the scale looks
+like for this product, specific enough that a worker could aim at it.
 
 Some things never change silently without an explicit decision: route slugs, primary nav labels, form
 field names and their order, the brand wordmark, existing legal or consent copy. Changing one of those

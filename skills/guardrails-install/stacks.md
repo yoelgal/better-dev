@@ -93,15 +93,22 @@ scanner the repo already has, else a grep over the staged diff for high-signal s
 # prefer a real scanner if the repo carries one:
 #   gitleaks protect --staged   |   trufflehog git file://. --since-commit HEAD --only-verified   |   detect-secrets-hook
 # otherwise a stack-agnostic grep over the staged diff:
-if git diff --cached -U0 | grep -nE '(api[_-]?key|secret|password|token)[[:space:]]*[:=]|-----BEGIN [A-Z ]*PRIVATE KEY-----|AKIA[0-9A-Z]{16}' ; then
+if git diff --cached -U0 | grep -inE '[a-z0-9_]*(api[_-]?key|secret|password|token)[a-z0-9_]*[[:space:]]*[:=][[:space:]]*["'\'']?[A-Za-z0-9+/_=-]{12,}["'\'']?|-----BEGIN [A-Z ]*PRIVATE KEY-----|AKIA[0-9A-Z]{16}' ; then
   echo "guardrails: possible secret in staged diff (line above) - remove it, or rotate the key if already pushed" >&2
   exit 1
 fi
 ```
 
-It matches on shape, so it false-positives on a variable literally named `token`; that is the safe
-direction. A hit blocks the commit, not the file - unstage it or, if the secret already reached a remote,
-rotate the key (a committed secret is compromised; deleting the line is not enough).
+It matches on value shape: an assignment of a 12-plus-character literal to a key-named variable, a PEM
+block, or an AWS key id. The key word may sit inside a compound identifier (`SECRET_KEY`,
+`AWS_SECRET_ACCESS_KEY`), and the value class covers base64 padding (`==`), so a padded key still fires;
+there is no end-of-line anchor, so an inline secret with a trailing comment fires too. It does not fire on
+a type declaration (`session_token: string;` - the value is too short) or a member-access reference
+(`token: session.token,`, `auth.slice('Bearer '.length)` - a dotted identifier is a reference, and a dot
+is not key material here, so the run is under the length floor). Code that names tokens is not a
+credential; code that carries one is. A hit blocks the commit, not the file - unstage it or, if the secret
+already reached a remote, rotate the key (a committed secret is compromised; deleting the line is not
+enough).
 
 ## CI check
 
@@ -129,26 +136,40 @@ Add it only when no workflow already runs these checks. An existing CI file is o
 install and the audit step are the supply-chain gate: a run resolves the committed tree, not a drifted one,
 and a known-vulnerable dependency fails the gate rather than shipping green.
 
-## Agent-side git safety (Claude Code)
+## Enforcement wiring for a clone install (Claude Code)
 
-A `PreToolUse` Bash hook that refuses destructive git before it runs - offered, not imposed, and only for a
-host that supports it. A small script reads the tool input, matches the command against a blocked-pattern
-list (`git push`, `git reset --hard`, `git clean -fd`, `git branch -D`, `git checkout .` / `git restore .`,
-`--force`), and exits non-zero with a short message when it hits one; otherwise exits 0. Wire it into the
-target settings (`.claude/settings.json` for this project, `~/.claude/settings.json` for all projects) under
-`hooks.PreToolUse` with a `Bash` matcher, **merging** into any existing hooks array rather than replacing it.
-Ask which patterns the operator wants before writing, and confirm the scope. Other hosts express the same
-idea through their own pre-execution hook, or go without - `/worktree-branching` already isolates the risk.
+A plugin install already carries the two `PreToolUse` entries in its `hooks.json` - write nothing. A
+clone install wires the same script into the repo's settings, on the operator's explicit yes. The
+destructive-pattern set, the safe rm-target allowlist, and the obfuscated-shell deny all live inside
+`bd-guard` - the settings carry only the wiring, never a pattern copy:
 
-The same hook can refuse the obfuscated-shell injection class - a command that hides or assembles another
-command - which is the real prompt-injection vector, distinct from a straight destructive command. High-signal
-shapes to add to the blocked list (these are near-always injection, rarely legitimate):
-
-```sh
-# refuse: parameter-transform / indirection / eval-like construction
-grep -qE '\$\{[A-Za-z_][A-Za-z0-9_]*@P\}|\$\{![A-Za-z_]|\beval\b|\|[[:space:]]*(ba)?sh\b' <<<"$COMMAND"
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          { "type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR/.better-dev/bin/bd-guard\" check-bash", "timeout": 5 }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|NotebookEdit",
+        "hooks": [
+          { "type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR/.better-dev/bin/bd-guard\" check-edit", "timeout": 5 }
+        ]
+      }
+    ]
+  }
+}
 ```
 
-Keep the message short and the exit non-zero. For a real-world irreversible side effect the hook cannot see
-(a remote resource delete, a prod write), the discipline lives in the loop and `/security-pass`, not the
-hook: confirm that specific action, and a prior approval does not extend to the next one.
+Three rules make the write safe: **merge, never replace** - an existing `hooks.PreToolUse` array
+survives byte-for-byte, these entries append to it; **per-repo consent** - `.claude/settings.json` is
+machine config, so the write happens once per repo on an explicit yes, and a re-run that finds the
+entries already present writes nothing; **verify the envelope** - `bd-guard` emits Claude Code's nested
+`hookSpecificOutput.permissionDecision` shape, and a wrong envelope fails silently (the same trap
+`bootstrap-hooks/porting.md` records for `SubagentStart`), so after wiring, pipe one destructive
+fixture through `check-bash` and confirm the host actually asks. Other hosts express the same idea
+through their own pre-execution hook, or record `safety-enforcement: prose` and go without -
+`/worktree-branching` already isolates most of the risk.

@@ -26,6 +26,21 @@ on the verdict - usually the fix worker - works through it like this:
    remaining blockers, the simple fixes, the structural ones. Verify each fix before the next; don't batch
    them into one untested sweep.
 
+## Accept or rebut - one disposition per blocking finding
+
+Steps 2-3 are an obligation, not a permission: every blocking finding ends the fix pass with exactly one
+written disposition - no third state, and silence is not a disposition:
+
+| Finding | Disposition | Fix or reason |
+|---|---|---|
+| its `file:line` | `ACCEPTED` / `REBUTTED` | the hunk or commit that answers it, or one line of technical reasoning plus the code or test that shows it |
+
+A finding with no row is `persistent` at re-review and re-blocks - it never just fades out of the
+conversation. And acceptance is a change, not a sentence: re-review checks each `ACCEPTED` row against
+the new diff, and an accepted finding whose cited seam the new diff never touches is itself a new
+finding, not a pass. Record the table through the memory contract alongside the per-cycle statuses
+below, so the next cycle reads dispositions, not vibes.
+
 Skip the performative acknowledgements - "you're absolutely right", "great catch", any thanks. The changed
 code shows you heard the feedback. State the fix and move on. If you pushed back and turned out wrong, say
 so plainly ("checked it - you're right, it does X; fixing") and continue, no long apology.
@@ -43,6 +58,12 @@ fixed it either stays gone or returns as regressed/reopened with its cause. A fi
 between cycles is a bookkeeping failure, not a pass. Carry this per-cycle status through the memory
 contract (`.better-dev/bin/bd-mem`) so the next cycle and the end-of-branch pass both see it.
 
+When reception overturns a grading, that is a calibration event, not just a fix: a finding the reviewer
+demoted to `⚠️` or Minor that proves out as a real Critical or Important, or a `REBUTTED` row later shown
+right. Record the corrected pattern -
+`.better-dev/bin/bd-mem learn "<pattern> - graded low at review, confirmed real" <confidence 0..1>
+"<recall key>"` - so the next review grades it on sight instead of relearning the doubt.
+
 ## Documented deviations, judged on merit
 
 The claim-blind channels never see the worker's report, so a deviation is judged here, at reception,
@@ -50,4 +71,6 @@ where the report is read - never inside the review channels. An in-scope adaptat
 obstacle for and documented in its report is judged on merit, not reflex-blocked: keep it where the
 adaptation serves the contract's intent and stays in scope. An equivalent change with no such note is
 silent drift, and a finding. The merit is in the documenting, not in the deviating - an undocumented
-adaptation, however sensible, still drifted the plan without saying so.
+adaptation, however sensible, still drifted the plan without saying so. The Spec channel's per-criterion
+table feeds this judgment: a `CHANGED` row names a goal met by different means than the plan described -
+match it against the worker's documented note and judge it by the same merit test.

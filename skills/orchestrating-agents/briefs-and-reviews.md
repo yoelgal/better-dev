@@ -17,6 +17,9 @@ What belongs in the brief:
 - The task itself, and the exact values it must use verbatim: numbers, magic strings, signatures, test
   cases. These live in the brief, not in your prose around it.
 - Interfaces and decisions from earlier tasks that the brief can't derive on its own.
+- Lessons that bear on this task's area: the relevant `learned` lines from this work-item's receipts,
+  and anything `.better-dev/bin/bd-mem recall "<area>"` returns. A pitfall one worker already paid for
+  is cheaper in the brief than rediscovered in the run.
 - Your resolution of any ambiguity you noticed while writing it - don't pass a known ambiguity through.
 - For a worker that writes files, the repo's high-consequence denylist, pasted in with the standing
   instruction to escalate rather than edit. A fresh worker can't see the repo's guardrails, so the brief
@@ -26,9 +29,10 @@ What belongs in the brief:
   the rule surface only at review. `/guardrails-install` records that list per repo; recall it with
   `.better-dev/bin/bd-mem recall "safety"`, then apply any `.better-dev/overrides.md` adjustments (which
   win), so the brief carries this repo's actual set rather than a generic one.
-- The report file path and the report skeleton the worker fills (the fields in `/orchestrating-agents`).
-  Ask for structured, capped output - a fixed skeleton, a named length bound. A report with no bound
-  sprawls to fill the worker's patience, and every unrequested line is spend; a bound stops it.
+- The report file path, and the report trailer the reply must end with (the **Report** bullet in this
+  skill's SKILL.md defines the keys - point at it, don't restate them; `bd-dispatch brief` emits the
+  block). Ask for structured, capped output - a fixed skeleton, a named length bound. A report with no
+  bound sprawls to fill the worker's patience, and every unrequested line is spend; a bound stops it.
 
 A dispatched worker does not inherit your security disposition. Any brief that has a worker read repo files
 or report on secrets carries, verbatim, the two load-bearing rules from `/security-pass`: a secret finding
@@ -103,9 +107,23 @@ same worker to retry unchanged:
 - `DONE_WITH_CONCERNS` - read the concerns first. If they touch correctness or scope, address them before
   review; if they're observations, note them and proceed.
 
+## Worker questions batch through you
+
+A dispatched worker never interrupts the user. A genuine preference question it hits goes one of two
+ways: if the work item cannot proceed without the answer, it settles `NEEDS_INPUT` as above; otherwise it
+writes the question as one line in its report file, counts it in the trailer's `QUESTIONS` key, proceeds
+on a recorded default, and tags the affected spot in its output so the answer can find it later. Between
+rounds you collect the question lines from every non-zero report, merge the ones asking the same thing in
+different words, and put at most the round's question budget to the user in one numbered message -
+default three per round; an override can change it. Answers broadcast into every subsequent brief. An
+answer that contradicts a worker's recorded default sends that item back as a fix dispatch - never a
+silent divergence between runs. Questions past the budget carry to the next round's collection; dropping
+one silently is the same dishonesty as a silent coverage cap.
+
 ## When a worker comes back empty, or a fan-out has holes
 
-A worker can error and return nothing at all - not `BLOCKED`, not `DONE`, just no claim. In a parallel
+A worker can error and return nothing at all - not `BLOCKED`, not `DONE`, just no claim. A reply with no
+report trailer lands here too: a status buried in prose is not a claim. In a parallel
 fan-out, one worker erroring doesn't fail the batch; it leaves a *null hole* in the results while the rest
 resolve. Filter the holes out before you merge, then treat each one as its own re-dispatch: a worker that
 returned nothing is not a worker that returned "done," and mapping over the batch as if every slot were
@@ -115,7 +133,18 @@ a merged answer is the same dishonesty as a silent cap on coverage.
 ## Retry vs relaunch
 
 Re-dispatching an unchanged brief to the same worker just reruns the same failure - change something first
-(more context, a smaller slice, a more capable worker, per the terminal-state table above). And a
+(more context, a smaller slice, a more capable worker, per the terminal-state table above).
+
+A re-dispatch also carries the prior attempt's lessons: put the `learned` lines from the work-item's last
+receipt (`.better-dev/bin/bd-mem ledger read <work-item> receipts.md`, tail) and the prior trailer's
+`BLOCKER` under the `## Prior attempts - do not re-enter` heading in the new brief - `bd-dispatch brief`
+emits the slot on any brief past the first. The retried worker's report file closes each carried lesson
+explicitly: addressed (what it did differently) or recurred (it hit the same wall). A recurred lesson
+means the decomposition is wrong, not the worker - it counts toward the two-failures rule, so the next
+move is re-decompose or escalate, never a third identical retry. The receipts stay append-only: the
+carry-forward reads them and writes a new receipt; it never rewrites an old one.
+
+And a
 *relaunch* is a fresh spawn, not a continuation: it doesn't inherit the tier, the tools, or the
 constraints of the run it resumes. Re-pin the model tier and the constraints explicitly on every relaunch.
 A resumed worker silently dropping to a weaker default is a real and expensive failure - it looks exactly

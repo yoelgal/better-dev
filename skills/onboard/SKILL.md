@@ -56,7 +56,7 @@ A read-only sweep. Report each as *observed value + where*, then move on:
 ls CLAUDE.md AGENTS.md 2>/dev/null                        # entry file(s)
 grep -l '@AGENTS.md' CLAUDE.md 2>/dev/null                # which imports which
 ls -d .better-dev .better-dev/bin .mcp.json 2>/dev/null   # prior data scaffold? bin bridge? MCP?
-ls "$HOME/.claude/skills/.better-dev-install" "$HOME/.codex/skills/.better-dev-install" 2>/dev/null  # tool installed? (marker holds clone path)
+ls "$HOME"/.*/skills/.better-dev-install "$HOME"/.config/*/skills/.better-dev-install 2>/dev/null  # tool installed for any host? (marker holds clone path)
 git rev-parse --is-inside-work-tree 2>/dev/null && git branch --format='%(refname:short)'
 git remote -v 2>/dev/null | head -1
 ```
@@ -131,7 +131,8 @@ refresh):
 
 ```bash
 sd=""
-for m in "$HOME/.claude/skills/.better-dev-install" "$HOME/.codex/skills/.better-dev-install"; do
+# Glob, don't name hosts: any adapter's convention leaves the marker at <skills-dir>/.better-dev-install.
+for m in "$HOME"/.*/skills/.better-dev-install "$HOME"/.config/*/skills/.better-dev-install; do
   [ -f "$m" ] && sd="$(cat "$m")/scripts" && [ -f "$sd/bd-mem" ] && break
 done
 if [ -n "$sd" ] && [ -f "$sd/bd-link" ]; then
@@ -195,7 +196,7 @@ for your host, not vendored here). Say what you want; the right skill enters, an
 | "X is broken / failing / slow", "why is prod down" | `/diagnose` | -> `/autonomous-loop` -> `/pr-and-verify` |
 | "let's build an app that does Y", a new project or epic | `/groundwork` | sets the foundation, then per-item front-ends |
 | "ship it", "open a PR", "let's land this" | `/pr-and-verify` | -> `/release-promotion` on green |
-| "release this", "promote to main", "hotfix prod" | `/release-promotion` | tags and double-merges the hotfix |
+| "release this", "promote to main", "hotfix prod", "did the deploy land / is prod healthy" | `/release-promotion` | tags, verifies the release live, double-merges the hotfix |
 | "make it look good", "design the page" | `/design-brief` | -> `/plan-grill` or the loop |
 | "is this safe", a security pass on a risky diff | `/security-pass` | composed by `/review` automatically |
 | "is there a tool or skill for X" | `/tool-sourcing` | -> `/self-extension` only if discovery is empty |
