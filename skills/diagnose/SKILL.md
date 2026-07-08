@@ -206,8 +206,9 @@ rather than asserted:
 
 Then hand to `/autonomous-loop`. The same loop that builds features drives this red→green: it writes
 the regression test, watches it fail, applies the fix, watches it pass, and re-runs the Phase 1 signal
-against the original scenario. The fix's done-contract is exactly *red signal goes green + regression
-test at a correct seam* - no new discipline for the loop to learn.
+against the original scenario. The fix's done-criteria are exactly *red signal goes green + regression
+test at a correct seam* - no new discipline for the loop to learn; the merge line above rides the
+contract for the PR stage, not the loop.
 
 When the diagnosis was fresh (recall found nothing), close the loop that Phase 3 opened: propose
 capturing the **failure signature → root cause + fix** through `.better-dev/bin/bd-mem learn` so the

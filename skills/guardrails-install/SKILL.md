@@ -190,17 +190,19 @@ this skill's prose above is the authoritative home for what each key means:
 .better-dev/bin/bd-mem remember "safety-denylist: <detected globs>"    # the paths a loop edit escalates on, not edits
 .better-dev/bin/bd-mem remember "safety-gate: <classes with a real surface here>"
 .better-dev/bin/bd-mem remember "safety-scope: <n>"                    # files touched that trip the scope gate; ~10 default
-.better-dev/bin/bd-mem remember "merge-policy: <auto-on-green | human>" # who merges a gates-passed green PR
+.better-dev/bin/bd-mem remember "merge-policy: <auto-on-green | human>" # standing allowance: who MAY merge a gates-passed green PR
 ```
 
 The merge policy is recorded the same way the branch structure is - detected, proposed, written on a yes.
-The default is `auto-on-green`: a PR whose change came through the loop's review and gates merges when CI
-is green, because the gates were the approval and a standing human sign-off re-reviews settled work. Record
+The proposed default is `auto-on-green`: the agent MAY merge a PR whose change came through the
+loop's review and gates - an allowance the operator grants here once, not a merge that happens by
+itself; each work-item still answers its own seal question before any merge fires. Record
 `human` where the base's branch protection requires a reviewing approval, or where the operator wants one -
 stakes, not habit, earn that gate. `/pr-and-verify` recalls this at entry: the recording is the
 standing *allowance*, never the act - each work-item's contract carries its own `merge: auto | hold`
-line (the seal question `/plan-grill`'s done-contract defines), and only an `auto-on-green` recording
-plus that item's `merge: auto` lets the agent merge. An unset policy holds the merge for the operator.
+line (the seal question `/plan-grill`'s done-contract defines); the recording alone never merges
+anything. `/pr-and-verify`'s DONE state owns the full merge condition; an unset policy holds the
+merge for the operator.
 
 Where `auto-on-green` is recorded and the host has a permission config, wire the allowance so the
 merge command actually runs without a prompt or classifier at the moment it is earned: on the Claude
