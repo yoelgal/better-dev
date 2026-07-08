@@ -25,7 +25,12 @@ Optional - add only when a skill actually needs it:
   *agent* must apply on its own - like this authoring standard, which the self-extension flow needs when it
   writes a skill. Those stay **model-invoked** so the agent can reach them. Omit the key to auto-fire.
 - `argument-hint` - e.g. `[feature-slug]`, shown at the `/name` prompt.
-- `allowed-tools` - narrow the tools the skill may reach for.
+- `allowed-tools` - grant exactly the tools the body's steps name, and omit the key when the job
+  genuinely needs the whole toolbox. An advise-only skill - a review, an audit, a map - grants
+  read-and-run tools and no Write/Edit: a reviewer that can edit the code it judges is one
+  rationalization away from doing so. Set the grant from the finished body, not from intent - a grant
+  narrower than the body's own steps kills the run mid-skill, which is worse than no grant. A host
+  that doesn't honor the key ignores it, so a correct grant costs nothing.
 
 Never put `version`, `license`, or prose in frontmatter.
 
@@ -45,6 +50,9 @@ Never put `version`, `license`, or prose in frontmatter.
   blocking tone principle 2 bans, and a firm sentence with a reason holds a gate where raised volume only
   adds noise. Do not soften a real gate into a hedge either: "please try to", "ideally", and "if possible"
   read as optional, and an optional gate is no gate. Say the rule once, at full strength, in a calm voice.
+- When a skill pins an output shape - a report trailer, a verdict block, a table - show the shape once
+  as a filled example, never only a prose description of it. An executor reproduces a shown format; a
+  described one drifts into a new shape per run. One example earns its lines; a gallery doesn't.
 - When you revise a skill rather than write one, cut before you add. Hardcoded process steps and defensive
   repetition written for a weaker model cap a stronger one, so the fix for a skill that under-performs is
   usually a deletion, not another rule. Every instruction you keep pairs with the failure it prevents; one
