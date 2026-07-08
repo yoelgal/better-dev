@@ -95,7 +95,7 @@ shared skills are never rewritten to encode your preference.
 | Group | Skills |
 |---|---|
 | **Enter & set up** | `onboard` · `groundwork` · `guardrails-install` |
-| **Scope a work-item** | `plan-grill` (feature) · `diagnose` (fix) · `design-brief` (UI direction) |
+| **Scope a work-item** | `plan-grill` (feature) · `diagnose` (fix) · `codebase-audit` (no item yet) · `design-brief` (UI direction) |
 | **Isolate & drive** | `worktree-branching` · `autonomous-loop` · `orchestrating-agents` · `review` · `security-pass` |
 | **Ship** | `pr-and-verify` · `release-promotion` |
 | **Self-improve** | `tool-sourcing` · `self-extension` |
