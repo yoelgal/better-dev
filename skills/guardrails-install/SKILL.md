@@ -197,8 +197,17 @@ The merge policy is recorded the same way the branch structure is - detected, pr
 The default is `auto-on-green`: a PR whose change came through the loop's review and gates merges when CI
 is green, because the gates were the approval and a standing human sign-off re-reviews settled work. Record
 `human` where the base's branch protection requires a reviewing approval, or where the operator wants one -
-stakes, not habit, earn that gate. `/pr-and-verify` recalls this at entry and holds the merge only when
-something recorded says to.
+stakes, not habit, earn that gate. `/pr-and-verify` recalls this at entry: the recording is the
+standing *allowance*, never the act - each work-item's contract carries its own `merge: auto | hold`
+line (the seal question `/plan-grill`'s done-contract defines), and only an `auto-on-green` recording
+plus that item's `merge: auto` lets the agent merge. An unset policy holds the merge for the operator.
+
+Where `auto-on-green` is recorded and the host has a permission config, wire the allowance so the
+merge command actually runs without a prompt or classifier at the moment it is earned: on the Claude
+family that is the merge command in the project's `.claude/settings.local.json` allow list (a
+gitignored personal grant - `/worktree-branching` mirrors it into fresh worktrees; propose the write,
+never add it silently). A host with no permission config needs no wiring - the recorded rule is the
+whole allowance, and the host's own approval flow stays whatever it is.
 
 Two more durable safety rules travel with the policy - the *why* behind the denylist lives in
 `/security-pass`, not here; these are the standing rules a green check does not by itself satisfy:

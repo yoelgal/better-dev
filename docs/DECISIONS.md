@@ -243,6 +243,19 @@ Full plan: `raw/synthesis/2026-07-08-links-harvest/master-plan.md`.
   frontmatter (unverified, host-specific); week-later log scheduler (D12); Carmack pride persona
   (D14); plan-time press-release step.
 
+## D16 - consent-based auto-merge (2026-07-08; user-ratified)
+Auto-merge is opt-in at two layers. (1) The standing allowance: `/guardrails-install` records
+`merge-policy: auto-on-green | human` (proposed at onboard, written on a yes) and, where the host has
+a permission config, wires the merge-command grant beside it (Claude family:
+`.claude/settings.local.json`, mirrored to worktrees) so an earned merge runs without a prompt; a
+host without a permission config needs no wiring. (2) The per-work-item consent: every contract seal
+(features via /plan-grill, fixes via /diagnose) asks - only when the allowance is recorded - whether
+this item merges automatically on DONE or holds for the operator, recorded as the contract's typed
+`merge: auto | hold` line. `/pr-and-verify` merges only on `merge: auto` + recorded `auto-on-green` +
+no other gate; a hold line, a missing line, or an unset policy all hold - silence is never consent.
+This flips the previous default (agent merges unless something recorded says otherwise); recorded
+project overrides are unaffected and still win.
+
 ## Tracer-bullet findings (2026-07-03, on the papers.town clone) - bind Phase 1
 Ran `onboard` + one feature slice → staging end-to-end on the real clone (locally, no push). Proven, plus:
 1. **Helpers → `.better-dev/bin/`** (bare `scripts/` collides with the project's own - see D0 install contract).

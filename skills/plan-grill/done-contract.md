@@ -226,6 +226,10 @@ reality doesn't match the plan, the loop stops here and reports rather than impr
 ## Open concerns
 Anything unresolved. If one blocks the plan, the state is NEEDS_INPUT - stop, don't guess.
 
+## Merge
+merge: <auto | hold> - <auto only where the repo records merge-policy: auto-on-green and the
+user said auto for this item at seal; hold otherwise, including when no policy is recorded>
+
 ## Ground truth
 Verdict from the baseline check + link to ground-truth.md.
 ```
@@ -239,6 +243,8 @@ Before you pin the contract, each line reads yes or the contract isn't ready:
 - Every criterion names its concrete observable - a value, status, row, or output line.
 - Every number in Problem and Goal carries a named source or a `TBD(<owner>)` marker - an unsourced
   number is an invented one.
+- The Merge line reads `auto` or `hold` - `auto` only where the repo records
+  `merge-policy: auto-on-green` AND the user chose auto for this item (asked at seal, never assumed).
 - The stop conditions are specific to this plan's real risks, not boilerplate.
 - No secret values appear anywhere - locations and credential types only.
 - Every promoted objection and lens finding has its matching contract line - an open concern, an
@@ -251,6 +257,14 @@ predict-the-next-three-questions check already ran; this is the last read before
 of them.
 
 ## Approval is pinned to the contract's content
+
+At the same confirmation, settle the Merge line. Where the repo records
+`merge-policy: auto-on-green` (`.better-dev/bin/bd-mem recall "merge-policy"`), ask one question
+beside the contract confirm: when the loop settles DONE and every gate passes - independent review,
+CI, the driven done-criteria - merge into the integration branch automatically, or hold the green PR
+for your look? Record the answer as the contract's `merge:` line. Where the policy is `human` or
+nothing is recorded, skip the question and write `merge: hold` with the reason - the standing
+allowance is `/guardrails-install`'s to grant, never this seal's to improvise.
 
 When the user confirms the contract, pin the approval to its bytes with
 `.better-dev/bin/bd-mem ledger approve <work-item>` - it records a content hash of `contract.md` beside
