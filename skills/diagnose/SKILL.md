@@ -200,11 +200,15 @@ rather than asserted:
   seam. The test body carries a one-line attribution comment - the work-item slug and the one-sentence
   root cause - so a future red on this test identifies itself as *this bug recurring*, not as a new
   mystery or a flake candidate.
+- **Merge disposition** - the same seal question `/plan-grill`'s done-contract defines settles the
+  fix-contract's `merge: auto | hold` line; a fix earns auto-merge exactly the way a feature does,
+  never by being "just a fix".
 
 Then hand to `/autonomous-loop`. The same loop that builds features drives this red→green: it writes
 the regression test, watches it fail, applies the fix, watches it pass, and re-runs the Phase 1 signal
-against the original scenario. The fix's done-contract is exactly *red signal goes green + regression
-test at a correct seam* - no new discipline for the loop to learn.
+against the original scenario. The fix's done-criteria are exactly *red signal goes green + regression
+test at a correct seam* - no new discipline for the loop to learn; the merge line above rides the
+contract for the PR stage, not the loop.
 
 When the diagnosis was fresh (recall found nothing), close the loop that Phase 3 opened: propose
 capturing the **failure signature → root cause + fix** through `.better-dev/bin/bd-mem learn` so the
