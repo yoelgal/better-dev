@@ -28,6 +28,11 @@ or "as appropriate," it isn't decomposed yet - that ambiguity is yours to resolv
 the judgment work in your own hands: decomposition, ambiguous design, user interaction, destructive
 actions, and the final synthesis. Workers get the bounded pieces.
 
+Fan out from a clean slate. Parallel work never starts over an unfinished background operation - a
+still-running worker, an unmerged lane, an unread report - because two actors over unknown state is how
+one surface gets edited twice. State the current world first (what is running, what settled, what is
+pending), then propose the fan-out.
+
 ## The dispatch verb (agent-agnostic)
 
 Dispatch means: hand a fresh, isolated-context worker a file brief and let it run. It never inherits
@@ -220,6 +225,11 @@ finished work - the most expensive failure there is.
   re-dispatch nothing already done.
 - You own the progress surface; isolated workers can't touch your todo list. Flip a task to in-progress
   before you spawn, and to done the moment you parse its receipt. Exactly one in-progress at a time.
+- Report on milestones, with the artifact. When the human names a milestone ("when all three merge",
+  "when the page renders"), the report at that milestone carries the artifact itself - the URL, the
+  screenshot, the merged-PR list - never a status sentence about it, and visual work reports with the
+  visual without being asked. Between named milestones, silence; a human who has to poll is a
+  reporting failure.
 - Run continuously between tasks - no "should I continue?" check-ins. Stop only at a genuine terminal
   state: a `BLOCKED` you can't resolve, `NEEDS_INPUT`, or all tasks done. An error or an exhausted budget
   is never a success.
