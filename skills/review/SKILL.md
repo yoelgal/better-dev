@@ -163,8 +163,8 @@ GATE_BREACH: <n>
 
 `CANNOT_VERIFY` counts the `⚠️ cannot verify from the diff` items; `GATE_BREACH` counts blast-radius
 policy findings (step 5 routes them). The counts are the interface; the moves stay in step 5:
-`CRITICAL + IMPORTANT = 0` and `GATE_BREACH = 0` is the clean verdict (`DONE`, or `DONE_WITH_CONCERNS` when `MINOR` or
-`CANNOT_VERIFY` is non-zero); any blocking count routes to the fix worker; `GATE_BREACH > 0` is
+`CRITICAL + IMPORTANT + MINOR = 0` and `GATE_BREACH = 0` is the clean verdict (`DONE`, or `DONE_WITH_CONCERNS`
+when `CANNOT_VERIFY` is non-zero or a reviewer-accepted `REBUTTED` row stands); any finding count routes to the fix worker; `GATE_BREACH > 0` is
 `NEEDS_INPUT` regardless of the rest. A counts block that disagrees with the prose is a reporting defect -
 fix the report, don't pick a line. When this review runs as a dispatched worker, the reply also ends with
 the report trailer `/orchestrating-agents` defines, its `STATUS` derived from these counts; the counts
@@ -174,13 +174,13 @@ block is review's own record, not that trailer.
 
 The severity ladder is **Critical · Important · Minor** (`reviewer-brief.md` defines each; a stated
 rationale never lowers a finding's severity, and a `⚠️ cannot verify from the diff` item is reported, not
-buried). Each tier maps to a gate action: Critical and Important **block** - they gate the merge and go to
-the fix worker; Minor **suggests** - recorded, never blocking. Map the aggregate onto the loop's
-terminal-state vocabulary from `/autonomous-loop`:
+buried). Every tier maps to the same gate action: it **blocks** - each finding is fixed or rebutted
+in-loop before the change lands; severity sets fix order and review effort, never whether a finding
+gets addressed. Map the aggregate onto the loop's terminal-state vocabulary from `/autonomous-loop`:
 
-- No Critical or Important, at most Minor → **DONE** (or **DONE_WITH_CONCERNS** if Minor items or ⚠️
-  cannot-verify items remain).
-- Any Critical or Important → not done. These feed the loop's **fix worker** - a third context, not the
+- Zero findings of any tier → **DONE** (or **DONE_WITH_CONCERNS** when only ⚠️ cannot-verify items or
+  reviewer-accepted `REBUTTED` rows remain - the residue no fix pass can retire).
+- Any finding, Minor included → not done. These feed the loop's **fix worker** - a third context, not the
   implementer and not a reviewer - which addresses only the listed findings; then re-review the new diff.
 - A `⚠️ cannot verify from the diff` item the reviewer couldn't settle is for the orchestrator to check
   itself (or escalate as **NEEDS_INPUT** if it needs the human or the contract).
@@ -196,11 +196,12 @@ that clears the most findings at once. Several findings often trace back to a si
 that fix first retires them together and beats working a severity-sorted list one item at a time.
 `reception.md` works the set in that order.
 
-Persist Minor findings and unresolved ⚠️ items through the memory contract
-(`.better-dev/bin/bd-mem remember "<finding>"`) so the end-of-branch pass sees them. The whole-branch review
+Persist reviewer-accepted `REBUTTED` rows and unresolved ⚠️ items through the memory contract
+(`.better-dev/bin/bd-mem remember "<finding>"`) so the end-of-branch pass sees them - fixed findings
+need no carry. The whole-branch review
 before a PR into staging runs this same skill once more over the full range.
 
-When the verdict is clean - no Critical or Important - record it to the work-item's ledger so the PR stage
+When the verdict is clean - zero open findings of any tier - record it to the work-item's ledger so the PR stage
 can confirm the change was reviewed without re-running the review:
 
 ```

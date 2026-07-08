@@ -46,7 +46,7 @@ exhausted budget to a success state.**
 | State | Meaning | Absorbs |
 |---|---|---|
 | `DONE` | proven against done-criteria | SDD DONE, grind SUCCESS, loopy success/clean-no-op |
-| `DONE_WITH_CONCERNS` | proven, non-blocking flags | SDD DONE_WITH_CONCERNS |
+| `DONE_WITH_CONCERNS` | proven; residue no fix pass can retire (accepted rebuttals, cannot-verify, doc judgment calls) - never an unaddressed fixable finding (D17) | SDD DONE_WITH_CONCERNS |
 | `BLOCKED` | external blocker, can't proceed | grind/SDD BLOCKED, loopy blocked |
 | `NEEDS_INPUT` | needs human/context/approval | SDD NEEDS_CONTEXT, loopy approval-required |
 | `EXHAUSTED` | budget/iterations hit | grind BUDGET_EXHAUSTED, loopy exhausted |
@@ -255,6 +255,18 @@ this item merges automatically on DONE or holds for the operator, recorded as th
 no other gate; a hold line, a missing line, or an unset policy all hold - silence is never consent.
 This flips the previous default (agent merges unless something recorded says otherwise); recorded
 project overrides are unaffected and still win.
+
+## D17 - all findings fixed in-loop; seal consent mechanically gated (2026-07-08; user directive)
+From the papers.town nim-inference retro. (1) Every review finding blocks, Minor included: the fix
+pass answers all of them (fixed or rebutted per reception's table), and a clean verdict means zero
+open findings of any severity. `DONE_WITH_CONCERNS` narrows to residue no fix pass can retire -
+reviewer-accepted rebuttals, unresolved cannot-verify items, judgment-call doc concerns. Severity now
+sets fix order and review effort, never whether a finding gets addressed. (2) `bd-mem ledger approve`
+refuses a contract without a `merge: auto | hold` line, so D16's seal question cannot be skipped.
+(3) `/pr-and-verify` never opens drafts - a hold is expressed by not merging, and a draft hides an
+earned green. (4) Settling `DONE`/`DONE_WITH_CONCERNS` requires a non-empty `receipts.md` - an
+unrecorded loop settles nothing. (5) Reviewer-brief calibration: an abuse vector that drains a finite
+budget or paid resource is at least Important.
 
 ## Tracer-bullet findings (2026-07-03, on the papers.town clone) - bind Phase 1
 Ran `onboard` + one feature slice → staging end-to-end on the real clone (locally, no push). Proven, plus:

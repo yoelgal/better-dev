@@ -185,10 +185,12 @@ Three tiers, and each maps to a gate action. Categorize by real severity - not e
 - **Critical** - broken behaviour, data-loss risk, a security hole, an incorrect contract. **Blocks** -
   must fix before the change lands.
 - **Important** - this change can't be trusted until it's fixed: a missed requirement, fragile or incorrect
-  logic, swallowed errors, a test that asserts nothing, verbatim duplication of a logic block, or
-  maintainability damage you'd block a merge over. **Blocks** - should fix before it lands.
-- **Minor** - polish, naming, a coverage gap that could be broader, an optimization. **Suggests** -
-  recorded, never blocking.
+  logic, swallowed errors, a test that asserts nothing, verbatim duplication of a logic block, an abuse
+  vector that drains a finite budget or paid resource, or maintainability damage you'd block a merge over.
+  **Blocks** - should fix before it lands.
+- **Minor** - polish, naming, a coverage gap that could be broader, an optimization. **Blocks like the
+  rest** - fixed or rebutted in-loop before the change lands, last in fix order; a finding never rides
+  into the PR unaddressed.
 
 When you're between two tiers, take the lower one. One wrong finding costs a reviewer more than one missed
 finding - if you're not confident, don't inflate it.

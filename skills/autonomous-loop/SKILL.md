@@ -278,8 +278,8 @@ The loop's own green is not the acceptance verdict - the two stay separate so th
 its own check. Acceptance has two parts the loop doesn't self-grade: a fresh reviewer that distrusts the
 report and reads the diff, not the claims (`/review`), and runtime observation - the change driven to
 where it executes and watched past its happy path (`/pr-and-verify`). Exit 0 is the working signal,
-runtime observation is the acceptance; a passing command is not yet a driven flow. Critical and Important
-findings go back as a fix pass, then re-review; the fix pass answers every blocking finding per the
+runtime observation is the acceptance; a passing command is not yet a driven flow. Findings of every
+severity, Minor included, go back as a fix pass, then re-review; the fix pass answers every finding per the
 accept-or-rebut table `/review`'s reception owns - `ACCEPTED` with the fix or `REBUTTED` in one line, and
 a finding answered with silence re-blocks at re-review. Cap that cycle: after a small fixed number of rounds
 (default 2) that don't clear the same findings, stop re-dispatching and settle `EXHAUSTED` with the
@@ -304,7 +304,9 @@ or an observed behavior from this run, or it carries an explicit `unverified` la
 verify-runtime owns the disposition). Before settling `DONE` or `DONE_WITH_CONCERNS`, re-run
 `.better-dev/bin/bd-mem ledger check-approval <work-item>` - the entry check proved the contract was
 clean when driving started; this one proves nothing edited it since. A re-opened gate settles
-`NEEDS_INPUT` naming the edit, never a done state. The same moment re-hashes the protect-set's pins
+`NEEDS_INPUT` naming the edit, never a done state. The same moment reads the work-item's `receipts.md`:
+at least one iteration entry, or the loop ran unrecorded - write the receipts from the session's actual
+tried/result/learned trail before settling, because an unrecorded loop settles nothing. The same moment re-hashes the protect-set's pins
 (the protect-set paragraph in "The loop" owns the disposition). In short:
 `DONE` / `DONE_WITH_CONCERNS` hand off to the PR-into-staging gate (`/pr-and-verify`), the recorded green
 (the command and its exit-0 output) travelling with them as evidence a reviewer reads rather than a
