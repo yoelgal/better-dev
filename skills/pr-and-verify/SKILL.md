@@ -122,7 +122,9 @@ then, because a clean verdict is the price of a push, it re-reviews the new diff
 records the fresh verdict to the ledger keyed to the new HEAD *before* those commits leave the worktree.
 Only then do they push, CI re-runs, and this skill re-reads the signal against the updated record. The
 re-review runs off the open PR, so the PR never waits on a reviewer - and the thing that writes the fix is
-never the thing that grades it green.
+never the thing that grades it green. When the re-run goes green, the root cause travels with it: the
+report names why the signal was red - the diagnosis, not just the recovery - because a bare "fixed" is a
+claim, and the cause is what makes the green trustworthy.
 
 Two failures are not fix passes. When the only blocker is one external condition the fix loop cannot touch -
 a base PR not yet green, an infra incident, a dependency PR that has to land first - do not dead-end on a

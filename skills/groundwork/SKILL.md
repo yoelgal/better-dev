@@ -21,11 +21,20 @@ architecture conventions, or a house way of slicing work wins over any default b
 
 ## 1. Shape the idea
 
-Settle the *what* and the broad shape before the substrate: the stack, the broad architecture, and the
-core domain model - enough to know what the foundation has to hold, not the full design. Put the
-idea's premise on trial first, in two lines: the outcome the epic serves and whether this build is
-the most direct path to it, and what it costs to build nothing - an epic that fails either line
-reframes with the user before any foundation is designed.
+The cheapest questions come before any design, and they are about the problem, not the solution.
+Put the idea's premise on trial first, in two lines: the outcome the epic serves and whether this
+build is the most direct path to it, and what it costs to build nothing - an epic that fails either
+line reframes with the user before any foundation is designed. For a greenfield product, two
+reality questions run beside that trial: has the user personally felt this problem, recently - and
+who is the second user? Thin answers to both get said out loud before the foundation is built, not
+discovered hundreds of prompts in; proceeding is still the user's call, made knowingly. In the same
+pass, pin the one differentiating idea in a sentence - the bet everything else orbits, the thing
+later features get weighed against - and when the project exists to accelerate other work (tooling,
+a harness, a meta-layer), name the concrete product work it accelerates; a product that doesn't
+exist yet is the finding, not a footnote.
+
+Then settle the *what* and the broad shape before the substrate: the stack, the broad architecture, and
+the core domain model - enough to know what the foundation has to hold, not the full design.
 
 If `/to-prd`, `/codebase-design`, or `/domain-modeling` are installed, compose them rather than
 re-deriving: `/to-prd` synthesizes the problem, solution, and user stories; `/codebase-design` gives the
@@ -105,7 +114,11 @@ When two candidate items both want the same file, that shared thing is usually a
 the foundation - push it down into step 2 rather than letting both items edit it. What can't be pushed
 down gets **sequenced**: the dependent item runs in a later wave, off staging, once the item it depends
 on has merged. The output is a list of named work-items, each with its owned areas, its base, and
-whether it's a feature (`/plan-grill`) or a fix (`/diagnose`). For the fuller method - the file-ownership
+whether it's a feature (`/plan-grill`) or a fix (`/diagnose`). A product epic's list also carries a
+distribution work-item - where this ships to real users, by when, shown to how many - tracked like any
+other item. Deferring it is legitimate only as an explicit tracked deferral, never a silent omission: a
+plan whose every item is build and none is reach is a build plan wearing a product plan's name. For the
+fuller method - the file-ownership
 map, the contention check across many items, the three ways to resolve a collision, and ordering items
 into waves - read `carving.md`.
 

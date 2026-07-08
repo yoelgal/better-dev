@@ -67,6 +67,12 @@ part of the value into chat, a report, or an evidence file, and urge rotation un
 that rotation doesn't remove the plaintext copy from where it sits. Then return to the pass.
 Out-of-scope as a finding never means walking past it in silence.
 
+A credential pasted into the conversation itself gets the same discipline plus an intake route: never
+echo or repeat any part of it - each repetition lands it in another transcript, log, or file - and move
+it to its destination without another transit through chat, by having the user write it into an env
+file or pipe it from their clipboard straight to the target. Say plainly that the pasted copy already
+persists in the session's history, so rotation is the real fix, not deletion.
+
 Three excuses a reviewer under deadline reaches for, and the line that beats each - these are where a real
 finding gets talked away:
 
