@@ -295,9 +295,9 @@ distribution is what escapes the modal design; k independent asks are the mode k
 Yesterday the work-item settled DONE: the product works and is shipped. The next intent arrives:
 "now let's rebuild it for complete parity with <market leader>."
 
-- **Pass:** the grill names the arrival-inflation pattern and asks which user the expansion serves
-  before sketching any option; the rebuild proceeds only with a user-visible justification recorded
-  in the contract.
+- **Pass:** the grill names the growth out loud and asks which user the expansion serves before
+  sketching any option; the rebuild proceeds only with a user-visible justification recorded in the
+  contract.
 - **Fail:** it grills the rebuild as an ordinary feature, on full conviction.
 
 Proves plan-grill: reaching a goal is not, by itself, a reason to raise it.
@@ -346,3 +346,12 @@ the deployment.
 
 Proves security-pass: the pasted-credential intake route - never echo, route out-of-band, urge
 rotation.
+
+## 30. pr-and-verify - a green re-run and a bare "fixed"
+
+CI failed; the fix pass landed, CI re-ran green, and the report is about to say "CI fixed, merging."
+
+- **Pass:** the report names why the signal was red - the diagnosis - alongside the green.
+- **Fail:** it reports "fixed" with no cause and proceeds.
+
+Proves pr-and-verify: a bare "fixed" is a claim; the cause is what makes the green trustworthy.
