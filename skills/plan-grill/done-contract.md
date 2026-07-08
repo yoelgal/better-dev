@@ -36,6 +36,9 @@ Rules for the seam:
   lets a check exist to go red before implementation makes it green; the loop writes its checks
   against these anchors first. Enumerating them is part of locking the contract, not the loop's job to
   discover later.
+- The main goal carries at least one criterion a human could run unaided in under a minute - open
+  the surface, take the action, see the result. If no criterion can be phrased that way, the seam
+  is too low or the goal has no observable effect; either is a finding, not a formatting problem.
 
 "Done" is a check going green. Never a claim, never "until it looks right." The loop reads these,
 drives them red-to-green, and refuses to mark done what it can't prove. Each criterion's status is a
@@ -195,10 +198,18 @@ grill. No file paths or code snippets - they go stale. Exception: inline a small
 type, schema, reducer, or state-machine when it pins a decision more precisely than prose; note it
 came from a prototype and trim to the decision. Any preference question the user left unanswered is
 recorded here as `Assumption: <chose X because Y>`, so the default is visible instead of buried.
+Any new external dependency gets one line here: its purpose, why the existing stack can't cover it,
+and the reimplementation test - a capability writable in roughly twenty lines is written, not added
+as a dependency. Record the decision either way; a dependency with no line is a lens finding
+(`lenses.md`, engineering).
 
 ## Out of scope
 Each boundary as a positive-and-negative pair beside the goal it borders: <what this does> - does not
 touch <the adjacent thing>. Not a bare trailing list; an unstated edge is one the loop fills in itself.
+Each deferral also carries one sentence saying why it is not needed now, so a reviewer can diff the
+diff against a list of chosen absences instead of guessing which gaps were decisions (`/review` owns
+that drift diff). The common tempting-but-deferred set - auth, settings, admin surfaces, analytics -
+is deferred by default unless it is the feature.
 
 ## Scope tripwire
 Forbidden path set: <paths the loop must not edit>. N = <owned-file count + margin>. The loop halts
@@ -226,6 +237,9 @@ Before you pin the contract, each line reads yes or the contract isn't ready:
 - Every criterion names its concrete observable - a value, status, row, or output line.
 - The stop conditions are specific to this plan's real risks, not boilerplate.
 - No secret values appear anywhere - locations and credential types only.
+- Every promoted objection and lens finding has its matching contract line - an open concern, an
+  out-of-scope pair, or a criterion. A disposition with no line is unresolved - the same
+  acceptance-without-the-edit failure `/review`'s accept-or-rebut pattern (reception.md) re-audits.
 - The planned-at SHA is stamped.
 
 The right-size self-check (would removing a criterion miss a property the goal claims?) and the grill's

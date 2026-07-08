@@ -21,14 +21,17 @@ architecture conventions, or a house way of slicing work wins over any default b
 
 ## 1. Shape the idea
 
-For a greenfield product, the cheapest questions come before any design, and they are about the
-problem, not the solution: has the user personally felt this problem, recently - and who is the second
-user? Thin answers to both get said out loud before the foundation is built, not discovered hundreds
-of prompts in; proceeding is still the user's call, made knowingly. In the same pass, pin the one
-differentiating idea in a sentence - the bet everything else orbits, the thing later features get
-weighed against - and when the project exists to accelerate other work (tooling, a harness, a
-meta-layer), name the concrete product work it accelerates; a product that doesn't exist yet is the
-finding, not a footnote.
+The cheapest questions come before any design, and they are about the problem, not the solution.
+Put the idea's premise on trial first, in two lines: the outcome the epic serves and whether this
+build is the most direct path to it, and what it costs to build nothing - an epic that fails either
+line reframes with the user before any foundation is designed. For a greenfield product, two
+reality questions run beside that trial: has the user personally felt this problem, recently - and
+who is the second user? Thin answers to both get said out loud before the foundation is built, not
+discovered hundreds of prompts in; proceeding is still the user's call, made knowingly. In the same
+pass, pin the one differentiating idea in a sentence - the bet everything else orbits, the thing
+later features get weighed against - and when the project exists to accelerate other work (tooling,
+a harness, a meta-layer), name the concrete product work it accelerates; a product that doesn't
+exist yet is the finding, not a footnote.
 
 Then settle the *what* and the broad shape before the substrate: the stack, the broad architecture, and
 the core domain model - enough to know what the foundation has to hold, not the full design.

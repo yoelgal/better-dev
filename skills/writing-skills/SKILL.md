@@ -92,6 +92,21 @@ exact spot the excuse shows up.
 | Answer first, report honestly | Lead with the outcome; if a step was skipped or a check failed, say so with the output. | A buried finding, a manufactured green, a hedged non-report. |
 | Name the mistakes that look like competence | The rationalization table itself: name the specific excuse that skips a gate under pressure. | The gate that never bit because its excuse went unnamed. |
 
+### The close-out
+
+A skill whose run can settle something durable ends with a close-out at its terminal moment - `DONE`, a
+fresh diagnosis, an incident, an adoption - never mid-run. The close-out is one call or one sentence:
+record the single keyed lesson (`.better-dev/bin/bd-mem learn "<lesson>" <confidence> "<key>" [<source>]`)
+or write an explicit `no durable lesson` line saying why. Two tests gate the write, and failing either
+means the `no durable lesson` line is the correct output: the line names a cause, technique, or standing
+fact - an event of this run ("fixed the typo", "CI was slow today", "PR merged") is a ledger receipt, not
+a lesson; and it would save a future session more time than it costs every future recall it appears in.
+The negative-lesson filter binds here as everywhere: never a transient "X is broken". A lesson recalled
+and used during the run is cited in the receipt as
+`prior lesson applied: <key> (confidence <c>, from <date>)` so the operator can audit what the store
+contributed. Each skill inlines only its own one-line close-out at its exit point; this section is the
+full form it points to.
+
 ## Composability & overrides
 
 - A skill **adds**; it never disables or replaces what the project already has installed.

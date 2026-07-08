@@ -67,6 +67,42 @@ for j in .claude-plugin/plugin.json hooks/hooks.json; do
   jq -e . "$j" >/dev/null 2>&1 && ok "$j" || bad "$j invalid JSON"
 done
 
+echo "== host adapters =="
+# hosts/ is the single host registry (install.sh and bd-uninstall enumerate it), so a broken adapter
+# ships breakage to a user machine unless it fails here: source-clean, required fields, name equals
+# filename, skills dir under HOME, no two hosts claiming one dir, dir-policy in its enum.
+seen_dirs=""
+for a in hosts/*; do
+  [ -f "$a" ] || continue
+  h="$(basename "$a")"
+  bd_host_name=""; bd_host_display=""; bd_host_cli=""; bd_host_skills_dir=""; bd_host_dir_policy=""
+  if ! . "./$a" 2>/dev/null; then bad "hosts/$h does not source cleanly"; continue; fi
+  errs=""
+  [ "$bd_host_name" = "$h" ]         || errs="$errs name!=filename($bd_host_name)"
+  [ -n "$bd_host_display" ]          || errs="$errs no-display"
+  [ -n "$bd_host_cli" ]              || errs="$errs no-cli"
+  case "$bd_host_skills_dir" in "$HOME"/*) ;; *) errs="$errs skills-dir-not-under-HOME" ;; esac
+  case "$bd_host_dir_policy" in ""|create|require-existing) ;; *) errs="$errs bad-dir-policy($bd_host_dir_policy)" ;; esac
+  case " $seen_dirs " in *" $bd_host_skills_dir "*) errs="$errs duplicate-skills-dir" ;; esac
+  seen_dirs="$seen_dirs $bd_host_skills_dir"
+  [ -z "$errs" ] && ok "hosts/$h" || bad "hosts/$h:$errs"
+done
+
+echo "== link sites =="
+# Static invariant: every link site routes through _link_or_copy (install.sh) / link_or_copy (bd-link),
+# the one place carrying the Windows copy fallback. A raw ln anywhere else regresses that silently.
+raw=""
+for f in install.sh scripts/*; do
+  [ -f "$f" ] || continue
+  [ "$(basename "$f")" = "bd-package-check" ] && continue   # this file names the pattern it greps for
+  n="$(grep -c 'ln -s' "$f" 2>/dev/null || true)"
+  allowed=0
+  case "$f" in install.sh|scripts/bd-link) allowed=1 ;; esac   # exactly the helper body's one call
+  [ "${n:-0}" -gt "$allowed" ] && raw="$raw $f"
+done
+[ -z "$raw" ] && ok "every link site routes through the symlink-or-copy helper" \
+  || bad "raw ln outside the helper in:$raw (route new link sites through _link_or_copy)"
+
 # Informational only: a backtick `/word` is used for real skill invocations, but also for illustrative
 # examples, placeholders (`/name`), URL paths (`/dashboard`), and flow names (`/learn`) - too ambiguous to
 # gate on. Surface unknowns for a human glance; don't fail the build.
@@ -84,10 +120,30 @@ echo "== em/en dash gate =="
 # under LC_ALL=C so this holds on BSD grep (no -P) as well as GNU. Covers the shipped surfaces.
 em="$(printf '\342\200\224')"; en="$(printf '\342\200\223')"
 dash_hits=""
-for f in $(find skills scripts docs hooks -type f 2>/dev/null; ls install.sh README.md BOOTSTRAP.md 2>/dev/null); do
+# The authored files inside the vendored daemon trees are under the no-dash rule too; the upstream .ts
+# sources are not (their comments legitimately carry dashes), so scan only what we wrote. Each `ls` is
+# its own existence guard - absent on a consumer install that did not vendor them.
+vendored_authored="browse/README.md browse/UPSTREAM browse/scripts/check-upstream.sh ios-qa/README.md ios-qa/UPSTREAM ios-qa/scripts/check-upstream.sh"
+for f in $(find skills scripts docs hooks hosts -type f 2>/dev/null; ls install.sh README.md BOOTSTRAP.md $vendored_authored 2>/dev/null); do
   LC_ALL=C grep -lq -e "$em" -e "$en" "$f" 2>/dev/null && dash_hits="$dash_hits $f"
 done
 [ -z "$dash_hits" ] && ok "no em/en dashes in shipped text" || bad "em/en dash in:$dash_hits"
+
+echo "== vendored daemons (lint-shape only) =="
+# The vendored daemon trees (browse/, ios-qa/) are NOT behaviorally CI-gated here: this lints their dir
+# shape only. Each must carry its provenance (UPSTREAM), license (LICENSE-upstream), and README.md, and
+# must commit no build output (node_modules/ or dist/ - git-tracked, not just on disk). A consumer install
+# may not vendor these dirs, so skip silently when absent.
+for vd in browse ios-qa; do
+  [ -d "$vd" ] || continue
+  errs=""
+  for req in UPSTREAM LICENSE-upstream README.md; do
+    [ -f "$vd/$req" ] || errs="$errs missing-$req"
+  done
+  git ls-files "$vd" 2>/dev/null | grep -qE '(^|/)(node_modules|dist)/' && errs="$errs committed-build-output"
+  [ -z "$errs" ] && ok "$vd/ vendored shape ok (lint-shape only, not behaviorally CI-gated)" \
+    || bad "$vd/:$errs"
+done
 
 echo "== manifest version =="
 v="$(jq -r '.version // empty' .claude-plugin/plugin.json 2>/dev/null)"
@@ -108,24 +164,58 @@ utt groundwork    "greenfield" "new project" "from scratch" "foundation"
 utt pr-and-verify "pull request" "open a pr" " pr "
 [ $fail = 0 ] && ok "entry skills carry canonical user phrasings" || true
 
-echo "== install/uninstall roundtrip =="
-# Prove the two lifecycle deliverables stay honest together: a clean HOME installs, links resolve, a
-# planted foreign skill is left alone, and bd-uninstall removes only ours.
-rt="$(mktemp -d)"
-mkdir -p "$rt/.claude/skills/review"; printf 'not ours\n' > "$rt/.claude/skills/review/SKILL.md"
-if HOME="$rt" "$ROOT/install.sh" --host claude >/dev/null 2>&1 \
-   && [ -L "$rt/.claude/skills/packaging" ] \
-   && [ -f "$rt/.claude/skills/.better-dev-install" ] \
-   && [ ! -L "$rt/.claude/skills/review" ] \
-   && HOME="$rt" "$ROOT/scripts/bd-uninstall" global --host claude --yes >/dev/null 2>&1 \
-   && [ ! -e "$rt/.claude/skills/packaging" ] \
-   && [ ! -f "$rt/.claude/skills/.better-dev-install" ] \
-   && [ -f "$rt/.claude/skills/review/SKILL.md" ]; then
-  ok "install links resolve, uninstall cleans ours, foreign skill survives"
+echo "== install/uninstall roundtrip (every adapter) =="
+# Prove the two lifecycle deliverables stay honest for every registered host: a clean HOME installs,
+# links resolve, a planted foreign skill is left alone, and bd-uninstall removes only ours. Pre-creating
+# the skills dir satisfies require-existing hosts, so the same loop covers both dir policies.
+for a in hosts/*; do
+  [ -f "$a" ] || continue
+  h="$(basename "$a")"
+  rt="$(mktemp -d)"
+  hd="$(HOME="$rt" bash -c 'source "$1" && printf %s "$bd_host_skills_dir"' _ "$a" 2>/dev/null)"
+  if [ -z "$hd" ]; then bad "roundtrip $h: adapter yields no skills dir"; rm -rf "$rt"; continue; fi
+  mkdir -p "$hd/review"; printf 'not ours\n' > "$hd/review/SKILL.md"
+  if HOME="$rt" "$ROOT/install.sh" --host "$h" >/dev/null 2>&1 \
+     && [ -L "$hd/packaging" ] \
+     && [ -f "$hd/.better-dev-install" ] \
+     && [ ! -L "$hd/review" ] \
+     && HOME="$rt" "$ROOT/scripts/bd-uninstall" global --host "$h" --yes >/dev/null 2>&1 \
+     && [ ! -e "$hd/packaging" ] \
+     && [ ! -f "$hd/.better-dev-install" ] \
+     && [ -f "$hd/review/SKILL.md" ]; then
+    ok "roundtrip $h: install links resolve, uninstall cleans ours, foreign skill survives"
+  else
+    bad "install/uninstall roundtrip: $h"
+  fi
+  rm -rf "$rt"
+done
+
+echo "== require-existing decline (skills dir absent) =="
+# The roundtrip above pre-creates every skills dir, so require-existing's DECLINE branch never runs there.
+# Cover it directly: for one require-existing host with its skills dir ABSENT, install must decline without
+# creating the dir and without linking anything. (Known install.sh defect, owned by another worker: the
+# decline branch still does installed++, so a declined host is miscounted as installed - asserted on the
+# observable dir side here, not the counter.)
+re_host=""; re_adapter=""
+for a in hosts/*; do
+  [ -f "$a" ] || continue
+  pol="$(HOME=/nonexistent bash -c 'source "$1" && printf %s "${bd_host_dir_policy:-require-existing}"' _ "$a" 2>/dev/null)"
+  [ "$pol" = "require-existing" ] && { re_host="$(basename "$a")"; re_adapter="$a"; break; }
+done
+if [ -z "$re_host" ]; then
+  ok "no require-existing host registered (decline path N/A)"
 else
-  bad "install/uninstall roundtrip"
+  rt="$(mktemp -d)"
+  hd="$(HOME="$rt" bash -c 'source "$1" && printf %s "$bd_host_skills_dir"' _ "$re_adapter" 2>/dev/null)"
+  rm -rf "$hd"   # ensure the skills dir is absent
+  HOME="$rt" "$ROOT/install.sh" --host "$re_host" >/dev/null 2>&1
+  if [ ! -d "$hd" ] && [ ! -f "$hd/.better-dev-install" ]; then
+    ok "require-existing $re_host: install declined, skills dir not created, nothing linked"
+  else
+    bad "require-existing $re_host: install did not decline with skills dir absent (dir or marker present)"
+  fi
+  rm -rf "$rt"
 fi
-rm -rf "$rt"
 
 echo
 [ $fail = 0 ] && echo "package-check: PASS ($(ls skills/ | wc -l | tr -d ' ') skills)" || { echo "package-check: FAIL"; exit 1; }

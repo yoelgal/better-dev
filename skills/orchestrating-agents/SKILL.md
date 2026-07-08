@@ -107,6 +107,17 @@ dispatch verb arranged for a job, not a new mechanism:
   next brief. Either way the point holds: one agent picks the first plausible theory and stops - several
   arguing don't.
 
+**Anchor the judges.** When a shape grades candidates - a judge panel picking a winner, a grader worker
+checking an artifact against a rubric - a bare "score it 1-10" collapses to vibes, so hand every judge
+the same anchored rubric: one anchor sentence per grade saying what an artifact at that grade concretely
+looks like (a top grade "satisfies every stated criterion with a runnable check per claim", a floor grade
+"misses the task or contradicts the brief"); a short list of named penalties, each subtracting a stated
+amount (an unverified claim, a criterion with no check, an unrequested scope add); and a declared
+tie-break cascade so near-ties resolve the same way across judges (say: correctness beats completeness
+beats polish). Each judge returns its grade with the anchor sentence it matched, not a naked number. The
+grades are advisory prose for picking a winner inside the shape - recorded nowhere - and a review verdict
+is never one of them: `/review` stays severity-gated, never averaged.
+
 **No silent caps.** When a shape bounds coverage - a top-N, a no-retry, a sample - record what it dropped
 in the ledger. A silent truncation reads as "covered everything" when it didn't; that is a dishonest
 report, not an efficient one. The same honesty covers a fan-out that came back with holes: report the
@@ -127,18 +138,29 @@ and is re-read every turn. Move artifacts as files instead:
   high-consequence denylist with the standing instruction to escalate rather than edit those paths (settle
   `NEEDS_INPUT`), so a fresh worker doesn't discover the rule only at review. Not your session history.
   `.better-dev/bin/bd-dispatch brief <work-item> <role>` writes a skeleton into the shared ledger and prints its path.
-- **Report** - the worker writes its full report to a file and returns a compact filled skeleton, not
-  prose:
-  - **STATUS** - one of the terminal states (`DONE`, `DONE_WITH_CONCERNS`, `BLOCKED`, `NEEDS_INPUT`,
-    `EXHAUSTED`, `NO_PROGRESS`).
-  - **STEPS** - per step: done or skipped, plus the check's result.
-  - **STOPPED BECAUSE** - if not `DONE`: which stop condition, and what was observed.
-  - **FILES CHANGED** - the list.
-  - **NOTES** - deviations, surprises, judgment calls.
+- **Report** - the worker writes its full report (steps taken, files changed, deviations, judgment
+  calls, and the full line for each question it parked) to the report file named in the brief, and ends
+  its reply with the **report trailer**: the last lines of the reply, one key per line, nothing after
+  them.
 
-  Name the report file in the brief. Before returning, the worker audits every claim in the report against
-  a session tool result (`/pr-and-verify` verify-runtime owns this disposition) - an unverified claim says
-  so plainly.
+  ```
+  STATUS: <one of DONE | DONE_WITH_CONCERNS | BLOCKED | NEEDS_INPUT | EXHAUSTED | NO_PROGRESS>
+  VERIFY: <command> -> exit <code>   (or: not run - <one-line why>)
+  COMMITS: <shas, or none>
+  BLOCKER: <one line>                (required unless STATUS is DONE or DONE_WITH_CONCERNS)
+  CONCERNS: <one line, or none>
+  QUESTIONS: <count, or none>        (the question lines themselves live in the report file)
+  ```
+
+  The trailer is the control-flow interface between worker and orchestrator: branch on `STATUS` exactly
+  as written and pass it to `bd-dispatch record` unedited - the script rejects anything off-vocabulary.
+  The prose above the trailer is context, never the verdict; a status implied in a paragraph but absent
+  from the trailer does not exist. A reply with no trailer is not a report - treat it as the
+  worker-came-back-empty case and re-dispatch; don't reconstruct a status from the prose. A review
+  dispatched as a worker ends with this same trailer, its `STATUS` derived from its own counts block
+  (`/review` owns that block; it is review's record, never a second trailer). Before writing the trailer,
+  the worker audits every claim in the report file against a session tool result (`/pr-and-verify`
+  verify-runtime owns this disposition) - an unverified claim says so plainly.
 - **Review inputs** - the reviewer gets the same brief, the report file, a diff package, and the
   work-item slug, all as files or plain values, never the diff pasted into the prompt. The slug resolves
   the shared ledger, so the reviewer can read the work-item's `approvals.log`
@@ -217,14 +239,14 @@ wire no router.
 Conversation memory doesn't survive compaction, and a controller that loses its place re-dispatches
 finished work - the most expensive failure there is.
 
-- Record each dispatch as a ledger receipt: `.better-dev/bin/bd-dispatch record <work-item> <role> <state> [note]`, using
-  the canonical terminal states - `DONE`, `DONE_WITH_CONCERNS`, `BLOCKED`, `NEEDS_INPUT`, `EXHAUSTED`,
-  `NO_PROGRESS`. The ledger lives in the primary checkout's `.better-dev/ledger/<work-item>/`, shared
-  across worktrees; `bd-dispatch` pins it there so a worker in a feature worktree records to the same
-  place. After a compaction, `.better-dev/bin/bd-dispatch pending <work-item>` lists what isn't finished - resume those,
+- Record each dispatch as a ledger receipt: `.better-dev/bin/bd-dispatch record <work-item> <role> <state> [note]`, where
+  `<state>` is the reply's trailer `STATUS`, passed through unedited. The ledger lives in the primary
+  checkout's `.better-dev/ledger/<work-item>/`, shared across worktrees; `bd-dispatch` pins it there so a
+  worker in a feature worktree records to the same place. After a compaction, `.better-dev/bin/bd-dispatch pending <work-item>` lists what isn't finished - resume those,
   re-dispatch nothing already done.
 - You own the progress surface; isolated workers can't touch your todo list. Flip a task to in-progress
-  before you spawn, and to done the moment you parse its receipt. Exactly one in-progress at a time.
+  before you spawn, and to done the moment you record its trailer's `STATUS`. Exactly one in-progress at
+  a time.
 - Report on milestones, with the artifact. When the human names a milestone ("when all three merge",
   "when the page renders"), the report at that milestone carries the artifact itself - the URL, the
   screenshot, the merged-PR list - never a status sentence about it, and visual work reports with the

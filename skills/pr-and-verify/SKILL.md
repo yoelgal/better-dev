@@ -191,5 +191,8 @@ that already landed:
 .better-dev/bin/bd-mem ledger put <work-item> pr.md - <<<'PR #<n> → <state>: <one line>'
 ```
 
-Promote a durable rule with `.better-dev/bin/bd-mem remember "<rule>"`; record a lesson with `bd-mem
-learn "<lesson>"`. When you revise this skill, follow `/writing-skills`.
+On merge or close, run the close-out: record the one keyed lesson this PR's verification taught
+(`.better-dev/bin/bd-mem learn "<lesson>" <confidence> "<key>"`) or write an explicit `no durable lesson`
+line - an event of this run ("PR merged cleanly") is a receipt, not a lesson. Promote to a rule
+(`bd-mem remember`) only per the confidence law in `bd-mem`. When you revise this skill, follow
+`/writing-skills`.

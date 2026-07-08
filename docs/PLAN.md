@@ -16,6 +16,13 @@ router (**no provider spine** - model choice is the host's; we may *advise* tier
 do **not** copy forge's `frugal`) · a cross-project brain (**no GBrain** - gstack's memory daemon deleted
 users' working trees; project-scoped only).
 
+The practices are the product; they are still skills, not a framework. Two optional daemons ride along as
+**sourced capabilities, not the spine** - `browse/` (headless-browser QA) and `ios-qa/` (on-device iOS QA),
+vendored from gstack under MIT and compiled only on first need (D14). A repo that never runs a browser or
+device check never touches them, and the skill layer degrades to the `/tool-sourcing` path when they are
+absent - so "not a framework" holds: the daemons are tools the practices reach for, never a runtime you
+install instead of your own.
+
 ## 2. Principles
 
 1. **Agent-agnostic** - `SKILL.md` (agentskills.io) is the portable unit; no lock to one model/harness.
@@ -101,9 +108,12 @@ pointers to sibling `.md`**, never `@`-links; cross-skill deps as `/skill` prose
 Build by **reimplementing patterns from understanding**. Ideas/methods/designs aren't copyrightable →
 reimplemented components are original work, **owe no attribution**. Order of preference: **reimplement >
 adapt > verbatim**; minimize verbatim. Rewriting someone's file with an AI = a derivative work - reimplement
-from the *idea*, not by paraphrasing their file. `NOTICE` credits **only** expression actually copied
-(currently ~none). **Never redistribute** `karpathy:LOOPS.md` (personal-use). **Never copy** superpowers'
-"MUST/STOP" tone. See `NOTICE`, `LICENSE` (MIT, © 2026 Yoel Gal).
+from the *idea*, not by paraphrasing their file. `NOTICE` credits **only** expression actually copied.
+**One exception on record (2026-07-07, user-ratified, D14):** the `browse/` and `ios-qa/` daemons vendor
+gstack's MIT code substantially verbatim - infrastructure too large to reimplement without losing
+fidelity; attributed in `NOTICE`, upstream license and commit pin ride in each dir; the reimplement-first
+default is unchanged for everything else. **Never redistribute** `karpathy:LOOPS.md` (personal-use).
+**Never copy** superpowers' "MUST/STOP" tone. See `NOTICE`, `LICENSE` (MIT, © 2026 Yoel Gal).
 
 ## 10. Components → reimplement from (condensed; full detail in the harvest manifest, §14)
 

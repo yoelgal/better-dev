@@ -13,7 +13,8 @@
 # those ride the Claude Code plugin (hooks.json) or the bootstrap-hooks skill. A clone install gets the
 # practices; wire the hooks separately if you want the session nudge.
 #
-#   ./install.sh [--host claude|codex|auto]   # default: auto (each host whose CLI is on PATH or home dir exists)
+#   ./install.sh [--host <name>|auto]         # <name> = any adapter file in hosts/; default: auto
+#                                              # (each host whose CLI is on PATH or home dir exists)
 #   ./install.sh --list    [--host ...]       # show current state per host; change nothing
 #   ./install.sh --verify  [--host ...]       # assert every better-dev link resolves + bd-package-check passes
 #   ./install.sh --dry-run [--host ...]       # print the link / skip / prune plan; touch nothing
@@ -90,16 +91,32 @@ classify() {
 }
 
 # ── Which hosts to install for ───────────────────────────────────────────────
-case "$HOST" in
-  auto) hosts="claude codex" ;;
-  claude|codex) hosts="$HOST" ;;
-  *) echo "install: unknown --host '$HOST' (expected claude, codex, or auto)" >&2; exit 1 ;;
-esac
+# The hosts/ dir is the single registry: every adapter file is a host, and adding a host is dropping a
+# file there - no script edits. Validation is the adapter file existing.
+avail=""
+for a in "$HOSTS_DIR"/*; do [ -f "$a" ] && avail="$avail $(basename "$a")"; done
+if [ "$HOST" = auto ]; then
+  hosts="$avail"
+else
+  [ -f "$HOSTS_DIR/$HOST" ] || { echo "install: no adapter 'hosts/$HOST' (have:$avail)" >&2; exit 1; }
+  hosts="$HOST"
+fi
 
 # apply skills for one host. arg1: 1 = dry-run (report only), 0 = act.
 host_apply() {
   dry="$1"
-  [ "$dry" = 1 ] || mkdir -p "$dir"
+  # Premise-verify before scaffolding: only a host whose skills-dir convention was verified on a real
+  # install carries bd_host_dir_policy="create". Everything else defaults to require-existing - linking
+  # into an invented path reports success and delivers nothing, so decline and name the missing dir.
+  if [ ! -d "$dir" ]; then
+    if [ "${bd_host_dir_policy:-require-existing}" = "create" ]; then
+      [ "$dry" = 1 ] || mkdir -p "$dir"
+    else
+      echo "  $bd_host_display: skills dir $dir absent - this host's convention is unverified; create it (or confirm the real path) and re-run. Not scaffolding blind."
+      declined=$((declined + 1))
+      return 0
+    fi
+  fi
   # Migrate off the old whole-dir link: it nested every SKILL.md two levels deep, where hosts never look,
   # so those skills were silently undiscovered. Drop any better-dev -> */skills link, live or stale.
   old="$dir/better-dev"
@@ -182,12 +199,13 @@ host_verify() {
 }
 
 installed=0
+declined=0
 verify_fail=0
 [ "$MODE" = list ] && echo "== better-dev install state =="
 for h in $hosts; do
   adapter="$HOSTS_DIR/$h"
   [ -f "$adapter" ] || { echo "install: no adapter for host '$h'" >&2; continue; }
-  bd_host_cli=""; bd_host_display=""; bd_host_skills_dir=""
+  bd_host_cli=""; bd_host_display=""; bd_host_skills_dir=""; bd_host_dir_policy=""
   . "$adapter"
   dir="$bd_host_skills_dir"
   # auto installs for a host whose CLI is on PATH OR whose home dir already exists (GUI-managed CLI,
@@ -216,8 +234,12 @@ fi
 
 echo
 if [ "$installed" -eq 0 ]; then
-  echo "install: no supported host found (no CLI on PATH and no host home dir; looked for: claude, codex)."
-  echo "  Re-run with --host claude (or --host codex) to install for one anyway."
+  if [ "$declined" -gt 0 ]; then
+    echo "install: nothing linked - $declined host(s) declined for an absent skills dir (named above). Create the real dir or pass --host, then re-run."
+  else
+    echo "install: no supported host found (no CLI on PATH and no host home dir; adapters available:$avail)."
+    echo "  Re-run with --host <name> to install for one anyway."
+  fi
   exit 0
 fi
 

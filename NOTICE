@@ -8,14 +8,29 @@ we actually copied verbatim/substantially, which MIT requires us to attribute, a
 (b) credits, as a courtesy, the projects whose patterns informed better-dev.
 
 ── Copied verbatim / substantially (MIT - attribution required) ──
-  (none yet - updated as the build proceeds; kept minimal by preferring reimplementation)
+  browse/ - vendored from garrytan/gstack browse/ (MIT, (c) 2026 Garry Tan), upstream
+    commit pinned in browse/UPSTREAM, upstream license in browse/LICENSE-upstream.
+    Cut down per the 2026-07-07 harvest ruling R1; kept files substantially verbatim.
+  ios-qa/ - vendored from garrytan/gstack ios-qa/ (MIT, (c) 2026 Garry Tan), upstream
+    commit pinned in ios-qa/UPSTREAM, upstream license in ios-qa/LICENSE-upstream.
+    Kept files byte-identical per the 2026-07-07 harvest ruling R2.
+  scripts/bd-guard - destructive-command pattern set and safe-rm allowlist adapted
+    from garrytan/gstack careful/ (MIT); script structure and everything else ours.
 
 ── Pattern inspiration (courtesy credit, not legally required) ──
   mattpocock/skills - Matt Pocock       (MIT)
   obra/superpowers - Jesse Vincent     (MIT)
   vercel-labs/skills - Vercel            (MIT)
   vercel-labs/agent-browser - Vercel            (MIT)
-  garrytan/gstack - Garry Tan         (MIT)
+  garrytan/gstack - Garry Tan         (MIT) (also: review specialists/lens patterns,
+    plan-review persona rubrics, cso false-positive machinery, investigate scope-lock
+    and circuit-breaker, learnings provenance schema, host-config shape, post-deploy
+    verify/watch phases - reimplemented; see verbatim section for the vendored dirs)
+  loperanger7/gstack-auto - loperanger7 (no license; ideas only, nothing copied:
+    accept-or-rebut tables, 3-strike hypothesis rule, regression-test-first protocol,
+    machine-readable verdict trailers, blast-radius wrong-layer read, anchored scoring
+    rubric, AI-slop tell list, bounded follow-up-question budget - all reimplemented)
+  Steve Krug - the "trunk test" usability heuristic (concept, reimplemented as guidance)
   orrgal1/claude-plugins - orrgal1           (MIT)
   nousresearch/hermes-agent - Nous Research     (MIT)
   DietrichGebert/ponytail - DietrichGebert    (MIT)

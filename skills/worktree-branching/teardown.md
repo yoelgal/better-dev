@@ -19,6 +19,9 @@ Three ordering facts, each of which git enforces the hard way if ignored:
   has the branch checked out.
 - **Prune afterwards.** `git worktree prune` clears any stale registration left behind.
 
+The scope boundary state (`bd-scope`) lives in the worktree's own git dir, so `git worktree remove`
+deletes it with the tree - teardown never needs a separate unfreeze step.
+
 ## Then, the ownership proof
 
 Plain `git worktree remove` already refuses a dirty or unregistered tree - reach for it first and let

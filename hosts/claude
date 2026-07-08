@@ -2,8 +2,9 @@
 #
 # Claude Code discovers a personal skill only at <skills-dir>/<name>/SKILL.md (ONE level deep); it does
 # not recurse into a namespace subfolder, so install.sh links each skill in individually as <name>.
-# Sourced by install.sh, which reads these four variables. Adding a host = drop a sibling file like this.
+# Sourced by install.sh, which reads these variables. Adding a host = drop a sibling file like this.
 bd_host_name="claude"
 bd_host_display="Claude Code"
 bd_host_cli="claude"                        # PATH probe for --host auto
 bd_host_skills_dir="$HOME/.claude/skills"   # native global skills dir
+bd_host_dir_policy="create"                 # convention verified on a real install - install.sh may mkdir

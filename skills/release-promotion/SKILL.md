@@ -1,6 +1,6 @@
 ---
 name: release-promotion
-description: Use when the integration branch looks ready to ship and someone wants to promote it to the release branch and tag a release - or when a production incident needs a hotfix landed correctly. For the hotfix path specifically, this skill's hotfix notes carry the both-branches detail.
+description: Use when the integration branch looks ready to ship and someone wants to promote it to the release branch and tag a release, when a just-tagged release needs its deploy verified live and healthy ("did the deploy land", "is prod healthy after the release"), or when a production incident needs a hotfix landed correctly. For the hotfix path specifically, this skill's hotfix notes carry the both-branches detail.
 allowed-tools:
   - Bash
   - Read
@@ -104,12 +104,17 @@ else
 fi
 ```
 
-Record the promote so a later session can see what shipped:
+Record the promote so a later session can see what shipped. The `deploy:` and `health:` values
+come from the deploy-verify pass in the next section - write the receipt once that pass settles
+its verdict:
 
 ```bash
-printf 'released: %s\nfrom: %s@%s\nto: %s\n' \
+printf 'released: %s\nfrom: %s@%s\nto: %s\ndeploy: %s\nhealth: %s\n' \
   "$version" "$integration" "$(git rev-parse --short "origin/$integration")" "$release" \
+  "$deploy_verdict" "$health_summary" \
   | .better-dev/bin/bd-mem ledger put "release-$version" release.md -
+# deploy: VERIFIED | DEGRADED | UNVERIFIED | REVERTED | NO_SURFACE   (typed marker, one of five)
+# health: per-page "path: <load-ms>ms, <n> console errors", or "-"   (the next release's baseline)
 ```
 
 Push normally here - never `--force`, and never `--no-verify` to slip past a failing hook. A
@@ -119,6 +124,26 @@ one push: before any force-push, history rewrite, branch delete, tag move, or `r
 release surface, state exactly what you're about to run and why and get confirmation for that
 specific action - a yes to one destructive step doesn't carry to the next. And if you realize you've
 already lost data or pushed the wrong sha, say so at once rather than quietly repairing it.
+
+## After the tag: verify the deploy
+
+A pushed tag starts the release; users have it only when the deploy lands and the deployed thing
+runs. Recall the recorded deploy surface (`.better-dev/bin/bd-mem recall "deploy"`). Three recorded
+answers, three paths:
+
+- `deploy-surface: none` - nothing runs anywhere (a library, a CLI). Record `deploy: NO_SURFACE`
+  in the release receipt; the release is done at the tag.
+- Deploy keys recorded - run the deploy-verify pass in `post-deploy.md`: wait out the deploy,
+  drive the deployed surface, watch it hold. Its verdict lands in the receipt before the release
+  settles.
+- No deploy keys at all - a gap, not a license to guess: settle `NEEDS_INPUT` naming
+  `/guardrails-install` as the recorder. A deploy command or a production URL is never invented
+  here.
+
+A release whose deploy was not observed is `deploy: UNVERIFIED` in the receipt and settles
+`NEEDS_INPUT` naming what has to run - the tag going up does not round it to done. The `deploy:`
+and `health:` fields are typed receipt markers, never loop states; `post-deploy.md` carries the
+mapping to the terminal states the release actually settles.
 
 ## Distill the loop's memory
 
@@ -147,8 +172,10 @@ a memory-consolidation pass uses:
 Two things keep this honest. Present the moves as a reviewable diff and light-confirm before applying
 any of them - propose, never auto-edit someone's memory. And never rewrite `learnings.jsonl` in
 place: it's append-only, so consolidation happens by promoting into `rules.md` and retiring stale
-rules there, not by editing the lesson stream. Nothing recurred or went stale? That's a clean
-NOOP - the pass isn't obliged to change anything.
+rules there, not by editing the lesson stream. The one sanctioned shrink of `learnings.jsonl` is
+`.better-dev/bin/bd-mem prune` at exactly this checkpoint: preview first, and `prune --apply` only
+on the operator's confirmation - nowhere else, and never unattended. Nothing recurred or went
+stale? That's a clean NOOP - the pass isn't obliged to change anything.
 
 ## If a release goes bad
 

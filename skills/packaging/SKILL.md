@@ -14,8 +14,8 @@ shippable before a release.
 
 - **The tool - global, once per machine.** The skills and `bd-*` helpers live in one clone; `install.sh`
   links each skill into the host's global skills directory one level deep, one symlink per skill
-  (`~/.claude/skills/<skill>`, `~/.codex/skills/<skill>`, and so on), gstack-style: every repo on the
-  machine shares one copy. The awareness hooks ship in the same clone but the installer does not wire them
+  (`~/.claude/skills/<skill>`, `~/.codex/skills/<skill>`, `~/.hermes/skills/<skill>` - one adapter file
+  per host under `hosts/`), gstack-style: every repo on the machine shares one copy. The awareness hooks ship in the same clone but the installer does not wire them
   (see the hook caveat below).
   Nothing is ever vendored per repo; updating is a `git pull` in the clone.
 - **A repo's `.better-dev/` - data only.** A project carries just its own data (`rules.md`,
@@ -78,3 +78,19 @@ and never deletes a foreign same-named skill. Your `.better-dev/` data - `rules.
 Because skills are discovered by directory, adding one is just a new `skills/<name>/` that passes
 `bd-package-check` - no manifest edit. Keep authoring on the `/writing-skills` standard; let
 `/self-extension` handle the staged-and-tested path when the agent writes one itself.
+
+## Adding a host
+
+A host is one file: `hosts/<name>`, shell-sourceable KEY=value pairs, no code. Required:
+`bd_host_name` (equals the filename), `bd_host_display`, `bd_host_cli` (the binary probed for
+auto-detection), and `bd_host_skills_dir` (the host's native global skills dir, under `$HOME`).
+Optional: `bd_host_dir_policy` - `create` only for a host whose skills-dir convention has been
+verified on a real install; everything else stays the default `require-existing`, and `install.sh`
+then links only into a directory the host itself created - a link into an invented path reports
+success and delivers nothing. `install.sh`, `bd-uninstall`, and the package gate all enumerate
+`hosts/`, so dropping the file is the whole change, and `bd-package-check` proves it: the new adapter
+sources cleanly, carries every required field, collides with no other host's dir, and round-trips
+install/uninstall in a throwaway `HOME`. Skills themselves never change per host - one `SKILL.md`
+text ships to every host, which is why no adapter has a transform, rewrite, or overlay field. Hosts
+whose conventions are still unverified (cursor and the rest) are tracked in issue #9, not shipped as
+guesses.

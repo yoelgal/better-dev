@@ -41,7 +41,9 @@ On a yes, write it as a single durable line through the memory contract:
 That lands the line inside the managed block in `.better-dev/overrides.md`. It is idempotent - the same
 override twice changes nothing - so re-persisting is always safe. Phrase the line as a standing rule the
 next session can act on cold ("integration branch is `develop`"), not as a note about this conversation
-("user said develop just now").
+("user said develop just now"). A keyed line records the stable option key, not the display label a
+question happened to use - phrasings shown to the user change between sessions, and the recorded
+preference has to survive the rewording.
 
 ## When the override waives a safety gate
 

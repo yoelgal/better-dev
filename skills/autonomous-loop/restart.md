@@ -72,6 +72,15 @@ The steps:
    gate and the already-run red-capable signal still hold - they were about reality, not about the
    implementation you just discarded. Fresh build, same target.
 
+   For a fix work-item, one more thing is re-checked before the replay: the contract's root cause.
+   Three failed fix passes against one diagnosis are that hypothesis's falsification - the same standard
+   `/diagnose` Phase 3 holds any prediction to - especially when the stuck-check's named cause is
+   `wrong-assumption`, or when each fix surfaced a new failure somewhere else (a wrong-layer tell, not
+   bad luck). In that case the replay detours through `/diagnose` re-diagnosis with the stalled
+   attempt's receipts as evidence: re-derive or re-confirm the root cause and amend `contract.md` -
+   which re-opens the approval pin, so the amended contract is re-confirmed before driving - then
+   rebuild. Replaying an unquestioned wrong root cause rebuilds the same stall.
+
 ## When to stop restarting
 
 A restart rebuilds the *build*. If a second restart still can't converge on the same contract, the
