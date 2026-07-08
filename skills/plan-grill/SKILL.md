@@ -1,6 +1,6 @@
 ---
 name: plan-grill
-description: Use when the user wants a new feature or capability built and it is not a one-to-two-step change - "I want to add X", "let's build a way to Y", "can we add", "new feature: Z", or a rough intent that needs a plan before code. Checks the baseline, ideates and grills the design watertight, and pins the observable done-criteria the loop drives to. For a bug or "X is broken" reach for /diagnose; for a whole new app or epic, /groundwork; for a trivial one-to-two-step change, just make it - still in its own worktree branch, skipping only the planning.
+description: Use when the user wants a new feature or capability built and it is not a one-to-two-step change - "I want to add X", "let's build a way to Y", "can we add", "new feature: Z", a rough intent that needs a plan before code, or somebody else's vague feedback or brief ("make it simpler", "we need a chatbot") that needs decoding into a measurable problem first. Checks the baseline, ideates and grills the design watertight, and pins the observable done-criteria the loop drives to. For a bug or "X is broken" reach for /diagnose; for a whole new app or epic, /groundwork; for a trivial one-to-two-step change, just make it - still in its own worktree branch, skipping only the planning.
 argument-hint: "[feature-slug or rough intent] [depth: light|full]"
 ---
 
@@ -13,8 +13,23 @@ settled *before* code, and nothing the implementation loop already owns.
 Read `.better-dev/overrides.md` first (`.better-dev/bin/bd-mem read overrides`). A project override -
 a different spec location, a house planning style, a skipped phase - wins over anything below.
 
-The flow is four steps behind one closing gate. Work from the feature worktree
+The flow is four steps behind one closing gate; a gated step 0 runs first when the brief is
+somebody else's words. Work from the feature worktree
 (`/worktree-branching` sets it up); the contract lands in the shared ledger, described at the end.
+
+## 0. Decode the brief when the words are somebody else's
+
+Gate: the intent arrives as relayed language - stakeholder feedback, user feedback on the product,
+a ticket quoting someone else ("make it simpler", "we need a chatbot", "users say X feels slow").
+First-person intent from the user at the keyboard skips this step in one line.
+
+Record the brief verbatim before restating it - the requester's exact words in quotes, with who
+said them, carried into the contract above its `## Problem` section; the specific word chosen is
+evidence, and a paraphrase destroys it. Then run the six decode moves in `brief-decode.md`. The
+decode ends in one measurable problem sentence plus an in-scope and an out-of-scope line; those
+seed the contract's Problem, Goal, and Out-of-scope, and the trigger's factual claims become
+premises for step 1. A trigger event that turns out to be a defect routes to `/diagnose`; a decode
+that uncovers an epic routes to `/groundwork`.
 
 ## 1. Check the baseline before planning on it
 
@@ -82,15 +97,17 @@ done-criteria will turn on and skip exhaustive branch-walking.
   corrects a default faster than they fill a blank. If the user answers "whatever you think," they
   lack confidence too - don't take it as a blank cheque; re-ask as a choice between two concrete options.
 - **Ask only what you can't discover.** A fact about this repo or system is yours to find, not the
-  user's to answer - go read it (this is where premise-checking pays off again). Spend the user's
-  attention only on a genuine preference or tradeoff the code can't settle; on one of those, offer
+  user's to answer - go read it (this is where premise-checking pays off again). Type each remaining
+  ambiguity by one key: would its readings change a done-criterion? If yes, it is a must-ask, asked
+  before the gate closes - two readings that grade differently are two different contracts. If no,
+  pick one and record the pick as a named assumption in the contract. On a must-ask, offer
   two to four mutually exclusive options with the one you'd pick marked; with five or more real
   options, chain a second question rather than dropping or merging options to fit. If a preference
   question goes unanswered, proceed on your default and record it as a named assumption in the
   contract rather than stalling or guessing silently. That path is for two-way doors only -
   decisions a later edit reverses. A one-way door - a schema or data-model fork, a destructive or
   irreversible action, a security or trust-boundary choice, an addition to the committed goal set -
-  never proceeds on an invented default: with no answer from the user and no recorded override
+  is asked regardless of the key above and never proceeds on an invented default: with no answer from the user and no recorded override
   answering that question, the state is `NEEDS_INPUT`. An override can carry the user's standing
   answer to a one-way question - that is an answer, deliberately given once - but no override makes
   one-way doors auto-decidable in general.

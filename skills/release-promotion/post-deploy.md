@@ -35,6 +35,14 @@ the host's monitor primitive, not a tight poll, with a 20-minute default budget
 
 ## Verify, depth keyed to what the release changed
 
+Where anything shows the release is flag-gated - the contract, the PR body, the diff, or a
+recorded `deploy-flag` rule - the flag state is part of the verify: read the flag's actual state
+before driving any surface, and drive the surface in the state users get. Record
+`flag: <name>=<state>` in the receipt. A release whose contract expected activation but whose flag
+reads off is a finding at the same severity as a failed check - the deploy landed, the feature
+didn't. A flag nobody recorded is never assumed: grade the surface's observed behavior against what
+the flag state predicts, or settle `NEEDS_INPUT` naming the flag.
+
 Classify `git diff "$prev_tag"..origin/$release --name-only` and take the first matching row:
 
 | Release diff | Verify depth |
@@ -77,8 +85,10 @@ Exits - exactly one:
 - Checks spent with only concerns - `deploy: DEGRADED`, each concern named in the receipt.
 
 The watch is bounded the same way `/pr-and-verify`'s wait-for gate is: a fixed check budget,
-terminal exits, self-terminates. A standing "keep an eye on prod" is the host's `/loop` to own -
-hand it the probe line as its command; this skill never becomes a cadence.
+terminal exits, self-terminates. A standing "keep an eye on prod" is the host's `/loop` or
+`/schedule` to own - on a `VERIFIED` settle, offer the operator the exact probe line ready to hand
+to it, and record `standing-watch: offered | armed | declined` in the receipt; this skill never
+becomes a cadence.
 
 ## Rollback
 

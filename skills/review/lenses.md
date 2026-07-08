@@ -89,8 +89,8 @@ Where no surface fits, invent nothing - the checklists bound the reflex, they do
   keys, reflection, config references), not just the compile or import check.
 - A side effect the deleted code carried (logging, cache invalidation, cleanup, a metric) either moved
   somewhere or was deliberately dropped, with the drop named.
-- A removed flag, env var, or config key that deployment, docs, or another repo still sets - it now
-  silently no-ops.
+- A removed or renamed command, skill, flag, env var, or config key whose old name deployment, docs,
+  or another repo still uses - it now silently no-ops or teaches a surface that no longer exists.
 - Data the old path produced (rows, files, queued jobs) that still arrives after the deletion - name
   what consumes it now.
 - Renamed, not removed: the concept survives under a new name while the contract asked for removal -

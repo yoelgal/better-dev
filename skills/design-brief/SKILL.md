@@ -13,16 +13,32 @@ looks like and how you will know.
 ## 1. Read the brief, state the direction as decisions
 
 The brief is the product's audience, its tone, and its constraints - read those before opening a
-component. Then state the direction in one line, as *decisions, not adjectives*: the type scale, the
+component. On an existing codebase, also read the token source and at least one representative
+component before stating any direction: a direction stated over an unread codebase is a reinvention,
+and reinventing what the repo already settles is a finding.
+
+Decide the register next: this surface either *is* the product (marketing, landing, portfolio - the
+design is the message) or *serves* the product (app UI, dashboard, settings - the design is the tool).
+The registers carry opposite defaults for type, color, and motion, and opposite failure tests - a face
+surface fails when its look is guessable from the product category alone (the same test
+`slop-and-checks.md` runs as the guessability test's first altitude - one check, cleared once); a tool surface fails when a
+user fluent in the category's best tools would pause at an off component. Record the register on the
+direction card; the tell audit in step 5 filters by it.
+
+Then state the direction in one line, as *decisions, not adjectives*: the type scale, the
 spacing rhythm, the color stance, the motion stance, and whether the read maps to a real design system
 or a named aesthetic family.
 
 "Clean, minimal, modern" is not a direction - it is the template every model defaults to, and
 defaulting is what produces the slop. "Just use a standard clean look" skips the one step that matters.
-If you cannot name those four decisions for this product, you have not read the brief yet. When
+If you cannot name those four decisions for this product, you have not read the brief yet. Avoiding
+the default is not a pass either - the standard escape aesthetic is itself a tell; run the two-altitude
+guessability test in `slop-and-checks.md` before pinning the direction. When
 proposing candidate directions to choose among, generate them as *verbalized candidates* - each with a
 stated probability, at least one tail option under ~0.10 (the shape in `/orchestrating-agents`) - the
-default-template pull is mode collapse, and asking for the distribution is what escapes it.
+default-template pull is mode collapse, and asking for the distribution is what escapes it. Label each
+candidate with one concrete noun; two candidates sharing a label, or one label that fits them all, is a
+rework signal, not a style note.
 
 When the read is blank, or an existing render reads as generic, don't reason from an empty page:
 source a specific admired reference - a real product this brief's audience would call premium - and
@@ -54,6 +70,21 @@ tokens module - and that file is the visual contract. The loop inherits one devi
 it: every color, spacing, and radius value in the diff resolves to the token source, and a raw hex or
 magic pixel value outside it is a finding, greppable, not a taste call. The override line points at
 the token source; the contract lives in code, where it cannot drift from what ships.
+
+A token set is pinned when the token source defines a value for each slot: the font or fonts and the
+weights in use, a type scale with a named base size, color roles named by function (such as subtle /
+default / strong / border / selected-background), the spacing scale, the radius values, and the icon
+set with its stroke width. A slot with no value is an
+open decision the next feature will improvise - walk the slots when recording the set, and an empty
+slot is a finding, not a default. A pinned font or icon set also names its license, and the license
+permits the deployment target; an asset whose license forbids the target is a finding at pin time,
+not at ship time.
+
+An iteration request - bolder, quieter, more premium - never expands the token set silently. A new
+color, radius, shadow, or font is a change to the frozen foundation surface: name it and confirm
+before adding, exactly as any other frozen-interface change (`/groundwork`). When a diff deviates,
+classify the deviation - a missing token, a one-off where a shared component exists, or a conceptual
+misalignment - the fix differs by class, and the class rides with the finding.
 
 ## 3. Compose the host's design skill; source one on a gap
 
@@ -98,13 +129,17 @@ An "AI tell" is a checkable ban, not a taste. The seed tells - the model-default
 unguided generation reaches for - ship with this skill; the full list, the clean-or-flag audit form,
 and the trunk test live in `slop-and-checks.md` beside this file. Per project: add tells you can
 count or measure ("the palette is the token set, no ad-hoc hex" - the repo's em-dash ban is the same
-species) and prune seed items that do not apply, recording additions in `.better-dev/overrides.md`.
-The audit in step 4 checks the render against the combined list, item by item.
+species) and filter seed items by the register on the direction card, recording additions in
+`.better-dev/overrides.md`. The list is never filtered to empty - the rule for that case is in
+`slop-and-checks.md`. The audit in step 4 checks the render against the combined list, item by item.
 
 ## 6. Redesign mode - audit against the brief, name what can't change silently
 
 On an existing UI, classify the mode first: preserve the current direction or overhaul it.
-Misreading that is the biggest source of a bad redesign. Then audit the render against the brief and
+Misreading that is the biggest source of a bad redesign. In preserve mode, write the surface's
+identity in one sentence before proposing anything; every proposal must read as the same product when
+rendered beside the original, and the noun-label check from step 1 runs on the variants - variation
+within identity, not selection between identities. Then audit the render against the brief and
 emit ranked violations - worst first, each naming the tell it breaks and the direction it should match -
 not a flat "make it nicer."
 

@@ -26,13 +26,55 @@ correctness leads, taste second, cost last: cost breaks a tie, it never override
 - **Top tier - judgment that cascades.** Decomposition and planning, grilling a plan against its
   done-contract, the adversarial evaluator's verdict, root-cause diagnosis, and the final synthesis across
   many workers' output. These are the calls that, made wrong, poison every stage downstream, so they hold
-  the best model available and stay in your own hands rather than being delegated.
+  the best model available - in your own hands when you are that tier, or bought as a consult (below)
+  when you are not.
 - **Mid tier - bounded building.** A closed-spec implementation slice, a mechanical refactor, test
   scaffolding, a documentation pass. This is the bulk of fan-out work: the spec is settled, one obvious
   approach remains, and a cheap check catches a miss - so a cheaper, faster tier carries it.
 - **Cheap tier - mechanical and classifying.** Extraction, reformatting, a rote edit, and a grader or
   classifier worker checking one artifact against one rubric. High-volume, low-stakes, and independently
   checkable.
+
+## Two directions, one economy
+
+Tiering runs in two directions, and both bill most tokens at the cheap rate:
+
+- **Delegate down (orchestrator).** The expensive context plans, dispatches cheaper workers against
+  closed specs, and verifies. Everything else in this file is this direction. In it the orchestrator's
+  own toolset stays minimal - the roster is its capability, and an orchestrator that starts doing the
+  work itself has left the pattern.
+- **Escalate up (consult).** A cheaper executor keeps the task and buys a bounded top-tier consult at
+  fixed moments, then continues executing itself. The consult returns a short plan, a verdict, or a
+  named risk - it never produces the deliverable; the executor does, at the executor's rate.
+
+Reach for the consult direction when the session doing the work is not the top tier and a stage from
+the top band arrives - a decomposition, a plan grill, a root-cause call. Consulting up at that moment
+is the sanctioned move; making the call at your own tier because "planning stays in my hands" is the
+failure this section exists to prevent. Rerunning the whole task at a higher tier remains the move for
+a below-bar *deliverable*; the consult is for a *judgment point* inside a task that is otherwise going
+fine.
+
+A consult is bounded, and the bounds are checkable:
+
+- **When:** once after orientation and before the first substantive write (reading files is
+  orientation; writing, editing, or committing to an interpretation is substantive), once before
+  settling done, and on a tripped stuck signal. A consult before any orientation reads is advice with
+  no context - do the reads first.
+- **Durable first:** before the settling-done consult, the deliverable is already on disk or
+  committed - a consult that outlives the session must not take an unwritten result with it.
+- **Output-capped:** the request names an explicit length bound for the answer (a short plan, not a
+  comprehensive one) - the consult's output is its dominant cost.
+- **Weight:** the advice is followed unless a step fails empirically or a primary source contradicts a
+  specific claim; on a conflict between advice and evidence already in hand, spend one more consult
+  naming both sides ("found X, advised Y - which constraint breaks the tie") rather than silently
+  picking.
+
+A cost comparison between tiers - a consult against a rerun, a cheap fan-out against expensive inline
+work - is valid only at the same verification standard: a cheaper run held to a lower bar is a
+different product, not a saving.
+
+The host decides what answers a consult - a stronger pinned subagent, a host advisor facility, or the
+human when no stronger tier exists. We advise the shape; the host owns the wiring.
 
 ## The routing question
 

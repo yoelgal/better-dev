@@ -52,6 +52,25 @@ we actually copied verbatim/substantially, which MIT requires us to attribute, a
   Model-routing CLAUDE.md section - @theo (Theo) (X thread, ideas)
   "Verbalized Sampling" - Zhang, Yu, Chong, Sicilia, Tomz, Manning, Shi
     (arXiv 2510.01171) (research paper; method reimplemented as guidance, cited)
+  pbakaus/impeccable - Paul Bakaus     (Apache-2.0; register split, two-altitude slop
+    test, token lock, identity lock/family pass, degraded-disclosure - all reimplemented)
+  orrgal1/claude-plugins pdd - orrgal1 (MIT; gate-cadence, gap-stop, negative-control,
+    fork-typing mechanics reimplemented; also credited above for forge/devloop)
+  garrytan/gstack document-release (MIT; diff-driven docs sweep, act-vs-ask split,
+    debt-in-PR-body, discoverability rule - reimplemented; also credited above)
+  "/brief-to-problem" - @nurijanian (George, prodmgmt.world) (X article, ideas;
+    brief-decode mechanics reimplemented - also credited above for the edge-case pass)
+  Fable 5 advisor/orchestrator patterns + advisor-tool doc - ClaudeDevs / Anthropic
+    (X thread + official docs, ideas; consult-direction bounds reimplemented)
+  Three-tier delegation + same-agent fixes - @pablostanley (Pablo Stanley) (X post, ideas)
+  Condensed Fable 5 prompting preamble - @dr_cintas (Alvaro Cintas) (X post, ideas;
+    reasoning-exposure footgun independently verified against official docs)
+  Ownership post (end-to-end + post-merge tail) - Thorsten Ball (Slack screenshot via
+    @curlysaarthak; ideas only, reimplemented)
+  Product-design token cheatsheet FORM - @_heyrico (rico, acedesign.io) (X post; the
+    slot-shape reimplemented, his values deliberately not shipped)
+  "Claude Code + SKILL.md" guide - @nyk_builderz (Nyk) (X article, ideas;
+    least-privilege allowed-tools + shown-format rules reimplemented)
 
 ── NOT copied - inspiration only, NOT redistributable ──
   Andrej Karpathy - LOOPS.md v060726 ("personal use permitted"). Concepts reimplemented

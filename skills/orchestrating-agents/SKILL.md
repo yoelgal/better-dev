@@ -26,7 +26,9 @@ Break the work into subtasks that are each self-contained: one clear task, enume
 deterministic output shape, one obvious approach. If a subtask still needs "investigate," "figure out,"
 or "as appropriate," it isn't decomposed yet - that ambiguity is yours to resolve, not a worker's. Keep
 the judgment work in your own hands: decomposition, ambiguous design, user interaction, destructive
-actions, and the final synthesis. Workers get the bounded pieces.
+actions, and the final synthesis. Workers get the bounded pieces. (When a judgment stage sits above your
+session's own band, "your own hands" means buying the bounded consult `tiers.md` defines - never making
+the top-band call at a lower tier.)
 
 Fan out from a clean slate. Parallel work never starts over an unfinished background operation - a
 still-running worker, an unmerged lane, an unread report - because two actors over unknown state is how
@@ -156,7 +158,11 @@ and is re-read every turn. Move artifacts as files instead:
   as written and pass it to `bd-dispatch record` unedited - the script rejects anything off-vocabulary.
   The prose above the trailer is context, never the verdict; a status implied in a paragraph but absent
   from the trailer does not exist. A reply with no trailer is not a report - treat it as the
-  worker-came-back-empty case and re-dispatch; don't reconstruct a status from the prose. A review
+  worker-came-back-empty case and re-dispatch; don't reconstruct a status from the prose. A report
+  covering a fan-out names the dispatch mode on its first line: `channels: fresh workers`, or
+  `degraded: in-session (<reason>)` when the run fell back to the single-session role-switch. A silent
+  degraded run is a reporting defect - the two modes carry different independence, and the report reads
+  identically without the line. A review
   dispatched as a worker ends with this same trailer, its `STATUS` derived from its own counts block
   (`/review` owns that block; it is review's record, never a second trailer). Before writing the trailer,
   the worker audits every claim in the report file against a session tool result (`/pr-and-verify`
@@ -179,8 +185,14 @@ separate fresh workers; a worker's "done" is a claim, not proof.
   and a stated rationale never downgrades a finding. Its verdict covers both spec compliance and quality.
   better-dev's independent evaluator is `/review`.
 - On findings, dispatch one fix worker with the complete list - not one fixer per finding, since each
-  rebuilds context and re-runs suites - then re-review until clean. A broad final review over the whole
-  change closes the run.
+  rebuilds context and re-runs suites - then re-review until clean. When the implementing worker's
+  session can still be continued, the fix worker *is* that worker: hand the findings back to it, since
+  it already holds the files, the suite state, and its cache, and independence is a property the
+  re-review needs, never the fixer - the maker fixing its own reviewed work is fine; the maker grading
+  it is not. Dispatch a fresh fixer in two cases: the implementer's session is gone (then it is a
+  relaunch - re-pin tier and constraints, `briefs-and-reviews.md`), or a finding shows the implementer
+  defending the defect as by-design, where its context is the contamination a fresh reader avoids. A
+  broad final review over the whole change closes the run.
 - Verify at or above the tier that did the work, never below it. An undetected bad result poisons every
   downstream stage.
 

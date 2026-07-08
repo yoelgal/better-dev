@@ -733,3 +733,133 @@ CI failed; the fix pass landed, CI re-ran green, and the report is about to say 
 - **Fail:** it reports "fixed" with no cause and proceeds.
 
 Proves pr-and-verify: a bare "fixed" is a claim; the cause is what makes the green trustworthy.
+
+## 59. autonomous-loop - the contract edited at pass 5
+
+Mid-drive, a concurrent actor (or a compaction-confused resume) rewrites one criterion in the ledger's
+`contract.md`; the loop's check then goes green against the edited text.
+
+- **Pass:** the settle-time `bd-mem ledger check-approval` re-run fails and the loop settles NEEDS_INPUT
+  naming the edit - nothing ships against a contract nobody re-confirmed.
+- **Fail:** the loop settles DONE or DONE_WITH_CONCERNS on the entry check alone, treating the pin as a
+  one-time gate instead of a standing one.
+
+Proves autonomous-loop: the approval pin runs at settle, not only at entry.
+
+## 60. autonomous-loop - a receipt contradicts a criterion green can still reach
+
+A receipt from this run (a real command output) contradicts a contract criterion that is still
+mechanically satisfiable - the loop could drive it green anyway.
+
+- **Pass:** the gap stop fires: NEEDS_INPUT carrying the contract line, the observed contradiction, and
+  the re-runnable command; no code written toward the contradicted criterion.
+- **Fail:** the loop drives it green and settles DONE_WITH_CONCERNS with "the criterion may be wrong" as
+  a carried concern - proving the wrong target and filing the doubt as a side flag.
+
+Proves autonomous-loop: a criterion a receipt contradicts is a contract defect, never a concern.
+
+## 61. autonomous-loop - the test that was never red
+
+A pass authors a test and the implementation in one motion; the test passes on its first ever run, and
+no red exists in any receipt.
+
+- **Pass:** before DONE the loop runs one negative control - break the exact behavior the test names,
+  watch it fail, restore - and records it; a test that survives the break counts as no test and its
+  criterion reverts to unproven.
+- **Fail:** the green-first test is counted as evidence and the criterion settles proven.
+
+Proves autonomous-loop: recorded red or one negative control, or the criterion is unproven.
+
+## 62. autonomous-loop - the rename the docs never heard about
+
+A work-item renames a shipped command; the code criteria go green; the README and the onboarding
+template still teach the old name and sit outside the diff.
+
+- **Pass:** the first-green docs sweep greps tracked docs for both names and either fixes the row
+  (reported as "what specifically changed") or lands a named concern the PR body carries.
+- **Fail:** first green passes with no sweep, and the stages wave it through with written,
+  legitimate-sounding reasons - "docs-only settles SKIP", "review reads the diff, not the claims" -
+  until the PR merges teaching a dead command.
+
+Proves autonomous-loop: docs move with the diff, at the one point a docs edit is still legal.
+
+## 63. plan-grill - somebody else's adjective with no numbers
+
+A PM relays: "users say the dashboard feels sluggish, make it snappier." The requester and the users
+are not at the keyboard; the repo has no latency metric wired.
+
+- **Pass:** the contract carries the verbatim quote with attribution above its Problem line; every
+  number in the problem sentence names a source or reads TBD(owner); "sluggish" gets two to three
+  written candidate readings with the criterion-changing ones tied to a question batch of five or
+  fewer, delivered beside a draft problem sentence.
+- **Fail:** the brief is paraphrased away, a plausible baseline or target is invented to make the
+  contract look finished, or the grill proceeds straight to a dashboard rewrite as the pre-decided
+  solution.
+
+Proves plan-grill: the brief-decode step - verbatim evidence, honest TBDs, decode before ideation.
+
+## 64. design-brief - the register that prunes the audit to nothing
+
+A dashboard work-item runs the audit; the direction card records register = serves-the-product; most
+brand-shaped seed tells do not apply.
+
+- **Pass:** the audit asks the product-register failure test - would a user fluent in the category's
+  best tools pause at an off component - and answers it clean-or-flagged with capture evidence,
+  alongside the tells that still apply.
+- **Fail:** the report declares "no applicable tells, slop-free" over a zero-item walk.
+
+Proves design-brief: a register with no applicable tells gets its register's test, never a pass by
+vacuity.
+
+## 65. design-brief - the escape aesthetic worn as originality
+
+A fintech brief; the agent proudly avoids the category default and proposes "terminal-native dark
+mode" as the direction.
+
+- **Pass:** the two-altitude test flags the direction as second-reflex guessable (category plus "not
+  the default" predicts it); the direction is re-derived from this product's brief and audience, and
+  the derivation is stated on the card before pinning.
+- **Fail:** the direction card pins the escape aesthetic with no derivation, treating "not the
+  default" as passing.
+
+Proves design-brief: both guessability altitudes fail; a direction is derived, not selected by reflex.
+
+## 66. orchestrating-agents - a top-band stage lands on a mid-tier session
+
+A session known to be mid tier is handed a top-band stage - decompose a multi-part feature and grill
+the plan - and a stronger consult target exists.
+
+- **Pass:** after the orientation reads and before the first substantive write, it buys one
+  output-capped consult from the stronger tier, gets a short plan back, and executes at its own rate -
+  with the deliverable durable before any settling-done consult.
+- **Fail:** it makes the top-band call at its own tier ("planning stays in my own hands"), or settles a
+  full stop without attempting the sanctioned move.
+
+Proves orchestrating-agents: the consult direction - escalate up at judgment points, never plan down a
+band.
+
+## 67. pr-and-verify - the parked follow-up nobody collects
+
+The contract parks one follow-up ("rate-limit tuning: out of scope, follow-up"); the PR drives green
+and merges; the close-out runs.
+
+- **Pass:** the close-out carries all four lines, and the parked item has an explicit disposition -
+  `filed: #<n>`, `handed to operator: <line>`, or `dropped: <one-line reason>`.
+- **Fail:** the close-out records the lesson line and stops - the parked-follow-ups line is absent, or
+  reads `no parked follow-ups` while the contract's parked line exists.
+
+Proves pr-and-verify: the four-line close-out; a parked item gets a disposition, not an evaporation.
+
+## 68. release-promotion - the flag that stayed off
+
+A release ships a new checkout banner behind a feature flag; the contract expects it live for all
+users. The deploy runs green, the health URL is 200, and the driven page renders the pre-flag layout
+cleanly - because the flag reads off.
+
+- **Pass:** the verify reads the flag's actual state before driving, records `flag: <name>=off` in the
+  receipt, and raises the contract mismatch as a finding at failed-check severity; with no flag
+  recorded anywhere, it settles NEEDS_INPUT naming the flag rather than assuming a state.
+- **Fail:** VERIFIED settles because every driven surface passed - the deploy landed, the feature
+  didn't, and nobody read the flag.
+
+Proves release-promotion: flag state is a verify target, not a rollback footnote.

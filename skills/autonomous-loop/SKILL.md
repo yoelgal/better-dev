@@ -80,7 +80,15 @@ absorbing it), the verify command from the contract, and a **protect-set** - the
 edit. It holds the tests and the contract artifacts (so the loop fixes the code
 rather than moving the goalposts), plus the repo's high-consequence path denylist - the policy
 `/guardrails-install` records. A test the loop writes this pass joins the protect-set the moment it is
-authored: a later pass may make it pass, never weaken it to. That is one layer of a three-layer defense
+authored: a later pass may make it pass, never weaken it. Pin it as it joins: re-emit the pinned list with
+the new row added - `ledger put` replaces the file, so write the existing rows plus the new one
+(`(.better-dev/bin/bd-mem ledger read <work-item> protect.hashes 2>/dev/null; shasum <test-file>) |
+.better-dev/bin/bd-mem ledger put <work-item> protect.hashes -`); a justified re-pin replaces that
+path's existing row rather than adding a second one, so each pinned path holds one current hash. At settle,
+re-hash the pinned set: a pinned file whose hash moved is re-pinned only by a pass whose receipt records
+the red-then-green that justified the edit; a moved hash with no such receipt settles `NEEDS_INPUT`
+naming the file - the goalpost-move this set exists to stop, surfaced as a comparison instead of trusted
+to a diff scan. That is one layer of a three-layer defense
 - the contract pins the concrete observable (`/plan-grill`) and the reviewer scans the diff for weakened
 or trivial tests (`/review`); this layer keeps the loop from gaming a test it wrote itself. Recall it with `.better-dev/bin/bd-mem recall "safety"` (one read returns
 the denylist, the gated classes, and the scope number together), then read `.better-dev/overrides.md`,
@@ -112,6 +120,12 @@ Then each pass:
    saying what to do, an input no scenario covers - that's a contract gap, not a place to pick a
    plausible default: settle `NEEDS_INPUT` with the branch and its options, or route it back to the
    front-end. A guess dressed as a sensible default is the failure this loop exists to prevent.
+   The same stop fires when a criterion is *wrong*, not missing - the contract asserts behavior a
+   receipt from this run contradicts. Never drive that criterion green: settle `NEEDS_INPUT` carrying
+   the contract line, the observed contradiction, and the re-runnable command that shows it. The owner
+   amends the contract - which re-opens the approval pin, so the amended contract is re-confirmed before
+   driving resumes - or overrules with the evidence in front of them; a rejected stop resumes against
+   the unchanged contract, the closed record kept in the receipts.
    For a fix work-item, read the contract's fix-scope line here, before any dispatch: a broad scope - a
    file list spanning layers, or `repo-wide` - is wrong-layer suspicion, because a large fix usually
    means the root cause sits somewhere other than where it's being patched, so re-derive the smallest
@@ -122,9 +136,17 @@ Then each pass:
    reproduction is that test: watch it fail, then write the minimal code to pass, one behavior at a time.
    Where a slice has no real behavioral seam, don't add a ceremonial test that passes on arrival; the
    contract's red-capable signal is the proof, and a test that can't fail is scaffolding, not evidence.
+   Every test authored this work-item has its red run in a receipt - the failing command, exit code, and
+   signature - before the pass that turns it green; one that reached green with no recorded red gets one
+   negative control before `DONE`: break the exact behavior it names, run it, watch it fail, restore. A
+   test that stays green under that break asserts nothing and counts as no test - the criterion it
+   claimed is back to unproven.
    Dispatch a fresh worker for the task (`/orchestrating-agents`, which also sizes the stage's tier - a
    judgment call like triaging a red or the reviewer's verdict earns the top tier, a closed-spec slice
-   runs cheaper); a worker that hits a missing fact asks rather than guessing, and its reply ends in the
+   runs cheaper); a worker that hits a missing fact asks rather than guessing, one whose tool results
+   contradict its brief surfaces the conflict as a question naming both sides rather than silently
+   complying or silently deviating (step 2's gap stop is this same rule one grade up, for a contradicted
+   contract criterion), and its reply ends in the
    report trailer `/orchestrating-agents` defines - the trailer's `STATUS`, not the prose around it, is
    what the pass settles on.
 4. **Re-verify.** Capture the exit code and the failure signature.
@@ -227,6 +249,29 @@ load-bearing for the signal - and it only removes; behavior is preserved. Then r
 has to leave the check green, and one that reddens it is reverted, not shipped. This runs every time the
 loop reaches green, not as an optional extra.
 
+## Docs move with the diff
+
+On that same first green, sweep the documentation the diff just falsified. Extract the public-surface
+delta from the work-item's diff - the commands, skills, flags, config keys, environment variables,
+endpoints, and file paths it added, renamed, or removed - and search every tracked `.md` for each old
+and new name. The sweep is bounded by the delta: a doc line the diff didn't falsify is not this pass's
+to improve. Each hit takes one of two dispositions, split by one test - **could this correction be
+wrong while the diff is right?**
+
+- **No** - a stale name or path, a count, a table or list row for the new surface, a cross-reference to
+  a moved file: fix it here, in this worktree, committed with the work-item, each edit reported as what
+  specifically changed ("README: added `/x` row, count 24 -> 25"), never as "updated docs".
+- **Yes** - narrative, positioning, a security-model description, removing a section, any edit over ~10
+  lines in one place: never auto-edit; record it as a concern line the PR body carries.
+
+Two more checks ride the sweep: a doc file this work-item adds is reachable by link or reference from
+the entry file (`CLAUDE.md`/`README.md`), or that is a concern; and a new public surface with no doc hit
+at all is a concern named `"<surface>: shipped undocumented"` - this pass reconciles docs with the code,
+it never generates missing documentation and never edits code to match a doc. The cleanup pass's
+re-verify law applies here unchanged: the sweep leaves the check green, an edit that reddens it is
+reverted, and it runs on every green. It runs here because it must: the review verdict is keyed to HEAD,
+so a docs commit made after `/review` un-readies the PR it was meant to finish.
+
 ## Verify separate from the signal
 
 The loop's own green is not the acceptance verdict - the two stay separate so the loop can't overfit to
@@ -256,7 +301,11 @@ read the report you are about to hand back: if its closing line is a plan, a que
 yourself, or a promise of work not yet done, the loop is not settled - do that work, then settle. Audit
 each claim in that report against a session tool result: every claim points to a command, an exit code,
 or an observed behavior from this run, or it carries an explicit `unverified` label (`/pr-and-verify`
-verify-runtime owns the disposition). In short:
+verify-runtime owns the disposition). Before settling `DONE` or `DONE_WITH_CONCERNS`, re-run
+`.better-dev/bin/bd-mem ledger check-approval <work-item>` - the entry check proved the contract was
+clean when driving started; this one proves nothing edited it since. A re-opened gate settles
+`NEEDS_INPUT` naming the edit, never a done state. The same moment re-hashes the protect-set's pins
+(the protect-set paragraph in "The loop" owns the disposition). In short:
 `DONE` / `DONE_WITH_CONCERNS` hand off to the PR-into-staging gate (`/pr-and-verify`), the recorded green
 (the command and its exit-0 output) travelling with them as evidence a reviewer reads rather than a
 promise, concerns carried into the PR; a confirmed `NO_PROGRESS` restarts from the contract

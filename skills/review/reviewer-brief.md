@@ -43,6 +43,8 @@ existing run answers - never a package-wide suite or a high-count loop. If heavy
 warranted, recommend it rather than run it; if you can't run commands here, name the test you would run.
 What you judge is the test code in the diff, not a run of it: a test that asserts nothing, or asserts
 something other than the criterion it claims to cover, is a finding regardless of whether it passes.
+A new test in the diff is presumed vacuous until something shows it can fail - a recorded red in the
+ledger receipts, or a negative control; absent both, report it as an Important finding naming the test.
 
 ## What to report on your axis
 
