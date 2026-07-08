@@ -20,8 +20,8 @@ jobs.
   not "the unit tests are green."
 - **The verdict** - `/review` runs *inside the loop*, before DONE, from a fresh context that never sees
   the report, and records a clean result to the work-item's ledger. This skill reads that record; it never
-  re-runs the review. The Critical and Important findings were the loop's to clear, not this skill's to fix.
-- **The fix loop** - Critical/Important findings and red CI both go back to `/autonomous-loop`, which
+  re-runs the review. The findings, every severity of them, were the loop's to clear, not this skill's to fix.
+- **The fix loop** - review findings and red CI both go back to `/autonomous-loop`, which
   owns the implement-and-verify loop. This skill decides *when* the change is not yet green; it does not
   run a second fix loop of its own.
 - **The managed-block splice** - `.better-dev/bin/bd-block` writes the PR brief into a marker-bounded
@@ -44,7 +44,9 @@ the loop recorded and confirm it is clean and current before touching the PR:
 .better-dev/bin/bd-mem ledger read <work-item> review.md
 ```
 
-The record carries the reviewed HEAD sha and a clean result. If it is missing, not clean, or keyed to a
+The record carries the reviewed HEAD sha and a clean result - clean means zero open findings of any
+severity; a counts block with `MINOR > 0` is not clean, since Minor findings are fixed or rebutted
+in-loop, never carried into the PR unaddressed. If the record is missing, not clean, or keyed to a
 sha other than `git rev-parse HEAD`, the change isn't ready - hand it back to `/autonomous-loop` to run its
 review-before-DONE gate over the current diff, and re-enter here once a clean verdict for this HEAD is on
 record. Review is never run from here; this skill only checks that it happened. That is what keeps the PR
@@ -61,6 +63,11 @@ exists - this step is idempotent and safe to re-run:
 ```
 gh pr view --json number 2>/dev/null || gh pr create --base <integration> --fill
 ```
+
+The PR opens ready for review, never as a draft. A hold on merging is expressed by not merging - the
+contract's `merge:` line owns that call - while a draft blocks the merge mechanically and hides an
+earned green from the operator and from any auto-merge. Nothing in this flow creates drafts; on finding
+one for this branch, convert it (`gh pr ready`) before proceeding.
 
 The **brief** is a tight what/why - one to three present-tense sentences leading with the change and its
 purpose, plus a `⚠️` line for each concern carried in from a `DONE_WITH_CONCERNS` settle. Shape it in

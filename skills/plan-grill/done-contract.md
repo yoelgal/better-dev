@@ -229,6 +229,8 @@ Anything unresolved. If one blocks the plan, the state is NEEDS_INPUT - stop, do
 ## Merge
 merge: <auto | hold> - <auto only where the repo records merge-policy: auto-on-green and the
 user said auto for this item at seal; hold otherwise, including when no policy is recorded>
+This line is mechanically unskippable: `.better-dev/bin/bd-mem ledger approve` refuses a contract
+without a `merge: auto` or `merge: hold` line, so a seal that skipped the question cannot pin.
 
 ## Ground truth
 Verdict from the baseline check + link to ground-truth.md.

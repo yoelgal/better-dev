@@ -133,6 +133,8 @@ ledger() {
     approve) # pin approval to the current contract.md bytes
       [ $# -ge 1 ] || die "ledger approve <work-item>"
       local d; d="$(ledger_dir "$1")"; [ -f "$d/contract.md" ] || die "no contract.md to approve for '$1'"
+      grep -Eq '^merge:[[:space:]]*(auto|hold)([[:space:]]|$)' "$d/contract.md" \
+        || die "contract.md has no 'merge: auto|hold' line - settle merge consent at seal first (plan-grill done-contract)"
       hash_file "$d/contract.md" | atomic_write "$d/.approved"; printf 'approved %s\n' "$(cat "$d/.approved")" ;;
     check-approval) # exit 0 = contract unchanged since approval; non-zero = gate re-opened
       [ $# -ge 1 ] || die "ledger check-approval <work-item>"
@@ -405,6 +407,8 @@ case "$op" in
       [ ! -d "$PWD/.better-dev" ]                             || { echo "FAIL: memory leaked into worktree"; exit 1; }
       grep -q "check green" "$here/.better-dev/ledger/login-x/contract.md" || { echo "FAIL: worktree write didn't reach primary"; exit 1; }
       grep -q "primary override" "$("$SELF" where)/overrides.md" || { echo "FAIL: worktree recall of primary overrides"; exit 1; }
+      if "$SELF" ledger approve login-x >/dev/null 2>&1; then echo "FAIL: approve must refuse a contract with no merge: line"; exit 1; fi
+      printf 'done: check green\nmerge: auto\n' | "$SELF" ledger put login-x contract.md - >/dev/null
       "$SELF" ledger approve login-x >/dev/null
       "$SELF" ledger check-approval login-x >/dev/null          || { echo "FAIL: approval invalid right after pin"; exit 1; }
       printf 'sneaky edit\n' >>"$here/.better-dev/ledger/login-x/contract.md"

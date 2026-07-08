@@ -28,8 +28,8 @@ on the verdict - usually the fix worker - works through it like this:
 
 ## Accept or rebut - one disposition per blocking finding
 
-Steps 2-3 are an obligation, not a permission: every blocking finding ends the fix pass with exactly one
-written disposition - no third state, and silence is not a disposition:
+Steps 2-3 are an obligation, not a permission: every finding, Minor included, ends the fix pass with
+exactly one written disposition - no third state, and silence is not a disposition:
 
 | Finding | Disposition | Fix or reason |
 |---|---|---|
@@ -45,9 +45,10 @@ Skip the performative acknowledgements - "you're absolutely right", "great catch
 code shows you heard the feedback. State the fix and move on. If you pushed back and turned out wrong, say
 so plainly ("checked it - you're right, it does X; fixing") and continue, no long apology.
 
-Critical and Important findings go back through the loop: fix, then re-review the new diff. Minor findings
-and unresolved `⚠️ cannot verify` items are recorded through the memory contract for the end-of-branch pass
-rather than blocking the current step.
+Findings of every tier go back through the loop: fix, then re-review the new diff - Minor lands last in
+fix order but never defers past the settle. Only reviewer-accepted `REBUTTED` rows and unresolved
+`⚠️ cannot verify` items are recorded through the memory contract for the end-of-branch pass; a fixable
+finding never waits there.
 
 Because a review can run several cycles, each finding carries a status the next cycle reads, not just a
 fix. Track each one as **new** (first raised this cycle), **addressed** (fixed and gone), **persistent**
