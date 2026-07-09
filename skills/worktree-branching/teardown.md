@@ -19,6 +19,12 @@ Three ordering facts, each of which git enforces the hard way if ignored:
   has the branch checked out.
 - **Prune afterwards.** `git worktree prune` clears any stale registration left behind.
 
+The same ordering rules out `gh pr merge --delete-branch`: it fails from a repo whose primary
+checkout pins the integration branch ("'staging' is already used by worktree") because gh tries to
+switch the local checkout to do the deletion. Merge without `--delete-branch` and let this teardown
+own deletion - local branch delete after the worktree remove, then `git push origin --delete <branch>`
+as the remote step.
+
 The scope boundary state (`bd-scope`) lives in the worktree's own git dir, so `git worktree remove`
 deletes it with the tree - teardown never needs a separate unfreeze step.
 
