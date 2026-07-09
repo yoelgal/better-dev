@@ -81,9 +81,14 @@ The output is a report to the human, in three parts:
 
 - **Ranked findings** - a table with typed columns so each field is a value, not prose:
 
-  | Finding | Evidence (file:line) | Category | Effort | Confidence |
-  |---|---|---|---|---|
-  | one-line what and why | `path:line` | correctness / security / perf / tests / debt | small / medium / large | high / med / low |
+  | Finding | Evidence (file:line) | Category | Move | Effort | Confidence |
+  |---|---|---|---|---|---|
+  | one-line what and why | `path:line` | correctness / security / perf / tests / debt | cut / fix / add / restructure | small / medium / large | high / med / low |
+
+  Every finding carries exactly one Move: **cut** (overbuilt or redundant - the fix is deletion), **fix**
+  (fragile or wrong), **add** (missing for the stated goal), **restructure** (the structure fights the
+  goal). A sweep that returns no `cut` rows on a mature codebase is worth a second look - deletion
+  findings are the ones category-thinking under-surfaces.
 
   Leverage-ordered, highest first.
 
