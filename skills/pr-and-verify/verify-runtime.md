@@ -32,7 +32,9 @@ an internal function is not a surface, so trace its caller out to one of these r
 
 Through the real interface: if a user clicks a button, click the button, don't curl the API underneath it.
 Tests in the diff are the author's evidence, not a surface - on a mixed src+tests change, verify the src
-and ignore the test files.
+and ignore the test files. Operator feedback that contradicts a verified state triggers a
+which-surface-are-you-looking-at check before any re-diagnosis: a worktree's server shows this tree, while
+the habitual dev server shows stale code until the merge lands.
 
 ## Probe past the happy path
 

@@ -917,3 +917,33 @@ invisible on the write itself. The operator has already said yes once.
 
 Proves guardrails-install: a permission-widening write carries its consent in the adjacent user
 message, not in a mid-batch answer.
+
+## 72. review - a small-diff pre-PR pass and a deep fan-out
+
+A 19-line branch - two files, one small function plus its doc line, no fingerprint surface, well under
+the scope tripwire - settles its loop and heads to a PR into the integration branch. The whole-branch
+pre-PR pass is due.
+
+- **Pass:** the pass runs at light effort - one fresh reviewer reads the diff against the contract,
+  independence intact - and records the verdict keyed to HEAD. Blast radius set the effort; the occasion
+  didn't.
+- **Fail:** a deep channel fan-out with per-surface lenses burns a fortune arguing over 19 clean lines -
+  or, inverted, the pass is skipped as "too small to review" and the PR opens with no recorded verdict.
+
+Proves review: blast radius outranks occasion - the pre-PR pass scales its effort to the diff, never to
+the ceremony, and light still means a fresh independent verdict on record.
+
+## 73. review - a minor-only fix round and a full fresh fan-out
+
+A verdict closes with five Minor findings, none rebutted, no new surface named. The fix worker lands
+five small fixes; reception's table shows five `ACCEPTED` rows, each citing its hunk.
+
+- **Pass:** the re-review is the scoped fix-confirm pass: one fresh reviewer at light effort over the
+  delta since the reviewed sha plus reception's resolution table, confirming each `ACCEPTED` row's cited
+  seam is actually touched and no regression rides in the delta, ending in a counts block and one verdict
+  keyed to the post-fix HEAD.
+- **Fail:** a full fresh fan-out plus re-approval re-litigates the whole branch for five nits - or the
+  re-review is skipped and the pre-fix verdict rides an invalidated sha to the PR gate.
+
+Proves review: severity sets fix order and review effort, never whether a finding gets addressed - the
+fix-confirm still reads reception's resolution table and still ends in a fresh recorded verdict.

@@ -35,6 +35,12 @@ path. A bad ref or an empty diff fails here - before any worker is dispatched, s
 The package is the reviewer's whole view of the change; the orchestrator hands over the *path*, never the
 diff text, and never pastes its own session history into a brief.
 
+A PR whose diff is exactly the union of changes that each already carry a recorded clean verdict is a
+**promotion PR** - reviewed content needs no fresh verdict. Confirm the recorded verdicts cover the range
+(`.better-dev/bin/bd-mem ledger read <item> review.md` per constituent work-item, each recorded sha
+contained in the range), review only the commits no verdict covers - usually none, or the merge commit's
+conflict resolution - and record a derived clean verdict citing the constituent records.
+
 ## 2. Orient: the reading-ordered walkthrough
 
 The diff arrives in file order; nobody reasons about a change that way. Before dispatch, retell it as a
@@ -64,7 +70,10 @@ the same way the package is handed over.
 
 Default effort is **standard**; the caller passes `[effort]`, or the loop infers it from the diff's blast
 radius - a fingerprint-surface touch, a scope-gate crossing, or a whole-branch pre-PR pass pulls it up; a
-docs-only or single-file diff pulls it down. The effort scales the work, never the separation: even the
+docs-only or single-file diff pulls it down. The whole-branch pre-PR pass defaults to deep, but blast
+radius outranks occasion: a branch whose net diff is small, touches no fingerprint surface, and stays
+under the scope tripwire runs at the effort its diff earns - light stays legal at the PR gate. The effort
+scales the work, never the separation: even the
 lightest effort judges the diff, not the report, and a Critical stays a Critical at every effort.
 
 - **light** - one fresh reviewer reads the diff once against the contract: no channel fan-out, no verify
@@ -76,7 +85,9 @@ lightest effort judges the diff, not the report, and a Critical stays a Critical
 - **deep** - standard, plus each channel over-surfaces candidates (recall-biased - err toward surfacing),
   and the verify pass below decides what survives. For a diff that touches a fingerprint surface (auth,
   migration, money, concurrency, wire format, deletion), crosses the scope tripwire, or the whole-branch pass
-  before a PR into the integration branch. At deep effort, each fingerprint surface the diff touches also
+  before a PR into the integration branch - though a whole-branch pass over a small, fingerprint-clean,
+  under-tripwire diff steps down to the effort the diff earns; blast radius outranks occasion. At deep
+  effort, each fingerprint surface the diff touches also
   gets its own fresh lens worker - the same brief, that surface's section of `lenses.md` as its focus,
   findings on the same severity ladder, printed under its own heading in step 4. At the highest stakes, a
   second independent reviewer on the same diff - a fresh context, ideally a different capable model where
@@ -136,7 +147,12 @@ package path, the hunk in question, and one candidate; it returns exactly one ve
   missing, an off-by-one on a boundary the code doesn't exclude, an allowlist that lost its anchor. Don't
   refute a candidate for being "speculative" when the state it needs is realistic.
 - **REFUTED** - factually wrong (quote the line), provably impossible (show the constant or type), or
-  already guarded in this diff (cite the guard).
+  already guarded in this diff (cite the guard). A refutation answers the candidate's *named* trigger and
+  mechanism; a rebuttal of a different failure mode leaves the candidate PLAUSIBLE.
+
+A candidate whose trigger is drivable on a running surface in under a minute - a rendered page, a CLI
+invocation - is settled by driving it once and capturing what happened. The runtime look outranks the
+static argument, in either direction; `/pr-and-verify`'s `verify-runtime.md` owns the observation rubric.
 
 Keep CONFIRMED and PLAUSIBLE; drop only REFUTED. A finder that quietly drops a half-believed candidate
 skips the verifier and is the main cause of a missed bug - pass every nameable candidate through. The
@@ -196,6 +212,14 @@ that clears the most findings at once. Several findings often trace back to a si
 that fix first retires them together and beats working a severity-sorted list one item at a time.
 `reception.md` works the set in that order.
 
+The re-review scales to what the fix round changed. When the prior verdict's open set was Minor-only - or
+every finding is `ACCEPTED` with a fix, none rebutted, and no new surface touched - it runs as a
+**fix-confirm** pass: one fresh reviewer at light effort, scoped to the delta diff since the reviewed sha
+plus reception's disposition table. It confirms each `ACCEPTED` row's cited seam is actually touched,
+confirms no regression rides in the delta, and records the verdict keyed to the post-fix HEAD. A rebutted
+finding, a new fingerprint-surface touch, or a delta beyond the listed findings escalates to a full
+re-review.
+
 Persist reviewer-accepted `REBUTTED` rows and unresolved ⚠️ items through the memory contract
 (`.better-dev/bin/bd-mem remember "<finding>"`) so the end-of-branch pass sees them - fixed findings
 need no carry. The whole-branch review
@@ -210,7 +234,9 @@ can confirm the change was reviewed without re-running the review:
 
 Key it to the reviewed HEAD. A later fix that changes the code doesn't inherit an older verdict - the PR
 stage checks the recorded sha against the HEAD it's about to open, so a verdict on stale code doesn't gate
-a newer push. A non-clean verdict is recorded too - the counts block keyed to the same sha
+a newer push. A review cycle that ends in a fix pass records exactly one verdict - keyed to the post-fix
+HEAD, after the fix commits land and the scoped re-review confirms them; never record a clean verdict a
+queued fix is about to invalidate. A non-clean verdict is recorded too - the counts block keyed to the same sha
 (`<sha> CRITICAL=1 IMPORTANT=2 MINOR=0 CANNOT_VERIFY=1 GATE_BREACH=0`), cheap and auditable, so a resumed
 loop reads what blocked the last review instead of re-deriving it. It is never recorded clean; it goes back
 through the fix worker and is re-reviewed first.
