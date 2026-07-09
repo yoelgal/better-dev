@@ -1,7 +1,8 @@
 # Runtime observation - the portable verify rubric
 
 The acceptance check for a done-criterion is what the change *does* when it runs, observed directly. This
-is the discipline `/pr-and-verify` step 3 runs, that `/autonomous-loop` points at for its end-to-end
+is the discipline `/pr-and-verify` step 3 runs - against the PR's preview deployment where the repo
+records one - that `/autonomous-loop` points at for its end-to-end
 handoff, that a GUI check narrows onto its own surface, and that `/release-promotion`'s deploy-verify
 pass runs against the deployed surface. Where the host ships `/verify`, compose it as
 the executor; where it doesn't (Codex, pi, a bare host), this is the rubric to run inline. Same standard
