@@ -62,8 +62,11 @@ scale the pattern that worked (`tiers.md`).
 1. **Single worker** (`Task`) - isolate one self-contained slice, or any task whose detail would bloat
    your coordination context.
 2. **Fan-out** (`Workflow`, or several `Task` calls in one turn) - independent subtasks at once. Only
-   when they don't write the same files; parallel writers to one surface collide. A broad review fans out
-   naturally: each worker takes a slice and none needs the others.
+   when they don't write the same files; parallel writers to one surface collide. Check that
+   mechanically before dispatching, not by recall: `git worktree list`, then per live branch
+   `git diff --name-only <base>...<branch>` - a path two lanes both touch makes those lanes
+   sequential, and discovering the overlap at PR time buys a conflict-resolution round instead. A
+   broad review fans out naturally: each worker takes a slice and none needs the others.
 3. **Pipeline** (`Workflow`) - dependent stages, each a fresh worker, where one stage's output file
    becomes the next stage's brief. A drive-to-green loop is itself a pipelineable stage: hand it a verify
    command and a protect-set, consume its terminal verdict, and don't micromanage its iterations.
@@ -123,7 +126,9 @@ is never one of them: `/review` stays severity-gated, never averaged.
 **No silent caps.** When a shape bounds coverage - a top-N, a no-retry, a sample - record what it dropped
 in the ledger. A silent truncation reads as "covered everything" when it didn't; that is a dishonest
 report, not an efficient one. The same honesty covers a fan-out that came back with holes: report the
-partial as partial, never a silent gap.
+partial as partial, never a silent gap. And report status in units of the work, never units of the
+workers: the coverage denominator is the findings, files, or criteria list, each item with its
+disposition - "N agents running" answers a question nobody asked.
 
 **Vet before presenting.** Before you present or act on fan-out findings, confirm each at its cited
 location yourself - a worker's `file:line` is a lead, not a fact. Collapse duplicates across workers, and

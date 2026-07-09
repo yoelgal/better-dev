@@ -105,7 +105,9 @@ without limit. That ceiling is a cost floor, not a progress limit - it settles `
 `DONE`. Before re-deriving anything about this area, spend one recall on it (`.better-dev/bin/bd-mem
 recall "<area>"`) - a lesson you already paid for is cheaper than the mistake it prevents, and the first
 receipt cites that recall or an explicit `recall empty`. A recalled lesson is a prior claim, not a
-current fact - verify it against today's code before acting on it. Run the verify once for a baseline. A red baseline is triaged before any fix points at it (read "Triage the red" below); if it
+current fact - verify it against today's code before acting on it, and a lesson that forbids a normal
+action or forces a costlier path gets that re-verification before it is enforced again, because it
+taxes every session until challenged. Run the verify once for a baseline. A red baseline is triaged before any fix points at it (read "Triage the red" below); if it
 already exits 0, clean the diff once (read "Clean on the first green") and settle `DONE` ("nothing to
 do") without iterating.
 
@@ -143,7 +145,10 @@ Then each pass:
    claimed is back to unproven.
    Dispatch a fresh worker for the task (`/orchestrating-agents`, which also sizes the stage's tier - a
    judgment call like triaging a red or the reviewer's verdict earns the top tier, a closed-spec slice
-   runs cheaper); a worker that hits a missing fact asks rather than guessing, one whose tool results
+   runs cheaper) - with one escape: a step whose edit this session has already fully specified and
+   live-verified (the exact file, the exact text, nothing left to decide) is applied inline rather than
+   paying a fresh worker to retype it, because dispatch buys fresh context or parallelism, and a
+   dispatch that adds neither is spend, not isolation. When dispatching, a worker that hits a missing fact asks rather than guessing, one whose tool results
    contradict its brief surfaces the conflict as a question naming both sides rather than silently
    complying or silently deviating (step 2's gap stop is this same rule one grade up, for a contradicted
    contract criterion), and its reply ends in the
@@ -204,7 +209,9 @@ guess" is not approval, and a prior approval never extends to the next irreversi
 approved path or class plus a one-line why to the work-item's
 approvals log: `.better-dev/bin/bd-mem ledger put <work-item> approvals.log -`. This shared record is the
 loop's approval artifact, and it is a different thing from the contract sign-off `check-approval` pins -
-that one tracks the contract's bytes, this one a blast-radius waiver.
+that one tracks the contract's bytes, this one a blast-radius waiver. A gated class the approved
+contract explicitly names is consented at seal: no stop, no approvals.log entry - the log records only
+mid-loop waivers the contract never anticipated.
 
 ## Triage the red before you fix it
 

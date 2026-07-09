@@ -184,7 +184,9 @@ change:
   protection on the base, or an override gating merges to a release step. A `merge: hold` line, a
   contract with no `merge:` line, or a repo with no recorded merge-policy all hold the same way:
   silence is never consent - leave the PR green and mergeable, name the operator as the merger, and
-  where no policy is recorded suggest recording one via `/guardrails-install`. Either way, hand the
+  where no policy is recorded suggest recording one via `/guardrails-install`. Never merge with
+  `--delete-branch` in a worktree layout - the local branch is checked out in the worktree, so branch
+  deletion follows worktree removal, in the teardown order `/worktree-branching` owns. Either way, hand the
   merged (or green mergeable) PR to `/release-promotion` for the promote-and-tag.
 - **`DONE_WITH_CONCERNS`** - the same, with non-blocking flags named in the PR body.
 - **`BLOCKED`** - an external block. When it is a single waitable condition (a base going green, an infra
@@ -192,11 +194,19 @@ change:
   the moment it clears; a genuine halt that no waiting resolves - a real rebase conflict, a contract or
   architectural dead-end - surfaces and holds.
 - **`NEEDS_INPUT`** - a done-criterion can't be run from here, a fix would need a protected surface, or a
-  gate needs a human. Ask the one question.
+  gate needs a human. Ask the one question. When the input is something only the human can supply - a
+  secret, an account, a paid resource, a choice between setups - lead the ask with the option that
+  eliminates the need ("or we remove X, which needs none of these") so the human can delete the question
+  instead of answering it.
 - **`EXHAUSTED`** - an operator-set budget was reached without converging. Report honestly; never dress
   it as green.
 - **`NO_PROGRESS`** - the same signal repeats with no learning. That is the loop's restart call, not a
   merge.
+
+Announce the terminal state before anything else: the settle report leads with one line - the state, the
+PR URL, merged or held (when held: who merges and why - the `merge: hold` line, the missing policy, or
+branch protection), and the worktree's disposition - so the operator never has to ask whether the work
+landed.
 
 Record the outcome to the ledger so a later session sees how the PR settled and does not re-open work
 that already landed:
@@ -205,7 +215,7 @@ that already landed:
 .better-dev/bin/bd-mem ledger put <work-item> pr.md - <<<'PR #<n> → <state>: <one line>'
 ```
 
-On merge or close, run the close-out - four lines, each written explicitly. The negative form is a line,
+On merge or close, run the close-out - five lines, each written explicitly. The negative form is a line,
 never an omission; a close-out with a line missing is unfinished:
 
 - **Lesson** - the one keyed lesson this PR's verification taught (`.better-dev/bin/bd-mem learn
@@ -225,5 +235,7 @@ never an omission; a close-out with a line missing is unfinished:
 - **Parked follow-ups** - each follow-up or out-of-scope line the contract parked gets a disposition:
   `filed: #<n>`, `handed to operator: <line>`, or `dropped: <one-line reason>`. A contract with none
   parked writes `no parked follow-ups`.
+- **Worktree disposition** - on merge, offer teardown via `/worktree-branching` (its guard and safe order
+  own the mechanics), or record `kept: <why>`. Not tearing down is a line, never an omission.
 
 When you revise this skill, follow `/writing-skills`.

@@ -14,7 +14,10 @@ on the verdict - usually the fix worker - works through it like this:
    shows it - not defensiveness. If a finding is unclear, ask before implementing; a guess on an unclear
    item produces the wrong fix.
 4. **YAGNI-check "do it properly" findings.** Before building out a feature a reviewer wants "done right",
-   grep for who actually uses it. Unused → the lazy fix is to remove it, not flesh it out.
+   grep for who actually uses it. Unused → the lazy fix is to remove it, not flesh it out. The same check
+   covers guard-shaped findings: before a fix adds a guard, a secret, a mandatory input, or a config knob,
+   check whether removing or redesigning the guarded thing deletes the question outright - a design that
+   needs no secret beats a well-guarded secret, and the smaller correct fix may sit upstream of the finding.
 5. **Quarantine out-of-scope suggestions.** A finding whose fix would reach outside this change's diff -
    a sibling module's bug, an unrelated refactor, a follow-up someone wants bundled in - doesn't go in the
    numbered fix list. Park it in a separate proposals section, one line each, framed as a yes/no for
@@ -46,7 +49,8 @@ code shows you heard the feedback. State the fix and move on. If you pushed back
 so plainly ("checked it - you're right, it does X; fixing") and continue, no long apology.
 
 Findings of every tier go back through the loop: fix, then re-review the new diff - Minor lands last in
-fix order but never defers past the settle. Only reviewer-accepted `REBUTTED` rows and unresolved
+fix order but never defers past the settle. A Minor-only round earns the scoped fix-confirm re-review
+`/review` step 5 defines; this table is its input either way. Only reviewer-accepted `REBUTTED` rows and unresolved
 `⚠️ cannot verify` items are recorded through the memory contract for the end-of-branch pass; a fixable
 finding never waits there.
 

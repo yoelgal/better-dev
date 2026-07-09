@@ -202,6 +202,8 @@ before it merges - this skill owns only the promotion and back-merge shape, not 
 ## Where this sits
 
 `/review` runs on the PR into integration; this skill runs *after* integration has soaked, to carry
-it the last hop to release. It never merges feature work and never touches a feature branch - its
+it the last hop to release. When branch protection forces the promote through a PR, that PR is a
+promotion PR of already-reviewed content - `/review` derives its verdict from the constituent recorded
+verdicts rather than re-reviewing what already carries one. It never merges feature work and never touches a feature branch - its
 only writes are the fast-forward of the release branch, the tag, and (for a hotfix) the back-merge
 into integration.
