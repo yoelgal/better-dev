@@ -71,6 +71,8 @@ we actually copied verbatim/substantially, which MIT requires us to attribute, a
     slot-shape reimplemented, his values deliberately not shipped)
   "Claude Code + SKILL.md" guide - @nyk_builderz (Nyk) (X article, ideas;
     least-privilege allowed-tools + shown-format rules reimplemented)
+  emilkowalski/skills - Emil Kowalski (MIT; frequency-budget motion rule, motion tell
+    set, reduced-motion criterion nuance - reimplemented)
 
 ── NOT copied - inspiration only, NOT redistributable ──
   Andrej Karpathy - LOOPS.md v060726 ("personal use permitted"). Concepts reimplemented

@@ -27,7 +27,9 @@ direction card; the tell audit in step 5 filters by it.
 
 Then state the direction in one line, as *decisions, not adjectives*: the type scale, the
 spacing rhythm, the color stance, the motion stance, and whether the read maps to a real design system
-or a named aesthetic family.
+or a named aesthetic family. (A motion stance is three decisions, not a mood: which
+trigger-frequency classes animate at all, the duration ceiling, and the easing family for entrances
+and exits - a tool surface defaults to a low ceiling, a face surface may spend more.)
 
 "Clean, minimal, modern" is not a direction - it is the template every model defaults to, and
 defaulting is what produces the slop. "Just use a standard clean look" skips the one step that matters.
@@ -120,8 +122,13 @@ not advice:
 - **Mobile is a dedicated pass, not a resize check.** Every visual criterion carries a
   mobile-viewport twin, driven and captured like its desktop one; on mobile, omitting a heavy
   ornament entirely beats degrading it.
-- **Motion is earned and bounded.** An animation signals a state change, plays once, and stays
-  subtle; motion with no state to signal is decoration the criterion refuses.
+- **Motion is budgeted by trigger frequency, and bounded.** An action fired dozens-plus times a
+  day - a keyboard shortcut, a palette toggle, list navigation - gets no entrance or exit animation
+  at all; an occasional surface - a modal, drawer, toast - gets one transition within the direction
+  card's duration ceiling; only a rare or first-run moment may spend on delight. The criterion names
+  the trigger's frequency class. An entrance or exit that starts slow instead of fast, motion that
+  keeps playing with no state left to signal, and movement that ignores the user's reduced-motion
+  preference (movement drops; comprehension-aiding fades stay) are flagged items, not style notes.
 
 ## 5. Tell-bans - seed list plus per-project additions
 
