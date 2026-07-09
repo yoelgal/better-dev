@@ -54,6 +54,11 @@ next skill.
 If `GIT_DIR == GIT_COMMON` you are in the primary checkout - the place features branch *from*, not
 *into*. Continue to Step 1.
 
+A worktree is per work-item, never per change. A same-work-item follow-up - a review fix, an operator
+tweak to an open item - rides the existing worktree and branch; only a new work-item earns a new one.
+And a live operator instruction ("just push it to the PR branch") is honored immediately per
+`/overrides`, never out-ritualed with fresh ceremony.
+
 ## Step 1 - resolve the branch and its base
 
 A work-item is a **feature** or a **fix**. The prefix decides the base branch:
@@ -77,7 +82,12 @@ base="staging"                # hotfix → main; honor the integration override
 
 Confirm the base branch actually exists in git before branching off it - a base named in prose isn't
 real until `git` shows it (`git rev-parse --verify "$base"` or `origin/$base`). A missing integration
-branch is an onboarding gap, not something to invent here.
+branch is an onboarding gap, not something to invent here, and a recorded name git contradicts is
+re-verified and rewritten (`/overrides`), never obeyed.
+
+Before opening a second parallel worktree, read the live lanes: `git worktree list`, then per live
+branch `git diff --name-only <base>...<branch>` - a path two lanes both touch makes the work
+sequential, not parallel.
 
 ## Step 2 - create the worktree
 
@@ -106,11 +116,13 @@ If `$path` already exists or the branch is already checked out somewhere, this i
 at the existing worktree rather than forcing a duplicate. If `git worktree add` fails on a sandbox
 permission error, say so and work in place - `edge-cases.md` covers that fallback.
 
-A fresh worktree also has none of the primary checkout's gitignored local settings, so a session
-rooted in it loses the operator's recorded permission grants (a `.claude/settings.local.json`
-allowlist, or the host's equivalent) and falls back to prompting or a classifier on actions the
-operator already approved. Mirror that file from the primary checkout into the new worktree when it
-exists - it is personal, gitignored state, so the copy never enters a PR.
+A fresh worktree also has none of the primary checkout's gitignored local state - neither the
+operator's recorded permission grants (a `.claude/settings.local.json` allowlist, or the host's
+equivalent, without which the session falls back to prompting on actions already approved) nor the
+runtime config the app needs (`.env*` files, the host's local settings). Copy that class from the
+primary checkout at creation - copy, never symlink: build tools reject symlinks and a symlink turns
+teardown into a two-step dance - so the first dev-server run doesn't die mid-task on missing env. It
+is personal, gitignored state, so the copies never enter a PR.
 
 A fresh worktree has no installed deps, so run the project's setup and one baseline check here -
 that way the loop's first verify measures your work, not a missing `node_modules` misread as a
@@ -165,6 +177,12 @@ A consumer that reads `handoff: yes` does not cross the worktree boundary on its
 found the session **already** in the right worktree, emit `handoff: no` instead and let the next
 skill continue in place. The hand-off targets are `/plan-grill` (feature) or `/diagnose` (fix) for
 the typed front-end, then `/autonomous-loop` to drive the work.
+
+An isolated worktree means an isolated running app: a dev server started here serves this tree on
+its own port, and the operator's habitual server keeps showing the old code until merge. When
+verifying against a live surface, name the exact URL/port that shows the fix in the same message,
+and give operator feedback that contradicts your verified state a stale-surface check first ("which
+port/URL are you looking at?") before any re-diagnosis.
 
 ## Finishing up
 

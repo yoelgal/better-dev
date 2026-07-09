@@ -21,6 +21,10 @@ What belongs in the brief:
   and anything `.better-dev/bin/bd-mem recall "<area>"` returns. A pitfall one worker already paid for
   is cheaper in the brief than rediscovered in the run.
 - Your resolution of any ambiguity you noticed while writing it - don't pass a known ambiguity through.
+- Capabilities, not exact tool names ("a browser check", never "the DesignSync tool"). A named tool the
+  worker can't find means look for the equivalent capability under another name and proceed, reporting
+  the substitution; only a capability with no equivalent settles `BLOCKED`. A tool-name mismatch is
+  never a stop.
 - For a worker that writes files, the repo's high-consequence denylist, pasted in with the standing
   instruction to escalate rather than edit. A fresh worker can't see the repo's guardrails, so the brief
   carries the list itself: if the task turns out to touch one of those paths - secrets and credentials, DB
@@ -136,6 +140,11 @@ resolve. Filter the holes out before you merge, then treat each one as its own r
 returned nothing is not a worker that returned "done," and mapping over the batch as if every slot were
 filled quietly bakes a gap into the merged result. Relay honestly what came back short - a silent hole in
 a merged answer is the same dishonesty as a silent cap on coverage.
+
+A worker that returned having made zero tool calls stalled on spawn rather than failed the task: where
+the host can message a live worker, one continuation ("you stopped before doing any work - begin now")
+is the first move, and a re-dispatch the second. Neither counts toward the two-failures rule, which
+measures the spec, not the harness.
 
 ## Retry vs relaunch
 
