@@ -16,8 +16,13 @@ are read first by every skill and beat anything a default would have done.
 ## When the user pushes back
 
 Someone steers away from what a skill was about to do - a different branch prefix, a spec that lands
-somewhere else, a phase they want skipped, a house rule the default didn't know about. Two things
-follow, in order:
+somewhere else, a phase they want skipped, a house rule the default didn't know about. Pushback also
+arrives as a wish rather than a complaint - "just handle it yourself", "stop asking me", said at a
+gate, a hold, or a question moment - and that is a correction to that moment's default, owed the same
+honor-now / offer-to-stand treatment; when the standing form is an allowance another skill records
+(auto-merge is `/guardrails-install`'s merge-policy; per-item consent stays the contract's `merge:`
+line and is never skipped - silence is never consent), route the persist there instead of writing a
+generic override line. Two things follow, in order:
 
 **1. Honor it now.** Apply the correction to the work in front of you immediately. This one is settled
 the moment they say it; nothing below gates the current work.
@@ -85,6 +90,12 @@ the same across every project, and a preference belongs to this one. The overrid
 default stays general and the project keeps its own opinion beside it. When a correction touches
 something a specific skill owns - a branch prefix for `/worktree-branching`, a repro convention for
 `/diagnose` - the override captures it; the skill stays untouched and simply reads it next time.
+
+A recorded line that git or file reality contradicts - an integration branch the record names that
+`git branch` no longer lists, a command that no longer exists - is a stale premise, not an
+instruction. Re-verify against reality, apply what is real now, and offer the one-line rewrite of the
+record (the same light confirm this skill already owns). Obeying the stale line, or stopping without
+offering the rewrite, both leave the next session to hit it again.
 
 ## What counts as an override versus a lesson
 

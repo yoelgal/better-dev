@@ -1,5 +1,24 @@
 #!/usr/bin/env bash
-# bd-mem - better-dev memory contract: init / remember / learn / recall / prune / persist-override / read / ledger.
+# bd-mem - better-dev memory contract: durable rules, scored lessons, project overrides, one ledger per work-item.
+#
+#   bd-mem init                                        create the .better-dev/ memory files (idempotent)
+#   bd-mem remember <rule>                             promote a verified, repeatedly-held fact to a durable rule
+#   bd-mem learn <lesson> [confidence] [key] [source]  log a scored lesson (source: observed|user-stated|inferred)
+#   bd-mem recall [query]                              print matching rules + lessons, key-exact first
+#   bd-mem prune [--apply]                             preview (or, with --apply, drop) superseded/stale lessons
+#   bd-mem persist-override <line>                     add a project override line inside the managed block
+#   bd-mem read [rules|overrides|learnings|ledger]     dump one memory surface
+#   bd-mem where                                       print the resolved .better-dev path
+#   bd-mem selftest                                    run the built-in checks
+#   bd-mem ledger init <work-item>                     scaffold contract.md / progress.md / receipts.md
+#   bd-mem ledger dir <work-item>                      print the ledger dir, creating it
+#   bd-mem ledger where <work-item>                    print the ledger dir without creating it
+#   bd-mem ledger resume <work-item>                   print contract + progress tail + last receipt
+#   bd-mem ledger put <work-item> <name> [<file>|-]    write an artifact into the ledger (- = stdin)
+#   bd-mem ledger read <work-item> [name]              print an artifact, or list the entry's files
+#   bd-mem ledger list                                 list every work-item in the ledger
+#   bd-mem ledger approve <work-item>                  pin approval to contract.md's exact bytes (+ snapshot)
+#   bd-mem ledger check-approval <work-item>           exit 0 = unchanged since approval; else gate re-opened
 #
 # The four operations skills use are remember, recall, persist(-override) and read; `learn`, `init`,
 # `prune`, and `ledger` are helpers. The backend is swappable via BETTER_DEV_MEMORY:
@@ -135,20 +154,30 @@ ledger() {
       local d; d="$(ledger_dir "$1")"; [ -f "$d/contract.md" ] || die "no contract.md to approve for '$1'"
       grep -Eq '^merge:[[:space:]]*(auto|hold)([[:space:]]|$)' "$d/contract.md" \
         || die "contract.md has no 'merge: auto|hold' line - settle merge consent at seal first (plan-grill done-contract)"
-      hash_file "$d/contract.md" | atomic_write "$d/.approved"; printf 'approved %s\n' "$(cat "$d/.approved")" ;;
-    check-approval) # exit 0 = contract unchanged since approval; non-zero = gate re-opened
+      hash_file "$d/contract.md" | atomic_write "$d/.approved"
+      atomic_write "$d/.approved.contract.md" <"$d/contract.md"   # snapshot the approved bytes - a re-opened gate diffs against these
+      printf 'approved %s\n' "$(cat "$d/.approved")" ;;
+    check-approval) # exit 0 = contract unchanged since approval; non-zero = gate re-opened (the error names the re-pin command)
       [ $# -ge 1 ] || die "ledger check-approval <work-item>"
       local d; d="$(ledger_dir "$1")"
-      [ -f "$d/.approved" ]   || { echo "not approved" >&2; exit 1; }
+      [ -f "$d/.approved" ]   || { printf 'not approved - after the operator confirms contract.md, pin with: bd-mem ledger approve %s\n' "$1" >&2; exit 1; }
       [ -f "$d/contract.md" ] || { echo "no contract.md" >&2; exit 1; }
-      [ "$(hash_file "$d/contract.md")" = "$(cat "$d/.approved")" ] && echo approved \
-        || { echo "contract edited since approval - gate re-opened" >&2; exit 1; } ;;
+      if [ "$(hash_file "$d/contract.md")" = "$(cat "$d/.approved")" ]; then echo approved; else
+        printf 'contract edited since approval - gate re-opened; re-confirm with the operator, then re-pin: bd-mem ledger approve %s\n' "$1" >&2
+        # print the delta since the approved snapshot so the re-confirm judges the edit, not the whole
+        # contract; a legacy entry (hash, no snapshot) degrades to the message alone, and a non-zero
+        # diff exit never changes this check's exit code
+        if [ -f "$d/.approved.contract.md" ]; then diff "$d/.approved.contract.md" "$d/contract.md" || true; fi
+        exit 1
+      fi ;;
     *) die "ledger where|dir|init|resume|put|read|list|approve|check-approval" ;;
   esac
 }
 
 op="${1:-}"; [ $# -gt 0 ] && shift || true
 case "$op" in
+  "" | -h | --help) # the full surface is the header above - print it, never make a session probe for it
+    sed -n '2,35p' "$SELF"; exit 0 ;;
   init)
     ensure; printf 'initialized %s\n' "$BD_DIR" ;;
   remember) # promote a durable rule (idempotent) and log it - grep-then-append is one locked section
@@ -182,7 +211,9 @@ case "$op" in
           # Same-key lessons resolve latest-wins: the store is append-only, so the last write under a key
           # is the correction and older entries under it never print. Each lesson carries a provenance
           # suffix [key · confidence · date · source] so a citation of it is auditable; a legacy line
-          # with none of those fields prints bare, exactly as before.
+          # with none of those fields prints bare, exactly as before. Any non-empty output gets a
+          # constant #-comment footer (never interpolating lesson text - stored lessons are untrusted
+          # input): lessons are prior claims, not settled fact, and the footer names the correction.
     ensure; q="${1:-}"; TAB="$(printf '\t')"
     {
       # rules.md: promoted and verified - substring tier, top confidence, printed verbatim
@@ -226,7 +257,13 @@ case "$op" in
           }
         }
       ' "$LEARN" 2>/dev/null || true
-    } | LC_ALL=C sort -t"$TAB" -k1,1n -k2,2rn -s | cut -f3- ;;
+    } | LC_ALL=C sort -t"$TAB" -k1,1n -k2,2rn -s | cut -f3- | LC_ALL=C awk '
+      # ponytail: footer emitted on any hit (rules included), not just lessons - shape detection is
+      # not worth it. It rides the last pipeline stage so body + footer leave in ONE buffered flush;
+      # a separate write after a `recall | grep -q` reader matched and exited would SIGPIPE.
+      { print }
+      END { if (NR) print "# prior claims, not settled fact - re-verify one that forbids a normal action or forces a costlier path before enforcing it; correct with: bd-mem learn \"<corrected>\" <conf> \"<same key>\"" }
+    ' ;;
   prune) # preview lesson-stream compaction candidates; `prune --apply` rewrites the file dropping them.
          # SUPERSEDED: an older entry under a key a later write corrected (recall already ignores it).
          # STALE: a lesson whose text names a repo path that no longer exists.
@@ -337,6 +374,18 @@ case "$op" in
       "$SELF" learn "shaky hypothesis about caches" 0.3 cache-guess >/dev/null
       "$SELF" recall "shaky hypothesis" | grep -q '^guess: shaky hypothesis about caches' || { echo "FAIL: guess prefix missing"; exit 1; }
       if "$SELF" recall "banana high" | grep -q '^guess:'; then echo "FAIL: high-confidence wrongly flagged guess"; exit 1; fi
+      # --- recall: epistemic footer (constant # line) after any hit, absent on an empty recall ---
+      "$SELF" recall banana | grep -q '^# prior claims' || { echo "FAIL: recall footer missing on hits"; exit 1; }
+      "$SELF" recall banana | grep -q 'bd-mem learn' || { echo "FAIL: recall footer must name the correction command"; exit 1; }
+      [ -z "$("$SELF" recall zz-no-such-query-zz)" ] || { echo "FAIL: footer printed on an empty recall"; exit 1; }
+      # --- help: bare / -h / --help print the full surface and exit 0; unknown ops still die ---
+      hp="$("$SELF" --help)" || { echo "FAIL: --help must exit 0"; exit 1; }
+      printf '%s' "$hp" | grep -q "ledger approve" || { echo "FAIL: --help missing ledger approve"; exit 1; }
+      printf '%s' "$hp" | grep -q "check-approval" || { echo "FAIL: --help missing check-approval"; exit 1; }
+      bare="$("$SELF")" || { echo "FAIL: bare invocation must print help and exit 0"; exit 1; }
+      [ "$bare" = "$hp" ] || { echo "FAIL: bare invocation differs from --help"; exit 1; }
+      "$SELF" -h >/dev/null || { echo "FAIL: -h must exit 0"; exit 1; }
+      if "$SELF" bogus-op 2>/dev/null; then echo "FAIL: unknown op must still die"; exit 1; fi
       # a key still recalls a lesson whose text does not contain the query (guardrails-style keying)
       "$SELF" learn "the denylist and gated classes" 0.9 safety >/dev/null
       "$SELF" recall safety | grep -q "denylist" || { echo "FAIL: key-substring recall"; exit 1; }
@@ -409,12 +458,26 @@ case "$op" in
       grep -q "primary override" "$("$SELF" where)/overrides.md" || { echo "FAIL: worktree recall of primary overrides"; exit 1; }
       if "$SELF" ledger approve login-x >/dev/null 2>&1; then echo "FAIL: approve must refuse a contract with no merge: line"; exit 1; fi
       printf 'done: check green\nmerge: auto\n' | "$SELF" ledger put login-x contract.md - >/dev/null
+      # --- self-serving errors: the not-approved failure names the re-pin command ---
+      if na="$("$SELF" ledger check-approval login-x 2>&1)"; then echo "FAIL: check-approval passed with no approval"; exit 1; fi
+      printf '%s' "$na" | grep -q "ledger approve" || { echo "FAIL: not-approved error must name ledger approve"; exit 1; }
       "$SELF" ledger approve login-x >/dev/null
+      # approve snapshots the approved bytes beside the hash, for the re-opened gate's delta
+      cmp -s "$here/.better-dev/ledger/login-x/.approved.contract.md" \
+             "$here/.better-dev/ledger/login-x/contract.md"           || { echo "FAIL: approve must snapshot the contract bytes"; exit 1; }
       "$SELF" ledger check-approval login-x >/dev/null          || { echo "FAIL: approval invalid right after pin"; exit 1; }
       printf 'sneaky edit\n' >>"$here/.better-dev/ledger/login-x/contract.md"
-      if "$SELF" ledger check-approval login-x >/dev/null 2>&1; then echo "FAIL: edit must re-open the approval gate"; exit 1; fi
+      # --- re-opened gate: names the re-pin command AND prints the delta since the snapshot ---
+      if ro="$("$SELF" ledger check-approval login-x 2>&1)"; then echo "FAIL: edit must re-open the approval gate"; exit 1; fi
+      printf '%s' "$ro" | grep -q "ledger approve" || { echo "FAIL: re-opened error must name ledger approve"; exit 1; }
+      printf '%s' "$ro" | grep -q "sneaky edit"    || { echo "FAIL: re-opened gate must print the edited line"; exit 1; }
+      # --- legacy entry (hash present, no snapshot) still reports cleanly, message alone ---
+      rm "$here/.better-dev/ledger/login-x/.approved.contract.md"
+      if lg="$("$SELF" ledger check-approval login-x 2>&1)"; then echo "FAIL: legacy entry must still re-open"; exit 1; fi
+      printf '%s' "$lg" | grep -q "gate re-opened" || { echo "FAIL: legacy entry must still report the re-open"; exit 1; }
+      if printf '%s' "$lg" | grep -q "sneaky edit"; then echo "FAIL: legacy entry printed a diff without a snapshot"; exit 1; fi
     ) && r=0 || r=1
     rm -rf "$g"
     [ $r = 0 ] && echo "selftest OK" || die "selftest FAILED (git/worktree)" ;;
-  *) die "usage: bd-mem init|remember|learn|recall|prune|persist-override|ledger|read|where|selftest" ;;
+  *) die "unknown op '$op' - run: bd-mem --help" ;;
 esac
