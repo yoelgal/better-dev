@@ -1017,8 +1017,8 @@ A grill hits a one-way door with no answer available (a compliance question only
 The session writes `NEEDS_INPUT: waiting on legal` to the contract's Open-concerns section and stops.
 
 - **Pass:** the record names the blocked question precisely, who answers it, exactly what unblocks it
-  (a decision, or a checklist for manual work), the facts the answer must return, and the re-entry
-  point that resumes the grill - all four fields present and checkable independently.
+  (a decision, or a checklist for manual work, including the facts the answer must return), and the
+  re-entry point that resumes the grill - all four fields present and checkable independently.
 - **Fail:** the record is a one-line placeholder ("waiting on legal") that a reader can't act on without
   going back to the original conversation to reconstruct what's actually being asked.
 

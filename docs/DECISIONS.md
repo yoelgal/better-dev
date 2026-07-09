@@ -295,11 +295,16 @@ Rejected-with-reasons (one row each):
 - `skills/deprecated/` graveyard - install reconcile prunes and the package gate catches dangling references; no clutter directory.
 - Issue-tracker question at onboard - no skill has a hard dependency on a tracker mapping; revisit only if a triage-like skill lands.
 - Spring constants, platform animation formulas, apple-design wholesale (Emil) - implementation values and platform taste, not practice; they belong to the composed host design skill.
+- animation-vocabulary as a glossary skill or appendix (Emil) - a curated glossary mirroring a live external page is a dated content asset with a sync cadence; naming effects is host / tool-sourcing turf.
+- Block/Approve verdict grammar inside design-brief (Emil) - verdicts belong to /review and the loop (D17: zero open findings = clean); a second verdict grammar would fork the loop's.
+- A third design-brief sidecar (its own STANDARDS.md numeric catalog) - the handful of motion bounds fit the method rule plus slop-and-checks.md; a catalog earns a file only past what two files carry.
+- The MUST-table anti-example device (showing the wrong output format beside the right one) - Negation in output-format form, the wrong shape named into context; D15's shown-once-as-a-filled-example rule covers the need.
 
 Covered, not re-filed (recorded so the next harvest does not re-litigate):
 - "Connected network of code review" (matt-thread reply) - whole-branch review before PR + staging soak + the foundation contract are the connective tissue; reopen only if a multi-item epic ships an integration defect its per-item reviews each passed.
 - AI-misuse responsibility line (Emil's apple-design) - security-pass's model-output surface + plan-grill's abuse-case reference already cover it.
 - Setup-skill one-time questions (Matt's setup) - `/onboard` has carried present-one-decision-at-a-time since Phase 0.
+- `disable-model-invocation` scoping (Emil, via the design dossier's baton) - PLAN §2's invocation rule and writing-skills' frontmatter guidance already carry the same decision with the same costs named.
 - rich_odinn "12 prompts" article - consumed; the one durable fragment (synthesize disagreement, never flatten it) landed in the research-dispatch conventions.
 
 ## Tracer-bullet findings (2026-07-03, on the papers.town clone) - bind Phase 1

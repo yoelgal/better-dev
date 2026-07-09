@@ -203,10 +203,11 @@ can't be settled and blocks
 the plan, that's a `NEEDS_INPUT` state, not a guess: record it and stop rather than inventing an
 answer.
 
-A `NEEDS_INPUT` record is a handoff, not a shrug. It names the blocked question, who answers it, and
-exactly what unblocks it - a decision to make, or manual work spelled as a precise checklist (sign up
-for the service, provision the access, move the data) - plus the facts the answer must come back with
-and the re-entry point that resumes the grill when it does.
+A `NEEDS_INPUT` record is a handoff, not a shrug - four fields, each checkable by a cold reader. It
+names the blocked question, who answers it, what unblocks it - a decision to make, or manual work
+spelled as a precise checklist (sign up for the service, provision the access, move the data),
+including the facts the answer must come back with - and the re-entry point that resumes the grill
+when it does.
 
 Write the contract to the **primary checkout's** shared ledger so every worktree sees it. Resolve the
 item's ledger directory with `.better-dev/bin/bd-mem ledger dir <work-item>` - it returns the
