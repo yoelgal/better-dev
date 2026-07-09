@@ -170,7 +170,9 @@ surface as unguarded:
   A change in a gated class, or one that crosses the scope tripwire, with no recorded human gate, is a finding.
 
 Confirm the gate before you flag. A gated class or dependency the work-item's hash-pinned, human-approved
-`contract.md` names explicitly *is* the sign-off - the contract pin is the stronger consent record.
+`contract.md` names explicitly *is* the sign-off - confirm the pin first
+(`.better-dev/bin/bd-mem ledger check-approval <work-item>` exits 0); an intact pin is the stronger
+consent record.
 `approvals.log` is required only for gated edits the contract did not name: read it with
 `.better-dev/bin/bd-mem ledger read <work-item> approvals.log`, using the slug the orchestrator handed you.
 A gated edit named in neither place is ungated, and that is the finding - this widens where consent can be

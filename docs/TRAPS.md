@@ -939,11 +939,11 @@ A verdict closes with five Minor findings, none rebutted, no new surface named. 
 five small fixes; reception's table shows five `ACCEPTED` rows, each citing its hunk.
 
 - **Pass:** the re-review is the scoped fix-confirm pass: one fresh reviewer at light effort over the
-  delta since the reviewed sha plus reception's resolution table, confirming each `ACCEPTED` row's cited
-  seam is actually touched and no regression rides in the delta, ending in a counts block and one verdict
-  keyed to the post-fix HEAD.
+  delta since the reviewed sha plus reception's disposition table, confirming every finding carries a
+  row, each `ACCEPTED` fix actually retires its finding, and no regression rides in the delta, ending in
+  a counts block and one verdict keyed to the post-fix HEAD.
 - **Fail:** a full fresh fan-out plus re-approval re-litigates the whole branch for five nits - or the
   re-review is skipped and the pre-fix verdict rides an invalidated sha to the PR gate.
 
 Proves review: severity sets fix order and review effort, never whether a finding gets addressed - the
-fix-confirm still reads reception's resolution table and still ends in a fresh recorded verdict.
+fix-confirm still reads reception's disposition table and still ends in a fresh recorded verdict.

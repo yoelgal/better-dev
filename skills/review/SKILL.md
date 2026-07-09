@@ -37,9 +37,14 @@ diff text, and never pastes its own session history into a brief.
 
 A PR whose diff is exactly the union of changes that each already carry a recorded clean verdict is a
 **promotion PR** - reviewed content needs no fresh verdict. Confirm the recorded verdicts cover the range
-(`.better-dev/bin/bd-mem ledger read <item> review.md` per constituent work-item, each recorded sha
-contained in the range), review only the commits no verdict covers - usually none, or the merge commit's
-conflict resolution - and record a derived clean verdict citing the constituent records.
+(`.better-dev/bin/bd-mem ledger read <item> review.md` per constituent work-item): a constituent is
+covered when its recorded sha is contained in the range, or - where the host squash-merges, so the
+reviewed sha is never an ancestor - when the content matches (`git diff <recorded-sha> <squash-commit>`
+empty on the item's paths, or a clean `git range-diff`). A constituent that matches neither way is
+uncovered and gets reviewed, as does any commit no verdict covers - usually none, or the merge commit's
+conflict resolution. Record the derived clean verdict where step 5 records any other: the promoting
+item's ledger `review.md` (the work-item that owns the PR, or the `release-<version>` item for an
+integration-to-release promote), keyed to the promotion PR's HEAD and citing the constituent records.
 
 ## 2. Orient: the reading-ordered walkthrough
 
@@ -101,8 +106,8 @@ and none of them is you. Each axis worker gets the same brief - `reviewer-brief.
 claim-blind rule (artifact and contract, never the report), the read-only-the-diff discipline, the
 severity ladder, and the output shape -
 plus the package path, the reading-ordered walkthrough from step 2, the work-item slug (so a channel can
-resolve the shared ledger and read the work-item's `approvals.log` to confirm a blast-radius sign-off),
-and the channel's own focus:
+resolve the shared ledger and confirm a blast-radius sign-off - the pinned `contract.md` naming the
+class, else `approvals.log`), and the channel's own focus:
 
 - **Spec** - does the diff implement what was asked, nothing missing and nothing smuggled in? Judge it
   against the plan or contract from `/plan-grill` (or the fix contract from `/diagnose`), which is the
@@ -215,9 +220,11 @@ that fix first retires them together and beats working a severity-sorted list on
 The re-review scales to what the fix round changed. When the prior verdict's open set was Minor-only - or
 every finding is `ACCEPTED` with a fix, none rebutted, and no new surface touched - it runs as a
 **fix-confirm** pass: one fresh reviewer at light effort, scoped to the delta diff since the reviewed sha
-plus reception's disposition table. It confirms each `ACCEPTED` row's cited seam is actually touched,
-confirms no regression rides in the delta, and records the verdict keyed to the post-fix HEAD. A rebutted
-finding, a new fingerprint-surface touch, or a delta beyond the listed findings escalates to a full
+plus reception's disposition table. It confirms every finding in the prior verdict carries a disposition
+row - a missing row is persistent and re-blocks - confirms each `ACCEPTED` fix actually retires its
+finding (the cited seam touched and the defect no longer holding), confirms no regression rides in the
+delta, and records the verdict keyed to the post-fix HEAD. A rebutted finding, a new fingerprint-surface
+touch, a delta beyond the listed findings, or a delta that crosses the scope tripwire escalates to a full
 re-review.
 
 Persist reviewer-accepted `REBUTTED` rows and unresolved ⚠️ items through the memory contract
@@ -234,8 +241,9 @@ can confirm the change was reviewed without re-running the review:
 
 Key it to the reviewed HEAD. A later fix that changes the code doesn't inherit an older verdict - the PR
 stage checks the recorded sha against the HEAD it's about to open, so a verdict on stale code doesn't gate
-a newer push. A review cycle that ends in a fix pass records exactly one verdict - keyed to the post-fix
-HEAD, after the fix commits land and the scoped re-review confirms them; never record a clean verdict a
+a newer push. A review cycle that ends in a fix pass records exactly one *final* verdict - keyed to the
+post-fix HEAD, after the fix commits are made in the worktree and the scoped re-review confirms them; the
+interim counts block below is a working record, not a second verdict. Never record a clean verdict a
 queued fix is about to invalidate. A non-clean verdict is recorded too - the counts block keyed to the same sha
 (`<sha> CRITICAL=1 IMPORTANT=2 MINOR=0 CANNOT_VERIFY=1 GATE_BREACH=0`), cheap and auditable, so a resumed
 loop reads what blocked the last review instead of re-deriving it. It is never recorded clean; it goes back
