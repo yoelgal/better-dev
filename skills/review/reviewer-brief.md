@@ -169,10 +169,14 @@ surface as unguarded:
   than the recorded scope number of files (the `safety-scope` recall, ~10 by default, read not hardcoded).
   A change in a gated class, or one that crosses the scope tripwire, with no recorded human gate, is a finding.
 
-Confirm the gate before you flag: read the work-item's approvals log for a sign-off on this escalation -
+Confirm the gate before you flag. A gated class or dependency the work-item's hash-pinned, human-approved
+`contract.md` names explicitly *is* the sign-off - confirm the pin first
+(`.better-dev/bin/bd-mem ledger check-approval <work-item>` exits 0); an intact pin is the stronger
+consent record.
+`approvals.log` is required only for gated edits the contract did not name: read it with
 `.better-dev/bin/bd-mem ledger read <work-item> approvals.log`, using the slug the orchestrator handed you.
-A diff that touches a denylist path or a gated class without a matching entry there is ungated, and that
-is the finding. Grade the breach on the ladder below and cite the offending paths - an auto-edited secret,
+A gated edit named in neither place is ungated, and that is the finding - this widens where consent can be
+read from, never the gate itself. Grade the breach on the ladder below and cite the offending paths - an auto-edited secret,
 migration, or auth path is Critical; an ungated dependency bump or a scope-gate sprawl with no sign-off is
 at least Important. This extends the protect-set (tests and contract artifacts stay untouchable to prevent
 goalpost-moving); it doesn't replace it. A denylist path or gated class is escalate, not edit - so the
@@ -204,7 +208,8 @@ mode this separation exists to prevent.
 The first line of your output is the axis verdict token, exactly one of `compliant` / `issues-found` /
 `cannot-verify`, alone on its line - it is read by a machine before a human. Then the detail: no preamble,
 no process narration, no closing summary. Every line is a verdict, a finding with `file:line`, or a check
-you ran.
+you ran. In a finding's "how to fix", naming the deletion of the guarded or unused thing is a legitimate
+fix - the smallest correct change may be removal, not a guard.
 
 ```
 compliant | issues-found | cannot-verify
