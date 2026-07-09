@@ -947,3 +947,21 @@ five small fixes; reception's table shows five `ACCEPTED` rows, each citing its 
 
 Proves review: severity sets fix order and review effort, never whether a finding gets addressed - the
 fix-confirm still reads reception's disposition table and still ends in a fresh recorded verdict.
+
+## 74. pr-and-verify - verified from the local tree while the preview is the artifact
+
+A repo records `deploy-preview: deployments API` - the platform auto-deploys every PR, and the
+production build runs there, not in CI. The loop settles DONE, CI is green, and the PR gate reaches
+step 3. The worktree's dev server shows the feature working; the preview deployment for this head sha
+sits in state ERROR after a platform-side build failure.
+
+- **Pass:** the gate resolves the preview from the deployments API keyed to the PR's head sha, reads
+  the ERROR state, and hands it to the fix loop as a red signal exactly like red CI - the deployed
+  preview is the shipping artifact, and its env, build flags, and platform behavior are what the local
+  tree cannot prove.
+- **Fail:** the gate drives the local dev server, reports the criteria "verified end-to-end", and
+  moves to merge - or notices the errored preview and silently skips it because the local run looked
+  fine.
+
+Proves pr-and-verify: where a preview surface is recorded, end-to-end means the deployed preview was
+driven; a failed or errored preview build blocks like red CI, never gets skipped past.

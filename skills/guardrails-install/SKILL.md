@@ -170,7 +170,15 @@ gap with what you observed, not written as a fact - a README claiming "deployed 
 .better-dev/bin/bd-mem remember "deploy-url: <production URL, operator-confirmed>"
 .better-dev/bin/bd-mem remember "deploy-status: <status command, or 'http'>"
 .better-dev/bin/bd-mem remember "deploy-health: <health URL or command>"
+.better-dev/bin/bd-mem remember "deploy-preview: <how a PR's preview URL resolves - deployments API | bot comment | command>"
 ```
+
+The preview rule earns the same premise-verify as the rest: record it only against an observed
+platform config *and* an actual preview deployment seen (a deployment listed for a recent PR's head
+sha, a preview URL that answered) - a platform that could deploy previews but demonstrably doesn't
+records the explicit negative `deploy-preview: none`. The negative matters because a recorded no is
+a decision `/pr-and-verify` settles on at its runtime-observation step, where a missing rule is a
+gap every later session pays to re-detect.
 
 A repo with no deploy surface (a library, a CLI) records `deploy-surface: none` - a recorded no is a
 fact `/release-promotion` reads and settles on, where a missing key is a question it has to re-ask.
