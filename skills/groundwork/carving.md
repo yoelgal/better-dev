@@ -62,6 +62,33 @@ between-wave check.)
 Most of the work should land in wave 1. A long tail of later waves means the items are more coupled than
 the carve admits - revisit steps 2 and 4.
 
+## When a change can't be sliced vertically - expand-contract
+
+A wide mechanical change - renaming a column, retyping a symbol every module imports - can't land as
+one work-item the way steps 1-5 assume: the edit touches call sites across the whole codebase at once,
+and no single vertical slice goes green while the rest of the tree still expects the old form. Don't
+force it into the carve above. Sequence it instead as three stages, wired through the same owns /
+depends-on / wave machinery as any other collision:
+
+- **Expand** - add the new form beside the old, so nothing that already works breaks. One work-item,
+  wave 1.
+- **Migrate, in batches** - move call sites to the new form in batches sized by their own blast radius
+  (a package, a directory), each batch its own work-item that depends-on the expand and nothing else.
+  CI stays green batch to batch, because the old form is still there for anything not yet migrated.
+- **Contract** - delete the old form once no caller depends on it. One work-item, depends-on every
+  migrate batch - the only item allowed to actually remove the old form.
+
+This is the one case where the carve is a sequence of same-purpose work-items rather than a set of
+disjoint parallel ones; the ownership rule from step 2 still holds inside each batch, and the collision
+check in step 3 still runs across batches.
+
+## Approve before it lands
+
+The carve above is a draft until the user confirms it. Present the work-item list - owns, depends-on,
+base, wave - and ask the three questions from groundwork step 5: is the granularity right (too coarse
+/ too fine), does each dependency edge gate only the item it blocks, should anything merge or split.
+Iterate until approved; only the approved list goes to the ledger (groundwork step 5).
+
 ## When two items can't be made disjoint
 
 Sometimes push-down, sequencing, and redrawing all fail - two pieces are genuinely one change. Say so,

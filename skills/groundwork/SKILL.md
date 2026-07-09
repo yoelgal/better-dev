@@ -45,8 +45,21 @@ a `/tool-sourcing` candidate - never a blocker.
 Otherwise run a lean built-in grill, reusing `/plan-grill`'s discipline - including its
 brief-decode step when the epic arrives as somebody else's words: one question at a time, each
 carrying the answer you'd pick and why, exploring the codebase before spending the user's attention, and
-confirming each decision as it locks. The aim is a shared understanding of the idea's shape - the
+confirming each decision as it locks. The lean grill stays human-in-the-loop - a grill that answers
+its own questions inside groundwork has stopped being one (plan-grill's must-ask guard,
+`skills/plan-grill/SKILL.md` step 3). The aim is a shared understanding of the idea's shape - the
 per-feature grilling happens later, in `/plan-grill`.
+
+Shaping an epic can outgrow one sitting, and one blocked question must not halt the rest. When a
+question blocks and others don't, park it as a `NEEDS_INPUT` record - plan-grill's four-field handoff
+(the question, who answers it, what unblocks it, the re-entry point) - and keep shaping the rest. A
+question earns a parked line only when you can state it precisely now, even if you can't answer it
+now (the fog test); anything dimmer stays a one-line signpost, not pre-sliced into questions. Shaping
+is done when the parked list is empty; it hands off with lines still open only if none of them changes
+the foundation.
+
+If shaping surfaces no epic - one feature, a foundation already standing - say so and drop down to
+`/plan-grill` directly; groundwork over a single work-item is ceremony.
 
 ## 2. Design the minimum shared foundation
 
@@ -127,6 +140,12 @@ into waves - read `carving.md`.
 Each carved work-item now goes down its own front-end - `/plan-grill` for a feature, `/diagnose` for a
 fix - and then to `/autonomous-loop`, exactly as if it had arrived on its own. Groundwork's job ends at
 the handoff; it doesn't grill each feature itself.
+
+Present the carve before recording it: the numbered work-item list, each with its owns, depends-on,
+base, and wave. Ask three things - is the granularity right (too coarse / too fine); does each
+dependency edge gate the item it blocks and nothing else; should any items merge or split? Iterate
+until the user approves; only the approved list goes to the ledger. A wrong carve costs N worktrees,
+not one - it is the cheapest expensive thing in the epic to get confirmed.
 
 Record the groundwork as the project's map so it survives a compaction and the fan-out stays
 coordinated. Write the foundation contract (its substrate spec from step 2) and the parallel work-item
