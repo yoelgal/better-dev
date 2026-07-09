@@ -274,8 +274,9 @@ the ledger entry. The approval attaches to *that text*, not to the bare fact tha
 happened. Before it drives, the loop runs `.better-dev/bin/bd-mem ledger check-approval <work-item>`
 (exit 0 = still approved). If the contract was later edited - a criterion reworded, a goal added, a seam
 moved - the hash no longer matches, the check fails, and the approval gate re-opens: the loop reads the
-plan as un-agreed again and waits for a fresh confirmation. So it never advances on a silently-changed,
-stale sign-off.
+plan as un-agreed again and waits for a fresh confirmation. The re-opened gate prints the diff since the
+approved snapshot, so the re-confirm is a judgment on the delta, not a re-read of the whole contract. So
+it never advances on a silently-changed, stale sign-off.
 
 Stamp the **planned-at** short SHA in the ledger beside that content hash at approval - the commit the
 plan was written against. The content hash guards the contract text; the planned-at SHA guards the code
