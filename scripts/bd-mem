@@ -125,8 +125,11 @@ ledger_dir() { printf '%s/ledger/%s' "$BD_DIR" "$(slug "$1")"; }
 # Portable sha256 of a file's bytes - pins a contract approval to that exact text.
 hash_file() { if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1"; else shasum -a 256 "$1"; fi | awk '{print $1}'; }
 
-# Portable file mtime in epoch seconds: BSD stat first, then GNU.
-mtime() { stat -f %m "$1" 2>/dev/null || stat -c %Y "$1" 2>/dev/null || echo 0; }
+# Portable file mtime in epoch seconds: GNU stat first, then BSD. The order is load-bearing -
+# BSD stat rejects -c cleanly (no stdout), but GNU stat reads -f %m as filesystem mode with a
+# bogus operand and prints a multi-line report to stdout even while exiting non-zero, so a
+# BSD-first chain captures that junk ahead of the fallback's epoch on Linux.
+mtime() { stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null || echo 0; }
 
 ledger() {
   local sub="${1:-list}"; [ $# -gt 0 ] && shift || true
