@@ -124,7 +124,9 @@ emit() {
   else
     fpnote=" No model fingerprint is recorded - write the executing model's name to .better-dev/model-fingerprint so a later model swap is caught."
   fi
-  context="better-dev practices are installed in this repo. The project's conventions and the list of available skills (onboard, plan-grill, diagnose, autonomous-loop, review, orchestrating-agents, worktree-branching, and more) live in a managed better-dev block in this project's CLAUDE.md or AGENTS.md; each skill self-describes through its description.${note}${lessons}${inflight}${fpnote}"
+  # Tier disposition rides the session note because dispatch decisions also happen outside any
+  # skill trigger - an orchestrator using the host's raw fan-out never loads tiers.md on its own.
+  context="better-dev practices are installed in this repo. The project's conventions and the list of available skills (onboard, plan-grill, diagnose, autonomous-loop, review, orchestrating-agents, worktree-branching, and more) live in a managed better-dev block in this project's CLAUDE.md or AGENTS.md; each skill self-describes through its description. Dispatching workers or fanning out agents? run each stage at the least-capable tier that fits it and escalate at judgment points - the reference is orchestrating-agents' tiers.md and the recorded tier-map (.better-dev/bin/bd-mem recall \"tier-map\").${note}${lessons}${inflight}${fpnote}"
   context="${context}$(update_nudge "$root/.better-dev/overrides.md")"
   escaped=$(escape_for_json "$context")
 
