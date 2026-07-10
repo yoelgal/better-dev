@@ -110,9 +110,9 @@ done-criteria will turn on and skip exhaustive branch-walking.
   is asked regardless of the key above and never proceeds on an invented default: with no answer from the user and no recorded override
   answering that question, the state is `NEEDS_INPUT`. An override can carry the user's standing
   answer to a one-way question - that is an answer, deliberately given once - but no override makes
-  one-way doors auto-decidable in general. The grill is human-in-the-loop by construction: the agent
-  never stands in for the user's side of it, and a must-ask answered by the same session that asked
-  it is a broken grill, not a fast one. The only non-user answers a must-ask accepts are a recorded
+  one-way doors auto-decidable in general. The grill is human-in-the-loop by construction: the user's
+  answers come only from the user, and a must-ask answered by the same session that asked it is a
+  broken grill, not a fast one. The only non-user answers a must-ask accepts are a recorded
   override or, for a two-way door, a default recorded as a named assumption; with neither, it parks
   as `NEEDS_INPUT`.
 - **Confirm as each decision locks.** When a decision settles, reflect it back in a line and move on
