@@ -63,6 +63,16 @@ and the craft is in the predicate. Negate a grep so success means the thing is g
 directories the change touches, so an unrelated hit elsewhere doesn't fail the check. Keep it read-only;
 a predicate observes, it never mutates. Name the symbol or path, not "cleaned up".
 
+An **operational-job** criterion's completion observable lives only in production - "every row
+backfilled" has no local seam. It attaches to the recorded ops-runner surface
+(`.better-dev/bin/bd-mem recall "ops-runner"` - recorded by `/guardrails-install`; when absent the
+criterion is a `NEEDS_INPUT` naming the recorder, not a guess). Pair it with a fixture-level
+rehearsal criterion the loop can drive red-to-green; the operational criterion's own box flips
+only on the execution receipt - the command as run on the recorded runner, the completion
+observable's before-and-after values, one idempotent re-run - never on the loop's local green. The
+job's safety properties (batching, resumability, no half-state) are the failure-behavior pass's
+rows, the same as any data-integrity operation.
+
 ### How the criteria prove the goal
 
 Under the criteria, write a ≤2-sentence line tying the set back to the goal's end-state - *these checks,
@@ -109,6 +119,28 @@ change outside the owned set, or a test that was green goes red. Set `<N>` to th
 plus a small margin and name it in the contract. This file owns the term: the loop's scope-guard and
 the review scope gate reference this tripwire by that name.
 
+## Contract-lite - the chore shape
+
+A chore-class work-item (the gate lives in the skill body) carries four parts instead of the full
+template - deliberately cheaper than a feature contract, priced to the chore's blast radius - and
+its goal still takes one shape from the list above, usually an end-state or a removal. The four
+parts:
+
+- **Baseline verify stays green** - the repo's recorded verify commands
+  (`.better-dev/bin/bd-mem recall "verify"`) green before the change and green after, on unchanged
+  assertions. For a refactor this is the behavior-preserving check; where the touched area has no
+  coverage, a characterization test pinning current behavior lands first, as part of the chore.
+- **The chore's own observable** - one runnable check, red now, green when the chore lands: a
+  dependency upgrade's lockfile resolving the target version with the audit gate exiting 0; a
+  removal's negated grep (the rule above); the named test or doc existing where it didn't.
+- **Scope line** - the forbidden path set and N, exactly as the scope tripwire defines.
+- **Merge line** - the same seal question as any contract, `merge: auto | hold`; `bd-mem ledger
+  approve` refuses a contract without it.
+
+The failure-behavior walk and the threat-surface pass run only when the chore crosses a trust
+boundary - a major bump of an auth or crypto dependency does. Approval pinning, the planned-at
+SHA, and the pre-seal checklist's applicable lines are unchanged.
+
 ## Failure behavior - the pass agents skip
 
 Done-criteria prove the goal *works*. They say nothing about what happens when it doesn't - and a spec
@@ -132,6 +164,15 @@ loop would ship, the scenario probably doesn't apply - drop the row rather than 
 whose expected behavior is load-bearing (money, data integrity, auth, irreversibility) promotes to a
 **done-criterion** with its own runnable check - a re-run that stays idempotent, a malformed input
 that's rejected, a mid-run failure that leaves no half-state.
+
+One mitigation gets named here rather than wished for at release time: a risky but reversible
+change - a pricing change, a default flip, anything user-facing whose only backout is a
+revert-and-redeploy - is a candidate for shipping flag-gated where the repo has a flag mechanism.
+When taken, the contract records the flag as `flag: <name>=<state at ship>` (filled:
+`flag: new-pricing=off`) under the template's Failure behavior section - the line
+`/release-promotion`'s post-deploy verify reads to drive the surface in the state users get, and
+the flag whose kill that skill holds as the faster rollback. A flag considered and declined gets
+its one-line reason in Implementation decisions, so the exposure reads as chosen, not overlooked.
 
 Where the foundation already settled a category's policy, inherit it - don't re-decide. groundwork's
 cross-cutting policy fixes the reconciliation stance (what the system does when the money doesn't add
@@ -189,6 +230,7 @@ How these prove the goal: <≤2 sentences tying the criteria set back to the goa
 | ... | ... | ... |
 Rows with load-bearing behavior are promoted to done-criteria above. Categories the foundation
 already settled (reconciliation stance, idempotency, units) are inherited, not re-decided.
+flag: <name>=<state at ship>   <- optional; only when the change ships flag-gated.
 
 ## Threat surface
 Trust boundaries crossed: <list, or "none - no external input">.
