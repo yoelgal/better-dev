@@ -1,6 +1,6 @@
 ---
 name: worktree-branching
-description: Use when a feature or fix work-item is about to start and needs its own isolated branch off the integration branch - before planning, diagnosis, or the autonomous loop runs - or when detecting whether such a worktree already exists. For removing one after merge, see this skill's teardown notes.
+description: Use when a feature, fix, or chore work-item is about to start and needs its own isolated branch off the integration branch - before planning, diagnosis, or the autonomous loop runs - or when detecting whether such a worktree already exists. For removing one after merge, see this skill's teardown notes; for moving a half-finished item to a colleague or another machine, its handoff notes.
 allowed-tools:
   - Bash
   - Read
@@ -8,8 +8,8 @@ allowed-tools:
 
 # Worktree branching
 
-One job: give a work-item exactly one isolated git worktree on its own `feature/` or `fix/`
-branch off the integration branch, so work runs in parallel without touching the primary
+One job: give a work-item exactly one isolated git worktree on its own `feature/`, `fix/`, or
+`chore/` branch off the integration branch, so work runs in parallel without touching the primary
 checkout. Detect an existing one before making a new one; never make two.
 
 Native `git worktree` is the whole mechanism - no wrapper is added where git already does the job.
@@ -61,7 +61,7 @@ And a live operator instruction ("just push it to the PR branch") is honored imm
 
 ## Step 1 - resolve the branch and its base
 
-A work-item is a **feature** or a **fix**. The prefix decides the base branch:
+A work-item is a **feature**, a **fix**, or a **chore**. The prefix decides the base branch:
 
 | Work-item | Branch          | Base (unless overridden) |
 |-----------|-----------------|--------------------------|
@@ -87,7 +87,9 @@ re-verified and rewritten (`/overrides`), never obeyed.
 
 Before opening a second parallel worktree, read the live lanes: `git worktree list`, then per live
 branch `git diff --name-only <base>...<branch>` - a path two lanes both touch makes the work
-sequential, not parallel.
+sequential, not parallel. So does a recorded `shared-runtime: serialize`
+(`.better-dev/bin/bd-mem recall "shared-runtime"`): lanes coupled through one mutable datastore
+collide in data, not files - Step 2's datastore note records that key.
 
 ## Step 2 - create the worktree
 
@@ -124,12 +126,25 @@ primary checkout at creation - copy, never symlink: build tools reject symlinks 
 teardown into a two-step dance - so the first dev-server run doesn't die mid-task on missing env. It
 is personal, gitignored state, so the copies never enter a PR.
 
+That copied runtime config points every lane at the same mutable datastore - one `DATABASE_URL`, one
+Redis, one object store - so when `git worktree list` shows another live lane, this lane's dev server
+and checks write the data that lane reads, even with zero file overlap between the branches. Where the
+stack supports it, namespace the copy per lane: suffix the schema or database name with the slug, or
+point the copy at a separate ephemeral store (a per-lane SQLite file, a second local database), so one
+lane's writes and resets never surface in another lane's verify. Where the stack offers no per-lane
+split, record the coupling once - `.better-dev/bin/bd-mem remember "shared-runtime: serialize"` - so
+`/orchestrating-agents`' live-lanes check treats data-coupled lanes as sequential rather than parallel;
+unrecorded, a failure born in another lane's data reads as flake, and no file diff explains it.
+
 A fresh worktree has no installed deps, so run the project's setup and one baseline check here -
 that way the loop's first verify measures your work, not a missing `node_modules` misread as a
 failure. Prefer the project's own named setup entry point (a documented setup or bootstrap script
 or task) over an ad-hoc install command composed here; a fixed, idempotent entry point is what a
 later session or a restart re-runs without guessing which command you used. If none exists, record
-it as a groundwork gap rather than papering over it with a one-off a future session can't find. If
+it as a groundwork gap rather than papering over it with a one-off a future session can't find. The
+recorded `dev-run` key (`.better-dev/bin/bd-mem recall "dev-run"`) is the command that stands this
+tree's app up when a check needs it live - recorded once by `/guardrails-install`, recalled here
+instead of re-discovered per worktree. If
 this skill hands off immediately (the interlock in Step 3), `/autonomous-loop`'s ground-truth gate
 covers the same baseline at the other end.
 
@@ -175,7 +190,8 @@ handoff: yes
 
 A consumer that reads `handoff: yes` does not cross the worktree boundary on its own. When Step 0
 found the session **already** in the right worktree, emit `handoff: no` instead and let the next
-skill continue in place. The hand-off targets are `/plan-grill` (feature) or `/diagnose` (fix) for
+skill continue in place. The hand-off targets are `/plan-grill` (feature, or a chore on its
+contract-lite path) or `/diagnose` (fix) for
 the typed front-end, then `/autonomous-loop` to drive the work.
 
 An isolated worktree means an isolated running app: a dev server started here serves this tree on
@@ -190,5 +206,9 @@ Removing a worktree after its PR merges is a destructive operation with a strict
 fail-closed ownership check. Read `teardown.md` when the work-item is done - don't improvise a
 `git worktree remove --force` or `rm -rf` from memory.
 
+Handing a half-finished work-item to a colleague or another machine is its own procedure - the ledger's
+consent gates are per-machine and gitignored, so a bundle travels on the branch and the receiving side
+re-pins consent. Read `handoff.md` before handing one off or picking one up.
+
 For the trickier detection cases - submodules, detached HEAD, native-tool phantom state, the sibling
-placement override, sandbox denial - read `edge-cases.md`.
+placement override, the trunk-based branch profile, sandbox denial - read `edge-cases.md`.
