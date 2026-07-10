@@ -268,6 +268,45 @@ earned green. (4) Settling `DONE`/`DONE_WITH_CONCERNS` requires a non-empty `rec
 unrecorded loop settles nothing. (5) Reviewer-brief calibration: an abuse vector that drains a finite
 budget or paid resource is at least Important.
 
+## D18 - links-harvest rulings (2026-07-09; carve gate, D-format, expand-contract, effort knob user-ratified)
+Sources: emilkowalski/skills, mattpocock/skills v1.1, shannholmberg orchestration chain, rich_odinn
+effort-levels post (dossiers under `raw/synthesis/2026-07-09-*`). Adopted: always-on carve approval
+gate in groundwork; expand-contract as carving.md's named wide-refactor exception; effort as a
+budget axis distinct from tier (no imported numbers). **Format ruling (standing):** harvest
+rejections land as one consolidated D-entry per batch, one row per rejection with a one-line why -
+no more comma-runs, no backfilled index.
+
+Rejected-with-reasons (one row each):
+- Tracker-hosted planning map (wayfinder) - D2 keeps files/ledger the single source of truth; a tracker map splits it.
+- A third planning front-end skill - groundwork + plan-grill occupy the slot (D12, D15); missing moves fold in.
+- One-ticket-per-session / claim-by-assignment - human tracker ergonomics; fresh-worker dispatch + a worktree already claim.
+- "Extremely extensive" user-story lists (to-spec) - extensiveness is an adjective satisfied by padding; done-contract right-sizing stands.
+- Flag-first reviewer posture (Emil) - under D17 every finding blocks; flag-first amplifies noise in a blocking regime.
+- 400-word review channel cap (Matt) - caps recall exactly where deep effort wants over-surfacing; effort tiers govern volume.
+- Reviewer-side remedial fix ordering (Emil) - fix selection belongs to the fix worker; a reviewer cannot verify fixes from the diff.
+- Moving refactoring wholly out of the loop (Matt's TDD change) - our cleanup pass is removal-only; adopting would delete the first-green slop-strip.
+- Vendor-named model routing table (shann) - agent-agnostic principle; tiers.md carries the tier-shaped version.
+- "Fable 5 Low beats Opus 4.8 xhigh" - unbenchmarked influencer claim; official guidance steers intelligence-sensitive work away from low. The opus-substitutes-fable5 design stance stands; no internal benchmark spent (user-ratified).
+- Same-tier rerun of an unchanged goal on a miss - a rerun must change brief, slice, or tier; which one is triage, not a fixed rule.
+- "The orchestrator never executes" absolutism - the loop's inline escape for a fully-specified, live-verified edit is deliberately cheaper; default, not ban.
+- Pinned-open-questions-then-execute (shann's plan.md handoff) - proceeding with unknowns open is what seal-before-drive prevents; the pinned-question SHAPE lands via plan-grill's four-field `NEEDS_INPUT` handoff instead.
+- Four-lens project review as a second audit taxonomy - codebase-audit keeps one vocabulary; the moves land as its Move column (cut/fix/add/restructure).
+- Changesets/CHANGELOG - stays the D15 non-goal; a symlinked-clone install has no per-version consumer.
+- `skills/deprecated/` graveyard - install reconcile prunes and the package gate catches dangling references; no clutter directory.
+- Issue-tracker question at onboard - no skill has a hard dependency on a tracker mapping; revisit only if a triage-like skill lands.
+- Spring constants, platform animation formulas, apple-design wholesale (Emil) - implementation values and platform taste, not practice; they belong to the composed host design skill.
+- animation-vocabulary as a glossary skill or appendix (Emil) - a curated glossary mirroring a live external page is a dated content asset with a sync cadence; naming effects is host / tool-sourcing turf.
+- Block/Approve verdict grammar inside design-brief (Emil) - verdicts belong to /review and the loop (D17: zero open findings = clean); a second verdict grammar would fork the loop's.
+- A third design-brief sidecar (its own STANDARDS.md numeric catalog) - the handful of motion bounds fit the method rule plus slop-and-checks.md; a catalog earns a file only past what two files carry.
+- The MUST-table anti-example device (showing the wrong output format beside the right one) - Negation in output-format form, the wrong shape named into context; D15's shown-once-as-a-filled-example rule covers the need.
+
+Covered, not re-filed (recorded so the next harvest does not re-litigate):
+- "Connected network of code review" (matt-thread reply) - whole-branch review before PR + staging soak + the foundation contract are the connective tissue; reopen only if a multi-item epic ships an integration defect its per-item reviews each passed.
+- AI-misuse responsibility line (Emil's apple-design) - security-pass's model-output surface + plan-grill's abuse-case reference already cover it.
+- Setup-skill one-time questions (Matt's setup) - `/onboard` has carried present-one-decision-at-a-time since Phase 0.
+- `disable-model-invocation` scoping (Emil, via the design dossier's baton) - PLAN §2's invocation rule and writing-skills' frontmatter guidance already carry the same decision with the same costs named.
+- rich_odinn "12 prompts" article - consumed; the one durable fragment (synthesize disagreement, never flatten it) landed in the research-dispatch conventions.
+
 ## Tracer-bullet findings (2026-07-03, on the papers.town clone) - bind Phase 1
 Ran `onboard` + one feature slice → staging end-to-end on the real clone (locally, no push). Proven, plus:
 1. **Helpers → `.better-dev/bin/`** (bare `scripts/` collides with the project's own - see D0 install contract).

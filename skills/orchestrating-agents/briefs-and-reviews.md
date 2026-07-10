@@ -37,6 +37,10 @@ What belongs in the brief:
   skill's SKILL.md defines the keys - point at it, don't restate them; `bd-dispatch brief` emits the
   block). Ask for structured, capped output - a fixed skeleton, a named length bound. A report with no
   bound sprawls to fill the worker's patience, and every unrequested line is spend; a bound stops it.
+- A research-type brief additionally requires primary sources - official docs, source code, specs,
+  first-party APIs, never a secondary write-up of them - with every claim followed back to the source
+  that owns it; one cited artifact filed to the repo's existing notes convention; and disagreement
+  between sources synthesized in the artifact, never flattened into one voice.
 
 A dispatched worker does not inherit your security disposition. Any brief that has a worker read repo files
 or report on secrets carries, verbatim, the two load-bearing rules from `/security-pass`: a secret finding

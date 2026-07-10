@@ -184,7 +184,12 @@ quietly bloat both - read `briefs-and-reviews.md`.
 ## Verify independently
 
 Never grade your own work, and never let a worker grade its own. The generator and the evaluator are
-separate fresh workers; a worker's "done" is a claim, not proof.
+separate fresh workers; a worker's "done" is a claim, not proof. The rule binds you one level up as well:
+you wrote every brief, so measuring a result against your own brief only proves the brief was followed,
+never that the brief was right. The reference a judge grades against must be authored outside the
+goal-writer - the sealed contract, the spec's verbatim constraints (`briefs-and-reviews.md`) - because a
+wrong assumption baked into every brief survives every worker-level check and scales into confident
+wrongness fleet-wide.
 
 - The evaluator distrusts the report: it reads the diff package read-only, checks each named risk once,
   and a stated rationale never downgrades a finding. Its verdict covers both spec compliance and quality.
@@ -219,11 +224,15 @@ down when both hold: the spec is closed (zero judgment left to the worker) and a
 exists for the result. Two failures on a subtask means the spec is wrong, not the worker - pull it back
 and re-decompose rather than escalating the model a third time.
 
-The default tier is a starting point, not a ceiling. When a worker's output misses the bar, rerun it at a
-higher tier straight away - don't stop to ask permission to spend more. Pausing a run to approve a cost is
-itself a cost, and a mediocre result is the expensive outcome. Judge the output against the contract, not
-against what the worker cost. The two-failures rule above still bounds this, and `tiers.md`'s no-re-descend
-rule is its memory - once a class needs the higher tier, keep it there for the run.
+The default tier is a starting point, not a ceiling. When a worker's output misses the bar, rerun it
+changed straight away - don't stop to ask permission to spend more, but don't reflex-escalate either:
+triage the miss per the terminal-state table (`briefs-and-reviews.md`) - a brief defect gets a corrected
+brief at the same tier, a genuine capability shortfall gets the higher tier. An escalation is your
+recorded decision, never a silent retry default: name the tier in the dispatch receipt's note, so the
+no-re-descend rule (`tiers.md`) has a memory to read. Pausing a run to approve a cost is itself a cost,
+and a mediocre result is the expensive outcome. Judge the output against the contract, not against what
+the worker cost. The two-failures rule above still bounds this, and `tiers.md`'s no-re-descend rule is
+its memory - once a class needs the higher tier, keep it there for the run.
 
 That rule sizes one worker for one subtask; a stage-to-tier band places whole stages. Name the bands by
 capability, never by vendor - "top tier" is the most capable model you have, which on a given day may be
@@ -262,8 +271,12 @@ finished work - the most expensive failure there is.
   worker in a feature worktree records to the same place. After a compaction, `.better-dev/bin/bd-dispatch pending <work-item>` lists what isn't finished - resume those,
   re-dispatch nothing already done.
 - You own the progress surface; isolated workers can't touch your todo list. Flip a task to in-progress
-  before you spawn, and to done the moment you record its trailer's `STATUS`. Exactly one in-progress at
-  a time.
+  before you spawn, and to done only after the result is measured, not merely claimed: a trailer's
+  `DONE` counts once you have run the brief's named check yourself - the same cheap mechanical check
+  that justified delegating (`tiers.md`) - or, for judgment-graded output, once its verdict lands.
+  Record the trailer's `STATUS` either way; counting is separate from recording. An unmeasured result
+  never becomes another stage's brief - that is how one bad output poisons a pipeline. Exactly one
+  in-progress at a time.
 - Report on milestones, with the artifact. When the human names a milestone ("when all three merge",
   "when the page renders"), the report at that milestone carries the artifact itself - the URL, the
   screenshot, the merged-PR list - never a status sentence about it, and visual work reports with the

@@ -10,7 +10,10 @@ per-project, so the seed list ships with the skill; the project derives addition
 list by the register on the direction card (a tool surface has no hero to flag). The list is never
 filtered to empty: a register with no applicable seed tells gets its register's failure test (step 1)
 as the audit question instead - a zero-item walk that declares slop-free is a vacuous audit, not a
-pass. Each tell is something a screenshot or the markup can answer:
+pass. Each tell is something a screenshot or the markup can answer. Motion tells are the exception:
+they are answered from the stylesheet or a repeated-trigger capture driven via
+`/browser-capability` - a static screenshot is motion-blind, and a still that "shows no motion
+problem" is a vacuous pass, the same species as the zero-item audit walk.
 
 1. A saturated violet-or-indigo gradient as a hero or section background.
 2. The three-up feature grid - icon, title, two-line blurb, times three.
@@ -32,6 +35,15 @@ pass. Each tell is something a screenshot or the markup can answer:
 17. Whimsical machine-generated microcopy in loading and empty states.
 18. A decorative CSS panel standing where the brief implies real imagery, and any image URL that
     does not resolve at render time.
+19. An entrance or exit whose easing starts slow (the wrong half of the curve on the moment the
+    user watches).
+20. An element entering from nothing - zero scale or a bare pop-in with no initial state.
+21. An unbounded transition animating every property rather than the two or three that changed.
+22. Any animation on a keyboard-triggered or many-times-a-day action.
+23. Hover-triggered motion not gated to hover-capable, fine-pointer devices (touch fires hover
+    on tap).
+24. Movement with no reduced-motion handling anywhere in the stylesheet.
+25. The everything-at-once page entrance - all sections animating in simultaneously on load.
 
 Imagery is also a criterion, not only a tell: step 4's "Real assets or none" rule owns the
 placeholder ban; this audit adds the mechanical tail - every referenced image URL resolves at

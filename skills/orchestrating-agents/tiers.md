@@ -100,6 +100,14 @@ axes at once. A run that finishes correctly but takes far longer than the task w
 the knob is set too high for that class of work; turn it down there. We advise the knob; the host owns the
 setting.
 
+Default the knob to the band, not to the maximum: cheap-band mechanical work runs at low effort, and the
+top of the knob is reserved the way the top tier is - for the judgment that cascades. Tier and effort are
+two separate economy axes; on a host with capped usage, the effort knob is the lever that stretches a
+fixed budget across the week, independent of which tier answers. Raise it back where a class of work
+starts missing, exactly as the calibration rules above move a tier. We advise the default; the host owns
+the setting, and no cross-model quality claim about a given effort level is citable without a benchmark
+run here.
+
 ## One vocabulary, three scales
 
 These scales stay distinct. `/review`'s light/standard/deep scales review *breadth* - how much of the
@@ -123,7 +131,8 @@ never runs below the tier that produced the work.
   decomposition and the envelope. Capability is rarely the issue twice; the spec usually is.
 - **No re-descend.** Once a tier fails a task *class* in this run, route similar tasks one tier higher for
   the rest of the run. The ledger's `failed` and `partial` lines are that memory - read them before you
-  classify the next similar task, rather than re-deriving the same optimistic guess.
+  classify the next similar task, rather than re-deriving the same optimistic guess. That memory only
+  exists if receipts carry the tier - name the dispatched tier in each `bd-dispatch record` note.
 - **Calibrate on the receipts.** If more than about one dispatch in ten at a tier comes back failed or
   partial, the triage is too aggressive for this work - shift that class up a tier. The ledger receipts
   are the signal; a rising failed-or-partial rate is the number to watch.

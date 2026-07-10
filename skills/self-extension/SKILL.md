@@ -54,7 +54,8 @@ When the source is a workflow you just ran or the user's own way of working, it 
 transcript, not on disk - don't guess it into a plausible-sounding procedure. Interview one question at a
 time about how they do it, what good output looks like, and the edge cases that trip it, folding each answer
 into the draft before you ask the next; if a question is answerable from the codebase, look there instead of
-asking.
+asking. Same rule as `/plan-grill`'s must-ask guard (`skills/plan-grill/SKILL.md` step 3): a fact you can
+find is yours to find, and an interview question answered by this same session is a broken interview.
 
 Prefer the exact commands, endpoints, and signatures that appear in the source over ones you half-recall,
 and don't invent a flag or path you never saw. A skill gets shared, so keep the host's or user's identity

@@ -110,7 +110,11 @@ done-criteria will turn on and skip exhaustive branch-walking.
   is asked regardless of the key above and never proceeds on an invented default: with no answer from the user and no recorded override
   answering that question, the state is `NEEDS_INPUT`. An override can carry the user's standing
   answer to a one-way question - that is an answer, deliberately given once - but no override makes
-  one-way doors auto-decidable in general.
+  one-way doors auto-decidable in general. The grill is human-in-the-loop by construction: the user's
+  answers come only from the user, and a must-ask answered by the same session that asked it is a
+  broken grill, not a fast one. The only non-user answers a must-ask accepts are a recorded
+  override or, for a two-way door, a default recorded as a named assumption; with neither, it parks
+  as `NEEDS_INPUT`.
 - **Confirm as each decision locks.** When a decision settles, reflect it back in a line and move on
   once it holds. If a decision reads like a standing policy for this project (a convention, not a
   one-off), offer to persist it - "make this the default here?" - and on a yes record it with
@@ -131,6 +135,17 @@ done-criteria will turn on and skip exhaustive branch-walking.
   commits to, and park the rest as out-of-scope or a follow-up item. Scope caught in the sentence
   it grew in is a one-line correction; absorbed silently, it's how a three-goal contract becomes a
   rewrite.
+- **When prose stops discriminating, prototype.** A must-ask that turns on how something should look
+  or behave, whose options read the same written down, gets a cheap concrete artifact to react to
+  instead of a fourth paraphrase - for a look-question, several radically different variants rendered
+  on one route and toggled by a URL param, so the user reacts to each in place rather than one mockup
+  at a time; for a logic question, a terminal run of the state machine or a filled example. The
+  artifact is throwaway from its first line and marked so, runs with one command, and persists
+  nothing. When it answers, keep the answer, not the code: the decision goes to `decisions.md`, the
+  decision-rich snippet may inline into the contract (the step-4 exception), and the artifact is
+  deleted or absorbed before the gate closes - a prototype still sitting in the tree at contract seal
+  is an unfinished decision. UI direction still belongs to `/design-brief`; this move settles a
+  single question, not the aesthetic.
 - **Attack the plan before you close.** The grill so far argued *for* the design - it walked the
   tree and filled each node with your recommended answer. Spend one pass arguing against it, through
   the four lenses in `lenses.md` - worth, engineering, design, and developer experience; the last two
@@ -187,6 +202,12 @@ letting the loop advance on a stale sign-off - `done-contract.md` covers the pin
 can't be settled and blocks
 the plan, that's a `NEEDS_INPUT` state, not a guess: record it and stop rather than inventing an
 answer.
+
+A `NEEDS_INPUT` record is a handoff, not a shrug - four fields, each checkable by a cold reader. It
+names the blocked question, who answers it, what unblocks it - a decision to make, or manual work
+spelled as a precise checklist (sign up for the service, provision the access, move the data),
+including the facts the answer must come back with - and the re-entry point that resumes the grill
+when it does.
 
 Write the contract to the **primary checkout's** shared ledger so every worktree sees it. Resolve the
 item's ledger directory with `.better-dev/bin/bd-mem ledger dir <work-item>` - it returns the

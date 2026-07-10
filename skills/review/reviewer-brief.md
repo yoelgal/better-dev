@@ -70,8 +70,10 @@ ledger receipts, or a negative control; absent both, report it as an Important f
   the severity ladder; the table is where it is discovered, not a second verdict. These are per-criterion
   markers, one layer below the verdict - they never appear as a loop state.
 
-  With no contract findable (a standalone "review since X"), the completion audit is skipped - say "no
-  spec available", never invent requirements. The scope check still runs: the package's commit list is
+  With no contract findable (a standalone "review since X"), look before declaring: issue references in
+  the package's commit list, a spec or plan file matching the branch or feature name. Found, it is the
+  contract. Not found, the completion audit is skipped - say "no spec available" and name where you
+  looked, never invent requirements. The scope check still runs: the package's commit list is
   the stated intent, and intent is a ceiling on scope, never proof of satisfaction - a claim can narrow
   what was authorized; it cannot prove what was done. Report it as two lines plus the drift: `Intent:`
   one line, `Delivered:` one line, then each change beyond the stated intent.
@@ -87,7 +89,8 @@ ledger receipts, or a negative control; absent both, report it as an Important f
   you were handed (`standards-baseline.md`). Cite the standard (file + rule) for a documented breach; name
   the smell and quote the hunk for a baseline call. Distinguish hard violations from judgement calls - a
   documented repo standard overrides the baseline, and every baseline smell is a judgement call. Skip
-  anything tooling already enforces.
+  anything tooling already enforces. Open with the sources census you were handed - which standards file,
+  or baseline only - so the reader knows what you judged against before your first finding.
 
 Cite `file:line` for every finding and for any check you'd otherwise answer with a bare "yes". If a
 requirement can't be judged from this diff alone - it lives in unchanged code or spans changes - report it

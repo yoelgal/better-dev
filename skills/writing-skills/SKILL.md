@@ -15,7 +15,9 @@ Required - two keys, nothing else load-bearing:
 - `name` - kebab-case, ≤ 64 chars, matches the folder name.
 - `description` - the *only* text an agent reads before deciding whether to load the body. Write it as
   **triggering conditions**, third person, starting "Use when …". Do **not** summarize the workflow
-  here: a description that reads like a summary tempts the agent to act on it and skip the body.
+  here: a description that reads like a summary tempts the agent to act on it and skip the body. Each
+  trigger names a **distinct** situation; a synonym that only renames a branch already listed is
+  duplication - collapse it into the branch it renames.
 
 Optional - add only when a skill actually needs it:
 
@@ -39,27 +41,46 @@ Never put `version`, `license`, or prose in frontmatter.
 
 ## Body - one job, disclosed progressively
 
-- **One skill, one job.** If a second job creeps in, split the skill.
+- **One skill, one job.** If a second job creeps in, split the skill. The bar for a trivial skill is
+  reach, not length: a four-sentence skill that only names a flow's steps in order earns its slot when
+  people keep asking "what's the flow" and the answer must be invocable by name; an answer that is only
+  ever read, never invoked, belongs in a routing table, not a skill of its own.
 - Keep the body to what **every** run needs. Push the rest into sibling `.md` files reached by a **prose
   pointer** ("for the tricky cases, read `edge-cases.md`") - never an `@`-link or import, which force-load
-  the file and spend context on every run whether it's needed or not.
+  the file and spend context on every run whether it's needed or not. When the sibling holds a precise
+  value - a threshold, a duration, a command - the pointer says to load the sibling whenever a finding
+  needs that value; never restate the number inline from memory.
 - Keep any always-loaded block lean - a skill body, a routing table, a discovery block is read on every
   turn, so cut a row before you add one.
 - Depend on another skill by **naming it in prose** ("run `/grill` first"), never by reaching into its
   files. Shared knowledge lives inside the skill that owns it and is reached by invoking that skill.
 - Voice: firm and precise, never maximalist. State a gate as a plain declarative that names its
-  consequence ("editing a committed test to reach green is out of bounds; it hides the very regression
-  the test exists to catch"), not a caps-locked wall of `MUST / ALWAYS / CRITICAL` - that shouting is the
+  consequence and the move to make instead ("a committed test's assertion stays load-bearing - edit
+  the code under test, not the test's expectation; editing a test to reach green hides the very
+  regression it exists to catch"), not a caps-locked wall of `MUST / ALWAYS / CRITICAL` - that shouting is the
   blocking tone principle 2 bans, and a firm sentence with a reason holds a gate where raised volume only
   adds noise. Do not soften a real gate into a hedge either: "please try to", "ideally", and "if possible"
   read as optional, and an optional gate is no gate. Say the rule once, at full strength, in a calm voice.
+- Steer by stating the target, not the ban. A prohibition names the banned behavior into context, and
+  the negation is a weak modifier the activated concept overruns - the ban half-reads as an instruction
+  to do the thing. Write the behavior you want ("reach the sibling file by a prose pointer") and reserve
+  outright bans for gates you cannot phrase positively; a gate that survives always pairs with the move
+  to make instead. The voice rule above governs how a gate sounds; this governs when a ban is the wrong
+  shape at all.
+- Read the finished draft for its silences. Every decision a skill declines to make is not left neutral -
+  it is delegated to the executor's priors. Walk what the draft never says (output shape, scope boundary,
+  the failure path, who approves) and make each omission deliberate: fill it, or leave it open on purpose
+  knowing which way the priors default.
 - When a skill pins an output shape - a report trailer, a verdict block, a table - show the shape once
   as a filled example, never only a prose description of it. An executor reproduces a shown format; a
   described one drifts into a new shape per run. One example earns its lines; a gallery doesn't.
 - When you revise a skill rather than write one, cut before you add. Hardcoded process steps and defensive
   repetition written for a weaker model cap a stronger one, so the fix for a skill that under-performs is
   usually a deletion, not another rule. Every instruction you keep pairs with the failure it prevents; one
-  that names no failure is a candidate for the cut.
+  that names no failure is a candidate for the cut. When a skill's numbered steps keep fighting real
+  runs - executors skip them, reorder them, rationalize around them - demote the body to reference: keep
+  the vocabulary and the ordering invariants, drop the choreography, and let the description still fire
+  it. A discipline can bind without a prescriptive procedure.
 
 ## Encode the judgment at the decision point
 
@@ -130,6 +151,11 @@ full form it points to.
   list - carries an explicit typed status field per item (a boolean or enum in a table or JSON shape), not
   a prose bullet. A model tidies prose and leaves `"passes": false` alone. Surrounding prose may stay, but
   free-form narrative belongs in an append-only file the model never rewrites.
+- When a skill leans on recorded per-repo config, split hard from soft. If a missing record makes the
+  output *wrong*, not just less sharp - a deploy command, the verify command, the safety policy - carry
+  an explicit one-line pointer to the recorder ("recorded by `/guardrails-install`; run it if absent").
+  If a missing record only dulls the output, vague prose is correct; a setup pointer there is cargo cult
+  that spends tokens on every run for no consumer that needs it.
 - Read `.better-dev/overrides.md` first and honor any project override before applying a default.
 - Record durable rules and lessons through the memory contract (`.better-dev/bin/bd-mem`), never by
   hand-writing state files. A lesson is one atomic insight with a recall key on the front, not a
