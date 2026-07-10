@@ -72,9 +72,15 @@ The foundation is the substrate later features would collide on. Design that, an
 - schema, shared types, and dependencies,
 - module boundaries and the interfaces/contracts between areas,
 - the auth and routing skeleton,
-- the build / test / deploy pipeline, named as fixed idempotent entry points (setup, test, reset - the
-  project's own named scripts or tasks) so later sessions and worktrees re-run them without guessing;
+- the build / test / deploy pipeline, named as fixed idempotent entry points (setup, test,
+  seed/reset - the project's own named scripts or tasks, the recorded `seed-reset` key among
+  them) so later sessions and worktrees re-run them without guessing;
   don't invent a new entry-point name when the repo already has one,
+- for a product that deploys, the deploy surface and the observability spine (error tracking, a health
+  endpoint, an alert channel that reaches a human) are foundation seams too - create them with
+  `/deploy-capability` and `/observability-install`, or record an explicit tracked deferral, never a
+  silent omission; a first release with nowhere to land, or a prod nobody can see, is a foundation gap
+  discovered at the worst moment,
 - naming and domain vocabulary.
 
 The depth boundary is a bright line, and it runs the opposite way from a waterfall: design **only what

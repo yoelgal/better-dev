@@ -335,6 +335,72 @@ silence at that parameter is a top-tier choice, not neutrality. Resume paths tha
 pins get relaunch-with-pin-restated, generalizing the host-specific observation. (Trap 99. D18's
 no-router ruling stands - a recorded map the dispatcher reads is config, not a router.)
 
+## D21 - flow-atlas audit dispositions (2026-07-10)
+A 78-agent flow audit of the whole library raised 34 canonical gaps; every one carries an explicit
+disposition here. 24 confirmed and fixed in this change-set, 6 refuted as already covered, 4
+re-affirmations of standing decisions, plus two audit blind-spots parked as named follow-ups.
+
+**24 confirmed - fixed in this change-set** (id -> landing site):
+- Ship: **G02** promote-range migration gate + `release-promotion/migrations.md` (deploy-migrate
+  vocabulary, snapshot-before-destructive-DDL, expand-before-deploy order); **G03** revert-range
+  applied-schema check before any revert (release-promotion "goes bad" + pr-and-verify containment),
+  `rollback-schema:` receipt line; **G05** hotfix routes through /diagnose first, expedited four-line
+  fix-contract shown filled (hotfix.md); **G08** `deploy-env` parity check before treating an
+  env-shaped failure as code (post-deploy + pr-and-verify step 3); **G12** `branch-model: trunk` as a
+  first-class profile (onboard records it from git, worktree-branching edge-case profile,
+  release-promotion reduces to tag-plus-verify); **G34** the flag's entry side - /plan-grill records
+  `flag: <name>=<state>` in the done-contract, the exact line post-deploy already reads.
+- Recorded keys (guardrails-install owns the schema): **G01** the greenfield fork - intentionally
+  absent records `deploy-surface: none`, needs-creating routes to the new skill **`deploy-capability`**
+  (+ `provisioning.md` for database/auth/email/DNS); **G04** the `obs-*` family with absence as
+  explicit per-key `none`, filled by the new skill **`observability-install`**; **G22** earned
+  autonomy - a counted 5+ unmodified-yes streak on a non-safety gate proposes the standing allowance
+  once, safety gates excluded; **G24** `dev-run` / `seed-reset` (+ onboard Phase 1 detection);
+  **G25** `ops-runner` + the operational-job criterion (done-contract) and verify-surface row
+  (verify-runtime).
+- Planning: **G13** two-repo work-items named at decode time, coordinated via
+  `orchestrating-agents/cross-repo.md` (mirrored contract line, deploy-order gate in pr-and-verify,
+  spanning done-criterion); **G14** chore-class contract-lite path (plan-grill gate + done-contract's
+  four-part shape); **G15** routing-table rows for the new verbs, rollback merged into the
+  release-promotion row, tie-break rule (CLAUDE.md + onboard block); **G21** mid-loop product
+  corrections routed by /overrides' three-disposition test (amend / new item / in-scope one-off),
+  loop carries the decision point.
+- Loop and lanes: **G06** model-fingerprint staleness nudge (bd-session-start compare-then-warn +
+  loop setup check + the TRAPS.md revalidation ritual); **G09** inbound-PR path `review/inbound.md`
+  (host mechanics + recorded-policy overlay); **G11** solo-adopter onboard mode (`adoption: solo`,
+  `.git/info/exclude`, local-only entry file, no shared-branch offer); **G20** `bd-mem ledger status`
+  + session-start in-flight clause; **G23** shared-datastore lanes (per-lane namespacing in
+  worktree-branching, data-disjointness in carving, `shared-runtime: serialize` recalled by both
+  live-lanes checks); **G26** `learnings.jsonl merge=union` on team adoption + the `mem: <work-item>`
+  close-out commit as propagation owner; **G27** `worktree-branching/handoff.md` (bundle on the
+  branch: contract bytes, consent hash, reviewed-HEAD verdict, receipts; consent re-pins on pickup);
+  **G30** library-defect-candidate disposition (self-extension names it, release distill surfaces
+  it); **G32** promotion-independent distill anchor - `ledger init` nudges `bd-mem prune` past 200
+  lessons, `--apply` stays release-checkpoint-only.
+
+**6 refuted - already covered** (id -> coverage): **G07** out-of-git changes - done-contract/lenses,
+pr-and-verify, and post-deploy already carry contract/verify/rollback for them; **G10** merge
+conflicts - sync-base-every-pass, BLOCKED-external, and the live-lanes check; **G17** bad-release /
+bad-merge recovery - containment + restart-from-contract + revert-forward/back-merge + TRAPS 42-44;
+**G18** EXHAUSTED/NO_PROGRESS - ownership split ratified in D1/D3/D4, canonical next-moves in
+terminal-states.md and restart.md; **G19** capability-gap chain - protect-set discipline plus
+explicit NEEDS_INPUT exits in tool-sourcing and self-extension; **G28** decision rationale - the
+tracked `.better-dev/overrides.md` is the read-first surface both auditors key off; the ledger is
+runtime state by design.
+
+**4 re-affirmed standing decisions**: **G16** the worktree handoff-and-stop is the deliberate
+imported design (PLAN.md:133) - an agent cannot relocate its own harness session; **G29** no tracker
+integration - the issue tracker owns triage (D13) and unattended cadence stays the host's (D12);
+**G31** no self-telemetry aggregation - trend DBs and health dashboards stay rejected (D14), eval
+harness still deferred to issue #6; **G33** no release-notes machinery - the announce slice stays
+the user-ratified D15 drop.
+
+**Parked, not absorbed** - the audit named two blind-spot axes its own lenses never covered: a
+threat model on better-dev itself, and better-dev treated as a product. Triage lives in the issue
+tracker (D13/D14), so each is to be filed as its own deferred issue - titles: "Threat model on
+better-dev itself (audit blind-spot, deferred)" and "better-dev as a product (audit blind-spot,
+deferred)" - and this paragraph records only the ruling; the tracker owns the backlog.
+
 ## Tracer-bullet findings (2026-07-03, on the papers.town clone) - bind Phase 1
 Ran `onboard` + one feature slice → staging end-to-end on the real clone (locally, no push). Proven, plus:
 1. **Helpers → `.better-dev/bin/`** (bare `scripts/` collides with the project's own - see D0 install contract).

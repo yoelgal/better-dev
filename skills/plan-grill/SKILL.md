@@ -1,21 +1,45 @@
 ---
 name: plan-grill
-description: Use when the user wants a new feature or capability built and it is not a one-to-two-step change - "I want to add X", "let's build a way to Y", "can we add", "new feature: Z", a rough intent that needs a plan before code, or somebody else's vague feedback or brief ("make it simpler", "we need a chatbot") that needs decoding into a measurable problem first. Checks the baseline, ideates and grills the design watertight, and pins the observable done-criteria the loop drives to. For a bug or "X is broken" reach for /diagnose; for a whole new app or epic, /groundwork; for a trivial one-to-two-step change, just make it - still in its own worktree branch, skipping only the planning.
+description: Use when the user wants a new feature or capability built and it is not a one-to-two-step change - "I want to add X", "let's build a way to Y", "can we add", "new feature: Z", a rough intent that needs a plan before code, or somebody else's vague feedback or brief ("make it simpler", "we need a chatbot") that needs decoding into a measurable problem first. Checks the baseline, ideates and grills the design watertight, and pins the observable done-criteria the loop drives to. For a bug or "X is broken" reach for /diagnose; for a whole new app or epic, /groundwork; for a trivial one-to-two-step change, just make it - still in its own worktree branch, skipping only the planning. Chore-class work enters here too - "upgrade to React 19", clearing the CVE the audit gate flagged, a behavior-preserving refactor, test or docs debt - on the contract-lite path.
 argument-hint: "[feature-slug or rough intent] [depth: light|full]"
 ---
 
 # plan-grill - the feature front-end
 
-Turn a rough feature intent into a plan grilled watertight, and emit a **done-contract** with
-*observable* done-criteria the autonomous loop can drive to. One job: everything a feature needs
-settled *before* code, and nothing the implementation loop already owns.
+Turn a rough intent - a feature, or a chore on its contract-lite path - into a plan grilled
+watertight, and emit a **done-contract** with *observable* done-criteria the autonomous loop can
+drive to. One job: everything a work-item needs settled *before* code, and nothing the
+implementation loop already owns.
 
 Read `.better-dev/overrides.md` first (`.better-dev/bin/bd-mem read overrides`). A project override -
 a different spec location, a house planning style, a skipped phase - wins over anything below.
 
 The flow is four steps behind one closing gate; a gated step 0 runs first when the brief is
-somebody else's words. Work from the feature worktree
+somebody else's words. Work from the work-item's worktree
 (`/worktree-branching` sets it up); the contract lands in the shared ledger, described at the end.
+
+One shape is named on arrival, whoever brings it - first-person intent included: a work-item that
+spans two separate repositories (a field added in one service's repo, consumed in another's) is
+named now, not discovered when the second repo turns out to be unreachable from this worktree. The
+spine is single-repo by construction (one ledger, one integration branch, one PR, one deploy
+surface), so the item routes to `/orchestrating-agents`' cross-repo coordination (its
+`cross-repo.md`): a per-repo work-item on each side, the three coordination lines mirrored verbatim
+into both contracts, and the provider-lands-first ordering. A monorepo holding several services
+stays an ordinary single-repo carve (`/groundwork`'s sequencing), not this route.
+
+## Chore-class work - the contract-lite path
+
+Gate: the intent is a chore - a dependency upgrade, a CVE the audit gate turned red on, a
+behavior-preserving refactor, test or docs debt. The goal is an end-state of the codebase, not a
+new capability, so ideation and the attack pass have nothing to decide: skip steps 0, 2, and 3,
+run the step-1 baseline check (a chore stands on premises too - "we are on version X", "nothing
+else reaches the removed path"), and write the contract-lite shape in `done-contract.md` - the
+baseline verify stays green, the chore's own observable, the scope line, the merge line. Blast
+radius outranks occasion: the chore earns a contract because the loop still needs an observable to
+drive and a scope to hold, priced well under a feature grill. A red dependency audit arrives here
+as a chore work-item - the remediation route the audit gate points to - with deferral (a reason
+and a review date, `/guardrails-install`'s form) reserved for an advisory that genuinely can't be
+cleared, never the default disposition. Seal and hand off exactly as below.
 
 ## 0. Decode the brief when the words are somebody else's
 

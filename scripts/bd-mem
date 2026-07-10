@@ -17,6 +17,7 @@
 #   bd-mem ledger put <work-item> <name> [<file>|-]    write an artifact into the ledger (- = stdin)
 #   bd-mem ledger read <work-item> [name]              print an artifact, or list the entry's files
 #   bd-mem ledger list                                 list every work-item in the ledger
+#   bd-mem ledger status                               one line per item: slug, state, age, branch (oldest first)
 #   bd-mem ledger approve <work-item>                  pin approval to contract.md's exact bytes (+ snapshot)
 #   bd-mem ledger check-approval <work-item>           exit 0 = unchanged since approval; else gate re-opened
 #
@@ -124,6 +125,12 @@ ledger_dir() { printf '%s/ledger/%s' "$BD_DIR" "$(slug "$1")"; }
 # Portable sha256 of a file's bytes - pins a contract approval to that exact text.
 hash_file() { if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1"; else shasum -a 256 "$1"; fi | awk '{print $1}'; }
 
+# Portable file mtime in epoch seconds: GNU stat first, then BSD. The order is load-bearing -
+# BSD stat rejects -c cleanly (no stdout), but GNU stat reads -f %m as filesystem mode with a
+# bogus operand and prints a multi-line report to stdout even while exiting non-zero, so a
+# BSD-first chain captures that junk ahead of the fallback's epoch on Linux.
+mtime() { stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null || echo 0; }
+
 ledger() {
   local sub="${1:-list}"; [ $# -gt 0 ] && shift || true
   case "$sub" in
@@ -135,6 +142,15 @@ ledger() {
       [ -f "$d/contract.md" ]  || printf '# Contract - %s\n\nDone-criteria (observable, graded not asserted - from /plan-grill or /diagnose):\n\n- [ ] \n\nPremise verified: \nRed-capable signal (already run once): \n' "$1" | atomic_write "$d/contract.md"
       [ -f "$d/progress.md" ]  || printf '# Progress - %s\n\nAppend-only recovery map: one settled step per line, then the terminal state.\nOn resume, trust this and `git log` over recollection.\n\n' "$1" | atomic_write "$d/progress.md"
       [ -f "$d/receipts.md" ]  || printf '# Receipts - %s\n\nPer-iteration detail: tried / result / learned / plan-delta.\n' "$1" | atomic_write "$d/receipts.md"
+      # A new work-item is the promotion-independent distill anchor: past the threshold, nudge the
+      # operator to run release-promotion's full distill pass - the lessons prune AND the rule
+      # disuse sweep - so a repo that never promotes accumulates neither. One nudge on stderr
+      # (stdout stays the dir path callers capture); `prune --apply` stays a release-checkpoint move.
+      # ponytail: fixed 200-lesson threshold; make it a recorded knob only if repos prove to pace differently.
+      local nl; nl="$(grep -c '"kind":"lesson"' "$LEARN" 2>/dev/null || true)"
+      if [ "${nl:-0}" -ge 200 ] 2>/dev/null; then
+        printf 'bd-mem: learnings.jsonl holds %s lessons - run the distill pass: preview compaction with `bd-mem prune`, and read rules.md for rules no recent work has matched, surfacing those for the operator to retire; `prune --apply` stays a release-checkpoint move\n' "$nl" >&2
+      fi
       printf '%s\n' "$d" ;;
     resume) [ $# -ge 1 ] || die "ledger resume <work-item>"
       local d; d="$(ledger_dir "$1")"; [ -d "$d" ] || die "no ledger for '$1' - run: bd-mem ledger init '$1'"
@@ -149,6 +165,25 @@ ledger() {
       local d; d="$(ledger_dir "$1")"
       if [ $# -ge 2 ]; then cat "$d/$2"; else ls -1 "$d" 2>/dev/null || true; fi ;;
     list) ls -1 "$BD_DIR/ledger" 2>/dev/null || true ;;
+    status) # one tab-separated row per item - slug, state, age, branch - oldest contract first.
+            # State is the last non-empty progress.md line's terminal state (the terminal-states.md
+            # taxonomy the loop writes as its final line); anything else, including an item with no
+            # progress.md at all, reads in-flight - "nothing recorded a terminal state" is exactly
+            # the stale-work signal this view exists to surface. Branch comes from worktree.md's
+            # `branch:` line when /worktree-branching recorded one.
+      local now d s c m st br last
+      now="$(date +%s)"
+      for d in "$BD_DIR/ledger"/*/; do
+        [ -d "$d" ] || continue
+        s="$(basename "$d")"
+        last="$(awk 'NF{l=$0} END{print l}' "$d/progress.md" 2>/dev/null || true)"
+        st="$(printf '%s' "$last" | grep -oE '^(DONE_WITH_CONCERNS|DONE|BLOCKED|NEEDS_INPUT|EXHAUSTED|NO_PROGRESS)' | head -n1 || true)"
+        [ -n "$st" ] || st=in-flight
+        c="$d/contract.md"; [ -f "$c" ] || c="$d"
+        m="$(mtime "$c")"
+        br="$(sed -n 's/^branch:[[:space:]]*//p' "$d/worktree.md" 2>/dev/null | head -n1 || true)"
+        printf '%s\t%s\t%s\t%s\t%s\n' "$m" "$s" "$st" "$(( (now - m) / 86400 ))d" "${br:--}"
+      done | sort -n | cut -f2- ;;
     approve) # pin approval to the current contract.md bytes
       [ $# -ge 1 ] || die "ledger approve <work-item>"
       local d; d="$(ledger_dir "$1")"; [ -f "$d/contract.md" ] || die "no contract.md to approve for '$1'"
@@ -170,14 +205,14 @@ ledger() {
         if [ -f "$d/.approved.contract.md" ]; then diff "$d/.approved.contract.md" "$d/contract.md" || true; fi
         exit 1
       fi ;;
-    *) die "ledger where|dir|init|resume|put|read|list|approve|check-approval" ;;
+    *) die "ledger where|dir|init|resume|put|read|list|status|approve|check-approval" ;;
   esac
 }
 
 op="${1:-}"; [ $# -gt 0 ] && shift || true
 case "$op" in
   "" | -h | --help) # the full surface is the header above - print it, never make a session probe for it
-    sed -n '2,35p' "$SELF"; exit 0 ;;
+    sed -n '2,36p' "$SELF"; exit 0 ;;
   init)
     ensure; printf 'initialized %s\n' "$BD_DIR" ;;
   remember) # promote a durable rule (idempotent) and log it - grep-then-append is one locked section
@@ -382,6 +417,7 @@ case "$op" in
       hp="$("$SELF" --help)" || { echo "FAIL: --help must exit 0"; exit 1; }
       printf '%s' "$hp" | grep -q "ledger approve" || { echo "FAIL: --help missing ledger approve"; exit 1; }
       printf '%s' "$hp" | grep -q "check-approval" || { echo "FAIL: --help missing check-approval"; exit 1; }
+      printf '%s' "$hp" | grep -q "ledger status" || { echo "FAIL: --help missing ledger status"; exit 1; }
       bare="$("$SELF")" || { echo "FAIL: bare invocation must print help and exit 0"; exit 1; }
       [ "$bare" = "$hp" ] || { echo "FAIL: bare invocation differs from --help"; exit 1; }
       "$SELF" -h >/dev/null || { echo "FAIL: -h must exit 0"; exit 1; }
@@ -437,6 +473,31 @@ case "$op" in
       grep -q "verified fix" .better-dev/learnings.jsonl || { echo "FAIL: latest entry dropped by --apply"; exit 1; }
       [ "$(grep -c '"kind":"rule"' .better-dev/learnings.jsonl)" = "$rules_before" ] || { echo "FAIL: prune touched rule lines"; exit 1; }
       "$SELF" prune | grep -q "nothing to prune" || { echo "FAIL: prune not clean after --apply"; exit 1; }
+      # --- ledger status: one row per item (slug / state / age / branch), oldest contract first ---
+      TAB="$(printf '\t')"
+      "$SELF" ledger init feat/status-probe >/dev/null
+      err="$("$SELF" ledger init feat/status-probe 2>&1 >/dev/null)"
+      [ -z "$err" ] || { echo "FAIL: distill nudge fired below threshold"; exit 1; }
+      printf 'branch: feat/status-probe\n' | "$SELF" ledger put status-probe worktree.md - >/dev/null
+      row="$("$SELF" ledger status | grep "^status-probe$TAB")" || { echo "FAIL: ledger status missing item"; exit 1; }
+      case "$row" in *"${TAB}in-flight${TAB}0d${TAB}feat/status-probe") ;; *) echo "FAIL: status row shape (want in-flight / 0d / branch): $row"; exit 1 ;; esac
+      printf 'DONE_WITH_CONCERNS\n' >>.better-dev/ledger/status-probe/progress.md
+      "$SELF" ledger status | grep -q "^status-probe${TAB}DONE_WITH_CONCERNS${TAB}" || { echo "FAIL: terminal state not read from progress.md"; exit 1; }
+      "$SELF" ledger init feat/status-midword >/dev/null
+      printf 'resumed after NEEDS_INPUT answered\n' >>.better-dev/ledger/status-midword/progress.md
+      "$SELF" ledger status | grep -q "^status-midword${TAB}in-flight${TAB}" || { echo "FAIL: a step line naming a state mid-sentence must read in-flight"; exit 1; }
+      "$SELF" ledger init feat/status-elder >/dev/null
+      touch -t 202001010000 .better-dev/ledger/status-elder/contract.md
+      elder="$("$SELF" ledger status | head -n1)"
+      case "$elder" in status-elder"${TAB}"in-flight"${TAB}"*d"${TAB}"-) ;; *) echo "FAIL: status not oldest-first with dash branch: $elder"; exit 1 ;; esac
+      # --- distill nudge: a fat lesson store surfaces at ledger init, on stderr, stdout untouched ---
+      i=0; while [ "$i" -lt 200 ]; do printf '{"kind":"lesson","text":"bulk lesson %s","confidence":0.6}\n' "$i"; i=$((i+1)); done >>.better-dev/learnings.jsonl
+      out="$("$SELF" ledger init feat/nudge-probe 2>/dev/null)"
+      case "$out" in */ledger/nudge-probe) ;; *) echo "FAIL: nudge polluted ledger init stdout"; exit 1 ;; esac
+      err="$("$SELF" ledger init feat/nudge-probe 2>&1 >/dev/null)"
+      printf '%s' "$err" | grep -q "bd-mem prune" || { echo "FAIL: distill nudge missing past threshold"; exit 1; }
+      printf '%s' "$err" | grep -q "release-checkpoint" || { echo "FAIL: nudge must keep --apply release-checkpoint-only"; exit 1; }
+      printf '%s' "$err" | grep -q "rules.md" || { echo "FAIL: nudge must name the rule disuse sweep, not compaction alone"; exit 1; }
     ) && r=0 || r=1
     rm -rf "$d"
     [ $r = 0 ] || die "selftest FAILED"

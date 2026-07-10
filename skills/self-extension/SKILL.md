@@ -1,6 +1,6 @@
 ---
 name: self-extension
-description: Use when sourcing an existing skill has come up empty and a capability still needs filling, or when a proven, repeatable workflow is worth capturing as a new reusable skill of its own.
+description: Use when sourcing an existing skill has come up empty and a capability still needs filling, when a proven, repeatable workflow is worth capturing as a new reusable skill of its own, or when a recurring correction or re-recorded override looks like a defect in the shipped skill text rather than this repo's preference - to name it a library-defect candidate for the operator to carry upstream.
 ---
 
 # Self-extension
@@ -41,6 +41,17 @@ earliest fit:
 When you patch an existing skill, read it in full this turn first and write the edit from those bytes, not
 from what you remember of it - a skill edited from memory drifts from what's actually on disk.
 
+**Some recurring lessons are the library's defect, not this repo's.** When the same correction keeps
+recurring - a lesson re-learned, an override re-recorded - and its root cause is shipped skill text (a
+better-dev default that is wrong here and would be wrong in any repo, a skill line that keeps producing
+the same wrong move), none of the rungs above fit. Editing the installed tool's text is a fork the next
+tool update silently reverts, and burying the correction as one repo's override leaves every other
+adopter re-hitting it. Name it a **library-defect candidate** instead: write up the evidence - the
+recurring correction, the skill line at fault, the fix that keeps being applied - and hand it to the
+operator to carry upstream, an issue or patch on the tool's own repo. The negative form is explicit
+too: a correction that holds only because of this repo's stack, domain, or house taste is a preference,
+not a defect - it stays a project override or lesson, recorded as such, and never travels upstream.
+
 ## 2. Gather the sources and the requirements
 
 The request mixes two kinds of content in any order: **sources** to gather (paths, directories, URLs, "what
@@ -62,8 +73,9 @@ and don't invent a flag or path you never saw. A skill gets shared, so keep the 
 out of it - the skill names itself.
 
 On demand, your own recent sessions are a legitimate source for this step: clustering recurring findings
-across them to decide, per cluster, whether the answer is a new skill, an automation, a one-line fix, or
-nothing is diagnosis only - it writes nothing without the same approval gate below.
+across them to decide, per cluster, whether the answer is a new skill, an automation, a one-line fix, a
+library-defect candidate (step 1 names that disposition), or nothing is diagnosis only - it writes
+nothing without the same approval gate below.
 
 ## 3. Author one SKILL.md
 

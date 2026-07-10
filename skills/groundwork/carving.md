@@ -32,6 +32,17 @@ that appears in two *owns* sets. No overlaps → the carve is already clean; ski
 the contention check as an `/orchestrating-agents` fan-out rather than by eye - one reader per ownership list,
 synthesizing the duplicated paths.
 
+Ownership is not only files. Lanes whose file sets are disjoint but whose dev servers, seeds, or migrations
+write the same datastore - one shared dev `DATABASE_URL`, one Redis, one object-store bucket - are not
+disjoint (`/worktree-branching`'s datastore note owns the full rationale: the breakage reads as flake, and no
+file diff explains it). Treat a store two items both *write* as a path owned twice, resolved by the same
+moves in step 4: push per-lane isolation down into the foundation (a database, schema, or namespace per
+worktree, reset through the seed/reset entry point the foundation names in groundwork step 2), or sequence
+the items - and when sequencing is the resolution, record it once (`.better-dev/bin/bd-mem remember
+"shared-runtime: serialize"` - `/worktree-branching`'s datastore note owns the key) so `/orchestrating-agents`'
+live-lanes recall sees the coupling. Items that only read a stable store stay disjoint - the contention
+is in the writes.
+
 ## 4. Resolve each collision
 
 Three moves, in preference order:

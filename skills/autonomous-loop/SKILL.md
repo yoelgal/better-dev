@@ -101,7 +101,12 @@ payments/PII, infra and prod config, dependency manifests and lockfiles - rather
 class definitions here. Verify the mechanical edit boundary while you're here: `/worktree-branching`
 scoped this worktree at creation - it is the boundary's one writer - so `.better-dev/bin/bd-guard status`
 names this tree. A missing boundary is a setup step that got skipped, restored through
-`/worktree-branching`, never by the loop scoping one itself. Add a budget only if the operator set one - an attended loop stops on no
+`/worktree-branching`, never by the loop scoping one itself. While here, compare the recorded model
+fingerprint (`cat "$(.better-dev/bin/bd-mem where)/model-fingerprint"` - the plain file
+`bd-session-start` writes at the primary checkout; skip when absent) against the
+model running this loop: a mismatch means the gates' calibration was proven on a different model -
+surface it to the operator and point at the re-validation ritual better-dev's `docs/TRAPS.md` carries,
+then continue, because a stale fingerprint flags the run rather than stopping it. Add a budget only if the operator set one - an attended loop stops on no
 measurable progress, not an invented cap. A run handed to an unattended or scheduled cadence is the
 exception: it carries a hard turn or wall-clock ceiling, because an uncapped background loop bills
 without limit. That ceiling is a cost floor, not a progress limit - it settles `EXHAUSTED`, never a
@@ -206,6 +211,10 @@ a fix work-item the contract's fix-scope line makes this checkable, not a vibe: 
 the declared scope is re-picked smaller, or - when the fix genuinely cannot land inside it - settled
 `NEEDS_INPUT` naming the file and the declared scope, because a fix that outgrows its diagnosed scope is
 evidence the root cause sits at a different layer, not permission to widen.
+A mid-run operator instruction that changes what is being built rather than how - "use Postgres, not
+SQLite" against a contract that pinned SQLite - is routed, never absorbed into the diff: `/overrides`
+names the three dispositions (amend the contract and re-confirm on the delta, open a new work-item, or
+apply an in-scope one-off) and the test that picks between them.
 
 Before settling a pass as done, read `rationalizations.md` - the excuses a stuck loop talks itself into
 and the counter to each.
@@ -372,7 +381,12 @@ Closing the ledger is part of `DONE`, not a courtesy after it: a non-trivial wor
 something durable and left no note is unfinished. On `DONE`/`DONE_WITH_CONCERNS`, record the reusable
 core keyed for recall - `.better-dev/bin/bd-mem learn "<lesson>" <confidence> "<signature-key>"` - or
 write an explicit `no durable lesson` line saying why; promote a recurring one with `.better-dev/bin/bd-mem
-remember "<rule>"`. Keep the WHAT filter: capture signature, root cause, and fix, never the transient run
+remember "<rule>"`. On a team adoption (`.better-dev/bin/bd-mem recall "adoption"`), the close-out also
+commits the memory delta its learn/remember calls left in the primary checkout - one `mem: <work-item>`
+commit staging only the memory files those calls touched, made only after confirming the primary
+checkout actually sits on the integration branch (`git branch --show-current` there matches the
+recorded one; a mismatch surfaces instead of committing) - so shared memory travels with the work
+that earned it. Keep the WHAT filter: capture signature, root cause, and fix, never the transient run
 (a one-off timeout, a flake seed, a machine path). A recalled lesson a pass applied is cited in that
 pass's receipt as `prior lesson applied: <key> (confidence <c>, from <date>)`, so the operator can audit
 what the store contributed. The same law fires earlier too - a root cause a

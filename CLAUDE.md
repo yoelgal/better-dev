@@ -2,15 +2,22 @@
 ## better-dev is wired here
 
 This repo uses **better-dev**: portable dev practices that run inside your agent (installed globally
-for your host, not vendored here). Say what you want; the right skill enters, and the chain runs itself:
+for your host, not vendored here). Say what you want; the right skill enters, and the chain runs
+itself - a tool you name wins over a row:
 
 | You say... | Enters | Then, on its own |
 |---|---|---|
 | "add / build feature X", "I want Y" (non-trivial) | `/plan-grill` | -> `/autonomous-loop` -> `/pr-and-verify` |
+| "upgrade the dependency", "clear the CVE", "chore: X" | `/plan-grill` (contract-lite) | -> the loop, priced under a feature grill |
 | "X is broken / failing / slow", "why is prod down" | `/diagnose` | -> `/autonomous-loop` -> `/pr-and-verify` |
 | "let's build an app that does Y", a new project or epic | `/groundwork` | sets the foundation, then per-item front-ends |
 | "ship it", "open a PR", "let's land this" | `/pr-and-verify` | -> `/release-promotion` on green |
-| "release this", "promote to main", "hotfix prod", "did the deploy land / is prod healthy" | `/release-promotion` | tags, verifies the release live, double-merges the hotfix |
+| "release this / promote to main", "roll back / revert the release", "hotfix prod", "did the deploy land / is prod healthy" | `/release-promotion` | tags, verifies live, reverts a bad release, double-merges the hotfix |
+| "deploy this", "get it live", "set up hosting" | `/deploy-capability` | creates the surface; `/guardrails-install` records it |
+| "wire monitoring", "can I see prod errors?", "does anything page me?" | `/observability-install` | fills the recorded `obs-*` gaps |
+| "review this PR", "review my colleague's PR" | `/review` | inbound path: host mechanics + this repo's recorded policy |
+| "what's in flight?", "where did we leave off?" | `.better-dev/bin/bd-mem ledger status` | one line per work-item with its state |
+| "hand this off", "pick up X's work" | `/worktree-branching` (handoff) | the bundle rides the branch; consent re-pins on pickup |
 | "make it look good", "design the page" | `/design-brief` | -> `/plan-grill` or the loop |
 | "is this safe", a security pass on a risky diff | `/security-pass` | composed by `/review` automatically |
 | "is there a tool or skill for X" | `/tool-sourcing` | -> `/self-extension` only if discovery is empty |

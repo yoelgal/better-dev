@@ -17,6 +17,24 @@ it out of the hook and report the gap.
 Detect the package manager for a Node repo by its lockfile: `package-lock.json` → npm, `pnpm-lock.yaml` →
 pnpm, `yarn.lock` → yarn, `bun.lockb` → bun. Default to npm when none is clear.
 
+## Detecting the runnable entry points and the migrate mechanism
+
+Same premise discipline: the value is what you read at `file:line`, and a missing signal is a gap to
+report, never a command to invent.
+
+| Signal | What it yields |
+| --- | --- |
+| `package.json` scripts `dev` / `start` | `dev-run: <pm> run dev` (or `start`) |
+| `package.json` scripts `seed` / `db:seed` / `db:reset`, or a `prisma.seed` entry | `seed-reset` commands (`npx prisma db seed`, `npx prisma migrate reset`) |
+| `package.json` migrate-deploy script, or a migrate line in a deploy workflow | `deploy-migrate: command` / `release-step` |
+| `Procfile` | `web:` → the dev-run shape; `release:` → `deploy-migrate: platform-auto` |
+| `fly.toml` `release_command` / `render.yaml` `preDeployCommand` | `deploy-migrate: platform-auto` |
+| `docker-compose.yml` / `compose.yaml` fronting the app | `dev-run: docker compose up` |
+| `Makefile` `run` / `dev` / `seed` targets | prefer `make <target>` |
+| `manage.py` (Django) | `dev-run: <runner> manage.py runserver`; a fixtures/`loaddata` or seed command → `seed-reset` |
+| `bin/dev` / `db/seeds.rb` (Rails) | `dev-run: bin/dev`; `seed-reset: rails db:seed` / `rails db:reset` |
+| `Procfile` `worker:` / a queue config (sidekiq, celery, bullmq) / a jobs workflow with `workflow_dispatch` | `ops-runner` candidates - confirm with the operator which one prod jobs actually use |
+
 ## Node - Husky + lint-staged
 
 If `.husky/` already exists, the repo has a hook - read it, add only missing checks, do not re-init.

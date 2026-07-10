@@ -50,6 +50,17 @@ path="$(dirname "$main_root")/$repo-$slug"
 A sibling path lives outside the repo, so it needs no `.gitignore` entry - but it also isn't
 discoverable from inside the repo, which is why `.worktrees/` is the default.
 
+## Trunk-based repo - integration and release coincide
+
+Where the repo records `branch-model: trunk` (`.better-dev/bin/bd-mem recall "branch-model"`), the
+integration branch and the release branch are the same branch: worktrees base off `main` (or whatever
+the trunk is named), PRs merge into it, and no separate staging sits between a merge and a release.
+Step 1's base column reads the trunk for every row, and `hotfix/` loses its special base - a hotfix is
+a fix like any other, already branching off the branch that releases. Everything else in this skill is
+unchanged: detection, creation, the edit boundary, and teardown work identically, and only the base
+resolution differs. What promotion still means when the two branches coincide is `/release-promotion`'s
+question, not this skill's.
+
 ## Sandbox denial
 
 If `git worktree add` fails with a permission error (a sandbox blocking directory creation), say so

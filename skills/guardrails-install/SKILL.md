@@ -1,6 +1,6 @@
 ---
 name: guardrails-install
-description: Use when a repo needs its guardrails installed or recorded - a missing commit-time or CI gate (no pre-commit hook, no lint/typecheck gate, no CI workflow), the autonomous loop's blast-radius policy (the high-consequence paths it should escalate rather than auto-edit, the change classes that gate a human, the scope threshold), the enforcement wiring that mechanically checks that policy (bd-guard hooks, recorded as safety-enforcement), or the deploy surface /release-promotion reads (deploy-* rules or deploy-surface: none). Invoked by /onboard while bootstrapping the minimum base, or run directly to fill a guardrail gap or record the safety policy without touching what the repo already has.
+description: Use when a repo needs its guardrails installed or recorded - a missing commit-time or CI gate (no pre-commit hook, no lint/typecheck gate, no CI workflow), the autonomous loop's blast-radius policy (the high-consequence paths it should escalate rather than auto-edit, the change classes that gate a human, the scope threshold), the enforcement wiring that mechanically checks that policy (bd-guard hooks, recorded as safety-enforcement), or the recorded rules downstream skills recall - deploy-* (including deploy-migrate and deploy-env, or deploy-surface: none), dev-run, seed-reset, ops-runner, and obs-* with absence as a named gap. Invoked by /onboard while bootstrapping the minimum base, run directly to fill a guardrail gap or record the safety policy without touching what the repo already has, or when the operator keeps answering the same non-safety gate yes run after run - a re-run then proposes the standing allowance the kept record has earned.
 allowed-tools:
   - Bash
   - Read
@@ -131,7 +131,8 @@ stays exactly as the operator wrote it.
 - **Supply-chain gate** (CI) - commit the lockfile, and have CI install with the frozen-lockfile form
   (`npm ci`, `pnpm i --frozen-lockfile`, `poetry install --sync`, `cargo build --locked`) so a run cannot
   silently resolve a different tree, then run the ecosystem audit as its own gate (`npm audit --omit=dev`,
-  `pip-audit`, `cargo audit`). A deferred advisory is documented with a reason and a review date, not
+  `pip-audit`, `cargo audit`). A red audit becomes a chore work-item through `/plan-grill`'s
+  contract-lite path; a deferred advisory is documented with a reason and a review date, not
   silently ignored. Detected-command discipline still applies - report a gap rather than inventing a command.
 
 Full commit-time coverage costs the least when the hook stays fast: format only the staged files, run
@@ -171,7 +172,27 @@ gap with what you observed, not written as a fact - a README claiming "deployed 
 .better-dev/bin/bd-mem remember "deploy-status: <status command, or 'http'>"
 .better-dev/bin/bd-mem remember "deploy-health: <health URL or command>"
 .better-dev/bin/bd-mem remember "deploy-preview: <how a PR's preview URL resolves - deployments API | bot comment | command>"
+.better-dev/bin/bd-mem remember "deploy-migrate: <command | platform-auto | release-step | manual | none>"
+.better-dev/bin/bd-mem remember "deploy-env: <where per-environment config lives + how to enumerate its required var names>"
 ```
+
+Two of these carry their own vocabulary. `deploy-migrate` records how schema migrations reach
+production - the migrations dir is already on the denylist sweep above; this key is the *run
+mechanism*, read from where it actually lives: `platform-auto` when the platform runs them on every
+deploy (a `release_command` in `fly.toml`, a Procfile `release:` phase), `release-step` when a deploy
+workflow step runs the migrate command, `command: <cmd>` when the repo maps a command
+(`npx prisma migrate deploy`) that nothing runs automatically, `manual` when the operator applies
+schema changes by hand with no repo command - recorded on their word, never inferred - and `none`
+when the repo carries migrations but has no path to the production schema (an external team owns
+and applies them). A repo with no migrations surface records nothing for this key - there is
+nothing to run. A repo with a migrations dir and no observable run mechanism is a
+gap to ask about, not a value to guess; `/release-promotion` reads the recorded value so new code
+never ships against an un-migrated database. `deploy-env` records where per-environment config lives
+(the platform's env store, a secrets manager, an `.env.<environment>` scheme) and how to enumerate the
+variable *names* an environment needs (the platform's own env listing, an `.env.example`, a config
+schema) - names only, never values. Downstream verify passes recall it to confirm a newly required var
+exists in each environment before a merge or promote, instead of meeting the miss as a red preview
+build triaged as generic infra.
 
 The preview rule earns the same premise-verify as the rest: record it only against an observed
 platform config *and* an actual preview deployment seen (a deployment listed for a recent PR's head
@@ -180,8 +201,73 @@ records the explicit negative `deploy-preview: none`. The negative matters becau
 a decision `/pr-and-verify` settles on at its runtime-observation step, where a missing rule is a
 gap every later session pays to re-detect.
 
-A repo with no deploy surface (a library, a CLI) records `deploy-surface: none` - a recorded no is a
-fact `/release-promotion` reads and settles on, where a missing key is a question it has to re-ask.
+Nothing observed splits two ways, and they record differently. A repo whose deploy surface is
+*intentionally absent* - a library, a CLI, code consumed as code - records `deploy-surface: none`: a
+recorded no is a fact `/release-promotion` reads and settles on, where a missing key is a question it
+has to re-ask. A product that deploys - it serves users, and greenfield just means it hasn't shipped
+yet - has a surface that needs *creating*, not recording: route to `/deploy-capability` to stand one
+up, then record the observed values it hands back. Writing `none` for that repo wires a circle -
+`/release-promotion` settles `NEEDS_INPUT` naming this skill as the recorder, this skill re-observes a
+repo with nothing to observe, and no one creates anything. Which of the two a repo is comes from the
+operator or the contract, never from a guess.
+
+## Record the runnable-app entry points
+
+The verify commands prove the code; downstream skills also have to *drive* it. Three more keys travel
+the same way - detected from the sources the check sweep already reads (`package.json` scripts, a
+Makefile's targets, a Procfile, a compose file, a framework's seed convention; `stacks.md` holds the
+per-stack forms), reported as observed value + where, recorded on a yes:
+
+```bash
+.better-dev/bin/bd-mem remember "dev-run: <the command that stands the app up locally>"
+.better-dev/bin/bd-mem remember "seed-reset: <seed command + reset command, or 'none'>"
+.better-dev/bin/bd-mem remember "ops-runner: <where operational prod jobs run - job runner | platform console command | triggered workflow | none>"
+```
+
+- `dev-run` - what a fresh worktree runs to stand the app up. The verify rubric (`/pr-and-verify`'s
+  `verify-runtime.md`, which the loop's runtime observation composes) and `/worktree-branching`'s
+  fresh-worktree baseline recall it instead of re-discovering it in every worktree.
+- `seed-reset` - how plausible data gets in and how local state resets. The explicit negative matters
+  most here: `seed-reset: none` turns a missing seed path into a plannable work item for `/plan-grill`,
+  where an unrecorded gap resurfaces as a fresh `NEEDS_INPUT` every time a verify pass needs data.
+- `ops-runner` - where a decoupled operational job (a backfill, a batched data fix) actually runs
+  against production: a job runner, the platform's one-off console command, a manually triggered
+  workflow. The recorded value is the execute route such a job's stop can name; `ops-runner: none` is
+  the recorded fact that "run it yourself" currently has no route.
+
+The never-guess rule holds: a command a README names that no script or config backs is a claim, not an
+entry point - report it as a gap and ask.
+
+## Record the observability surface
+
+For a repo with a deploy surface, a verified deploy the operator cannot see fail is a gap the same
+size as a missing CI gate. Three keys record whether production is visible and whether an incident
+reaches a human before a churned user's email does - same premise-verify as the deploy keys: an SDK
+init observed at `file:line`, a config that names a channel, a probe seen answering.
+(`deploy-surface: none` makes all three moot - skip them.)
+
+```bash
+.better-dev/bin/bd-mem remember "obs-error-tracking: <where prod errors aggregate, observed at file:line>"
+.better-dev/bin/bd-mem remember "obs-alert-channel: <what pages a human on a prod incident>"
+.better-dev/bin/bd-mem remember "obs-health: <the standing probe that watches prod between releases>"
+```
+
+- `obs-error-tracking` - the error tracker the app initializes: its SDK setup in code, its DSN named
+  in config (the name, never the secret value).
+- `obs-alert-channel` - the route from a failure to a person: the tracker's alert rule, an uptime
+  service's notification, a paging hook. Most of these live outside the repo, so the value is
+  operator-confirmed, the same standing `deploy-url` has.
+- `obs-health` - whether anything watches the health URL *unattended* between releases: a monitor
+  service, a scheduled workflow, the host's own cadence primitive armed with the release watch's
+  probe line. `deploy-health` above records the URL; this records that something reads it when nobody
+  is looking.
+
+Absence records exactly the way `deploy-surface: none` does - an explicit negative per key
+(`obs-error-tracking: none`, `obs-alert-channel: none`, `obs-health: none`), a fact downstream skills
+settle on instead of re-asking. Each recorded `none` is a named gap `/observability-install` exists to
+fill; a production repo carrying `obs-alert-channel: none` learns of its incidents from users, so that
+line belongs in the close-out headline with the other operator-action items, never below a victory
+banner.
 
 ## Record the blast-radius policy
 
@@ -245,6 +331,18 @@ compounds. Record the discipline through the same memory contract:
 ```bash
 .better-dev/bin/bd-mem remember "context-hygiene: the repo's standing context (CLAUDE.md + always-loaded blocks) is a per-turn tax - keep it lean, prune stale lines on each release, and rewrite instructions written for an older model rather than carrying them forward."
 ```
+
+## Earned autonomy - propose the standing line the record already supports
+
+On a re-run against a working repo - or when the operator keeps answering the same non-safety gate
+yes, run after run - read `earned-autonomy.md` and propose, once, the standing allowance the kept
+approval record supports (a 5+ unmodified-yes streak, counted from the record, never estimated).
+
+Safety gates sit outside this move entirely. The denylist paths, the human-gate classes (auth,
+payments/PII, infra, dependency bumps), and the scope threshold get no proactive proposal however
+long their yes streak runs - a hundred approvals on a payments path is a hundred deliberate looks,
+the gate working, not friction to optimize away. Loosening one of those starts with the operator
+through `/overrides`, never with this skill suggesting it.
 
 ## Make CI a gate, not a suggestion (advice, host-specific)
 

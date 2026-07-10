@@ -1,6 +1,6 @@
 ---
 name: overrides
-description: Use when the user pushes back on a better-dev default mid-flow - "just push to the PR, don't open a worktree", "use feat/ not feature/", "skip the grill here", "we never instrument prod" - to honor the correction now and, with a light confirm, make it the standing default for this project. Also the read-first layer every skill consults before applying a default.
+description: Use when the user pushes back on a better-dev default mid-flow - "just push to the PR, don't open a worktree", "use feat/ not feature/", "skip the grill here", "we never instrument prod" - to honor the correction now and, with a light confirm, make it the standing default for this project. Also when a mid-loop instruction changes what is being built rather than how - a correction to a decision the work-item's contract pins - to route it to the right disposition instead of absorbing it. Also the read-first layer every skill consults before applying a default.
 ---
 
 # overrides - the project's own opinions win
@@ -96,6 +96,32 @@ A recorded line that git or file reality contradicts - an integration branch the
 instruction. Re-verify against reality, apply what is real now, and offer the one-line rewrite of the
 record (the same light confirm this skill already owns). Obeying the stale line, or stopping without
 offering the rewrite, both leave the next session to hit it again.
+
+## When the correction changes the product, not the practice
+
+Mid-loop, an instruction can change *what* is being built rather than how better-dev works - "stop,
+use Postgres, not SQLite" against a contract that pinned SQLite. That is never an override line: an
+override records how this project wants the work done, and a product decision lives in the work-item's
+sealed contract - recording it here leaves the contract asserting the old decision while the code
+diverges, and `/review`'s spec channel later re-litigates the operator's own instruction as a finding.
+Route it instead. The test is the sealed contract, read now rather than remembered, and it picks one of
+three dispositions:
+
+- **It contradicts a line the contract pins** - a done-criterion, a pinned decision, the scope. That is
+  a contract amendment: amend `contract.md`, which re-opens the approval pin
+  (`.better-dev/bin/bd-mem ledger check-approval` now fails), and the re-confirm judges the printed
+  delta - `/plan-grill`'s seal owns the mechanics. Driving resumes only against the re-pinned contract;
+  changing the code first leaves the contract asserting a decision the operator already reversed.
+- **It names a deliverable no criterion covers** - not a change to this item but a second item. That is
+  a new work-item with its own worktree and contract (`/worktree-branching`), never a rider smuggled
+  into the running loop's diff.
+- **It fits inside what the approved contract leaves open** - a detail no line pins either way. That is
+  an in-scope one-off: apply it now, no re-approval, one receipt line recording the instruction and
+  where it landed.
+
+When two readings survive the test, ask the operator which they meant - one question is cheaper than an
+amendment that re-opens approval for a detail that was always in scope, or a one-off that quietly
+rewrites a pinned decision.
 
 ## What counts as an override versus a lesson
 

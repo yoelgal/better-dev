@@ -220,7 +220,10 @@ proposes rather than writes; you're offering a candidate, not editing memory by 
 ## Composability
 
 Diagnose adds; it never replaces an installed debugger, test runner, or observability skill - it
-sequences them. It's the fix-side twin of `/plan-grill` (the feature front-end); both feed the same
-`/autonomous-loop`. A live production incident is diagnosed here first; once the fix lands through the
-loop and `/pr-and-verify`, `/release-promotion` carries the hotfix to both branches. When revising this
-skill, follow `/writing-skills`.
+sequences them. On a production incident with no telemetry to read, the recorded `obs-*` rules name
+the gap (`.better-dev/bin/bd-mem recall "obs"`), and once the incident is stabilized
+`/observability-install` is the route that fills it - per-incident instrumentation covers this
+diagnosis, not the next one. It's the fix-side twin of `/plan-grill` (the feature front-end); both
+feed the same `/autonomous-loop`. A live production incident is diagnosed here first; once the fix
+lands through the loop and `/pr-and-verify`, `/release-promotion` carries the hotfix to both
+branches. When revising this skill, follow `/writing-skills`.

@@ -65,7 +65,11 @@ scale the pattern that worked (`tiers.md`).
    when they don't write the same files; parallel writers to one surface collide. Check that
    mechanically before dispatching, not by recall: `git worktree list`, then per live branch
    `git diff --name-only <base>...<branch>` - a path two lanes both touch makes those lanes
-   sequential, and discovering the overlap at PR time buys a conflict-resolution round instead. A
+   sequential, and discovering the overlap at PR time buys a conflict-resolution round instead. One
+   more read rides that check: `.better-dev/bin/bd-mem recall "shared-runtime"` - a recorded
+   `shared-runtime: serialize` (written by `/worktree-branching` where lanes share one mutable
+   datastore with no per-lane split) makes writing lanes sequential even with zero file overlap,
+   because they collide in data the file diff can't show. A
    broad review fans out naturally: each worker takes a slice and none needs the others.
 3. **Pipeline** (`Workflow`) - dependent stages, each a fresh worker, where one stage's output file
    becomes the next stage's brief. A drive-to-green loop is itself a pipelineable stage: hand it a verify
@@ -293,7 +297,10 @@ finished work - the most expensive failure there is.
 ## Handing off
 
 Workers that write files run in isolated worktrees - see `/worktree-branching` - and a finished run hands
-off to the PR-into-staging gate. `/autonomous-loop` composes this skill as its outer layer: it reaches
+off to the PR-into-staging gate. A half-finished item moving to a colleague or another machine travels by
+the handoff bundle `/worktree-branching`'s handoff notes define - consent re-pins on the receiving side,
+never imports. A work-item spanning two repositories has no shared ledger or PR to coordinate through -
+read `cross-repo.md` for the three contract lines that tie the two halves together. `/autonomous-loop` composes this skill as its outer layer: it reaches
 for the dispatch verb here rather than re-specifying it. Durable rules and lessons still go through the
 memory contract (`.better-dev/bin/bd-mem`), and any project override in `.better-dev/overrides.md` wins
 over these defaults - read it first. When you revise this skill, follow `/writing-skills`.

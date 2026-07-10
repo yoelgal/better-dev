@@ -12,7 +12,9 @@ at the end of this file.
 Every command and URL in this pass comes from the recorded `deploy-*` rules
 (`.better-dev/bin/bd-mem recall "deploy"`), written once by `/guardrails-install` - detected,
 premise-verified, never guessed. A value that isn't recorded is a `NEEDS_INPUT` naming
-`/guardrails-install` as the recorder, not a guess. The same rule the main body holds for branches
+`/guardrails-install` as the recorder, not a guess. On a greenfield product where nothing was ever
+created, the recorder's own fork routes to `/deploy-capability` - the `NEEDS_INPUT` names the
+creator, not a recorder with nothing to observe. The same rule the main body holds for branches
 holds here: a deploy target named in prose - a README's "deployed on Vercel", a stale doc's URL -
 is not a deploy target until a recorded, premise-verified rule says so.
 
@@ -38,10 +40,13 @@ the host's monitor primitive, not a tight poll, with a 20-minute default budget
 Where anything shows the release is flag-gated - the contract, the PR body, the diff, or a
 recorded `deploy-flag` rule - the flag state is part of the verify: read the flag's actual state
 before driving any surface, and drive the surface in the state users get. Record
-`flag: <name>=<state>` in the receipt. A release whose contract expected activation but whose flag
+`flag: <name>=<state>` in the receipt. The contract's flag line is the entry side of the same
+shape - `/plan-grill` records `flag: <name>=<state at ship>` in the done-contract's Failure
+behavior section when a change ships flag-gated - so this pass reads the contract line and writes
+the receipt line in one vocabulary. A release whose contract expected activation but whose flag
 reads off is a finding at the same severity as a failed check - the deploy landed, the feature
-didn't. A flag nobody recorded is never assumed: grade the surface's observed behavior against what
-the flag state predicts, or settle `NEEDS_INPUT` naming the flag.
+didn't. A flag nobody recorded is never assumed: grade the surface's observed behavior against
+what the flag state predicts, or settle `NEEDS_INPUT` naming the flag.
 
 Classify `git diff "$prev_tag"..origin/$release --name-only` and take the first matching row:
 
@@ -58,6 +63,12 @@ same surface table, same probe-past-the-happy-path, same every-claim-points-to-a
 Two differences only: the target is the deployed artifact, not the worktree (env, build step, and
 CDN all differ, so a green worktree proves nothing about the deploy), and destructive probes stay
 off a live system - read paths and idempotent writes only.
+
+An env-shaped failure gets named before it gets treated as code: when the release's diff newly
+reads an env var and the deploy run failed or the driven surface errors, recall `"deploy-env"` and
+re-confirm the var exists in production (the release gate confirmed it before the tag; this is the
+re-read on a red). A missing var settles `NEEDS_INPUT` naming the var, not a revert - rolling back
+code over a config gap re-ships the same red.
 
 ## The bounded post-deploy watch
 

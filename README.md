@@ -94,7 +94,7 @@ shared skills are never rewritten to encode your preference.
 
 | Group | Skills |
 |---|---|
-| **Enter & set up** | `onboard` · `groundwork` · `guardrails-install` |
+| **Enter & set up** | `onboard` · `groundwork` · `guardrails-install` · `deploy-capability` (creates the deploy surface) · `observability-install` (prod visibility) |
 | **Scope a work-item** | `plan-grill` (feature) · `diagnose` (fix) · `codebase-audit` (no item yet) · `design-brief` (UI direction) |
 | **Isolate & drive** | `worktree-branching` · `autonomous-loop` · `orchestrating-agents` · `review` · `security-pass` |
 | **Ship** | `pr-and-verify` · `release-promotion` |
@@ -122,7 +122,7 @@ Skills you later mint with `/self-extension` are **repo-scoped** by default - co
 
 | Path | What |
 |------|------|
-| `skills/` | the 24 practices (agentskills.io: `name` + `description`, progressive disclosure) |
+| `skills/` | the 26 practices (agentskills.io: `name` + `description`, progressive disclosure) |
 | `scripts/` | the `bd-*` spine - `bd-mem` (memory + ledger), `bd-block`, `bd-dispatch`, `bd-guard` (enforced guardrails), `bd-worktree-guard`, `bd-review-package`, `bd-skill-stage`, `bd-link`, `bd-package-check`, `bd-uninstall` |
 | `hooks/` · `hosts/` | session awareness + PreToolUse guard hooks · per-host install adapters (declarative, enumerated) |
 | `browse/` · `ios-qa/` | vendored daemons (gstack, MIT - see `NOTICE`): headless-browser QA · on-device iOS QA; compiled on first need, never in CI |

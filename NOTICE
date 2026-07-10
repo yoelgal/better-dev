@@ -73,6 +73,9 @@ we actually copied verbatim/substantially, which MIT requires us to attribute, a
     least-privilege allowed-tools + shown-format rules reimplemented)
   emilkowalski/skills - Emil Kowalski (MIT; frequency-budget motion rule, motion tell
     set, reduced-motion criterion nuance - reimplemented)
+  Amp handoff pattern - Sourcegraph (ideas only; the handoff artifact that moves a
+    half-finished item between machines - reimplemented in worktree-branching's handoff
+    notes, with better-dev's own consent re-pin on pick-up)
 
 ── NOT copied - inspiration only, NOT redistributable ──
   Andrej Karpathy - LOOPS.md v060726 ("personal use permitted"). Concepts reimplemented

@@ -1,6 +1,6 @@
 ---
 name: release-promotion
-description: Use when the integration branch looks ready to ship and someone wants to promote it to the release branch and tag a release, when a just-tagged release needs its deploy verified live and healthy ("did the deploy land", "is prod healthy after the release"), or when a production incident needs a hotfix landed correctly. For the hotfix path specifically, this skill's hotfix notes carry the both-branches detail.
+description: Use when the integration branch looks ready to ship and someone wants to promote it to the release branch and tag a release, when a just-tagged release needs its deploy verified live and healthy ("did the deploy land", "is prod healthy after the release"), when a bad release needs rolling back ("roll back the release", "revert prod"), or when a production incident needs a hotfix landed correctly. For the hotfix path specifically, this skill's hotfix notes carry the both-branches detail.
 allowed-tools:
   - Bash
   - Read
@@ -32,6 +32,14 @@ it win:
 integration="staging"   # honor an override (e.g. develop)
 release="main"          # honor an override (e.g. master)
 ```
+
+A repo can run trunk-based - integration and release are the same branch (a recorded
+`branch-model: trunk`; with nothing recorded, the staged two-branch shape below is the default).
+The promote then degenerates on purpose: the ancestor gate and the fast-forward are no-ops on a
+single branch, and the soak window collapses to the merge itself, because `/pr-and-verify`'s merge
+into the trunk *is* the release. What still binds is everything after the merge: the version tag
+at the released head and the deploy-verify pass in `post-deploy.md`, receipt and all. On a trunk
+repo this skill reduces to tag-plus-verify - a smaller job, never a skipped one.
 
 ## Verify the premise at the git level
 
@@ -75,6 +83,22 @@ Check the head commit of the integration branch, not a stale local copy. Every g
   A `DIVERGED` result means `main` holds a commit `staging` doesn't - almost always a hotfix that was
   never merged back. Reconcile that first (see the hotfix notes); promoting over it would drop the
   fix.
+
+- **Migrations in the promote range have a run plan.** Diff the range against the recorded
+  migrations glob (`git diff "$prev_tag"..origin/$integration --name-only`, grepped against the
+  `safety-denylist` rule; recorded by `/guardrails-install` - run it if absent: a repo with a
+  migrations directory and no recorded glob settles `NEEDS_INPUT` naming the recorder rather than
+  passing this gate on an empty grep). A clean diff satisfies this gate silently.
+  On a hit, run the migration gate in `migrations.md` before promoting - it confirms which mechanism
+  applies the migration, fixes the apply order relative to the deploy, and takes a snapshot receipt
+  before anything destructive. New code over an un-migrated production schema fails only after the
+  tag, so this gate is the last place to catch it.
+
+- **Newly required env vars exist in production.** When the promote range newly reads an env var,
+  recall `"deploy-env"` (recorded by `/guardrails-install` - run it if absent) and confirm each new
+  var is present in production before the tag. A missing var settles `NEEDS_INPUT` naming the var -
+  a config-only release with a green build still ships the miss, so this gate never waits for
+  something to go red first.
 
 If a gate is red or its answer can't be established, this is a `BLOCKED` (a hard failure) or
 `NEEDS_INPUT` (a convention the operator has to name) - report which gate and stop. Don't relax a
@@ -138,7 +162,8 @@ answers, three paths:
   settles.
 - No deploy keys at all - a gap, not a license to guess: settle `NEEDS_INPUT` naming
   `/guardrails-install` as the recorder. A deploy command or a production URL is never invented
-  here.
+  here. For a product that has never shipped, the recorder will route to `/deploy-capability` to
+  create the surface first - the stop names both so the operator is not sent in a circle.
 
 A release whose deploy was not observed is `deploy: UNVERIFIED` in the receipt and settles
 `NEEDS_INPUT` naming what has to run - the tag going up does not round it to done. The `deploy:`
@@ -166,8 +191,18 @@ a memory-consolidation pass uses:
   machine-specific path).
 - **UPDATE** - a rule a later lesson refined; propose the sharper wording.
 - **DELETE** - a rule no recall has matched across the last several work-items is stale; surface it
-  for the operator to retire. This is the one place rules get pruned, so nothing else has to.
+  for the operator to retire. The sweep anchors here and carries a between-release trigger: once
+  the store passes its threshold, `ledger init` on a new work-item nudges the operator to run this
+  full distill pass - the lessons prune *and* this rule disuse sweep, never compaction alone - while
+  `prune --apply` stays a release-checkpoint move. So a repo that rarely promotes accumulates
+  neither stale lessons nor never-matched rules silently waiting for one.
 - **NOOP** - most lessons; leave them where they are.
+
+One class of lesson leaves the learnings-and-rules plane entirely: a recurring lesson whose cause
+is the shipped skill text itself - a default that misled every run it touched, a step executors
+keep rationalizing around - is a library-defect candidate, not a house rule. Surface it to the
+operator to carry upstream (`/self-extension`'s recent-sessions clustering mines exactly this
+shape); a local override would bury a defect every adopter still hits.
 
 Two things keep this honest. Present the moves as a reviewable diff and light-confirm before applying
 any of them - propose, never auto-edit someone's memory. And never rewrite `learnings.jsonl` in
@@ -180,15 +215,27 @@ stale? That's a clean NOOP - the pass isn't obliged to change anything.
 ## If a release goes bad
 
 What users already pulled is out, but the release branch itself is recoverable - so recover it
-forward, never by force-resetting a pushed branch. Revert the commits that shipped: a fast-forward
-promote carried a range, so revert that range (`git revert --no-commit <prev-tag>..<release>`, or
-`git revert <bad-sha>` for a single culprit); a merge-commit promote or a hotfix merge is
-`git revert -m 1 <merge-sha>`. Re-run verification on the revert, tag it as a new patch release, and
-push - a new tag forward, never a moved or deleted one. Then back-merge the revert into integration
-so the two histories stay reconciled, the same both-branches discipline a hotfix uses; skip that and
-the next promote silently re-ships the bad commit. If the release sits behind a feature flag, killing
-the flag is the faster rollback - record the flag's path in the release receipt so the next operator
-finds it without spelunking.
+forward, never by force-resetting a pushed branch.
+
+One check comes before any revert executes: diff the revert range against the recorded migrations
+glob (`git diff --name-only "<prev-tag>..<release>"`, grepped against the `safety-denylist` rule).
+A hit means the bad range carried a migration that already ran on production - and `git revert`
+walks back the migration *file*, never the applied schema, so reverted code would run against a
+schema it never saw, while the re-verify, running on the revert's own code, catches nothing. That
+is a `NEEDS_INPUT` naming the applied-schema hazard, with three ways out for the operator to
+choose: run the down migration (`migrations.md` carries the discipline), roll forward with a fix
+instead of reverting, or restore the snapshot the migration gate receipted. Record the choice in
+the release receipt (`rollback-schema: down-migrated | rolled-forward | restored <ref>`). A clean
+diff reverts without ceremony.
+
+Revert the commits that shipped: a fast-forward promote carried a range, so revert that range
+(`git revert --no-commit <prev-tag>..<release>`, or `git revert <bad-sha>` for a single culprit);
+a merge-commit promote or a hotfix merge is `git revert -m 1 <merge-sha>`. Re-run verification on
+the revert, tag it as a new patch release, and push - a new tag forward, never a moved or deleted
+one. Then back-merge the revert into integration so the two histories stay reconciled, the same
+both-branches discipline a hotfix uses; skip that and the next promote silently re-ships the bad
+commit. If the release sits behind a feature flag, killing the flag is the faster rollback -
+record the flag's path in the release receipt so the next operator finds it without spelunking.
 
 ## Hotfixes
 
@@ -196,8 +243,10 @@ A production hotfix branches off the release branch, not integration - and once 
 land on **both** branches, or the next promote silently reverts it. That both-sides discipline, the
 back-merge, and the proof that the fix reached each branch live in `hotfix.md`; read it when an
 incident needs a fix in production now. Create the branch itself through `/worktree-branching` (it
-already bases `hotfix/<slug>` on `main`), drive the fix with `/autonomous-loop`, and run `/review`
-before it merges - this skill owns only the promotion and back-merge shape, not the fixing.
+already bases `hotfix/<slug>` on `main`), diagnose the incident with `/diagnose` first - its
+production path stabilizes before root-causing and writes the fix-contract the loop's entry gates
+check - then drive the fix with `/autonomous-loop`, and run `/review` before it merges. This skill
+owns only the promotion and back-merge shape, not the diagnosing or the fixing.
 
 ## Where this sits
 
