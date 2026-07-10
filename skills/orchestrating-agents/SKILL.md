@@ -262,7 +262,11 @@ The full stage table, the confidence-envelope routing question, the pilot-small-
 no-re-descend and calibration rules for a tier that keeps missing a task class live in `tiers.md`.
 
 better-dev advises how to shape and place work; it doesn't route models - the host owns model choice, so
-wire no router.
+wire no router. But owning the choice is not the same as making it: on a host whose dispatch call takes
+a per-worker model or tier parameter, omitting it is itself a choice - the worker silently inherits the
+orchestrator's own model, pricing every closed-spec slice at the top tier. A band decision that never
+reaches the dispatch parameter was never made; `tiers.md`'s "Resolving a band at the dispatch call"
+says how a band becomes a concrete parameter without the library naming models.
 
 ## Track and resume
 

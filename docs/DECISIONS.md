@@ -323,7 +323,19 @@ main with staging force-synced (pre-pipeline setup; no skill governs it yet - re
 with a remote), planned-at-SHA drift check skipped (text already prescribes it), commits batched
 (step 6 already prescribes per-step commits).
 
-## D20 - flow-atlas audit dispositions (2026-07-10)
+## D20 - tier-map resolution at the dispatch call (2026-07-10; recurring flagship-inherit complaint)
+Source: repeated operator observation (podcast-thing and prior sessions) that fan-out workers run on
+the session's frontier model despite tiers.md placing them mid/cheap. Root cause: D18 rightly rejected
+a vendor-named routing table in the library, but "the host owns model choice" left the host's actual
+choice mechanism - the per-dispatch model parameter - unaddressed, and an omitted parameter inherits
+the orchestrator's model. Ruling: the library stays vendor-free; the binding lands as a repo-recorded
+knob (`tier-map: top/mid/cheap -> host model names`, via bd-mem, recorded at the first fan-out if
+missing, overrides winning) plus the rule that a band decision must reach the dispatch parameter -
+silence at that parameter is a top-tier choice, not neutrality. Resume paths that drop per-dispatch
+pins get relaunch-with-pin-restated, generalizing the host-specific observation. (Trap 99. D18's
+no-router ruling stands - a recorded map the dispatcher reads is config, not a router.)
+
+## D21 - flow-atlas audit dispositions (2026-07-10)
 A 78-agent flow audit of the whole library raised 34 canonical gaps; every one carries an explicit
 disposition here. 24 confirmed and fixed in this change-set, 6 refuted as already covered, 4
 re-affirmations of standing decisions, plus two audit blind-spots parked as named follow-ups.
