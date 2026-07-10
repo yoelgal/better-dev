@@ -1,6 +1,6 @@
 ---
 name: review
-description: Use when a diff or branch needs an independent verdict inside the better-dev loop - the loop's gate after an implementer reports done, a whole-branch pass before a PR into the integration branch, or "review since X" against a fixed point. It is the loop's spec+standards evaluator; for a quick working-diff scan the host /code-review is fine, and for a GitHub PR the host /review.
+description: Use when a diff or branch needs an independent verdict inside the better-dev loop - the loop's gate after an implementer reports done, a whole-branch pass before a PR into the integration branch, or "review since X" against a fixed point - or when a colleague's inbound human-authored PR needs this repo's recorded policy applied over the host's PR-review mechanics. It is the loop's spec+standards evaluator; for a quick working-diff scan the host /code-review is fine.
 argument-hint: "[effort] [base] [head]"
 allowed-tools:
   - Bash
@@ -254,4 +254,6 @@ loop reads what blocked the last review instead of re-deriving it. It is never r
 through the fix worker and is re-reviewed first.
 
 The author side of this - how findings are answered without performative agreement or blind implementation -
-lives in `reception.md`; reach for it when acting on a verdict.
+lives in `reception.md`; reach for it when acting on a verdict. The inbound side - a colleague's
+human-authored PR, arriving with no work-item ledger - lives in `inbound.md`: the host's PR-review
+mechanics plus this repo's recorded policy overlay.
