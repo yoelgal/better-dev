@@ -12,7 +12,20 @@ Branch names come from the overrides read in the main body (`release` defaults t
 
 1. **Branch off the release branch.** `/worktree-branching` already bases `hotfix/<slug>` on
    `main` - let it create the worktree rather than hand-rolling `git worktree add`.
-2. **Fix and prove it.** Drive the change with `/autonomous-loop` to a real green check, and run
+2. **Diagnose, then fix and prove it.** Route the incident through `/diagnose` first - its
+   production path stabilizes before root-causing and reads prod telemetry as the signal source -
+   and let it write the fix-contract `/autonomous-loop`'s entry gates check. Incident pressure earns
+   an expedited contract, never a skipped one; four lines pass the gates:
+
+   ```
+   symptom: checkout 500s on card payments since 14:02 UTC
+   red signal: curl -s https://<prod>/api/checkout -d @fixture.json → 500 (error tracker: TypeError at charge.ts:88)
+   fix scope: src/payments/charge.ts
+   merge: auto
+   ```
+
+   The red signal comes from prod telemetry, captured red and re-runnable - that is what the loop
+   drives green. Then drive the change with `/autonomous-loop` to a real green check, and run
    `/review` before it lands - a hotfix under incident pressure is exactly when a skipped review
    bites.
 3. **Merge to the release branch and tag.** Same fail-closed discipline as a normal promote: CI

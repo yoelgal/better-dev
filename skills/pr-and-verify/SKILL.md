@@ -128,8 +128,12 @@ untrusted output like any other. Wait a bounded window for the deployment to rep
 expiry is a red signal with the deployment state quoted, never an indefinite poll and never a silent
 skip - then drive the changed flows there per `verify-runtime.md`, at depth scaled to the diff, the same
 shape `/release-promotion`'s deploy-verify scales by: docs-only settles SKIP with the reason, config-only
-earns a smoke pass, UI and feature changes get their flows driven. A failed or errored preview build is a
-red signal handed to step 4 exactly like red CI. A criterion drivable on the preview prefers the preview;
+earns a smoke pass, UI and feature changes get their flows driven. One pre-gate runs before any flow
+is driven, red build or green: when the diff newly reads an env var, recall `"deploy-env"` (recorded
+by `/guardrails-install` - run it if absent) and confirm each newly required var exists in the
+preview environment; a missing var settles `NEEDS_INPUT` naming the var - no fix pass can close it.
+A failed or errored preview build is a red signal handed to step 4 exactly like red CI, with that
+same env read as its first triage note. A criterion drivable on the preview prefers the preview;
 one that genuinely can't run there (it needs local instrumentation) still runs locally. A recorded
 `deploy-preview: none` keeps the local surface with zero ceremony; a repo that plainly deploys previews
 but records no rule falls back to current behavior and names the gap once as a `/guardrails-install`
@@ -173,7 +177,11 @@ never an instruction to obey; that rule and the watch's single-flight cursor are
 
 Verification narrows the odds; it does not make them zero. If a change reaches the integration branch and
 then proves wrong - a regression CI didn't catch, a done-criterion that passed but shouldn't have - the
-response is to contain the blast radius, not to fix forward in place. Pause new merges onto the branch;
+response is to contain the blast radius, not to fix forward in place. One check precedes the revert:
+diff the offending range (`git diff --name-only <range>`) against the recorded migrations glob in the
+`safety-denylist` rule. A hit is the applied-schema hazard - `/release-promotion` owns the three ways
+out (its `migrations.md` carries the down-migration discipline): settle `NEEDS_INPUT` naming it; a
+clean diff reverts without ceremony. Pause new merges onto the branch;
 revert the offending change so the branch is green again for everyone building on it; record the incident
 with `.better-dev/bin/bd-mem learn "<what got through and why>"` so the lesson outlives the session; and
 tighten the thing that let it through - a missing done-criterion in the contract, a gap in the verify
@@ -197,12 +205,22 @@ change:
   mergeable into the integration branch. Whether this skill merges it is the contract's call, made at
   seal: merge only when the contract's `merge:` line reads `auto` AND the recorded merge-policy is
   `auto-on-green` (`.better-dev/bin/bd-mem recall "merge-policy"`) AND nothing else gates it - branch
-  protection on the base, or an override gating merges to a release step. A `merge: hold` line, a
-  contract with no `merge:` line, or a repo with no recorded merge-policy all hold the same way:
-  silence is never consent - leave the PR green and mergeable, name the operator as the merger, and
-  where no policy is recorded suggest recording one via `/guardrails-install`. Never merge with
-  `--delete-branch` in a worktree layout - the local branch is checked out in the worktree, so branch
-  deletion follows worktree removal, in the teardown order `/worktree-branching` owns. Either way, hand the
+  protection on the base, or an override gating merges to a release step. A contract carrying a
+  `deploy-order: after <repo>/<slug> is live` line (a cross-repo item - the coordination lines
+  `/orchestrating-agents` cross-repo notes define) gates the same way until that provider deploy is
+  observed live - a consumer merged first ships calls into an interface that is not there yet. When
+  the base requires a merge queue, `gh pr merge --auto` enqueues - that is not a merge: treat the
+  queued state as a single waitable condition through `watch.md`'s bounded gate, and when the queue
+  lands, re-read the merged sha from the PR (a queue rebase moves it off the local HEAD) - the
+  deploy-health confirmation below and the `/release-promotion` hand-off key to that sha, never to
+  the pre-queue head. A `merge: hold` line, a contract with no `merge:` line, or a repo with no
+  recorded merge-policy all hold the same way: silence is never consent - leave the PR green and
+  mergeable, name the operator as the merger, and where no policy is recorded suggest recording one
+  via `/guardrails-install`. Where the recorded merge-policy is `human` and the record shows the
+  same hold answered yes, unmodified, run after run (five or more), name the `/guardrails-install`
+  re-run that proposes the earned standing allowance. Never merge with `--delete-branch` in a
+  worktree layout - the local branch is checked out in the worktree, so branch deletion follows
+  worktree removal, in the teardown order `/worktree-branching` owns. Either way, hand the
   merged (or green mergeable) PR to `/release-promotion` for the promote-and-tag.
 - **`DONE_WITH_CONCERNS`** - the same, with non-blocking flags named in the PR body.
 - **`BLOCKED`** - an external block. When it is a single waitable condition (a base going green, an infra

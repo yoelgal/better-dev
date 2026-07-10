@@ -29,7 +29,19 @@ an internal function is not a surface, so trace its caller out to one of these r
 | Mobile app | the device or simulator screen | install the build, drive the flow by touch, screenshot and actually look |
 | Library | the public export | exercise the package boundary, never `import ./src/...` |
 | Migration / data | the store | run it, read the rows and the resulting schema back |
+| Operational prod job (a backfill, a one-off batch) | the recorded `ops-runner` surface | run or observe it there, read the completion receipt back - job status plus row counts before/after |
 | Prompt / agent config | the agent | run it and capture what it does |
+
+The operational-job row runs where the recorded `ops-runner` rule says prod jobs run (recorded by
+`/guardrails-install` - run it if absent); its observation is the completion receipt, and with no
+rule recorded the criterion settles NEEDS_INPUT naming the recorder. A recorded `ops-runner: none`
+settles NEEDS_INPUT too, naming who runs the job - the absent route is a recorded fact, not a
+question to re-detect - never an improvised production command.
+
+Standing a local surface up follows the same pattern: recall `"dev-run"` for the command that runs
+this tree's app, and `"seed-reset"` where the flow needs data - a recorded `seed-reset: none` is a
+named gap `/plan-grill` can plan a work-item for, never a silent skip. Both are recorded once by
+`/guardrails-install`; re-discovering them per worktree is the re-detection those keys exist to end.
 
 Through the real interface: if a user clicks a button, click the button, don't curl the API underneath it.
 Tests in the diff are the author's evidence, not a surface - on a mixed src+tests change, verify the src
