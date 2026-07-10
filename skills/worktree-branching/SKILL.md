@@ -94,9 +94,17 @@ collide in data, not files - Step 2's datastore note records that key.
 ## Step 2 - create the worktree
 
 **Prefer a native tool.** If the harness offers one - a tool named like `EnterWorktree` /
-`WorktreeCreate`, a `/worktree` command, or a `--worktree` flag - use it and skip the git commands.
-Running `git worktree add` alongside a native tool leaves phantom state the harness can't see. Only
-fall through to git when there is no native tool.
+`WorktreeCreate`, a `/worktree` command, or a `--worktree` flag - use it, skip the git commands,
+and let it place the worktree in its own default directory. Never feed it the `.worktrees/` path
+below: that is the *git fallback's* default, not an argument for the native tool, and a
+model-supplied path outside the harness default buys a needless permission prompt. One check
+first: the native tool must branch off the *base* from Step 1. If it branches off the repo's
+default branch instead and no recorded host knob changes that (e.g. Claude Code's
+`worktree.baseRef: head` with the session sitting on the base), create with the git fallback below
+and - where the host supports entering an existing worktree by path - enter it natively; the
+relocation prompt that follows is the expected cost of honoring the base, not a mistake. Running
+`git worktree add` alongside a native *creation* leaves phantom state the harness can't see. Only
+fall through to git when there is no native tool or it cannot honor the base.
 
 **Git fallback.** Place worktrees under `.worktrees/` at the repo root (gitignored, discoverable);
 a sibling `../<repo>-<slug>` layout is an override some repos prefer - see `edge-cases.md`. Guard the
@@ -124,7 +132,9 @@ equivalent, without which the session falls back to prompting on actions already
 runtime config the app needs (`.env*` files, the host's local settings). Copy that class from the
 primary checkout at creation - copy, never symlink: build tools reject symlinks and a symlink turns
 teardown into a two-step dance - so the first dev-server run doesn't die mid-task on missing env. It
-is personal, gitignored state, so the copies never enter a PR.
+is personal, gitignored state, so the copies never enter a PR. The copy happens at creation, not
+lazily on first failure: a fresh worktree whose first `bd-mem` or dev-server call dies on missing
+gitignored state (a missing bin bridge, an absent `.env`) is the tell this step was skipped.
 
 That copied runtime config points every lane at the same mutable datastore - one `DATABASE_URL`, one
 Redis, one object store - so when `git worktree list` shows another live lane, this lane's dev server
@@ -179,9 +189,11 @@ parallel worktrees never share a boundary. Where no enforcement hook is wired
 so a later hook install starts enforcing without a re-setup. If the boundary ever blocks legitimate
 work, `.better-dev/bin/bd-guard off` lifts it in one command.
 
-Now the interlock. When this skill **created** a new worktree, the work lives there - but the agent
-cannot move its own harness session into that directory. So it hands off and stops rather than
-pretending to continue:
+Now the interlock. When this skill **created** a new worktree, the work lives there. If the host
+can switch the session into it natively (the same worktree tool entering by path, or creation
+already moved the session), take that and continue as `handoff: no`. Otherwise the agent cannot
+move its own harness session into that directory, so it hands off and stops rather than pretending
+to continue:
 
 ```
 handoff: yes

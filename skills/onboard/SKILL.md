@@ -312,7 +312,11 @@ Recap what changed, then list any phase the operator skipped or deferred (tool n
 globally, no integration branch, a memory backend left on files, an unmapped test command) so they can
 come back with `/onboard <phase>`. Anything still waiting on the operator's own hands **leads** the
 recap - "ready", "armed", or "fully wired" is claimable only when that list is empty; a pending
-operator action is the headline, not a footnote under a victory banner.
+operator action is the headline, not a footnote under a victory banner. Each parked decision is also
+recorded where downstream skills trip over it, because a recap line scrolls away:
+`.better-dev/bin/bd-mem remember "pending-decision: <question> (parked at onboard)"`. The first skill
+that needs the answer - a contract about to set merge policy, a loop about to deploy - treats a
+recorded pending-decision as a must-ask, never a blank it may fill with the autonomous default.
 
 If Phase 1 found a remote, note once - advisory, not a blocker - whether the host can reach it before
 the first remote-dependent step (`/pr-and-verify`, `/release-promotion`, branch protection): a

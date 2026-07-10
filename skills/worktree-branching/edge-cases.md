@@ -26,6 +26,15 @@ and cleanup. Running `git worktree add` next to it creates a second, phantom wor
 can't track. Use the native tool and skip the git fallback entirely - this holds even under time
 pressure, where reaching for the familiar `git worktree add` is the tempting mistake.
 
+Placement belongs to the native tool too: its own default directory wins (Claude Code:
+`.claude/worktrees/`), and `.worktrees/` is the git fallback's default - passing it to the native
+tool trips the host's permission gate on a model-supplied location, friction for zero gain. The
+one legitimate hybrid is honoring the base: when native creation can only branch off the repo's
+default branch and the base is the integration branch, look for a host knob first (Claude Code:
+`worktree.baseRef: head` while the session sits on the base - worth recording at onboard); only
+without one create via git off the base and enter the result by path, naming the relocation
+prompt as expected when it fires.
+
 ## Placement override - sibling directory
 
 The default is `.worktrees/<slug>` inside the repo (gitignored, easy to discover). Some workflows

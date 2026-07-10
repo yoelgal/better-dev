@@ -203,7 +203,12 @@ crosses a trust boundary - auth, money, PII, an upload, an external fetch, or an
 the threat-surface pass beside it; both live in `done-contract.md`, and any load-bearing row they
 surface promotes to a done-criterion. Where the foundation already settled a category (the
 reconciliation stance, idempotency, units), inherit its policy rather than re-deciding. A scenario
-the contract leaves silent is a decision the loop will make for you at 2am. A visual property is a
+the contract leaves silent is a decision the loop will make for you at 2am. One class of contract
+line is never invented: process policy - merge autonomy, deploy behavior, anything that removes a
+human hold. It enters the contract only from a recorded override, an onboard-recorded knob, or an
+explicit user answer this session; a decision onboard parked as waiting-on-you is a standing
+must-ask, and absent an answer the conservative form (human hold) goes in. An autonomous policy
+whose only "approval" is the gate the user clicked through is not consent - it's smuggling. A visual property is a
 done-criterion too, phrased observably - renders at the target widths, uses the token set, passes the
 guideline audit - and proven by a screenshot plus an audit over what it shows (`/browser-capability`),
 never a self-report.
@@ -220,7 +225,14 @@ implementation decisions, out-of-scope) read `done-contract.md`.
 ## Close the gate, then hand off
 
 Present the contract and wait for the user's confirmation before treating the plan as locked -
-nothing downstream should run on an un-agreed contract. On confirmation, pin the approval to the
+nothing downstream should run on an un-agreed contract. Presenting means rendering the contract
+itself as message text in (or immediately before) the message that asks for confirmation - at
+minimum the Problem, Goal, the done-criteria with their runnable checks, and out-of-scope. A
+"lock and run?" prompt whose only view of the contract is its own summary line, or a pointer to
+`done-contract.md` on disk, asks the user to sign what they haven't read - render first, then ask.
+And when the user's reply to the gate is itself a request to see it ("what is in the contract?"),
+the only correct next message is the rendered contract - re-raising the same prompt unrendered turns
+a mis-fired gate into a collected blind approval. On confirmation, pin the approval to the
 contract's content hash (via `.better-dev/bin/bd-mem`) so a later edit re-opens this gate rather than
 letting the loop advance on a stale sign-off - `done-contract.md` covers the pinning. If a question
 can't be settled and blocks

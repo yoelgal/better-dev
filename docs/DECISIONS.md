@@ -307,7 +307,23 @@ Covered, not re-filed (recorded so the next harvest does not re-litigate):
 - `disable-model-invocation` scoping (Emil, via the design dossier's baton) - PLAN §2's invocation rule and writing-skills' frontmatter guidance already carry the same decision with the same costs named.
 - rich_odinn "12 prompts" article - consumed; the one durable fragment (synthesize disagreement, never flatten it) landed in the research-dispatch conventions.
 
-## D19 - flow-atlas audit dispositions (2026-07-10)
+## D19 - podcast-thing transcript-audit rulings (2026-07-10; first full pipeline run in the wild)
+Source: session d7ba7450 in ~/Developer/podcast-thing (onboard -> groundwork -> worktree ->
+plan-grill -> autonomous-loop, ends mid-loop), audited against the skills it composed. Two systemic
+themes: every human gate fired without rendering its artifact, and the loop ran soloist while its
+receipts narrated compliance in the loop's own vocabulary. Adopted (traps 89-98):
+- Native worktree tool owns placement; `.worktrees/` is the git fallback's default, never a native-tool argument; base honoring is the one legitimate hybrid.
+- "Present before approval" = full artifact rendered as message text; a question-prompt synopsis or a file on disk is not presentation; a user asking to see the artifact gets the artifact, never the same prompt again.
+- The loop's inline escape is a per-step conditions test (fully specified + live-verified), not a rationale a receipt can quote as a waiver; a whole work-item inline is a defect; can't-dispatch hosts run orchestrating-agents' degraded mode. (D18's "default, not ban" ruling stands - this pins the default's teeth.)
+- Process policy (merge autonomy, deploy) is never an inventable contract default; an onboard-parked decision is recorded as `pending-decision:` and is a standing must-ask; absent an answer the conservative form goes in.
+- A pasted brief seeds answers as quoted decodes, never as "stated knowingly"; unsupported answers stay must-asks; the carve gate is never batched with preference questions.
+- Negative controls are per test; protect-pins land in the authoring pass; receipts land per pass (settle backstop is for crashes); the scope boundary binds where a step may write even for contract-named seams (route via the owning skill); worktree local-state copy happens at creation.
+Not adopted as rules (compliance failures of existing text, kept as observations): setup commits on
+main with staging force-synced (pre-pipeline setup; no skill governs it yet - revisit if it recurs
+with a remote), planned-at-SHA drift check skipped (text already prescribes it), commits batched
+(step 6 already prescribes per-step commits).
+
+## D20 - flow-atlas audit dispositions (2026-07-10)
 A 78-agent flow audit of the whole library raised 34 canonical gaps; every one carries an explicit
 disposition here. 24 confirmed and fixed in this change-set, 6 refuted as already covered, 4
 re-affirmations of standing decisions, plus two audit blind-spots parked as named follow-ups.
