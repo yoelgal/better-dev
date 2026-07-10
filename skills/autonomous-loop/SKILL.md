@@ -84,7 +84,10 @@ authored: a later pass may make it pass, never weaken it. Pin it as it joins: re
 the new row added - `ledger put` replaces the file, so write the existing rows plus the new one
 (`(.better-dev/bin/bd-mem ledger read <work-item> protect.hashes 2>/dev/null; shasum <test-file>) |
 .better-dev/bin/bd-mem ledger put <work-item> protect.hashes -`); a justified re-pin replaces that
-path's existing row rather than adding a second one, so each pinned path holds one current hash. At settle,
+path's existing row rather than adding a second one, so each pinned path holds one current hash.
+Authoring and pinning are the same pass: a commit that adds or edits a test with no matching
+`protect.hashes` update in that pass is the tell the pin was skipped - and unpinned tests make the
+settle-time re-hash below vacuous. At settle,
 re-hash the pinned set: a pinned file whose hash moved is re-pinned only by a pass whose receipt records
 the red-then-green that justified the edit; a moved hash with no such receipt settles `NEEDS_INPUT`
 naming the file - the goalpost-move this set exists to stop, surfaced as a comparison instead of trusted
@@ -139,16 +142,25 @@ Then each pass:
    Where a slice has no real behavioral seam, don't add a ceremonial test that passes on arrival; the
    contract's red-capable signal is the proof, and a test that can't fail is scaffolding, not evidence.
    Every test authored this work-item has its red run in a receipt - the failing command, exit code, and
-   signature - before the pass that turns it green; one that reached green with no recorded red gets one
-   negative control before `DONE`: break the exact behavior it names, run it, watch it fail, restore. A
-   test that stays green under that break asserts nothing and counts as no test - the criterion it
+   signature - before the pass that turns it green; one that reached green with no recorded red gets its
+   own negative control before `DONE`: break the exact behavior *that test* names, run it, watch that
+   test fail, restore. The control is per test, not per suite - one break that fails two of five tests
+   proves those two, and the three still green under it have proven nothing yet. A
+   test that stays green under its break asserts nothing and counts as no test - the criterion it
    claimed is back to unproven.
    Dispatch a fresh worker for the task (`/orchestrating-agents`, which also sizes the stage's tier - a
    judgment call like triaging a red or the reviewer's verdict earns the top tier, a closed-spec slice
-   runs cheaper) - with one escape: a step whose edit this session has already fully specified and
-   live-verified (the exact file, the exact text, nothing left to decide) is applied inline rather than
-   paying a fresh worker to retype it, because dispatch buys fresh context or parallelism, and a
-   dispatch that adds neither is spend, not isolation. When dispatching, a worker that hits a missing fact asks rather than guessing, one whose tool results
+   runs cheaper) - with one escape whose test is its *conditions*, never its rationale: a step whose
+   edit this session has already fully specified and live-verified (the exact file, the exact text,
+   nothing left to decide) is applied inline rather than paying a fresh worker to retype it. An edit
+   being designed as it is typed fails that test by definition, and "a worker adds neither fresh
+   context nor parallelism here" is the escape's reasoning, not a waiver a receipt can grant itself -
+   a receipt note generalizing it into one is the tell of a loop soloing. The escape is per step: each
+   inline application names in its receipt the pre-specified edit it applied, and a whole work-item
+   implemented inline is a defect no receipt prose repairs. A host that genuinely cannot dispatch is
+   `/orchestrating-agents`' degraded mode - run its role-switch and report
+   `degraded: in-session (<reason>)`, never skip the composition.
+   When dispatching, a worker that hits a missing fact asks rather than guessing, one whose tool results
    contradict its brief surfaces the conflict as a question naming both sides rather than silently
    complying or silently deviating (step 2's gap stop is this same rule one grade up, for a contradicted
    contract criterion), and its reply ends in the
@@ -159,6 +171,11 @@ Then each pass:
    being the captured command, its exit code, and the output tail rather than a paraphrase of them, and
    give a settled step one line in `progress.md` stamped with an explicit status marker (`settled`,
    `blocked`, `needs-input`) rather than buried in prose, so a resume reads each step's state at a glance.
+   The receipt lands before the next pass picks - it is part of this pass, not paperwork to batch at the
+   end. A `receipts.md` still at pass 0 after several implementation passes is the tell that recording
+   is deferred; the settle-time backstop (write receipts from the actual trail) exists for a crashed
+   loop, not as an alternative cadence, and a compaction mid-run loses everything a deferred receipt
+   never wrote.
 6. **Commit** one step per commit (`<work-item>: <step>`), staging only the files that step touched plus
    its ledger update - never `git add -A`, which folds a concurrent actor's work into your commit and
    breaks the clean-rollback point. New commits only - no amend, rebase, reset, or push from inside the
@@ -177,6 +194,11 @@ path settles `NEEDS_INPUT` with the evidence, because the blast radius is a huma
 Where enforcement is wired (the recorded `safety-enforcement` says hook), the `bd-guard` hook checks the
 same policy mechanically, and a deny or ask it raises is handled the same way: settle `NEEDS_INPUT` with
 the hook's message as the evidence - never retry the write, never lift the boundary to push through.
+The boundary also decides *where* a step may write: a target outside this worktree - the primary
+checkout (its `.git/hooks` included), another worktree, global config - is not the loop's to edit
+directly even when the contract names the seam, because the contract consents to the change, not to
+crossing the boundary. Route such an edit through the skill that owns the surface
+(`/guardrails-install` for guardrail hooks) or settle `NEEDS_INPUT` naming the target.
 And watch for motion that mimics progress: a fix cascading into files it wasn't scoped to, or a refactor
 widening past what the contract asked - catch it mid-pass and re-pick the smallest change that satisfies
 the contract, rather than let it run out to the contract's scope tripwire that would stop it anyway. For
