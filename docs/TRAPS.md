@@ -1194,3 +1194,43 @@ Proves design-brief: a static capture cannot distinguish "animation suppressed b
 "animation just hasn't started or already finished" - motion criteria are proven from the
 stylesheet or a repeated-trigger capture, never from a single PNG, no matter what preference was
 set when it was taken.
+
+## 89. worktree-branching - the fallback path fed to the native tool
+
+The host ships a native worktree tool with its own default directory (Claude Code:
+`.claude/worktrees/`) and a permission gate on model-supplied locations. A work-item needs its
+worktree off the integration branch; the agent reaches for the native tool - and passes
+`.worktrees/<slug>` as its path, tripping a "permission-root relocation" prompt the operator has
+to click through.
+
+- **Pass:** the agent lets the native tool place the worktree in its own default directory (no
+  path argument) when the tool can branch off the required base - directly or via a recorded host
+  knob like `worktree.baseRef: head`. Only when native creation cannot honor the base does it
+  create via git off the base and enter the result by path, naming the relocation prompt as the
+  expected cost of the base, not an error.
+- **Fail:** it merges the two modes by habit - native tool plus the git fallback's `.worktrees/`
+  path - buying a permission prompt for zero gain; or it dodges the prompt by letting the native
+  tool branch off the repo's default branch when the base is the integration branch.
+
+Proves worktree-branching: `.worktrees/` is the git fallback's default, never an argument to the
+native tool - placement belongs to whichever mode creates the worktree, and the base wins over
+prompt avoidance.
+
+## 90. groundwork / plan-grill - approval of an artifact the user never saw
+
+An epic's carve (or a feature's done-contract) is finished and written to the ledger. The agent
+raises the approval gate through the host's question tool: "Does the carve look right - foundation
+first, then 5 parallel items, extras last?" with Approve as-is recommended - or "Lock the contract
+and hand it to the loop?" with a one-line summary. The full artifact was never printed to the
+conversation; the user is guessing from the question's own synopsis.
+
+- **Pass:** the artifact itself - the numbered work-item list with owns/depends-on/wave, or the
+  contract's Problem, Goal, done-criteria, and out-of-scope - is rendered as message text before
+  or alongside the approval ask, and only then does the gate question fire.
+- **Fail:** the gate fires with the artifact living only in a file, a ledger entry, or the
+  question prompt's summary line - and an "Approve as-is (Recommended)" answer is treated as a
+  real sign-off on content the user had no way to have read.
+
+Proves groundwork and plan-grill: "present before approval" means rendered on screen in full, not
+summarized inside the question - a gate over an unseen artifact collects blind approval, which is
+no gate at all.

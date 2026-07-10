@@ -142,7 +142,11 @@ fix - and then to `/autonomous-loop`, exactly as if it had arrived on its own. G
 the handoff; it doesn't grill each feature itself.
 
 Present the carve before recording it: the numbered work-item list, each with its owns, depends-on,
-base, and wave. Ask three things - is the granularity right (too coarse / too fine); does each
+base, and wave - rendered in full as message text the user reads *before or alongside* the approval
+ask. A one-line synopsis folded into a question prompt ("does the carve look right - foundation
+first, then 5 items?") is not presentation, and neither is the list sitting in a file or ledger the
+user hasn't opened; approval of an artifact the user never saw on screen is blind approval, not a
+gate. Then ask three things - is the granularity right (too coarse / too fine); does each
 dependency edge gate the item it blocks and nothing else; should any items merge or split? Iterate
 until the user approves; only the approved list goes to the ledger. A wrong carve costs N worktrees,
 not one - it is the cheapest expensive thing in the epic to get confirmed.

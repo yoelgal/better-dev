@@ -196,7 +196,11 @@ implementation decisions, out-of-scope) read `done-contract.md`.
 ## Close the gate, then hand off
 
 Present the contract and wait for the user's confirmation before treating the plan as locked -
-nothing downstream should run on an un-agreed contract. On confirmation, pin the approval to the
+nothing downstream should run on an un-agreed contract. Presenting means rendering the contract
+itself as message text in (or immediately before) the message that asks for confirmation - at
+minimum the Problem, Goal, the done-criteria with their runnable checks, and out-of-scope. A
+"lock and run?" prompt whose only view of the contract is its own summary line, or a pointer to
+`done-contract.md` on disk, asks the user to sign what they haven't read - render first, then ask. On confirmation, pin the approval to the
 contract's content hash (via `.better-dev/bin/bd-mem`) so a later edit re-opens this gate rather than
 letting the loop advance on a stale sign-off - `done-contract.md` covers the pinning. If a question
 can't be settled and blocks
