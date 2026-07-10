@@ -323,6 +323,18 @@ main with staging force-synced (pre-pipeline setup; no skill governs it yet - re
 with a remote), planned-at-SHA drift check skipped (text already prescribes it), commits batched
 (step 6 already prescribes per-step commits).
 
+## D20 - tier-map resolution at the dispatch call (2026-07-10; recurring flagship-inherit complaint)
+Source: repeated operator observation (podcast-thing and prior sessions) that fan-out workers run on
+the session's frontier model despite tiers.md placing them mid/cheap. Root cause: D18 rightly rejected
+a vendor-named routing table in the library, but "the host owns model choice" left the host's actual
+choice mechanism - the per-dispatch model parameter - unaddressed, and an omitted parameter inherits
+the orchestrator's model. Ruling: the library stays vendor-free; the binding lands as a repo-recorded
+knob (`tier-map: top/mid/cheap -> host model names`, via bd-mem, recorded at the first fan-out if
+missing, overrides winning) plus the rule that a band decision must reach the dispatch parameter -
+silence at that parameter is a top-tier choice, not neutrality. Resume paths that drop per-dispatch
+pins get relaunch-with-pin-restated, generalizing the host-specific observation. (Trap 99. D18's
+no-router ruling stands - a recorded map the dispatcher reads is config, not a router.)
+
 ## Tracer-bullet findings (2026-07-03, on the papers.town clone) - bind Phase 1
 Ran `onboard` + one feature slice → staging end-to-end on the real clone (locally, no push). Proven, plus:
 1. **Helpers → `.better-dev/bin/`** (bare `scripts/` collides with the project's own - see D0 install contract).

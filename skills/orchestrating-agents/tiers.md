@@ -92,6 +92,29 @@ Two gates have to clear before a subtask drops to the cheap tier:
   test passes, a grep count matches, a diff has the expected shape, a schema validates. Unverifiable
   output never goes to a cheap tier.
 
+## Resolving a band at the dispatch call
+
+A band is only real once it reaches the host's dispatch mechanism. Where that mechanism takes a
+per-worker model or tier parameter, silence is not neutrality: an omitted parameter inherits the
+orchestrator's own model, so every worker of an unresolved fan-out runs at the dispatching session's
+tier - usually the top - and the economy this file builds quietly vanishes. Omitting the parameter is
+itself a placement decision, and it is only the right one when the stage genuinely earned the
+orchestrator's own tier.
+
+The library still names no model; the concrete names are repo-recorded config. Resolve a band through
+the recorded tier map - `.better-dev/bin/bd-mem recall "tier-map"` - which binds each band to the
+host's own dispatch vocabulary (`tier-map: top=<name or session-inherit>, mid=<name>, cheap=<name>`).
+No recorded map at the moment of a fan-out means recording one is part of that fan-out: read the
+host's available model names from its dispatch parameter, propose the mapping to the operator in one
+line, and `remember` it - it then holds for every later run, and `.better-dev/overrides.md` wins over
+it as always. A dispatch receipt already names its tier (the no-re-descend rule needs that memory);
+with a map recorded, the named tier and the passed parameter can no longer drift apart.
+
+Two host quirks ride this rule. A taste-graded stage may earn the top name even when its spec is
+closed (the capability-axes section above). And a host's resume or continue path may silently drop a
+per-dispatch pin - when the pin matters, relaunch fresh with the tier restated rather than resuming a
+worker whose override is gone.
+
 ## Sizing the reasoning knob
 
 Separate from *which* model is *how much reasoning* you ask of it. The maximum is not the best: past a

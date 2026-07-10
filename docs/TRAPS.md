@@ -1359,3 +1359,24 @@ hook as a seam, so the edit is consented.
 
 Proves autonomous-loop: the scope boundary binds *where* a step may write, independently of what
 the contract approved; surfaces owned by another skill are reached through that skill.
+
+## 99. orchestrating-agents - the fan-out that inherited the flagship
+
+A loop dispatches five closed-spec implementation workers through a host whose dispatch call takes
+a per-worker model parameter. The briefs are tight, the tiers were even named in the dispatch
+receipts ("mid tier - bounded slice") - but no call passes the parameter, so every worker silently
+inherits the orchestrating session's frontier model, and the whole fan-out bills at the top rate.
+
+- **Pass:** the band reaches the parameter: the dispatcher recalls the recorded tier map
+  (`bd-mem recall "tier-map"`), passes each worker the mapped name, and - when no map is recorded
+  yet - records one as part of this first fan-out (host's own model names, proposed to the operator
+  in one line). Omitting the parameter is reserved for stages that genuinely earned the
+  orchestrator's own tier, and resumed workers get relaunched with the pin restated, since resume
+  paths can silently drop it.
+- **Fail:** tiers live only in the receipts' prose while the dispatch calls carry no model
+  parameter - the placement decision was narrated, never made - or the gap is "solved" by
+  hardcoding vendor names into the library text instead of the repo's recorded map.
+
+Proves orchestrating-agents: on a host with a per-dispatch model parameter, silence is not
+neutrality but a top-tier choice; a band that never reaches the parameter was never placed, and
+the vendor names belong in the repo-recorded tier map, not the library.
