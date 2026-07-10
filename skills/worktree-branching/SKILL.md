@@ -130,7 +130,9 @@ equivalent, without which the session falls back to prompting on actions already
 runtime config the app needs (`.env*` files, the host's local settings). Copy that class from the
 primary checkout at creation - copy, never symlink: build tools reject symlinks and a symlink turns
 teardown into a two-step dance - so the first dev-server run doesn't die mid-task on missing env. It
-is personal, gitignored state, so the copies never enter a PR.
+is personal, gitignored state, so the copies never enter a PR. The copy happens at creation, not
+lazily on first failure: a fresh worktree whose first `bd-mem` or dev-server call dies on missing
+gitignored state (a missing bin bridge, an absent `.env`) is the tell this step was skipped.
 
 A fresh worktree has no installed deps, so run the project's setup and one baseline check here -
 that way the loop's first verify measures your work, not a missing `node_modules` misread as a
