@@ -268,6 +268,13 @@ orchestrator's own model, pricing every closed-spec slice at the top tier. A ban
 reaches the dispatch parameter was never made; `tiers.md`'s "Resolving a band at the dispatch call"
 says how a band becomes a concrete parameter without the library naming models.
 
+Make the choice audible at the call: immediately before each dispatch, state the band, the parameter it
+resolved to, and the one-line basis ("mid - closed-spec classification against an attached rubric"), and
+let that same line be the dispatch receipt's note rather than a second artifact. The announcement forces
+the placement into the open where an omitted parameter would hide, and the receipt keeps it honest
+afterwards: announced band, passed parameter, and recorded note agree, and drift between any two is a
+reviewable defect.
+
 ## Track and resume
 
 Conversation memory doesn't survive compaction, and a controller that loses its place re-dispatches
