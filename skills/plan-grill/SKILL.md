@@ -70,6 +70,14 @@ full premise-extraction, cost-ordered observation pass, verdict taxonomy, and re
 `ground-truth.md`. The deliverable of this pass is a verdict with receipts, not a change: no fix, no
 build, no code until the grill closes. This is observation, not debugging - no root-cause spiral.
 
+The repo's contribution guide is a baseline input too. Locate it before planning on top of it: a
+project override may pin its path; else look for `CONTRIBUTING.md` or a coding-standards file at
+the root, under `docs/`, or under `.github/`. If present, read it - documented test requirements
+feed the done-criteria, PR-size and process rules ("open an issue first", review expectations) feed
+the scope line, and branch/commit conventions become premises like any other. Either way the
+contract carries one census line - "contribution guide: `CONTRIBUTING.md`" or "no contribution
+guide found" - so a missed guide is a visible miss, not a silent one.
+
 ## 2. Ideate - propose, then pick one to grill
 
 Before sketching options, put the premise itself on trial in two lines: the outcome this feature

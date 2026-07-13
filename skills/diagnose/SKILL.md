@@ -15,6 +15,13 @@ touches a fix.**
 Read `.better-dev/overrides.md` first - a project override (a repro command, a test seam convention,
 a "we never instrument prod" rule) wins over anything here.
 
+Locate the repo's contribution guide in the same setup read: an override may pin its path; else look
+for `CONTRIBUTING.md` or a coding-standards file at the root, under `docs/`, or under `.github/`. If
+present, read it - documented test requirements feed the fix-contract's done-criteria, PR-size and
+process rules feed the fix scope, and branch/commit conventions ride the contract as premises. The
+fix-contract carries one census line - "contribution guide: `CONTRIBUTING.md`" or "no contribution
+guide found" - so a missed guide is a visible miss, not a silent one.
+
 Before you re-derive anything about this area, spend one recall on it
 (`.better-dev/bin/bd-mem recall "<area>"`) and cite what it returned, or an explicit "recall empty" -
 a lesson you already paid for is cheaper than the mistake it prevents. A recalled lesson is a prior
