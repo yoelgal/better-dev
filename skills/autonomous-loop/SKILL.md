@@ -157,7 +157,7 @@ Then each pass:
    first dispatch - invoke it where the host has a skill mechanism, read its SKILL.md where it
    doesn't - and dispatch by its mechanics: bands resolved through the recorded tier-map into the
    host's per-worker model parameter, its brief shape, its report trailer, its dispatch receipts.
-   The mentions of it in this file are routing, not a working summary; a loop that dispatches from
+   The other mentions of it in this file are routing, not a working summary; a loop that dispatches from
    them alone improvises those mechanics, and every worker silently inherits the session's own model,
    pricing closed-spec slices at the top tier. The tell is mechanical: each dispatch receipt names its
    tier band, and a receipt without one means the band decision never reached the dispatch call - a
