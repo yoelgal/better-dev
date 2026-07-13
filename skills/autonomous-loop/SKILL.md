@@ -153,9 +153,16 @@ Then each pass:
    proves those two, and the three still green under it have proven nothing yet. A
    test that stays green under its break asserts nothing and counts as no test - the criterion it
    claimed is back to unproven.
-   Dispatch a fresh worker for the task (`/orchestrating-agents`, which also sizes the stage's tier - a
-   judgment call like triaging a red or the reviewer's verdict earns the top tier, a closed-spec slice
-   runs cheaper) - with one escape whose test is its *conditions*, never its rationale: a step whose
+   Dispatch a fresh worker for the task. Enter `/orchestrating-agents` itself before this work-item's
+   first dispatch - invoke it where the host has a skill mechanism, read its SKILL.md where it
+   doesn't - and dispatch by its mechanics: bands resolved through the recorded tier-map into the
+   host's per-worker model parameter, its brief shape, its report trailer, its dispatch receipts.
+   The mentions of it in this file are routing, not a working summary; a loop that dispatches from
+   them alone improvises those mechanics, and every worker silently inherits the session's own model,
+   pricing closed-spec slices at the top tier. The tell is mechanical: each dispatch receipt names its
+   tier band, and a receipt without one means the band decision never reached the dispatch call - a
+   defect in the pass, not a formality. One escape, whose test is its *conditions*, never its
+   rationale: a step whose
    edit this session has already fully specified and live-verified (the exact file, the exact text,
    nothing left to decide) is applied inline rather than paying a fresh worker to retype it. An edit
    being designed as it is typed fails that test by definition, and "a worker adds neither fresh
