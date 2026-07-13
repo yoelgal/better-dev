@@ -131,7 +131,10 @@ owns the full failure-behavior pass.
 ## Composability
 
 Additive. It rides the host's security review when present and never edits files. It reuses `/review`'s
-dispatch and severity ladder rather than restating them, and reads `.better-dev/overrides.md` first so a
+dispatch, and grades survivors on the same three-tier ladder - Critical / Important / Minor - whose
+definitions and gate actions `/review`'s reviewer brief owns: run as review's Security channel, the
+channel brief carries the full ladder; run standalone, the three names are the grading vocabulary and
+the gate stays review's to apply. It reads `.better-dev/overrides.md` first so a
 project's recorded exceptions win. Run as `/review`'s Security channel at deep effort, the channel
 over-surfaces: a candidate that fails the sentence-gate is handed to review's verify pass as a candidate
 rather than dropped, and the verifier settles it. Invoked directly, the gate stays absolute and the drop

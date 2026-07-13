@@ -100,8 +100,13 @@ lightest effort judges the diff, not the report, and a Critical stays a Critical
 
 ### The channels
 
-Each channel runs as its own fresh worker via `/orchestrating-agents` (host subagent, else the in-session
-role-switch with a context reset). Running them apart is the point: neither pollutes the other's context,
+Each channel runs as its own fresh worker. Enter `/orchestrating-agents` before dispatching the first
+channel - invoke it where the host has a skill mechanism, read its SKILL.md where it doesn't - and
+dispatch by its mechanics: the host subagent verb (else its in-session role-switch with a context
+reset), bands resolved through the recorded tier-map into the host's per-worker model parameter, and
+its report trailer. A dispatch made from this file's mentions alone improvises those mechanics, every
+channel silently inheriting the session's own model.
+Running them apart is the point: neither pollutes the other's context,
 and none of them is you. Each axis worker gets the same brief - `reviewer-brief.md`, which carries the
 claim-blind rule (artifact and contract, never the report), the read-only-the-diff discipline, the
 severity ladder, and the output shape -
