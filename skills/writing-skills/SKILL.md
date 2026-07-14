@@ -54,6 +54,17 @@ Never put `version`, `license`, or prose in frontmatter.
   turn, so cut a row before you add one.
 - Depend on another skill by **naming it in prose** ("run `/grill` first"), never by reaching into its
   files. Shared knowledge lives inside the skill that owns it and is reached by invoking that skill.
+  A cross-skill reference is one of three kinds, and the sentence must show which: **routing** sends
+  the reader to a different skill instead of this one ("for a bug, `/diagnose`"); **attribution** names
+  where a rule lives without needing it here ("`/security-pass` owns the full rule"); **load-bearing**
+  is a step of this skill whose operative mechanics live in the referenced skill. The first two work
+  as a bare name. A load-bearing reference works only in one of two forms: an **imperative enter-step**
+  at the moment the mechanics are needed ("enter `/x` before the first dispatch"), or the operative
+  rule inlined where it executes with the name kept as attribution. The middle form - a citation plus
+  a partial paraphrase - fails silently: the executor already believes it can do the step, the
+  paraphrase satisfies the need the reference was meant to create, and the referenced text never
+  loads (observed: a loop whose every worker inherited the session's model because the tier rule
+  lived one un-taken hop away).
 - Voice: firm and precise, never maximalist. State a gate as a plain declarative that names its
   consequence and the move to make instead ("a committed test's assertion stays load-bearing - edit
   the code under test, not the test's expectation; editing a test to reach green hides the very
