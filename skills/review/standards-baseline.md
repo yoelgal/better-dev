@@ -43,7 +43,7 @@ Match each against the diff. The reading is *the signal* → *the move*.
   auto-generated scaffolding. → Delete it. Keep only the comment carrying what the code can't - a
   non-obvious *why*, a gotcha, an invariant - and hold each survivor to one line. (Not a Fowler smell;
   ours.)
-- **Reinvented Platform** - a hand-maintained map, table, or helper in the diff that re-implements what
+- **Reinvented platform** - a hand-maintained map, table, or helper in the diff that re-implements what
   the language runtime or platform already ships: a language-name map where `Intl.DisplayNames` exists,
   hand-rolled URL or path string-splitting, a homemade UUID or date formatter. → Call the platform API
   and delete the copy; a hand-kept subset silently caps behaviour at the entries someone remembered to
