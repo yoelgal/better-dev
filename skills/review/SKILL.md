@@ -122,10 +122,10 @@ class, else `approvals.log`), and the channel's own focus:
   `CONTRIBUTING.md` / coding-standards file, and always the Fowler smell baseline in `standards-baseline.md` -
   a zero-setup rubric that holds even when the repo documents nothing. A documented repo standard wins
   over the baseline; every baseline smell is a judgement call. Find that file before dispatch: a project
-  override may pin its path; else look for `CONTRIBUTING.md`, a coding-standards or style file at the root
-  or under `docs/`. The channel's report opens with a one-line census of what it judged against -
-  "standards sources: `CONTRIBUTING.md` + baseline", or "no repo standards found; baseline only" - so a
-  missed standards file is a visible miss, not a silent one.
+  override may pin its path; else look for `CONTRIBUTING.md`, a coding-standards or style file at the root,
+  under `docs/`, or under `.github/`. The channel's report opens with a one-line census of what it
+  judged against - "standards sources: `CONTRIBUTING.md` + baseline", or "no repo standards found;
+  baseline only" - so a missed standards file is a visible miss, not a silent one.
 - **Security** - don't reimplement this here. If the host ships `/security-review` (or `/code-review`),
   compose it as a channel; if it ships neither, run better-dev's own `/security-pass`, the zero-setup
   security channel that holds when the host offers nothing. Either way, run it on the same diff, treat its

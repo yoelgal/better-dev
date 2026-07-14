@@ -19,6 +19,14 @@ branching base, and before any single feature is grilled.
 Read `.better-dev/overrides.md` first (`.better-dev/bin/bd-mem read overrides`). A project's own stack,
 architecture conventions, or a house way of slicing work wins over any default below.
 
+Locate the repo's contribution guide in the same establishing read: an override may pin its path; else
+look for `CONTRIBUTING.md` or a coding-standards file at the root, under `docs/`, or under `.github/`.
+When one exists it shapes the whole epic - documented test requirements feed every carved item's
+done-criteria, PR-size and process rules shape how the carve slices, and branch/commit conventions are
+foundation facts the work-item briefs inherit. The groundwork record carries one census line -
+"contribution guide: `CONTRIBUTING.md`" or "no contribution guide found" - and shaping proceeds either
+way.
+
 ## 1. Shape the idea
 
 The cheapest questions come before any design, and they are about the problem, not the solution.
