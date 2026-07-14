@@ -2,8 +2,9 @@
 
 The Standards channel carries the repo's own conventions first. On top of them - and even when the repo
 documents nothing - it also carries this fixed baseline, so the axis always has something to judge against.
-The set is the classic Fowler refactoring smells (Martin Fowler, _Refactoring_, ch. 3), plus comment slop -
-a modern addition of our own for the AI-slop era; the readings below are our own.
+The set is the classic Fowler refactoring smells (Martin Fowler, _Refactoring_, ch. 3), plus two
+additions of our own for the AI-slop era - comment slop and reinvented platform; the readings below are
+our own.
 
 Two rules bind the whole baseline:
 
@@ -42,3 +43,8 @@ Match each against the diff. The reading is *the signal* → *the move*.
   auto-generated scaffolding. → Delete it. Keep only the comment carrying what the code can't - a
   non-obvious *why*, a gotcha, an invariant - and hold each survivor to one line. (Not a Fowler smell;
   ours.)
+- **Reinvented Platform** - a hand-maintained map, table, or helper in the diff that re-implements what
+  the language runtime or platform already ships: a language-name map where `Intl.DisplayNames` exists,
+  hand-rolled URL or path string-splitting, a homemade UUID or date formatter. → Call the platform API
+  and delete the copy; a hand-kept subset silently caps behaviour at the entries someone remembered to
+  add, and it only ever shrinks relative to the real thing. (Not a Fowler smell; ours.)
