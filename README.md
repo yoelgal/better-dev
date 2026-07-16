@@ -98,7 +98,7 @@ shared skills are never rewritten to encode your preference.
 | **Scope a work-item** | `plan-grill` (feature) · `diagnose` (fix) · `codebase-audit` (no item yet) · `design-brief` (UI direction) |
 | **Isolate & drive** | `worktree-branching` · `autonomous-loop` · `orchestrating-agents` · `review` · `security-pass` |
 | **Ship** | `pr-and-verify` · `release-promotion` |
-| **Self-improve** | `tool-sourcing` · `self-extension` |
+| **Self-improve** | `tool-sourcing` · `self-extension` · `source-harvest` (raw material -> library improvements) |
 | **Sourced capabilities** | `codebase-map` (structural orientation) · `browser-capability` (UI proof, owned daemon in `browse/`) · `ios-capability` (on-device proof, daemon in `ios-qa/`) |
 | **Foundations** | `writing-skills` · `packaging` · `bootstrap-hooks` · `overrides` · `uninstall` |
 
