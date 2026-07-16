@@ -90,17 +90,22 @@ the repo already uses.
 ## Anything else - a native hook
 
 No framework, no Node/Python tooling: a plain `.git/hooks/pre-commit` running the detected commands. Only
-write it if none exists (never clobber a native hook the operator wrote):
+write it if none exists (never clobber a native hook the operator wrote) - the write and the executable
+bit both live outside git's own tracked tree, so emit them as a paste-ready block for the operator to
+run, the same as the Husky and `pre-commit` installers above:
 
 ```sh
+cat > .git/hooks/pre-commit <<'EOF'
 #!/usr/bin/env sh
 set -eu
 <detected lint command>
 <detected typecheck command>
+EOF
+chmod +x .git/hooks/pre-commit
 ```
 
-`chmod +x .git/hooks/pre-commit`. A native hook is not committed with the repo, so pair it with a CI check
-so the gate survives a fresh clone.
+A native hook is not committed with the repo, so pair it with a CI check so the gate survives a fresh
+clone.
 
 ## Secret-content scan (stack-agnostic)
 
@@ -157,9 +162,11 @@ and a known-vulnerable dependency fails the gate rather than shipping green.
 ## Enforcement wiring for a clone install (Claude Code)
 
 A plugin install already carries the two `PreToolUse` entries in its `hooks.json` - write nothing. A
-clone install wires the same script into the repo's settings, on the operator's explicit yes. The
-destructive-pattern set, the safe rm-target allowlist, and the obfuscated-shell deny all live inside
-`bd-guard` - the settings carry only the wiring, never a pattern copy:
+clone install needs the same script wired into the repo's `.claude/settings.json` - the agent never
+edits that file itself; it emits the block below as a paste-ready operator-run step and the operator
+applies it on their own explicit yes. The destructive-pattern set, the safe rm-target allowlist, and
+the obfuscated-shell deny all live inside `bd-guard` - the settings carry only the wiring, never a
+pattern copy:
 
 ```json
 {
@@ -184,8 +191,8 @@ destructive-pattern set, the safe rm-target allowlist, and the obfuscated-shell 
 
 Three rules make the write safe: **merge, never replace** - an existing `hooks.PreToolUse` array
 survives byte-for-byte, these entries append to it; **per-repo consent** - `.claude/settings.json` is
-machine config, so the write happens once per repo on an explicit yes, and a re-run that finds the
-entries already present writes nothing; **verify the envelope** - `bd-guard` emits Claude Code's nested
+machine config, so the operator applies the snippet once per repo on an explicit yes, and a re-run
+that finds the entries already present emits nothing; **verify the envelope** - `bd-guard` emits Claude Code's nested
 `hookSpecificOutput.permissionDecision` shape, and a wrong envelope fails silently (the same trap
 `bootstrap-hooks/porting.md` records for `SubagentStart`), so after wiring, run one destructive
 fixture through `check-bash` and confirm the host actually asks. By then the guard is live on your own

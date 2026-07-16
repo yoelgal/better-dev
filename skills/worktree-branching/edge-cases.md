@@ -28,12 +28,11 @@ pressure, where reaching for the familiar `git worktree add` is the tempting mis
 
 Placement belongs to the native tool too: its own default directory wins (Claude Code:
 `.claude/worktrees/`), and `.worktrees/` is the git fallback's default - passing it to the native
-tool trips the host's permission gate on a model-supplied location, friction for zero gain. The
-one legitimate hybrid is honoring the base: when native creation can only branch off the repo's
-default branch and the base is the integration branch, look for a host knob first (Claude Code:
-`worktree.baseRef: head` while the session sits on the base - worth recording at onboard); only
-without one create via git off the base and enter the result by path, naming the relocation
-prompt as expected when it fires.
+tool trips the host's permission gate on a model-supplied location, friction for zero gain. Native
+creation typically can only branch off the repo's default branch, not the integration base - honor
+the base afterward, in the fresh clean tree the native tool just created:
+`git fetch origin "$base"` then `git checkout -B "$branch" "origin/$base"` (falling back to local
+`"$base"`). Zero settings: no host knob, no relocation prompt.
 
 ## Placement override - sibling directory
 
