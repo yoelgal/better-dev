@@ -34,13 +34,26 @@ looks like, not just "test the page."
    Cypress with a `test:e2e` script) pins the tool. Use that and skip to step 3; never wire a second browser
    beside one the project already runs.
 2. **The owned daemon** - `browse/` in the better-dev install (better-dev's vendored cut of gstack's MIT
-   browser; provenance in `browse/UPSTREAM`). If its binary or a running daemon exists, use it. If not and
-   the machine can take it (bun installable, network available, user not declining), compile it on first
-   need: `bun install && bun run build` inside `browse/` yields `browse/dist/browse` (~55MB, self-contained);
-   `bun run src/cli.ts` works uncompiled while iterating. A Chromium must exist too - a detected Chrome, or
-   `bunx playwright install chromium` (~170MB) once. First call starts the per-workspace daemon (~3s); every
-   call after runs in ~100-200ms with cookies, tabs, and logins persisting across the whole check. Record
-   the adoption in memory like any sourced tool.
+   browser; provenance in `browse/UPSTREAM`). If its binary or a running daemon exists, use it. A networked
+   installer is never run by the agent mid-work-item, so if not and the machine can take it (bun
+   installable, network available, user not declining), offer the compile step as a paste-ready block
+   (offered to the clipboard where the host has one) for the operator to run on first need:
+
+   ```
+   cd browse && bun install && bun run build
+   ```
+
+   which yields `browse/dist/browse` (~55MB, self-contained); `bun run src/cli.ts` works uncompiled while
+   iterating. A Chromium must exist too - a detected Chrome, or this paste-ready block for the operator to
+   run once (~170MB):
+
+   ```
+   bunx playwright install chromium
+   ```
+
+   The agent proceeds once it detects the binary or Chromium in place. First call starts the per-workspace
+   daemon (~3s); every call after runs in ~100-200ms with cookies, tabs, and logins persisting across the
+   whole check. Record the adoption in memory like any sourced tool.
 
    One hard rule rides with it: **cookie import needs explicit first-use approval.** Before the first
    `cookie-import-browser` in a project, ask the user - it decrypts their real browser's cookies via the
