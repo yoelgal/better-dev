@@ -139,7 +139,7 @@ at the existing worktree rather than forcing a duplicate. If `git worktree add` 
 permission error, say so and work in place - `edge-cases.md` covers that fallback.
 
 A fresh worktree also has none of the primary checkout's gitignored local state - the runtime
-config the app needs (`.env*` files, the host's local settings). Copy that class from the primary
+config the app needs (`.env*` files and the like). Copy that class from the primary
 checkout at creation - copy, never symlink: build tools reject symlinks and a symlink turns
 teardown into a two-step dance - so the first dev-server run doesn't die mid-task on missing env. It
 is personal, gitignored state, so the copies never enter a PR. The copy happens at creation, not
