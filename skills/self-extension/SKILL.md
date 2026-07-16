@@ -121,13 +121,18 @@ owns the two steps that have to be machine-enforced rather than trusted to prose
    that could go wrong - and ask. In an autonomous run there's no human at the keyboard, so this stop is a
    `NEEDS_INPUT` state (the vocabulary is `/autonomous-loop`'s), not a failure; promotion resumes when
    approval comes.
-5. **Land or discard.** On a yes, `.better-dev/bin/bd-skill-stage commit <dir> local` atomically moves a local skill into
-   this repo's project skills dir (`.claude/skills/<name>`, discovered only here), and
-   `.better-dev/bin/bd-skill-stage commit <dir> global` moves a global one into your host's own global skills dir
-   (`~/.claude/skills/<name>`, seen across your repos) - either way refusing to clobber an existing skill,
-   follow a symlink, or land outside the target root. The folder is taken from the frontmatter `name`, so
-   name and folder always match. On a no, or after the retries are spent,
-   `.better-dev/bin/bd-skill-stage discard <dir>` clears the staging dir.
+5. **Land or discard.** An installed skill lands in a `.claude/`-scoped or `$HOME`-scoped dir and then runs
+   with full agent permissions, so that write stays operator-run, with consent adjacent to it, rather than
+   agent-run. On a yes, emit the landing command paste-ready (offer it to the clipboard where the host has
+   one) and let the operator run it: `.better-dev/bin/bd-skill-stage commit <dir> local` atomically moves a
+   local skill into this repo's project skills dir (`.claude/skills/<name>`, discovered only here), and
+   `.better-dev/bin/bd-skill-stage commit <dir> global` moves a global one into the operator's own global
+   skills dir (`~/.claude/skills/<name>`, seen across their repos) - either way refusing to clobber an
+   existing skill, follow a symlink, or land outside the target root. The folder is taken from the
+   frontmatter `name`, so name and folder always match. Once the operator reports it ran, verify the
+   landing yourself: confirm the skill dir now exists at the target root. On a no, or after the retries are
+   spent, `.better-dev/bin/bd-skill-stage discard <dir>` clears the staging dir - that write only touches
+   this repo's own staging dir, so it stays agent-run.
 
 ## 5. Verify and record
 
