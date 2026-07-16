@@ -69,6 +69,61 @@ update_nudge() {
   printf ' better-dev: update available (%s commit(s)) - git -C %s pull, then re-run its install.sh if the update added, removed, or renamed skills (it reconciles the links)' "$behind" "$clone"
 }
 
+# --- link nudge: does the installed clone hold a skill this host never linked? -
+# Covers the gap update_nudge leaves: after a pull, a brand-new skills/<name>/ in
+# the clone has no host link yet, the behind-count is zero, and nothing else
+# would notice. Claude-host-scoped for now ($HOME/.claude/skills); other
+# link-install hosts (codex, hermes) get the same treatment when it bites - the
+# hosts/ adapters own their own dir names.
+link_nudge() {
+  local clone="${CLAUDE_PLUGIN_ROOT:-}" hostdir="$HOME/.claude/skills" entry name target found missing n skill
+  # Locate the clone: the plugin root if it looks like one, else the target of an
+  # existing better-dev link (its prefix before /skills/<name>).
+  if [ -z "$clone" ] || [ ! -d "$clone/skills" ]; then
+    clone=""
+    if [ -d "$hostdir" ]; then
+      for entry in "$hostdir"/*; do
+        [ -L "$entry" ] || continue
+        name="$(basename "$entry")"
+        target="$(readlink "$entry" 2>/dev/null)" || continue
+        case "$target" in
+          */skills/"$name" | */skills/"$name"/) clone="${target%/skills/"$name"*}" ;;
+        esac
+        [ -n "$clone" ] && break
+      done
+    fi
+  fi
+  [ -n "$clone" ] && [ -d "$clone/skills" ] || return 0
+
+  # Guard: a plugin-only install with no host links skips silently - those skills
+  # ride the plugin update, not install.sh.
+  [ -d "$hostdir" ] || return 0
+  found=0
+  for entry in "$hostdir"/*; do
+    [ -e "$entry" ] || [ -L "$entry" ] || continue
+    name="$(basename "$entry")"
+    if [ -L "$entry" ]; then
+      target="$(readlink "$entry" 2>/dev/null)"
+      case "$target" in "$clone"/skills/*) found=1 ;; esac
+    elif [ -f "$entry/.better-dev-skill" ]; then
+      found=1
+    fi
+    [ "$found" = 1 ] && break
+  done
+  [ "$found" = 1 ] || return 0
+
+  # Detect: existence under any form (link, dir, file) is enough here - the
+  # classify-grade ours-vs-foreign call is install.sh --verify's job.
+  missing=""; n=0
+  for skill in "$clone"/skills/*/; do
+    [ -f "${skill}SKILL.md" ] || continue
+    name="$(basename "$skill")"
+    [ -e "$hostdir/$name" ] || [ -L "$hostdir/$name" ] || { missing="$missing${missing:+, }$name"; n=$((n + 1)); }
+  done
+  [ "$n" -gt 0 ] || return 0
+  printf ' better-dev: %s skill(s) in the installed clone have no link for this host (%s) - run %s/install.sh to reconcile.' "$n" "$missing" "$clone"
+}
+
 emit() {
   local root="$1" note lessons n inflight bdm rows cnt oldest fpnote fpcur fprec context escaped
   # Point at the overrides layer only when the project actually has one, so the
@@ -128,6 +183,7 @@ emit() {
   # skill trigger - an orchestrator using the host's raw fan-out never loads tiers.md on its own.
   context="better-dev practices are installed in this repo. The project's conventions and the list of available skills (onboard, plan-grill, diagnose, autonomous-loop, review, orchestrating-agents, worktree-branching, and more) live in a managed better-dev block in this project's CLAUDE.md or AGENTS.md; each skill self-describes through its description. Dispatching workers or fanning out agents? run each stage at the least-capable tier that fits it and escalate at judgment points - the reference is orchestrating-agents' tiers.md and the recorded tier-map (.better-dev/bin/bd-mem recall \"tier-map\").${note}${lessons}${inflight}${fpnote}"
   context="${context}$(update_nudge "$root/.better-dev/overrides.md")"
+  context="${context}$(link_nudge)"
   escaped=$(escape_for_json "$context")
 
   # Emit only the field the current host reads. Cursor wants snake_case
@@ -250,6 +306,31 @@ if [ "${1:-}" = "selftest" ]; then
   printf 'better-dev auto-update: ff-only\n' >> "$tmp/proj/.better-dev/overrides.md"
   out="$(cd "$tmp/proj" && CLAUDE_PLUGIN_ROOT="$clone" "$SELF")"
   printf '%s' "$out" | grep -q "auto-updated" || fail "ff-only override did not auto-update"
+
+  # Link nudge: a clone with skills a, b - a linked, b absent -> nudge names b.
+  lclone="$tmp/lclone"
+  mkdir -p "$lclone/skills/a" "$lclone/skills/b"
+  : > "$lclone/skills/a/SKILL.md"; : > "$lclone/skills/b/SKILL.md"
+  home1="$tmp/home1"; mkdir -p "$home1/.claude/skills"
+  ln -s "$lclone/skills/a" "$home1/.claude/skills/a"
+  out="$(cd "$tmp/proj" && HOME="$home1" CLAUDE_PLUGIN_ROOT="$lclone" "$SELF")"
+  printf '%s' "$out" | jq -e . >/dev/null || fail "link-nudge output not valid JSON"
+  printf '%s' "$out" | grep -q "no link for this host (b)" || fail "missing link nudge for unlinked skill b"
+
+  # All linked -> no nudge.
+  ln -s "$lclone/skills/b" "$home1/.claude/skills/b"
+  out="$(cd "$tmp/proj" && HOME="$home1" CLAUDE_PLUGIN_ROOT="$lclone" "$SELF")"
+  printf '%s' "$out" | grep -q "no link for this host" && fail "link nudge fired with everything linked"
+
+  # Host skills dir with no better-dev entries at all (plugin-only) -> silent.
+  home2="$tmp/home2"; mkdir -p "$home2/.claude/skills/unrelated"
+  out="$(cd "$tmp/proj" && HOME="$home2" CLAUDE_PLUGIN_ROOT="$lclone" "$SELF")"
+  printf '%s' "$out" | grep -q "no link for this host" && fail "link nudge fired on a plugin-only install"
+
+  # No $HOME/.claude/skills at all -> silent.
+  home3="$tmp/home3"; mkdir -p "$home3"
+  out="$(cd "$tmp/proj" && HOME="$home3" CLAUDE_PLUGIN_ROOT="$lclone" "$SELF")"
+  printf '%s' "$out" | grep -q "no link for this host" && fail "link nudge fired with no host skills dir"
 
   echo "bd-session-start selftest: ok"
   exit 0

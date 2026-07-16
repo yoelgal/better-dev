@@ -67,7 +67,9 @@ skill (the most common reason to re-run), prunes a skill removed upstream, and r
 stale links, so a pull that renames or drops a skill leaves no orphan. There is no per-skill version
 pinning - latest wins - so a `bd-package-check` after a pull is the safety net that catches a skill a new
 version broke. `bd-package-check` runs hermetically (a throwaway `HOME`) and proves the package installs
-cleanly, not that any real host is actually linked - use `./install.sh --verify` for that.
+cleanly, not that any real host is actually linked - use `./install.sh --verify` for that. The
+session-start hook is the mechanical catch in between: it nudges when the clone is behind upstream, and
+also when a pulled clone holds a skill the host never linked.
 
 ## Uninstalling
 
