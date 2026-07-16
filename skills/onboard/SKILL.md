@@ -297,6 +297,8 @@ to an open item rides that item's existing worktree. Branching is `<detected con
   project, `/groundwork` takes the idea to a shared foundation and parallelizable work-items.
 - `.better-dev/` holds tracked data (rules, overrides, learnings); `bin/` and `ledger/` are per-machine
   and gitignored. A fresh clone re-runs `/onboard` to rebuild the `bin` bridge.
+- Update the tool itself with `git pull` in the global clone; a new session picks it up, and re-run
+  `./install.sh` when the pull added or removed a skill.
 - Re-run `/onboard` any time to wire in what's missing.
 
 better-dev is additive: it complements, never replaces, whatever else is installed.

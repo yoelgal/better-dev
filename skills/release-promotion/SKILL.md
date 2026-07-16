@@ -156,7 +156,11 @@ runs. Recall the recorded deploy surface (`.better-dev/bin/bd-mem recall "deploy
 answers, three paths:
 
 - `deploy-surface: none` - nothing runs anywhere (a library, a CLI). Record `deploy: NO_SURFACE`
-  in the release receipt; the release is done at the tag.
+  in the release receipt; the release is done at the tag. Where the library ships by linked install
+  (better-dev itself), the tag is not the end - propagation is the deploy: the primary checkout pulls,
+  fresh sessions pick up the new text, and a release that added or removed skills names the
+  `install.sh` re-run each consuming machine still owes. Record a propagation line in the release
+  receipt.
 - Deploy keys recorded - run the deploy-verify pass in `post-deploy.md`: wait out the deploy,
   drive the deployed surface, watch it hold. Its verdict lands in the receipt before the release
   settles.

@@ -61,10 +61,13 @@ install/uninstall roundtrip in a throwaway `HOME` so a broken installer can't sh
 
 ## Updating and breaking changes
 
-`git pull` in the clone is the update. Re-running `install.sh` reconciles the links: it prunes a skill
-removed upstream and reclaims a moved clone's stale links, so a pull that renames or drops a skill leaves
-no orphan. There is no per-skill version pinning - latest wins - so a `bd-package-check` after a pull is
-the safety net that catches a skill a new version broke.
+`git pull` in the clone is the update, but a running session keeps the text it loaded at start - only a
+fresh session sees the pulled text. Re-running `install.sh` reconciles the links: it links a brand-new
+skill (the most common reason to re-run), prunes a skill removed upstream, and reclaims a moved clone's
+stale links, so a pull that renames or drops a skill leaves no orphan. There is no per-skill version
+pinning - latest wins - so a `bd-package-check` after a pull is the safety net that catches a skill a new
+version broke. `bd-package-check` runs hermetically (a throwaway `HOME`) and proves the package installs
+cleanly, not that any real host is actually linked - use `./install.sh --verify` for that.
 
 ## Uninstalling
 
@@ -76,8 +79,10 @@ and never deletes a foreign same-named skill. Your `.better-dev/` data - `rules.
 ## Adding or removing a skill
 
 Because skills are discovered by directory, adding one is just a new `skills/<name>/` that passes
-`bd-package-check` - no manifest edit. Keep authoring on the `/writing-skills` standard; let
-`/self-extension` handle the staged-and-tested path when the agent writes one itself.
+`bd-package-check` - no manifest edit. A new `skills/<name>/` is only discovered on a machine that
+re-runs `./install.sh`; until then its symlink doesn't exist there. Keep authoring on the
+`/writing-skills` standard; let `/self-extension` handle the staged-and-tested path when the agent
+writes one itself.
 
 ## Adding a host
 

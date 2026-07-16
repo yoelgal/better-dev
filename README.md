@@ -110,7 +110,8 @@ Two layers, so the tool updates once and your data travels with the repo:
   into your host's global skills dir, one symlink per skill (`~/.claude/skills/<skill>`,
   `~/.codex/skills/<skill>`, …), so every repo shares one copy. Claude Code users can install the plugin
   ([`.claude-plugin/plugin.json`](.claude-plugin/plugin.json)) instead - same skill contract. Update with a
-  single `git pull` in the clone.
+  single `git pull` in the clone - picked up by a session that starts fresh after the pull; re-run
+  `./install.sh` when the pull added or removed a skill.
 - **The repo - data only.** `/onboard` creates `.better-dev/` for *this repo's data* (`rules.md`,
   `overrides.md`, `learnings.jsonl` committed; loop `ledger/` gitignored) plus `.better-dev/bin`, a
   per-machine symlink to the global tool. No practices are ever copied into the repo.

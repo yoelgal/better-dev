@@ -266,7 +266,10 @@ never an omission; a close-out with a line missing is unfinished:
 - **Shared-behavior change** - if the diff renamed a pattern, altered a default others rely on, or added
   a step every future change in this area must take, record the convention as a rule
   (`.better-dev/bin/bd-mem remember "<rule>"`) and add one heads-up line to the PR body's brief naming
-  the behavior that changed - the rule reaches the next session, the PR line reaches the colleague.
+  the behavior that changed - the rule reaches the next session, the PR line reaches the colleague. When
+  the merged diff changes a practice that other machines consume by linked install (a skill library like
+  better-dev itself), name the propagation step in that line too: consuming clones pull, sessions restart
+  to pick up the new text, and an added or removed skill dir needs an installer re-run on each machine.
   Otherwise write `no shared-behavior change`.
 - **Originating report** - when the contract traces to an issue or ticket, the PR body carries its
   closing keyword (`Fixes #<n>`) before merge, and the observation that settled the criterion (the
