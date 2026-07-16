@@ -95,16 +95,28 @@ collide in data, not files - Step 2's datastore note records that key.
 
 **Prefer a native tool.** If the harness offers one - a tool named like `EnterWorktree` /
 `WorktreeCreate`, a `/worktree` command, or a `--worktree` flag - use it, skip the git commands,
-and let it place the worktree in its own default directory. Never feed it the `.worktrees/` path
-below: that is the *git fallback's* default, not an argument for the native tool, and a
-model-supplied path outside the harness default buys a needless permission prompt. One check
-first: the native tool must branch off the *base* from Step 1. If it branches off the repo's
-default branch instead and no recorded host knob changes that (e.g. Claude Code's
-`worktree.baseRef: head` with the session sitting on the base), create with the git fallback below
-and - where the host supports entering an existing worktree by path - enter it natively; the
-relocation prompt that follows is the expected cost of honoring the base, not a mistake. Running
-`git worktree add` alongside a native *creation* leaves phantom state the harness can't see. Only
-fall through to git when there is no native tool or it cannot honor the base.
+and let it place the worktree in its own default directory. Name it with the resolved branch name
+directly, `<prefix>/<slug>` (Claude Code's `EnterWorktree` `name` parameter accepts `/`-separated
+segments, so `feat/my-slug` is a legal name). Never feed it the `.worktrees/` path below: that is
+the *git fallback's* default, not an argument for the native tool, and a model-supplied path
+outside the harness default buys a needless permission prompt.
+
+Native creation typically branches off the repo's default branch, not the base from Step 1 - honor
+the base afterward, in the fresh clean tree the native tool just created:
+
+```bash
+git fetch origin "$base"
+git checkout -B "$branch" "origin/$base" 2>/dev/null || git checkout -B "$branch" "$base"
+```
+
+Do not use `git reset --hard` here - `bd-guard` flags it as a working-tree discard, and it is the
+wrong tool anyway. `checkout -B` moves the branch pointer and re-checks-out the tree, and it
+refuses rather than discards if the tree unexpectedly carries changes; a fresh worktree is clean,
+so that refusal never fires in the normal case - a safety property of the command, not a
+workaround for a problem this flow has. No host knob, no settings write, no
+create-with-git-then-enter-natively hybrid, no relocation prompt. Running `git worktree add`
+alongside a native *creation* leaves phantom state the harness can't see - only the fallback below
+reaches for it. The git fallback remains only for a host with no native worktree tool at all.
 
 **Git fallback.** Place worktrees under `.worktrees/` at the repo root (gitignored, discoverable);
 a sibling `../<repo>-<slug>` layout is an override some repos prefer - see `edge-cases.md`. Guard the
@@ -126,15 +138,18 @@ If `$path` already exists or the branch is already checked out somewhere, this i
 at the existing worktree rather than forcing a duplicate. If `git worktree add` fails on a sandbox
 permission error, say so and work in place - `edge-cases.md` covers that fallback.
 
-A fresh worktree also has none of the primary checkout's gitignored local state - neither the
-operator's recorded permission grants (a `.claude/settings.local.json` allowlist, or the host's
-equivalent, without which the session falls back to prompting on actions already approved) nor the
-runtime config the app needs (`.env*` files, the host's local settings). Copy that class from the
-primary checkout at creation - copy, never symlink: build tools reject symlinks and a symlink turns
+A fresh worktree also has none of the primary checkout's gitignored local state - the runtime
+config the app needs (`.env*` files, the host's local settings). Copy that class from the primary
+checkout at creation - copy, never symlink: build tools reject symlinks and a symlink turns
 teardown into a two-step dance - so the first dev-server run doesn't die mid-task on missing env. It
 is personal, gitignored state, so the copies never enter a PR. The copy happens at creation, not
 lazily on first failure: a fresh worktree whose first `bd-mem` or dev-server call dies on missing
 gitignored state (a missing bin bridge, an absent `.env`) is the tell this step was skipped.
+Settings-class files - a `.claude/settings.local.json` allowlist, or the host's equivalent - are
+operator-owned and never copied here: the agent never writes them, so there is nothing of that
+class for this step to carry forward. Where a noisier fresh worktree keeps re-prompting on actions
+the operator already approved elsewhere, `/guardrails-install`'s grant step hands the operator a
+paste-ready copy command instead.
 
 That copied runtime config points every lane at the same mutable datastore - one `DATABASE_URL`, one
 Redis, one object store - so when `git worktree list` shows another live lane, this lane's dev server

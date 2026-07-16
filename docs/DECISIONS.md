@@ -401,6 +401,21 @@ tracker (D13/D14), so each is to be filed as its own deferred issue - titles: "T
 better-dev itself (audit blind-spot, deferred)" and "better-dev as a product (audit blind-spot,
 deferred)" - and this paragraph records only the ruling; the tracker owns the backlog.
 
+## D22 - settings-class writes go operator-run everywhere; the native worktree flow is zero-settings (2026-07-16)
+Settings-class mutations - host settings and permission files - are operator-run everywhere in the
+library, never an agent write: paste-ready with a clipboard offer where the host has one, always.
+This revises D16's wiring mechanism only, not its consent policy - the allowance is still recorded,
+the per-item merge line still gates, and silence is still never consent. The native worktree flow is
+now zero-settings, revising D19's "one legitimate hybrid": native creation is named
+`<prefix>/<slug>` directly, then `git checkout -B "$branch" "origin/$base"` (falling back to local
+`"$base"`) honors the integration base in the fresh clean tree the native tool already created - no
+host knob, no relocation prompt. Evidence: agent writes to `.claude/settings.json` /
+`.claude/settings.local.json` are classifier-blocked in auto mode even with adjacent operator
+consent (2026-07-16); host settings (`worktree.baseRef` and the like) are snapshotted at session
+start, so a mid-session knob change never takes effect anyway; Claude Code's `EnterWorktree` `name`
+parameter accepts `/`-separated segments, so naming the worktree with the resolved branch directly
+needs no separate relocation step.
+
 ## Tracer-bullet findings (2026-07-03, on the papers.town clone) - bind Phase 1
 Ran `onboard` + one feature slice → staging end-to-end on the real clone (locally, no push). Proven, plus:
 1. **Helpers → `.better-dev/bin/`** (bare `scripts/` collides with the project's own - see D0 install contract).

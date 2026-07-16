@@ -301,14 +301,13 @@ merge for the operator.
 Where `auto-on-green` is recorded and the host has a permission config, wire the allowance so the
 merge command actually runs without a prompt at the moment it is earned: on the Claude family that is
 the merge command in the project's `.claude/settings.local.json` allow list (a gitignored personal
-grant - `/worktree-branching` mirrors it into fresh worktrees). A permission-widening write is judged
-by the host's action classifier on the tool call in front of it; consent given mid-batch, several
-calls earlier, does not travel. So the grant is its own question at a **turn boundary**: finish
-everything else, ask, and write only on the operator's direct reply - that adjacent message is the
-consent a classifier can see. A denial that still lands is the host working, not an error: hand over
-a paste-ready snippet (offered to the clipboard where the host has one) as the fallback, never as the
-first resort. A host with no permission config needs no wiring - the recorded rule is the whole
-allowance, and the host's own approval flow stays whatever it is.
+grant). The agent never writes that file itself - observed 2026-07-16: the write class is
+classifier-blocked in auto mode even with adjacent operator consent. The grant is its own question
+at a **turn boundary**: finish everything else, then ask it, and emit a paste-ready snippet (offered
+to the clipboard where the host has one) carrying the exact line to add. The operator runs it and
+confirms; the agent proceeds only on that confirmation. A host with no permission config needs no
+wiring - the recorded rule is the whole allowance, and the host's own approval flow stays whatever
+it is.
 
 Two more durable safety rules travel with the policy - the *why* behind the denylist lives in
 `/security-pass`, not here; these are the standing rules a green check does not by itself satisfy:
@@ -403,11 +402,11 @@ Detect, in order, which delivery this repo already has:
 - **The better-dev plugin's hooks are registered** (the plugin `hooks.json` carries the two `PreToolUse`
   entries) - nothing to do; enforcement is already always-on. A plugin install never writes host
   settings.
-- **A clone install on a host with a pre-execution hook** - offer to wire `bd-guard check-bash` and
-  `bd-guard check-edit` into the host's settings (Claude Code: `.claude/settings.json`
-  `hooks.PreToolUse`, merging into any existing array, never replacing it - an existing hooks array
-  survives byte-for-byte). A settings write is machine config: confirm it per repo, on an explicit yes.
-  `stacks.md` holds the exact settings shape.
+- **A clone install on a host with a pre-execution hook** - the agent never edits
+  `.claude/settings.json` itself; it emits the wiring as a paste-ready operator-run step carrying
+  `stacks.md`'s exact JSON (Claude Code: `hooks.PreToolUse`, merging into any existing array, never
+  replacing it - an existing hooks array survives byte-for-byte). The operator runs it per repo, on
+  an explicit yes, then the probe verification below confirms it took.
 - **A host with no pre-execution hook** - the policy stands as prose and the loop's escalation
   discipline carries it alone. A named coverage limit, not a failure.
 
