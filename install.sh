@@ -6,8 +6,10 @@
 # dir, ONE LEVEL DEEP (~/.claude/skills/<skill>, ~/.codex/skills/<skill>) - hosts discover a skill only at
 # <skills-dir>/<name>/SKILL.md, never nested under a namespace folder - so every repo you open sees the
 # practices, and nothing is ever vendored per project. Update with a plain `git pull` in this clone; the
-# per-skill symlinks mean every host picks the new version up at once, and a re-run reconciles: it prunes
-# a link whose skill was removed upstream and reclaims a moved clone's stale links.
+# per-skill symlinks mean a session started after the pull picks up the new text - a session already
+# running keeps the text it loaded at start. A pull that adds or removes a skill needs a re-run of
+# ./install.sh too: it links the new one and prunes a link whose skill was removed upstream, and also
+# reclaims a moved clone's stale links.
 #
 # This script installs skills only. It does NOT wire the SessionStart/SubagentStart awareness hooks -
 # those ride the Claude Code plugin (hooks.json) or the bootstrap-hooks skill. A clone install gets the
@@ -246,7 +248,9 @@ fi
 if [ "$IS_WINDOWS" -eq 1 ]; then
   echo "Windows: installed as file copies - re-run ./install.sh after every 'git pull' to refresh."
 else
-  echo "Update any time:  git -C \"$SRC\" pull   (a re-run of ./install.sh reconciles links after a pull)."
+  echo "Update any time:  git -C \"$SRC\" pull   (a session already running keeps its loaded text; a"
+  echo "  fresh session picks up the pull. Re-run ./install.sh after a pull that adds or removes a skill,"
+  echo "  so the new one links and orphans prune)."
 fi
 echo "Hooks: this installer wires skills only. For the SessionStart/SubagentStart nudge, use the Claude"
 echo "  Code plugin (.claude-plugin/plugin.json + hooks.json) or the bootstrap-hooks skill."
