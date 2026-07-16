@@ -16,6 +16,10 @@ The note is the same paragraph; the JSON envelope around it is not.
   single most important thing to get right when adding a subagent hook.
 - **SubagentStart, Codex:** same nested shape, plus a top-level `systemMessage`.
 
+The SessionStart hook also emits an unlinked-skill nudge (a clone skill the host never linked) - it is
+scoped to hosts that install by linking into `$HOME/.claude/skills`, so adapt the host skills dir when
+porting.
+
 The scripts pick the field from environment markers the host sets (`CURSOR_PLUGIN_ROOT`,
 `CLAUDE_PLUGIN_ROOT`, `COPILOT_CLI`, `PLUGIN_DATA`). A host that reads several fields without
 de-duplicating is why the scripts branch to emit exactly one, rather than emitting all of them.
