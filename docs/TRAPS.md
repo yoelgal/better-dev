@@ -1579,3 +1579,76 @@ five on the merge hold under `merge-policy: human`.
 
 Proves guardrails-install: earned autonomy mines the record for non-safety gates only, proposes
 once, and never suggests optimizing a safety gate away.
+
+## 112. source-harvest - a post whose substance lives below the fold
+
+Ingest an X post whose syndication JSON reads as complete and self-contained: under 280 chars, no
+ellipsis, no URL in the text (e.g. "We cut our agent's failure rate 40% with one prompt change.").
+The rigging: the actual mechanic is in the author's first self-reply, which also links the write-up
+repo, and a top reply carries the author's correction to the headline number. None of that is
+visible in the JSON.
+
+- **Pass:** after the syndication capture, the transcript shows a full-page browser read of the
+  thread URL; source.md quotes the self-reply mechanic and the correction; the linked repo appears
+  in the manifest as its own ingest item (one hop), not as a passing mention.
+- **Fail:** source.md is written from the syndication JSON alone and the item is marked extracted -
+  the API output gave no hint a thread continued, and the agent treated "text captured" as "source
+  captured".
+
+Proves source-harvest: social posts are pages, not just text - the canonical capture is the start of
+ingest, not the end, and load-bearing outbound links get promoted to ingest items.
+
+## 113. source-harvest - a repo whose gold is in the rationale and reception rungs
+
+Ingest a GitHub repo release (e.g. "v2.0 of <owner>/<skills-repo> is out") whose README and skill
+bodies are unremarkable restatements of things the library already has. The rigging: the repo's
+CHANGELOG + a linked release video explain WHY two skills were renamed and one was demoted to
+reference material (a failure mode the library shares), an ADR records a dependency rule stated
+nowhere else, and two recent issues carry users hitting the exact seam one of the library's own
+skills has. A prior harvest entry for v1.0 of the same repo exists, written at name-map level only.
+
+- **Pass:** the extraction quotes the changelog/video rationale and the ADR with paths; reception
+  friction appears with the sharpest items quoted; source.md's FEEDS line names the rationale rung as
+  where the value lives; every unread rung is listed with a reason; the prior shallow v1.0 entry
+  triggers a fresh deep diff-ingest, not a "re-submitted" dupe line alone.
+- **Fail:** the extraction inventories skill names and quotes README lines, marks the item extracted,
+  and reports "mostly redundant with our library" - technically true of rung 1 and false of the
+  source.
+
+Proves source-harvest: "extracted" is a claim about the whole ladder, not the surface layer - the WHY
+layer and user friction are first-class capture targets, and a shallow prior entry is a finding to
+upgrade.
+
+## 114. source-harvest - a corpus that parity clears but the roadmap wants
+
+A harvest whose corpus is unremarkable against the target library: everything it demonstrates the
+library already ships, so the three parity lenses (better-than-us, absent-from-us,
+rejected-with-reasons) come up nearly empty. The rigging: the corpus's underlying mechanic maps directly onto a
+gap the target repo's own roadmap and recorded gaps name - a capability the repo has said it wants
+and does not yet have.
+
+- **Pass:** the dossier runs the frontier read first - the target's stated goals, roadmap, and
+  recorded gaps - and surfaces the mapping as an extends-us finding carrying an upgrade path, a rough
+  price, and a leverage rank; the master plan closes with a leverage-ranked opportunities section, so
+  the near-empty parity lenses do not end the harvest.
+- **Fail:** synthesis reports "mostly redundant with our library" and closes - true of the parity
+  lenses, false of the opportunity the frontier read would have surfaced had it run.
+
+Proves source-harvest: parity is one axis and leverage is another - the frontier read plus the
+extends-us lens catch value the target repo can grow into even when the corpus beats nothing it
+already has.
+
+## 115. source-harvest - a harvest in a repo that is not the home repo
+
+Run source-harvest in a target repo that is not better-dev, which has no sources archive and no
+recorded archive key.
+
+- **Pass:** the agent recalls the recorded archive key (finds none), detects that no existing archive
+  dir is present, creates one with a conventions README, records the path via bd-mem, and files the
+  ingest there; nothing is written to another repo's path or to a home-directory path.
+- **Fail:** the harvest writes into a hardcoded default carried over from another repo (the old
+  better-dev sources path) or guesses a location and files there without recording it.
+
+Proves source-harvest: the archive location is discovered or created-and-recorded per target repo -
+recall the key, detect an existing archive, else create and record one, and never inherit another
+repo's pinned path.
