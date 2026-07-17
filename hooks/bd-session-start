@@ -147,7 +147,7 @@ emit() {
   # replaces the default (same knob style as "better-dev auto-update:"). Only the
   # wired message is overridable - an unwired repo has no overrides to read.
   welcome="$WELCOME_WIRED"
-  custom="$(grep -im1 '^better-dev welcome:' "$root/.better-dev/overrides.md" 2>/dev/null | sed 's/^[^:]*:[[:space:]]*//' || true)"
+  custom="$(grep -iEm1 'better-dev[[:space:]]+welcome:' "$root/.better-dev/overrides.md" 2>/dev/null | sed 's/^[^:]*:[[:space:]]*//; s/[[:space:]]*$//' || true)"
   [ -n "$custom" ] && welcome="$(escape_for_json "$custom")"
   # Point at the overrides layer only when the project actually has one, so the
   # note never sends the agent to an empty file.
@@ -256,7 +256,7 @@ if [ "${1:-}" = "selftest" ]; then
 
   # Per-repo welcome wording: a "better-dev welcome:" override line replaces the
   # default systemMessage, JSON-escaped; removing the line restores the default.
-  printf 'better-dev welcome: Howdy "team" at ACME\n' >> "$tmp/proj/.better-dev/overrides.md"
+  printf '  better-dev  welcome: Howdy "team" at ACME \r\n' >> "$tmp/proj/.better-dev/overrides.md"
   out="$(cd "$tmp/proj" && CLAUDE_PLUGIN_ROOT=x "$SELF")" || fail "errored with welcome override"
   printf '%s' "$out" | jq -e . >/dev/null || fail "welcome-override output not valid JSON"
   [ "$(printf '%s' "$out" | jq -r '.systemMessage')" = 'Howdy "team" at ACME' ] || fail "custom welcome not applied"
