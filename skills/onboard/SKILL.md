@@ -169,6 +169,17 @@ fi
 If the loop leaves `$sd` empty, no marker resolved and the tool is not installed for this host - loop
 back to the bootstrap block above rather than running `bd-link` against an empty path.
 
+With the bridge resolving, offer the standing allowance so its own calls never trip the permission
+gate. Where the host has a permission config (Claude family: `.claude/settings.local.json`), emit a
+paste-ready snippet - offered to the clipboard where the host has one - adding two allow rules,
+`"Bash(.better-dev/bin/bd-mem:*)"` and `"Bash(.better-dev/bin/bd-guard:*)"`, merging into any existing
+allow list rather than replacing it. The rationale: these scripts write only inside `.better-dev/`, and
+nearly every skill leans on `bd-mem` for recall/remember/learn/ledger on almost every step (`bd-guard`
+at worktree creation), so an unwired host prompts on its own memory spine. The doctrine: a permission
+file is a settings-class mutation, so the write stays operator-run - the operator applies the snippet
+and confirms, the agent never edits the file itself. A host with no permission config skips this
+entirely, and a re-run that finds both rules already present proposes nothing.
+
 Now `.better-dev/bin/bd-mem` resolves. **Point the memory contract at what Phase 1 found, then
 initialize it:**
 
