@@ -220,7 +220,14 @@ change:
   same hold answered yes, unmodified, run after run (five or more), name the `/guardrails-install`
   re-run that proposes the earned standing allowance. Never merge with `--delete-branch` in a
   worktree layout - the local branch is checked out in the worktree, so branch deletion follows
-  worktree removal, in the teardown order `/worktree-branching` owns. Either way, hand the
+  worktree removal, in the teardown order `/worktree-branching` owns. Run the merge itself from the
+  primary checkout, not from inside the work-item's worktree: the recorded merge allowance's host
+  grant (e.g. the Claude-family allow rule in `.claude/settings.local.json`) is personal local state
+  of the primary checkout and does not follow the agent into a worktree, so a merge attempted from
+  the worktree hits the host's permission gate even with the policy recorded and green earned. Where
+  the host also blocks remote branch deletion (observed: both `git push --delete` and the API route
+  are classifier-gated), the merged branch's cleanup is a paste-ready command handed to the operator
+  in the close-out, never a retried write. Either way, hand the
   merged (or green mergeable) PR to `/release-promotion` for the promote-and-tag.
 - **`DONE_WITH_CONCERNS`** - the same, with non-blocking flags named in the PR body.
 - **`BLOCKED`** - an external block. When it is a single waitable condition (a base going green, an infra
