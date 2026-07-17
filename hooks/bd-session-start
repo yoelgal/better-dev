@@ -41,15 +41,40 @@ escape_for_json() {
   printf '%s' "$s"
 }
 
+# --- shared clone resolution fallback: does an existing host skill symlink under
+# $HOME/.claude/skills point into a better-dev clone? Read the link and take its
+# target's prefix before /skills/<name>. Covers the clone install path (skills
+# symlinked into a git checkout by install.sh, hooks wired via settings, no
+# plugin - CLAUDE_PLUGIN_ROOT unset) that CLAUDE_PLUGIN_ROOT alone can't see.
+# Callers try their own CLAUDE_PLUGIN_ROOT usability check first and only fall
+# back to this when that check fails.
+resolve_clone_via_symlink() {
+  local hostdir="$HOME/.claude/skills" entry name target clone=""
+  [ -d "$hostdir" ] || return 1
+  for entry in "$hostdir"/*; do
+    [ -L "$entry" ] || continue
+    name="$(basename "$entry")"
+    target="$(readlink "$entry" 2>/dev/null)" || continue
+    case "$target" in
+      */skills/"$name" | */skills/"$name"/) clone="${target%/skills/"$name"*}" ;;
+    esac
+    [ -n "$clone" ] && break
+  done
+  [ -n "$clone" ] && printf '%s' "$clone"
+}
+
 # --- update nudge: is the installed better-dev clone behind its origin? -------
-# Best-effort and strictly non-blocking. The clone is the plugin install
-# (CLAUDE_PLUGIN_ROOT); if it isn't a git checkout with an upstream we say
-# nothing. A bounded fetch refreshes the count when we can time-box it; when we
-# can't (no `timeout`), we skip the fetch and report from the last-known
-# upstream rather than risk a hang. Never pulls - unless the project opted into
-# ff-only auto-update in overrides, which can only fast-forward, never clobber.
+# Best-effort and strictly non-blocking. Locates the clone via CLAUDE_PLUGIN_ROOT
+# when it looks like a git checkout, else the same readlink fallback link_nudge
+# uses (the clone install path); if neither finds one, or it isn't a git
+# checkout with an upstream, we say nothing. A bounded fetch refreshes the count
+# when we can time-box it; when we can't (no `timeout`), we skip the fetch and
+# report from the last-known upstream rather than risk a hang. Never pulls -
+# unless the project opted into ff-only auto-update in overrides, which can
+# only fast-forward, never clobber.
 update_nudge() {
   local overrides="$1" clone="${CLAUDE_PLUGIN_ROOT:-}" tobin behind
+  [ -n "$clone" ] && [ -d "$clone/.git" ] || clone="$(resolve_clone_via_symlink)"
   [ -n "$clone" ] && [ -d "$clone/.git" ] || return 0
   git -C "$clone" rev-parse --abbrev-ref '@{u}' >/dev/null 2>&1 || return 0
 
@@ -77,22 +102,8 @@ update_nudge() {
 # hosts/ adapters own their own dir names.
 link_nudge() {
   local clone="${CLAUDE_PLUGIN_ROOT:-}" hostdir="$HOME/.claude/skills" entry name target found missing n skill
-  # Locate the clone: the plugin root if it looks like one, else the target of an
-  # existing better-dev link (its prefix before /skills/<name>).
-  if [ -z "$clone" ] || [ ! -d "$clone/skills" ]; then
-    clone=""
-    if [ -d "$hostdir" ]; then
-      for entry in "$hostdir"/*; do
-        [ -L "$entry" ] || continue
-        name="$(basename "$entry")"
-        target="$(readlink "$entry" 2>/dev/null)" || continue
-        case "$target" in
-          */skills/"$name" | */skills/"$name"/) clone="${target%/skills/"$name"*}" ;;
-        esac
-        [ -n "$clone" ] && break
-      done
-    fi
-  fi
+  # Locate the clone: the plugin root if it looks like one, else the fallback above.
+  [ -n "$clone" ] && [ -d "$clone/skills" ] || clone="$(resolve_clone_via_symlink)"
   [ -n "$clone" ] && [ -d "$clone/skills" ] || return 0
 
   # Guard: a plugin-only install with no host links skips silently - those skills
@@ -287,8 +298,10 @@ if [ "${1:-}" = "selftest" ]; then
   out="$(cd "$tmp/proj" && CURSOR_PLUGIN_ROOT=x "$SELF")"; printf '%s' "$out" | jq -e '.additional_context' >/dev/null || fail "Cursor field missing"
   out="$(cd "$tmp/proj" && COPILOT_CLI=1 "$SELF")"; printf '%s' "$out" | jq -e '.additionalContext' >/dev/null || fail "Copilot field missing"
 
-  # Update nudge: clone that isn't a git repo -> silent.
-  out="$(cd "$tmp/proj" && CLAUDE_PLUGIN_ROOT="$tmp/notgit" "$SELF")"
+  # Update nudge: clone that isn't a git repo -> silent. HOME points at an empty
+  # dir so the fallback that a failed CLAUDE_PLUGIN_ROOT now triggers can't wander
+  # into whatever real skill symlinks happen to exist on the machine running this.
+  out="$(cd "$tmp/proj" && HOME="$tmp" CLAUDE_PLUGIN_ROOT="$tmp/notgit" "$SELF")"
   printf '%s' "$out" | grep -q "update available" && fail "nudged when clone is not a git repo"
 
   # Update nudge: a clone one commit behind its origin gets a pull nudge.
@@ -301,6 +314,15 @@ if [ "${1:-}" = "selftest" ]; then
   ( cd "$clone" && git fetch -q ) >/dev/null 2>&1   # clone now knows origin is ahead
   out="$(cd "$tmp/proj" && CLAUDE_PLUGIN_ROOT="$clone" "$SELF")"
   printf '%s' "$out" | grep -q "update available" || fail "no update nudge when clone is behind"
+
+  # Same behind-origin clone, but CLAUDE_PLUGIN_ROOT unset (the clone install path,
+  # no plugin) - resolved through the host skill-symlink fallback link_nudge already
+  # used. The fixture clone needs a real skills/<name>/SKILL.md for the link to point at.
+  mkdir -p "$clone/skills/onboard"; : > "$clone/skills/onboard/SKILL.md"
+  fbhome="$tmp/fbhome"; mkdir -p "$fbhome/.claude/skills"
+  ln -s "$clone/skills/onboard" "$fbhome/.claude/skills/onboard"
+  out="$(cd "$tmp/proj" && HOME="$fbhome" CLAUDE_PLUGIN_ROOT= "$SELF")"
+  printf '%s' "$out" | grep -q "update available" || fail "no update nudge via the clone-install fallback (CLAUDE_PLUGIN_ROOT unset)"
 
   # Opt-in ff-only auto-update: with the override, the clone fast-forwards itself.
   printf 'better-dev auto-update: ff-only\n' >> "$tmp/proj/.better-dev/overrides.md"
