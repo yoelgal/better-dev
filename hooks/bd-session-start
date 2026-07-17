@@ -5,8 +5,9 @@
 # `.better-dev/` scaffold), emit a short awareness note so the agent knows the
 # practices are here and where the project's overrides live - plus, when they
 # apply, the in-flight work-item count and a model-changed staleness warning.
-# When better-dev is not installed, this is a no-op - it never errors and never
-# blocks the session.
+# Every run also emits a one-line user-visible welcome (systemMessage), wired
+# or not; when better-dev is not installed that welcome is the only output -
+# the hook never errors and never blocks the session.
 #
 # Reimplemented for better-dev from understanding of superpowers' session-start
 # (MIT, Jesse Vincent): the single-pass JSON escape, the three-way platform
@@ -16,6 +17,11 @@
 set -euo pipefail
 
 case "$0" in /*) SELF="$0" ;; *) SELF="$PWD/$0" ;; esac
+
+# One-line user-visible welcome, emitted on every run. Static strings with no
+# JSON-special characters, so they embed without escaping.
+WELCOME_WIRED="better-dev ready - practices wired in this repo"
+WELCOME_UNWIRED="better-dev ready - not wired in this repo (run /onboard to wire it)"
 
 # --- locate a better-dev repo by walking up from the working directory --------
 # We deliberately do NOT read stdin (a hook that blocks on stdin can freeze the
@@ -136,7 +142,16 @@ link_nudge() {
 }
 
 emit() {
-  local root="$1" note lessons n inflight bdm rows cnt oldest fpnote fpcur fprec context escaped
+  local root="$1" note lessons n inflight bdm rows cnt oldest fpnote fpcur fprec context escaped welcome custom
+  # Per-repo welcome wording: a "better-dev welcome: <text>" line in overrides.md
+  # replaces the default (same knob style as "better-dev auto-update:"). Only the
+  # wired message is overridable - an unwired repo has no overrides to read.
+  welcome="$WELCOME_WIRED"
+  # Strip through the knob token, not the first colon - the unanchored match
+  # allows text (even a colon) before the knob. Bracket classes because BSD sed
+  # has no case-insensitive flag.
+  custom="$(grep -iEm1 'better-dev[[:space:]]+welcome:' "$root/.better-dev/overrides.md" 2>/dev/null | sed -E 's/^.*[Ww][Ee][Ll][Cc][Oo][Mm][Ee]:[[:space:]]*//; s/[[:space:]]*$//' || true)"
+  [ -n "$custom" ] && welcome="$(escape_for_json "$custom")"
   # Point at the overrides layer only when the project actually has one, so the
   # note never sends the agent to an empty file.
   note=""
@@ -201,12 +216,14 @@ emit() {
   # additional_context; Claude Code wants nested hookSpecificOutput; Copilot and
   # other SDK hosts want a top-level additionalContext. Claude Code reads several
   # of these without de-duping, so we branch instead of emitting all of them.
+  # systemMessage rides along in every branch: Claude Code shows it to the user
+  # as a one-line welcome, other hosts ignore the unknown field harmlessly.
   if [ -n "${CURSOR_PLUGIN_ROOT:-}" ]; then
-    printf '{ "additional_context": "%s" }\n' "$escaped"
+    printf '{ "systemMessage": "%s", "additional_context": "%s" }\n' "$welcome" "$escaped"
   elif [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] && [ -z "${COPILOT_CLI:-}" ]; then
-    printf '{ "hookSpecificOutput": { "hookEventName": "SessionStart", "additionalContext": "%s" } }\n' "$escaped"
+    printf '{ "systemMessage": "%s", "hookSpecificOutput": { "hookEventName": "SessionStart", "additionalContext": "%s" } }\n' "$welcome" "$escaped"
   else
-    printf '{ "additionalContext": "%s" }\n' "$escaped"
+    printf '{ "systemMessage": "%s", "additionalContext": "%s" }\n' "$welcome" "$escaped"
   fi
 }
 
@@ -215,14 +232,17 @@ if [ "${1:-}" = "selftest" ]; then
   fail() { echo "selftest FAIL: $1" >&2; exit 1; }
   tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 
-  # No .better-dev anywhere -> no-op (empty output, exit 0).
+  # No .better-dev anywhere -> welcome only: valid JSON with a systemMessage,
+  # no context field, exit 0.
   out="$(cd "$tmp" && CLAUDE_PLUGIN_ROOT=x "$SELF" 2>/dev/null)" || fail "errored when not installed"
-  [ -z "$out" ] || fail "emitted output when better-dev not installed"
+  printf '%s' "$out" | jq -e '.systemMessage' >/dev/null || fail "missing welcome when not installed"
+  printf '%s' "$out" | grep -qE 'additionalContext|additional_context' && fail "emitted context when better-dev not installed"
 
-  # Installed, no overrides -> valid JSON, mentions the skills, omits overrides.
+  # Installed, no overrides -> valid JSON, welcome + awareness note, omits overrides.
   mkdir -p "$tmp/proj/.better-dev"
   out="$(cd "$tmp/proj" && CLAUDE_PLUGIN_ROOT=x "$SELF")" || fail "errored when installed"
   printf '%s' "$out" | jq -e . >/dev/null || fail "installed output is not valid JSON"
+  printf '%s' "$out" | jq -e '.systemMessage' >/dev/null || fail "missing welcome when installed"
   printf '%s' "$out" | grep -q "better-dev practices are installed" || fail "missing awareness note"
   printf '%s' "$out" | grep -q "overrides.md" && fail "mentioned overrides with none present"
 
@@ -236,6 +256,19 @@ if [ "${1:-}" = "selftest" ]; then
   out="$(cd "$tmp/proj" && CLAUDE_PLUGIN_ROOT=x "$SELF")" || fail "errored with overrides"
   printf '%s' "$out" | jq -e . >/dev/null || fail "overrides output not valid JSON"
   printf '%s' "$out" | grep -q "overrides.md" || fail "did not point at overrides"
+
+  # Per-repo welcome wording: a "better-dev welcome:" override line replaces the
+  # default systemMessage, JSON-escaped; removing the line restores the default.
+  printf '  better-dev  welcome: Howdy "team" at ACME \r\n' >> "$tmp/proj/.better-dev/overrides.md"
+  out="$(cd "$tmp/proj" && CLAUDE_PLUGIN_ROOT=x "$SELF")" || fail "errored with welcome override"
+  printf '%s' "$out" | jq -e . >/dev/null || fail "welcome-override output not valid JSON"
+  [ "$(printf '%s' "$out" | jq -r '.systemMessage')" = 'Howdy "team" at ACME' ] || fail "custom welcome not applied"
+  printf 'note: better-dev welcome: prefixed knob\n' > "$tmp/proj/.better-dev/overrides.md"
+  out="$(cd "$tmp/proj" && CLAUDE_PLUGIN_ROOT=x "$SELF")" || fail "errored with prefixed knob line"
+  [ "$(printf '%s' "$out" | jq -r '.systemMessage')" = 'prefixed knob' ] || fail "prefixed knob line not stripped through the knob"
+  printf 'use tabs\n' > "$tmp/proj/.better-dev/overrides.md"
+  out="$(cd "$tmp/proj" && CLAUDE_PLUGIN_ROOT=x "$SELF")" || fail "errored after welcome removal"
+  printf '%s' "$out" | grep -q "Howdy" && fail "custom welcome leaked after removal"
 
   # Memory clause: absent with no learnings file, absent when it has no lesson
   # lines, present with the count and the recall pointer once lessons exist.
@@ -362,7 +395,7 @@ fi
 # path must never surface as a session error, which set -e alone can't promise
 # before the trailing exit 0 runs. This trap makes the stated contract hold.
 trap 'exit 0' ERR
-bd_root="$(find_bd_root)" || exit 0
+bd_root="$(find_bd_root)" || { printf '{ "systemMessage": "%s" }\n' "$WELCOME_UNWIRED"; exit 0; }
 FP_WRITE=""
 emit "$bd_root"
 # The fingerprint updates only after the note above went out - an interrupted emit warns again
