@@ -147,7 +147,10 @@ emit() {
   # replaces the default (same knob style as "better-dev auto-update:"). Only the
   # wired message is overridable - an unwired repo has no overrides to read.
   welcome="$WELCOME_WIRED"
-  custom="$(grep -iEm1 'better-dev[[:space:]]+welcome:' "$root/.better-dev/overrides.md" 2>/dev/null | sed 's/^[^:]*:[[:space:]]*//; s/[[:space:]]*$//' || true)"
+  # Strip through the knob token, not the first colon - the unanchored match
+  # allows text (even a colon) before the knob. Bracket classes because BSD sed
+  # has no case-insensitive flag.
+  custom="$(grep -iEm1 'better-dev[[:space:]]+welcome:' "$root/.better-dev/overrides.md" 2>/dev/null | sed -E 's/^.*[Ww][Ee][Ll][Cc][Oo][Mm][Ee]:[[:space:]]*//; s/[[:space:]]*$//' || true)"
   [ -n "$custom" ] && welcome="$(escape_for_json "$custom")"
   # Point at the overrides layer only when the project actually has one, so the
   # note never sends the agent to an empty file.
@@ -260,6 +263,9 @@ if [ "${1:-}" = "selftest" ]; then
   out="$(cd "$tmp/proj" && CLAUDE_PLUGIN_ROOT=x "$SELF")" || fail "errored with welcome override"
   printf '%s' "$out" | jq -e . >/dev/null || fail "welcome-override output not valid JSON"
   [ "$(printf '%s' "$out" | jq -r '.systemMessage')" = 'Howdy "team" at ACME' ] || fail "custom welcome not applied"
+  printf 'note: better-dev welcome: prefixed knob\n' > "$tmp/proj/.better-dev/overrides.md"
+  out="$(cd "$tmp/proj" && CLAUDE_PLUGIN_ROOT=x "$SELF")" || fail "errored with prefixed knob line"
+  [ "$(printf '%s' "$out" | jq -r '.systemMessage')" = 'prefixed knob' ] || fail "prefixed knob line not stripped through the knob"
   printf 'use tabs\n' > "$tmp/proj/.better-dev/overrides.md"
   out="$(cd "$tmp/proj" && CLAUDE_PLUGIN_ROOT=x "$SELF")" || fail "errored after welcome removal"
   printf '%s' "$out" | grep -q "Howdy" && fail "custom welcome leaked after removal"
