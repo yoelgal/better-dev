@@ -9,7 +9,7 @@
 #   bd-mem persist-override <line>                     add a project override line inside the managed block
 #   bd-mem papercut add <text> [context]               log a friction papercut agents hit mid-work
 #   bd-mem papercut list                               one line per open papercut: id, age, text
-#   bd-mem papercut resolve <id>                        drop a triaged papercut by id
+#   bd-mem papercut resolve <id>                       drop a triaged papercut by id
 #   bd-mem read [rules|overrides|learnings|papercuts|ledger]  dump one memory surface
 #   bd-mem where                                       print the resolved .better-dev path
 #   bd-mem selftest                                    run the built-in checks
