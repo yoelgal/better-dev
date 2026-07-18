@@ -144,7 +144,10 @@ done-criteria will turn on and skip exhaustive branch-walking.
   corrects a default faster than they fill a blank. If the user answers "whatever you think," they
   lack confidence too - don't take it as a blank cheque; re-ask as a choice between two concrete options.
 - **Ask only what you can't discover.** A fact about this repo or system is yours to find, not the
-  user's to answer - go read it (this is where premise-checking pays off again). Type each remaining
+  user's to answer - go read it (this is where premise-checking pays off again). A lookup slow enough
+  to stall the interview goes to a background worker while the questions continue - only questions
+  downstream of that fact wait for it, and the dispatched worker reads, never writes: an unfenced
+  background errand fills its silence with side effects. Type each remaining
   ambiguity by one key: would its readings change a done-criterion? If yes, it is a must-ask, asked
   before the gate closes - two readings that grade differently are two different contracts. If no,
   pick one and record the pick as a named assumption in the contract. On a must-ask, offer
