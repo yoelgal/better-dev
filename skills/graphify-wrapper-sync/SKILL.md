@@ -45,11 +45,32 @@ for name in $names; do
   dst="$this/$path"; out="$dst/graphify-out"
   [ -d "$dst" ] || { echo "skip '$name': $path absent in this worktree"; continue; }
 
-  # Seed from main if this worktree has no graph yet.
+  # Repair a torn local graph.json (a partial/killed prior copy) so the seed
+  # decision below treats the domain as missing rather than complete - graphify's
+  # shrink guard would otherwise refuse `update` on an unparsable graph.
+  if [ -f "$out/graph.json" ] && ! jq -e . "$out/graph.json" >/dev/null 2>&1; then
+    echo "[$name] removing unparsable graph.json (will re-seed/rebuild)"
+    rm -f "$out/graph.json"
+  fi
+
+  # Seed from main if this worktree has no graph yet. Copy the siblings first,
+  # then install main's graph.json last via a same-dir temp + mv, so an
+  # interrupted copy never leaves an unparsable graph a later path trusts.
+  src="$main/$path/graphify-out"
   if [ ! -f "$out/graph.json" ] && [ -n "$main" ] && [ "$main" != "$this" ] \
-     && [ -f "$main/$path/graphify-out/graph.json" ]; then
+     && jq -e . "$src/graph.json" >/dev/null 2>&1; then
     echo "[$name] seeding from main worktree"
-    mkdir -p "$out" && cp -R "$main/$path/graphify-out/." "$out/"
+    mkdir -p "$out"
+    for f in "$src"/* "$src"/.*; do
+      b=${f##*/}; case "$b" in "*"|.|..|graph.json) continue;; esac
+      [ -e "$f" ] || continue; cp -R "$f" "$out/" 2>/dev/null || true
+    done
+    tmp="$out/.graph.$$.tmp"
+    if cp "$src/graph.json" "$tmp" 2>/dev/null; then
+      mv "$tmp" "$out/graph.json" 2>/dev/null || rm -f "$tmp"
+    else
+      rm -f "$tmp"
+    fi
   fi
 
   if [ "$do_sem" = true ]; then
