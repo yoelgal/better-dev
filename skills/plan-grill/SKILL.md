@@ -268,7 +268,11 @@ A `NEEDS_INPUT` record is a handoff, not a shrug - four fields, each checkable b
 names the blocked question, who answers it, what unblocks it - a decision to make, or manual work
 spelled as a precise checklist (sign up for the service, provision the access, move the data),
 including the facts the answer must come back with - and the re-entry point that resumes the grill
-when it does.
+when it does. When the who is a third party - a stakeholder, an expert, a client not in this chat -
+the unblock artifact is an async questionnaire drafted now: questions ordered most-important-first
+(async may get one pass), one idea per question, an answer stub under each. Grill the user only
+about the send - who it goes to and what must come back - never about answers that are the
+recipient's to give.
 
 Write the contract to the **primary checkout's** shared ledger so every worktree sees it. Resolve the
 item's ledger directory with `.better-dev/bin/bd-mem ledger dir <work-item>` - it returns the
