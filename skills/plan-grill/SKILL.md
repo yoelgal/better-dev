@@ -18,6 +18,12 @@ The flow is four steps behind one closing gate; a gated step 0 runs first when t
 somebody else's words. Work from the work-item's worktree
 (`/worktree-branching` sets it up); the contract lands in the shared ledger, described at the end.
 
+One rule binds on every path in - feature or chore-class, the brief relayed or first-person: a
+brief that points at an external source - an X post, a repo, an article - captures that source's
+content through `/source-harvest`'s extraction recipes before anything is decoded or planned. The
+link is the brief, and the recipes carry the canonical per-type capture; an improvised fetch loses
+the exact text and media the decode reads.
+
 One shape is named on arrival, whoever brings it - first-person intent included: a work-item that
 spans two separate repositories (a field added in one service's repo, consumed in another's) is
 named now, not discovered when the second repo turns out to be unreachable from this worktree. The
