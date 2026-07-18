@@ -42,7 +42,7 @@ emit() {
   local root="$1" note context escaped
   note=""
   [ -s "$root/.better-dev/overrides.md" ] && note=" Honor .better-dev/overrides.md before any built-in default."
-  context="You're a worker dispatched in a better-dev repo. The project's practices still apply to your task - see /orchestrating-agents for how dispatch and file handoffs work.${note} Do the specific task you were briefed with; no need to re-run onboarding."
+  context="You're a worker dispatched in a better-dev repo. The project's practices still apply to your task - see /orchestrating-agents for how dispatch and file handoffs work.${note} Do the specific task you were briefed with; no need to re-run onboarding. Hit friction - a dead-end tool call, a broken doc link, a flaky command? Log it in one line and keep going: .better-dev/bin/bd-mem papercut add \"<what happened>\"."
   escaped=$(escape_for_json "$context")
 
   # Codex reads a nested hookSpecificOutput too, but also surfaces a top-level
@@ -66,6 +66,7 @@ if [ "${1:-}" = "selftest" ]; then
   printf '%s' "$out" | jq -e '.hookSpecificOutput.additionalContext' >/dev/null || fail "missing SubagentStart shape"
   printf '%s' "$out" | jq -e '.hookSpecificOutput.hookEventName == "SubagentStart"' >/dev/null || fail "wrong hookEventName"
   printf '%s' "$out" | grep -q "orchestrating-agents" || fail "missing dispatch pointer"
+  printf '%s' "$out" | grep -q "papercut add" || fail "missing papercut nudge"
 
   out="$(cd "$tmp/proj" && PLUGIN_DATA=x "$SELF")"; printf '%s' "$out" | jq -e '.systemMessage' >/dev/null || fail "Codex systemMessage missing"
 
