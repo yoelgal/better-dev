@@ -122,9 +122,9 @@ a surface exists, and each tag cut over a stale manifest widens the lag every co
 manifest reads. A lagging surface gets bumped as a commit that rides the promote range through the
 normal gates; found after the tag, it is fixed forward on integration, since a published tag never
 moves. If no scheme is discoverable, that's a `NEEDS_INPUT`: ask for the version rather than
-guessing. Guard the tag
-before creating it: an existing `$version` tag means this promote already ran, or the version was
-never bumped - either way, stop and reconcile rather than moving or overwriting a published tag:
+guessing. Guard the tag before creating it: an existing `$version` tag means this promote already
+ran, or the version was never bumped - either way, stop and reconcile rather than moving or
+overwriting a published tag:
 
 ```bash
 if git rev-parse -q --verify "refs/tags/$version" >/dev/null; then
