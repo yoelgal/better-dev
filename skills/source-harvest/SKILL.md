@@ -12,6 +12,11 @@ the improvements. The pipeline has three stages with a hard boundary between the
 editorialize into the library, and never start rewriting skills before the synthesis
 round has been criticized for completeness.
 
+One arrival is a routing case, not a full harvest: a link handed over as a build ask
+("implement this into the library") still gets its Stage 1 capture here - then the
+captured brief routes to `/plan-grill` for the build, and this skill's synthesis and
+execution stages stand down; they judge harvested material, not feature requests.
+
 The target is the repo the session is in, or the one the user names - never a
 remembered default from a previous harvest. Find its archive before the first write:
 
