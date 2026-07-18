@@ -25,7 +25,10 @@ guide found" - so a missed guide is a visible miss, not a silent one.
 Before you re-derive anything about this area, spend one recall on it
 (`.better-dev/bin/bd-mem recall "<area>"`) and cite what it returned, or an explicit "recall empty" -
 a lesson you already paid for is cheaper than the mistake it prevents. A recalled lesson is a prior
-claim, not a current fact - verify it against today's code before acting on it.
+claim, not a current fact - verify it against today's code before acting on it. A fix item carved by
+`/groundwork` also reads its epic's record first (`.better-dev/bin/bd-mem ledger read <epic>
+groundwork.md`) and enters the settled decisions as settled - plan-grill's carved-item entry rule,
+same form here.
 
 The order below matters: a theory before a red signal is the exact failure this skill exists to
 prevent. Don't skip forward.

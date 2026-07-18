@@ -84,6 +84,15 @@ the scope line, and branch/commit conventions become premises like any other. Ei
 contract carries one census line - "contribution guide: `CONTRIBUTING.md`" or "no contribution
 guide found" - so a missed guide is a visible miss, not a silent one.
 
+A carved work-item's baseline starts one level up. When the item came out of a `/groundwork` carve,
+the epic's record is settled ground, not conversation history a fresh session may drop: read it
+before grilling (`.better-dev/bin/bd-mem ledger read <epic> groundwork.md`) and carry its decisions
+as settled - never re-asked, never silently reopened - with the frozen surface and the cross-cutting
+policy entering as premises. A need this item can't meet without contradicting a settled decision is
+groundwork's pause-the-wave signal: stop and show the conflict rather than widening the answer inside
+this item. The carve's readiness gate is checked here too, not assumed: a foundation not yet merged
+green to the integration branch means this item isn't ready to grill.
+
 ## 2. Ideate - propose, then pick one to grill
 
 Before sketching options, put the premise itself on trial in two lines: the outcome this feature

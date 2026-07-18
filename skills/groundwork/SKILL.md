@@ -156,8 +156,12 @@ into waves - read `carving.md`.
 ## 5. Hand off, and record the groundwork
 
 Each carved work-item now goes down its own front-end - `/plan-grill` for a feature, `/diagnose` for a
-fix - and then to `/autonomous-loop`, exactly as if it had arrived on its own. Groundwork's job ends at
-the handoff; it doesn't grill each feature itself.
+fix - and then to `/autonomous-loop`. It does not arrive as if it were standalone: the front-end runs in
+a fresh session where this discussion no longer exists, so the epic's ledger record is the context
+transfer - the receiving front-end loads it and enters the epic's settled decisions as settled
+(plan-grill's carved-item entry rule). Groundwork's job ends at the handoff; it doesn't grill each
+feature itself, and mid-groundwork the pull to just start building one of the features is the signal the
+carve's edge is reached: hand off, don't build.
 
 Present the carve before recording it: the numbered work-item list, each with its owns, depends-on,
 base, and wave - rendered in full as message text the user reads *before or alongside* the approval
