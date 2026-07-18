@@ -1,6 +1,6 @@
 ---
 name: graphify-wrapper-setup
-description: "Use when you first wire up graphify-wrapper on a machine or repo - install the graphify CLI, add the never-commit guard, seed the per-repo registry, and pick a semantic backend; the one-time 'set up graphify' step before any mapping or indexing."
+description: Use when you first wire up graphify-wrapper on a machine or repo - install the graphify CLI, add the never-commit guard, seed the per-repo registry, and pick a semantic backend; the one-time 'set up graphify' step before any mapping or indexing.
 allowed-tools:
   - Bash
   - Read

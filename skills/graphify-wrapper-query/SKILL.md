@@ -1,6 +1,6 @@
 ---
 name: graphify-wrapper-query
-description: "Use when you want to traverse a domain's graph to orient before grepping - 'who calls this', 'what depends on X', 'shortest path between A and B', 'explain this node'."
+description: Use when you want to traverse a domain's graph to orient before grepping - 'who calls this', 'what depends on X', 'shortest path between A and B', 'explain this node'.
 argument-hint:
   '<name> "<question>" [--affected | --path "A" "B" | --explain] [--budget N]'
 allowed-tools:
