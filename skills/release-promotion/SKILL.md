@@ -115,7 +115,13 @@ git switch "$release" && git merge --ff-only "origin/$integration"
 ```
 
 Then tag the release at that commit. Take the version from the project's scheme (a bumped
-`package.json`, a `VERSION` file, the last tag's successor) - read it, don't invent one. If no scheme
+`package.json`, a `VERSION` file, the last tag's successor) - read it, don't invent one. Before
+cutting it, confirm every version-bearing surface the repo ships (a package or plugin manifest, a
+`VERSION` file) names the version being tagged - tag succession alone is not the scheme while such
+a surface exists, and each tag cut over a stale manifest widens the lag every consumer of that
+manifest reads. A lagging surface gets bumped as a commit that rides the promote range through the
+normal gates; found after the tag, it is fixed forward on integration, since a published tag never
+moves. If no scheme
 is discoverable, that's a `NEEDS_INPUT`: ask for the version rather than guessing. Guard the tag
 before creating it: an existing `$version` tag means this promote already ran, or the version was
 never bumped - either way, stop and reconcile rather than moving or overwriting a published tag:
