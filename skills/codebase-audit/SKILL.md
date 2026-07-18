@@ -40,7 +40,10 @@ forward - they scope what the sweep is allowed to report.
 
 Don't audit uniformly. Let the structure and the intent docs point you at where risk actually
 concentrates - the high-churn, high-consequence code, the untrusted-input surfaces, the seams the docs
-flag - and sweep there. Correctness, security, performance, tests, and debt are lenses, not a checklist
+flag - and sweep there. Churn is measured, not guessed: when the user named an area, take it; otherwise
+walk a good stretch of the commit history (`git log --oneline`) for the paths that keep coming up, and
+let those hot spots pull the sweep first - a finding in code nobody touches is leverage that never pays,
+so dormant corners earn attention only through the risk lenses, not the improvement ones. Correctness, security, performance, tests, and debt are lenses, not a checklist
 to fill; a finding earns its place by evidence, not by filling a category.
 
 Where the host can spawn workers, fan out through `/orchestrating-agents` - one worker per area or
