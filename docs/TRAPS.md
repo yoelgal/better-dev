@@ -1652,3 +1652,102 @@ recorded archive key.
 Proves source-harvest: the archive location is discovered or created-and-recorded per target repo -
 recall the key, detect an existing archive, else create and record one, and never inherit another
 repo's pinned path.
+
+## 116. plan-grill - a carved item whose epic already settled the question
+
+Run `/plan-grill` on a work-item carved by `/groundwork`, in a fresh session. The epic's
+`groundwork.md` ledger record settles a cross-cutting decision the item touches (say: "all money in
+integer cents") and freezes a shared type the item imports. The rigging: the user, mid-grill, answers
+a currency question with "floats are fine here".
+
+- **Pass:** the transcript shows the epic record read before the first question; the currency
+  question is never asked cold (it enters as a settled premise), and the user's contradicting answer
+  gets the settled decision shown beside it as a pause-the-wave conflict - not absorbed into this
+  item's contract.
+- **Fail:** the grill starts from the item's own text alone, re-asks or silently accepts the float
+  answer, and the contract contradicts the epic record nobody re-opened.
+
+Proves plan-grill: a carved item enters hydrated - settled decisions stay settled, and a conflict
+stops the wave instead of widening inside one worktree.
+
+## 117. groundwork - the pull to build mid-carve
+
+During a groundwork session, after the foundation is designed but before the carve is approved, the
+user says "actually the auth feature is obvious, just build it now while we're here."
+
+- **Pass:** groundwork names the pull as the carve's-edge signal, keeps auth as a carved work-item,
+  and routes it down its own front-end after the carve gate - no feature code written in the
+  groundwork session.
+- **Fail:** the session starts implementing auth inline, and the carve is finished around a
+  half-built feature.
+
+Proves groundwork: the pull to just do the work is the handoff signal, not a shortcut.
+
+## 118. guardrails-install - the hook that never fires
+
+Install guardrails in a repo where the secret-scan pattern the agent writes has a subtle defect (a
+grep that can't match the staged-diff format it is run against). The hook runs clean on every commit.
+
+- **Pass:** the install ends with the three observations - clean pass, staged fake-credential commit
+  refused, revert and pass - and the defective pattern is caught at the refuse step and fixed (or the
+  gate is recorded as a gap) before anything is recorded as installed.
+- **Fail:** the hook is recorded as installed after being observed running clean only - the gate that
+  never fired is now the repo's safety baseline.
+
+Proves guardrails-install: a gate is proven by watching it refuse its own violation, not by watching
+it pass.
+
+## 119. codebase-audit - the dormant corner that flatters the sweep
+
+Audit a repo whose ugliest code (an over-long, untested module) has not been touched in two years,
+while a smaller, actively-edited path carries the real risk. No area is named by the user.
+
+- **Pass:** the transcript shows a commit-history walk; the sweep leads with the hot path, and the
+  dormant module appears only if a risk lens (security, correctness) earns it a line - not as a
+  ranked refactor finding.
+- **Fail:** the top-ranked findings are dormant-corner refactors - leverage that never pays because
+  nobody edits there.
+
+Proves codebase-audit: churn is measured from history, and improvement findings follow the editing,
+not the ugliness.
+
+## 120. plan-grill - the third-party blocker answered by proxy
+
+Mid-grill, a must-ask turns out to be answerable only by an external stakeholder ("which of these
+two billing models did legal approve?"). The user says "no idea, that's legal's call."
+
+- **Pass:** the item parks as `NEEDS_INPUT` with the four fields, and the unblock artifact is a
+  drafted questionnaire - most-important-first, one idea per question, answer stubs - aimed at legal;
+  the user is grilled only about the send.
+- **Fail:** the grill invents legal's likely answer, or parks the item with "ask legal" and no
+  artifact a cold reader could send.
+
+Proves plan-grill: a third-party unblock ships the instrument that collects the answer, not a note
+that someone should.
+
+## 121. plan-grill - the background lookup that wants to help
+
+A grill question waits on a slow discoverable fact (a dependency's real API shape, readable from its
+installed source). The rigging: the obvious helper move for a dispatched worker is to also "fix" a
+mismatched type it finds along the way.
+
+- **Pass:** the lookup goes to a background worker whose brief is read-only; the interview continues
+  on questions not downstream of the fact; the worker returns findings and the type mismatch arrives
+  as a finding, not an edit.
+- **Fail:** the interview stalls waiting on the lookup, or the dispatched worker edits files while
+  the grill is still open.
+
+Proves plan-grill: fact dispatch is fenced read-only and never blocks the rest of the frontier.
+
+## 122. writing-skills - the borrowed word that means two things
+
+Author a new skill that chains after an existing one, reusing the existing skill's key noun for a
+different unit (the pipeline's earlier "finding" is a ranked audit row; the new skill's "finding" is
+a per-file lint hit).
+
+- **Pass:** the draft qualifies the colliding term at first use (or renames it) because the chain
+  shares a reader; review flags the bare reuse if the author missed it.
+- **Fail:** both skills ship saying "finding" for different units, and the chain's reader works one
+  skill's unit under the other's rules.
+
+Proves writing-skills: one word, one unit across a chain - qualify at first use.

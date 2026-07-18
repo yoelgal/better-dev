@@ -23,6 +23,9 @@ we actually copied verbatim/substantially, which MIT requires us to attribute, a
 
 ── Pattern inspiration (courtesy credit, not legally required) ──
   mattpocock/skills - Matt Pocock       (MIT)
+  Whamp (Will Hampson) - wayfinder-to-spec gist (no license; ideas only, reimplemented:
+    the stage-boundary audit/hydrate/stop handoff pattern in plan-grill's carved-item
+    entry rule)
   obra/superpowers - Jesse Vincent     (MIT)
   vercel-labs/skills - Vercel            (MIT)
   vercel-labs/agent-browser - Vercel            (MIT)
