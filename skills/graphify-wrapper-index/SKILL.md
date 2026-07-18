@@ -29,7 +29,7 @@ name="$1"; path="$2"; sem=false
 case "$*" in *--semantic*) sem=true;; esac
 root=$(gfx_this_worktree)
 [ -d "$root/$path" ] || { echo "path not found in repo: $path"; exit 1; }
-tmp=$(mktemp)
+tmp=$(mktemp "$(dirname "$reg")/.reg.XXXXXX")
 jq --arg n "$name" --arg p "$path" --argjson s "$sem" \
    '.indexes[$n]={path:$p, semantic:$s}' "$reg" > "$tmp" && mv "$tmp" "$reg"
 echo "registered '$name' -> $path (semantic=$sem)"
@@ -44,5 +44,5 @@ domain set, refines it with you interactively, and registers the chosen ones.
 ## Removing a domain
 
 ```bash
-tmp=$(mktemp); jq --arg n "$1" 'del(.indexes[$n])' "$reg" > "$tmp" && mv "$tmp" "$reg"
+tmp=$(mktemp "$(dirname "$reg")/.reg.XXXXXX"); jq --arg n "$1" 'del(.indexes[$n])' "$reg" > "$tmp" && mv "$tmp" "$reg"
 ```

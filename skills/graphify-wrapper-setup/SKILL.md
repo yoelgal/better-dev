@@ -16,11 +16,24 @@ Make a repo ready for graphify-wrapper. Idempotent - safe to re-run.
 
 ## 1. Ensure the CLI
 
-The PyPI package is `graphifyy` (double-y); the binary is `graphify`.
+The PyPI package is `graphifyy` (double-y); the binary is `graphify`. The
+wrapper needs graphifyy 0.9.18 or newer. Its hooks read the built_at_commit
+provenance that graphifyy added in 0.7.0, and the wedge safety rests on the
+atomic graph writes graphifyy completed in 0.9.18, so an older build leaves the
+refresh hook dead and its writes non-atomic. Setup upgrades a stale install
+before continuing.
 
 ```bash
 command -v graphify >/dev/null || uv tool install graphifyy
 graphify --version
+
+floor=0.9.18
+have=$(graphify --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+if [ -n "$have" ] && [ "$(printf '%s\n%s\n' "$floor" "$have" | sort -V | head -1)" != "$floor" ]; then
+  echo "graphifyy $have is below the $floor floor; upgrading"
+  uv tool upgrade graphifyy
+  graphify --version
+fi
 ```
 
 If `uv` is missing, stop and tell the operator to install it (`brew install uv`);
@@ -74,7 +87,7 @@ elif [ -n "${GEMINI_API_KEY:-}${GOOGLE_API_KEY:-}" ]; then b=gemini
 elif [ -n "${OPENAI_API_KEY:-}" ]; then b=openai
 elif [ -n "${DEEPSEEK_API_KEY:-}" ]; then b=deepseek
 else b=claude-cli; fi
-reg=$(gfx_registry); tmp=$(mktemp)
+reg=$(gfx_registry); tmp=$(mktemp "$(dirname "$reg")/.reg.XXXXXX")
 jq --arg b "$b" '.backend=$b' "$reg" > "$tmp" && mv "$tmp" "$reg"
 echo "semantic backend: $b"
 ```
