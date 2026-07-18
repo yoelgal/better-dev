@@ -1,8 +1,9 @@
 # Extraction recipes (verified on macOS, arm64)
 
-Concrete per-type recipes for stage 1 of `source-harvest`. All verified working
-2026-07-07 on macOS (arm64); on another OS keep each recipe's shape - the canonical
-capture, then the page read - and swap the tool invocations. Re-verify a recipe
+Concrete per-type recipes for stage 1 of `source-harvest`. All verified working on
+macOS (arm64), 2026-07-07 unless a recipe notes its own date; on another OS keep each
+recipe's shape - the canonical capture, then the page read - and swap the tool
+invocations. Re-verify a recipe
 against its tool's --help if it misbehaves before debugging deeper.
 
 ## X post (plain text)
