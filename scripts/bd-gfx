@@ -52,7 +52,7 @@ gfx_this_worktree() { git rev-parse --show-toplevel 2>/dev/null; }
 gfx_backend() {
   local r; r=$(gfx_registry)
   if [ -f "$r" ]; then
-    jq -r '.backend // empty' "$r" 2>/dev/null && return 0
+    jq -r '.backend // "claude-cli"' "$r" 2>/dev/null && return 0
   fi
   printf 'claude-cli\n'
 }
@@ -143,6 +143,42 @@ _gfx_selftest() {
   _eq "registry index_names" "$( GRAPHIFY_HOME="$rh" gfx_index_names )"          "a"
   _eq "registry index_field" "$( GRAPHIFY_HOME="$rh" gfx_index_field a path )"   "pkg/a"
   rm -rf "$rh"
+
+  # backend falls back to claude-cli when the registry carries no backend key
+  local bh; bh=$(mktemp -d)
+  printf '%s\n' '{"indexes":{}}' >"$bh/registry.json"
+  _eq "backend no-key default" "$( GRAPHIFY_HOME="$bh" gfx_backend )" "claude-cli"
+  rm -rf "$bh"
+
+  # default_branch: an origin/HEAD symbolic ref wins
+  local db; db=$(mktemp -d)
+  ( cd "$db" && git init -q \
+      && git -c user.email=t@t -c user.name=t commit -q --allow-empty -m init \
+      && git update-ref refs/remotes/origin/develop HEAD \
+      && git symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/develop )
+  _eq "default_branch origin/HEAD" "$( cd "$db" && gfx_default_branch )" "develop"
+  rm -rf "$db"
+
+  # default_branch: no origin/HEAD, but refs/remotes/origin/main present
+  local dm; dm=$(mktemp -d)
+  ( cd "$dm" && git init -q \
+      && git -c user.email=t@t -c user.name=t commit -q --allow-empty -m init \
+      && git update-ref refs/remotes/origin/main HEAD )
+  _eq "default_branch origin/main" "$( cd "$dm" && gfx_default_branch )" "main"
+  rm -rf "$dm"
+
+  # default_branch: nothing to go on -> main
+  local dn; dn=$(mktemp -d); ( cd "$dn" && git init -q )
+  _eq "default_branch fallback" "$( cd "$dn" && gfx_default_branch )" "main"
+  rm -rf "$dn"
+
+  # main_worktree: on the default branch it prints this worktree's root
+  local mw; mw=$(mktemp -d)
+  ( cd "$mw" && git init -q && git symbolic-ref HEAD refs/heads/main \
+      && git -c user.email=t@t -c user.name=t commit -q --allow-empty -m init )
+  _eq "main_worktree is this" \
+      "$( cd "$mw" && gfx_main_worktree )" "$( cd "$mw" && gfx_this_worktree )"
+  rm -rf "$mw"
 
   rm -rf "$d"
   [ "$rc" = 0 ] && printf 'bd-gfx selftest OK\n'
