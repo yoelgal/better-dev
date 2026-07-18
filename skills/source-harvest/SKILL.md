@@ -41,7 +41,11 @@ Read the archive's own `README.md` for its filing conventions before writing any
   reel ID, repo slug). An unchanged dupe gets one appended "re-submitted <date>" line in
   its existing source.md, never a re-ingest. But a re-submission with a new version, or
   whose prior entry was shallow (stopped at rung 1-2 of the depth ladder), gets the
-  note AND a fresh deep diff-ingest as its own entry.
+  note AND a fresh deep diff-ingest as its own entry. "Unchanged" is checked at HEAD,
+  not at the last release: an author post clarifying or defending a released version is
+  itself evidence of unreleased fixes in flight, so clone and diff the default branch
+  against the prior ingest - the changesets sitting ahead of the tag are often the
+  answer to the very thread being harvested.
 - Dead links, paywalls, private accounts: record the failure in the batch manifest and
   tell the user; never silently skip.
 

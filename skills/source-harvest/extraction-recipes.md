@@ -57,6 +57,13 @@ author/title before filing; on a mismatch re-run with a longer delay. This read 
 recovers truncated note-tweets: the thread page carries the full text the
 syndication API cuts at ~280 chars.
 
+The top-level thread DOM is one layer, not the conversation: replies clipped at "Show
+more" and subthreads folded behind "Show replies" are absent from it. Give each
+truncated reply its own syndication fetch (its status id is in the page), and each
+substantive subthread its own permalink page read with this same recipe - the author's
+canonical answers routinely live two levels down, under a reply the top page shows
+only folded.
+
 Fallback (setting off, no settings needed): open the page, select-all, copy, read
 the clipboard. Frontmost gotcha (hit 2026-07-07): some terminal apps (cmux) stay
 frontmost after `activate`, so the keystrokes land in the terminal and you copy your
