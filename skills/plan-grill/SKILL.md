@@ -47,6 +47,12 @@ Gate: the intent arrives as relayed language - stakeholder feedback, user feedba
 a ticket quoting someone else ("make it simpler", "we need a chatbot", "users say X feels slow").
 First-person intent from the user at the keyboard skips this step in one line.
 
+One rule binds whether the words are relayed or first-person: a brief that points at an external
+source - an X post, a repo, an article - captures that source's content through `/source-harvest`'s
+extraction recipes before anything is decoded or planned. The link is the brief, and the recipes
+carry the canonical per-type capture; an improvised fetch loses the exact text and media the decode
+reads.
+
 Record the brief verbatim before restating it - the requester's exact words in quotes, with who
 said them, carried into the contract above its `## Problem` section; the specific word chosen is
 evidence, and a paraphrase destroys it. Then run the six decode moves in `brief-decode.md`. The
