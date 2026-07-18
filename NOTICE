@@ -16,6 +16,10 @@ we actually copied verbatim/substantially, which MIT requires us to attribute, a
     Kept files byte-identical per the 2026-07-07 harvest ruling R2.
   scripts/bd-guard - destructive-command pattern set and safe-rm allowlist adapted
     from garrytan/gstack careful/ (MIT); script structure and everything else ours.
+  skills/graphify-wrapper-*, scripts/bd-gfx, hooks/bd-graphify-* - ported from
+    orrgal1/claude-plugins graphify-wrapper v1.2.0 (MIT, (c) 2026 orrgal1); mechanics
+    kept substantially verbatim, prose adapted to house rules (dash-free, Use-when
+    descriptions, bridge-resolved lib path).
 
 ── Pattern inspiration (courtesy credit, not legally required) ──
   mattpocock/skills - Matt Pocock       (MIT)

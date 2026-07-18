@@ -169,6 +169,12 @@ fi
 If the loop leaves `$sd` empty, no marker resolved and the tool is not installed for this host - loop
 back to the bootstrap block above rather than running `bd-link` against an empty path.
 
+Onboard also runs `/graphify-wrapper-setup` as part of the same wiring - idempotent, so a re-run is
+safe: it installs the graphify CLI, gitignores `graphify-out/` globally, and inits the per-repo domain
+registry. When that registry holds no domains yet, offer `/graphify-wrapper-map` to build the first
+graph; a re-run treats a missing registry as a gap to fill, which is how an existing repo picks the
+capability up.
+
 With the bridge resolving, offer the standing allowance so its own calls never trip the permission
 gate. Where the host has a permission config (Claude family: `.claude/settings.local.json`), emit a
 paste-ready snippet - offered to the clipboard where the host has one - adding two allow rules,
@@ -286,6 +292,7 @@ itself - a tool you name wins over a row:
 | "is this safe", a security pass on a risky diff | `/security-pass` | composed by `/review` automatically |
 | "is there a tool or skill for X" | `/tool-sourcing` | -> `/self-extension` only if discovery is empty |
 | "who calls this / what breaks if I change X" | `/codebase-map` | orientation, changes nothing |
+| "index the repo", "build / refresh the code graph" | `/graphify-wrapper-map` (or `-sync`) | `/graphify-wrapper-query` answers from it; hooks keep worktree graphs fresh |
 | "what's worth doing here", "audit this codebase" | `/codebase-audit` | ranked findings; you pick -> front-ends |
 | "here are some links / ingest these / harvest this", a dump of source material for the library | `/source-harvest` | ingests verbatim -> critical synthesis -> library improvements |
 | "just push to the PR / use feat/ / skip the grill" | `/overrides` | records the standing default |

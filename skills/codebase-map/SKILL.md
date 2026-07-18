@@ -31,7 +31,8 @@ Look for a structural source the project or host already provides, and prefer it
 
 - A code-graph, structural-search, or knowledge-graph skill the host or project ships - names vary by
   host, so detect by what it answers (callers, dependents, symbol paths), not by a name this skill
-  can't know is installed.
+  can't know is installed. better-dev ships `/graphify-wrapper-query` (with `/graphify-wrapper-sync`
+  for freshness) as exactly this class of tool once a repo has registered domains.
 - The language's own index - an LSP / IDE symbol index, `ctags`, or a framework's route and schema
   introspection.
 
