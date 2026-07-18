@@ -28,25 +28,40 @@ curl each into `media/` (no auth needed), then transcribe or describe them into
 source.md. Downloaded image files are readable by extraction subagents (the
 main-agent-only constraint applies to conversation-pasted images, not files on disk).
 
-Images INSIDE an X Article are a known gap: the select-all copy captures text only.
-When an article's figures matter, screenshot the rendered page (or save the specific
-images from the browser by hand) into `media/` and note in source.md which figures
-were captured versus skipped - never silently drop them.
+Images INSIDE an X Article: the preferred outerHTML capture (recipe below) keeps
+them as img tags - harvest the `pbs.twimg.com/media/...` URLs from the cleaned
+markdown into `media/`. Only the select-all fallback loses them; if forced onto it,
+screenshot the rendered page into `media/` and note in source.md which figures were
+captured versus skipped - never silently drop them.
 
 ## Full-page browser read (X Articles, threads, any authenticated page)
 
-Preferred: Chrome AppleScript JS (`execute javascript "document.body.innerText"`) - but
-it needs View > Developer > Allow JavaScript from Apple Events, usually off. The
-no-settings fallback that works: open the page, select-all, copy, read the clipboard.
+Preferred (verified 2026-07-18): pull the rendered DOM out of Chrome and clean it
+with pandoc. Needs View > Developer > Allow JavaScript from Apple Events turned on
+(one-time, per profile) - if it is off the osascript errors telling you so; use the
+fallback below or ask the operator to flip it.
 
-Frontmost gotcha (hit 2026-07-07): some terminal apps (cmux) stay frontmost after
-`activate`, so the keystrokes land in the terminal and you copy your own session. Force
-focus inside System Events right before the keystrokes - `set frontmost of process
-"Google Chrome" to true`, delay 2 - and verify the active tab's URL via AppleScript
-before trusting the clipboard. The URL check alone is not enough: a slow-loading page
-can leave the PREVIOUS tab's content in the copy, so confirm the captured text names
-the expected author before filing; on a mismatch, re-capture with a longer delay. The same recipe also recovers truncated note-tweets: the
-thread page copied this way carries the full text the syndication API cuts at ~280 chars.
+    osascript <<'EOF' > raw-capture.html
+    tell application "Google Chrome" to open location "https://x.com/i/article/<ARTICLE_ID>"
+    delay 7
+    tell application "Google Chrome" to get execute active tab of front window javascript "document.documentElement.outerHTML"
+    EOF
+    pandoc -f html -t gfm-raw_html raw-capture.html -o raw-capture.md
+
+No keystrokes, no clipboard, no focus games - and unlike the copy fallback it keeps
+every img src: content images are the `pbs.twimg.com/media/...` URLs in the markdown
+(`profile_images/` is avatar junk), curl each into `media/`. A slow page can still
+hand you the previous tab's DOM, so confirm the capture names the expected
+author/title before filing; on a mismatch re-run with a longer delay. This read also
+recovers truncated note-tweets: the thread page carries the full text the
+syndication API cuts at ~280 chars.
+
+Fallback (setting off, no settings needed): open the page, select-all, copy, read
+the clipboard. Frontmost gotcha (hit 2026-07-07): some terminal apps (cmux) stay
+frontmost after `activate`, so the keystrokes land in the terminal and you copy your
+own session. Force focus inside System Events right before the keystrokes - `set
+frontmost of process "Google Chrome" to true`, delay 2 - and apply the same
+expected-author check before trusting the clipboard.
 
     pbpaste > /tmp/clip-backup.txt   # restore the user's clipboard after the batch
     osascript <<'EOF'
@@ -65,7 +80,7 @@ thread page copied this way carries the full text the syndication API cuts at ~2
     pbpaste > raw-capture.txt
     cat /tmp/clip-backup.txt | pbcopy
 
-Then strip the X page chrome: content starts at the article title (~line 5), ends
+Either way, strip the X page chrome: content starts at the article title, ends
 before "Want to publish your own Article?". Keep the author's trailing promo if it is
 part of the article body; sed line ranges beat regex here.
 
