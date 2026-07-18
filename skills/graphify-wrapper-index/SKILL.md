@@ -1,12 +1,10 @@
 ---
 name: graphify-wrapper-index
-description: Use when you want to register or remove a named domain index by hand - 'add an index for services/backend', 'drop that domain'; discovery via /graphify-wrapper-map, build via /graphify-wrapper-sync.
+description: Use when a named domain index needs registering or removing by hand - "add an index for services/backend", "drop that domain" - discovery via /graphify-wrapper-map, build via /graphify-wrapper-sync.
 argument-hint: "<name> <path> [--semantic]  (or: <name> to remove)"
 allowed-tools:
   - Bash
   - Read
-  - Grep
-  - Glob
 ---
 
 # /graphify-wrapper-index

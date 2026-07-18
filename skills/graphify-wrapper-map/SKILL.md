@@ -1,6 +1,6 @@
 ---
 name: graphify-wrapper-map
-description: Use when you want to turn a sprawling repo into a small, deliberate set of domains worth indexing - 'index the repo', 'build the code graph', 'map this codebase' - the guided front door to /graphify-wrapper-index.
+description: Use when a sprawling repo needs turning into a small, deliberate set of domains worth indexing - "index the repo", "build the code graph", "map this codebase" - the guided front door to /graphify-wrapper-index.
 allowed-tools:
   - Bash
   - Read

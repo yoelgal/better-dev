@@ -1,6 +1,6 @@
 ---
 name: graphify-wrapper-sync
-description: Use when you want to build or refresh this worktree's domain graphs - 'sync the index', 'rebuild the graph', 'refresh graphify' - AST-only by default, --semantic for the full extract.
+description: Use when a worktree's domain graphs need building or refreshing - "sync the index", "rebuild the graph", "refresh graphify" - AST-only by default, --semantic for the full extract.
 argument-hint: "[<name> - defaults to all registered] [--semantic]"
 allowed-tools:
   - Bash

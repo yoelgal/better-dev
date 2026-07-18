@@ -1,6 +1,6 @@
 ---
 name: graphify-wrapper-status
-description: Use when you want to see the registered domain indexes and their freshness for this worktree - 'graphify status', 'which graphs are built', 'are my indexes stale'.
+description: Use when someone wants to see the registered domain indexes and their freshness for this worktree - "graphify status", "which graphs are built", "are my indexes stale".
 allowed-tools:
   - Bash
 ---
