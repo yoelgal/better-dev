@@ -1,0 +1,194 @@
+#!/usr/bin/env bash
+# bd-gfx - better-dev's shared graphify helpers.
+#   source it:  . "${CLAUDE_PLUGIN_ROOT}/scripts/bd-gfx"
+#          or:  . "$repo/.better-dev/bin/bd-gfx"
+# Repo-keyed central home holds only the registry; graphs live in-tree
+# (gitignored) at <path>/graphify-out/ per graphify's native layout.
+# Ported from orrgal1/claude-plugins graphify-wrapper (MIT), see NOTICE.
+
+# Canonical repo id, stable across all worktrees (derived from git identity).
+gfx_repo_key() {
+  local url
+  url=$(git remote get-url origin 2>/dev/null || true)
+  if [ -n "$url" ]; then
+    printf '%s\n' "$url" | sed -E \
+      -e 's#\.git$##' \
+      -e 's#^[a-z]+://##' \
+      -e 's#^[^@]*@##' \
+      -e 's#^[^:/]*[:/]##' \
+      -e 's#/#__#g'
+  else
+    git rev-parse --git-common-dir 2>/dev/null | shasum -a 256 | cut -c1-12
+  fi
+}
+
+# Central home (registry only). Override with GRAPHIFY_HOME.
+gfx_home() { printf '%s\n' "${GRAPHIFY_HOME:-$HOME/.claude/graphify/$(gfx_repo_key)}"; }
+gfx_registry() { printf '%s\n' "$(gfx_home)/registry.json"; }
+
+gfx_default_branch() {
+  local b
+  b=$(git symbolic-ref -q --short refs/remotes/origin/HEAD 2>/dev/null); b=${b#origin/}
+  if [ -z "$b" ]; then
+    for c in main master; do
+      git show-ref -q --verify "refs/remotes/origin/$c" 2>/dev/null && { b=$c; break; }
+    done
+  fi
+  printf '%s\n' "${b:-main}"
+}
+
+# Absolute path of the worktree checked out on the default branch (seed source).
+gfx_main_worktree() {
+  local def; def=$(gfx_default_branch)
+  git worktree list --porcelain 2>/dev/null | awk -v b="refs/heads/$def" '
+    /^worktree /{wt=$2}
+    /^branch /{ if ($2==b){print wt; exit} }'
+}
+
+# Path of the current worktree root.
+gfx_this_worktree() { git rev-parse --show-toplevel 2>/dev/null; }
+
+# Backend for --semantic builds; defaults to claude-cli (no API key, plan-billed).
+gfx_backend() {
+  local r; r=$(gfx_registry)
+  if [ -f "$r" ]; then
+    jq -r '.backend // "claude-cli"' "$r" 2>/dev/null && return 0
+  fi
+  printf 'claude-cli\n'
+}
+
+# Model for the claude-cli semantic backend. graphify's claude-cli path defaults
+# to Opus (overkill for structured-JSON extraction); we pin sonnet.
+gfx_cli_model() {
+  local r; r=$(gfx_registry)
+  if [ -f "$r" ]; then
+    jq -r '.cli_model // "sonnet"' "$r" 2>/dev/null && return 0
+  fi
+  printf 'sonnet\n'
+}
+
+# File globs excluded from semantic `extract`. graphify reads docs AND images as
+# text and asks the LLM to graph them, but SVG markup (path/base64 data) and
+# decoded binary bytes are token-heavy noise with zero architectural signal, and
+# big image-stuffed chunks are what time out. Default to dropping image/asset
+# files; override per-repo with a JSON `.extract_excludes` array in the registry.
+gfx_extract_excludes() {
+  local r; r=$(gfx_registry)
+  if [ -f "$r" ] && jq -e '(.extract_excludes // empty) | type == "array"' "$r" >/dev/null 2>&1; then
+    jq -r '.extract_excludes[]' "$r" 2>/dev/null && return 0
+  fi
+  printf '%s\n' '*.svg' '*.png' '*.jpg' '*.jpeg' '*.gif' '*.webp' '*.bmp' '*.ico' '*.tiff' '*.heic'
+}
+
+# Per-chunk token budget for the claude-cli backend. graphify hardcodes the
+# `claude -p` subprocess timeout at 600s (--api-timeout governs only HTTP API
+# backends), so oversized chunks time out. Cap chunk size below graphify's 60k
+# default so each call finishes under the wall. Override with `.cli_token_budget`.
+gfx_cli_token_budget() {
+  local r; r=$(gfx_registry)
+  if [ -f "$r" ]; then
+    jq -r '.cli_token_budget // "20000"' "$r" 2>/dev/null && return 0
+  fi
+  printf '20000\n'
+}
+
+# jq read of an index field:  gfx_index_field <name> <field>
+gfx_index_field() {
+  jq -r --arg n "$1" --arg f "$2" '.indexes[$n][$f] // empty' "$(gfx_registry)" 2>/dev/null
+}
+
+gfx_index_names() { jq -r '.indexes | keys[]' "$(gfx_registry)" 2>/dev/null; }
+
+# --- selftest -------------------------------------------------------------
+# Runs only when this file is EXECUTED, never when sourced. Offline checks of
+# the helpers above against throwaway git repos and registries under mktemp.
+_gfx_selftest() {
+  local d rc=0
+  d=$(mktemp -d)
+  # shellcheck disable=SC2317
+  _fail() { printf 'bd-gfx selftest FAIL: %s\n' "$1" >&2; rc=1; }
+  _eq() { [ "$2" = "$3" ] || _fail "$1: expected '$3', got '$2'"; }
+
+  # repo key from an ssh remote
+  ( cd "$d" && git init -q && git remote add origin git@github.com:acme/mono.git )
+  _eq "ssh repo_key" "$( cd "$d" && gfx_repo_key )" "acme__mono"
+  # same repo, https remote form yields the same key
+  ( cd "$d" && git remote set-url origin https://github.com/acme/mono.git )
+  _eq "https repo_key" "$( cd "$d" && gfx_repo_key )" "acme__mono"
+
+  # no-remote repo hashes to a 12-char hex string
+  local nr key
+  nr=$(mktemp -d); ( cd "$nr" && git init -q )
+  key=$( cd "$nr" && gfx_repo_key )
+  [[ "$key" =~ ^[0-9a-f]{12}$ ]] || _fail "no-remote repo_key: not 12 hex, got '$key'"
+  rm -rf "$nr"
+
+  # gfx_home honours GRAPHIFY_HOME, else falls under $HOME/.claude/graphify/<key>
+  _eq "gfx_home override" "$( cd "$d" && GRAPHIFY_HOME=/tmp/x gfx_home )" "/tmp/x"
+  _eq "gfx_home default" "$( cd "$d" && unset GRAPHIFY_HOME; gfx_home )" \
+      "$HOME/.claude/graphify/acme__mono"
+
+  # defaults with no registry file present
+  local h; h=$(mktemp -d)
+  _eq "default backend"       "$( GRAPHIFY_HOME="$h" gfx_backend )"          "claude-cli"
+  _eq "default cli_model"     "$( GRAPHIFY_HOME="$h" gfx_cli_model )"        "sonnet"
+  _eq "default token_budget"  "$( GRAPHIFY_HOME="$h" gfx_cli_token_budget )" "20000"
+  _eq "default excludes[0]"   "$( GRAPHIFY_HOME="$h" gfx_extract_excludes | head -1 )" "*.svg"
+  rm -rf "$h"
+
+  # values read from a registry file
+  local rh; rh=$(mktemp -d)
+  printf '%s\n' '{"backend":"api","indexes":{"a":{"path":"pkg/a"}}}' >"$rh/registry.json"
+  _eq "registry backend"     "$( GRAPHIFY_HOME="$rh" gfx_backend )"              "api"
+  _eq "registry index_names" "$( GRAPHIFY_HOME="$rh" gfx_index_names )"          "a"
+  _eq "registry index_field" "$( GRAPHIFY_HOME="$rh" gfx_index_field a path )"   "pkg/a"
+  rm -rf "$rh"
+
+  # backend falls back to claude-cli when the registry carries no backend key
+  local bh; bh=$(mktemp -d)
+  printf '%s\n' '{"indexes":{}}' >"$bh/registry.json"
+  _eq "backend no-key default" "$( GRAPHIFY_HOME="$bh" gfx_backend )" "claude-cli"
+  rm -rf "$bh"
+
+  # default_branch: an origin/HEAD symbolic ref wins
+  local db; db=$(mktemp -d)
+  ( cd "$db" && git init -q \
+      && git -c user.email=t@t -c user.name=t commit -q --allow-empty -m init \
+      && git update-ref refs/remotes/origin/develop HEAD \
+      && git symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/develop )
+  _eq "default_branch origin/HEAD" "$( cd "$db" && gfx_default_branch )" "develop"
+  rm -rf "$db"
+
+  # default_branch: no origin/HEAD, but refs/remotes/origin/main present
+  local dm; dm=$(mktemp -d)
+  ( cd "$dm" && git init -q \
+      && git -c user.email=t@t -c user.name=t commit -q --allow-empty -m init \
+      && git update-ref refs/remotes/origin/main HEAD )
+  _eq "default_branch origin/main" "$( cd "$dm" && gfx_default_branch )" "main"
+  rm -rf "$dm"
+
+  # default_branch: nothing to go on -> main
+  local dn; dn=$(mktemp -d); ( cd "$dn" && git init -q )
+  _eq "default_branch fallback" "$( cd "$dn" && gfx_default_branch )" "main"
+  rm -rf "$dn"
+
+  # main_worktree: on the default branch it prints this worktree's root
+  local mw; mw=$(mktemp -d)
+  ( cd "$mw" && git init -q && git symbolic-ref HEAD refs/heads/main \
+      && git -c user.email=t@t -c user.name=t commit -q --allow-empty -m init )
+  _eq "main_worktree is this" \
+      "$( cd "$mw" && gfx_main_worktree )" "$( cd "$mw" && gfx_this_worktree )"
+  rm -rf "$mw"
+
+  rm -rf "$d"
+  [ "$rc" = 0 ] && printf 'bd-gfx selftest OK\n'
+  return "$rc"
+}
+
+# Sourced -> expose functions only. Executed -> dispatch the argument.
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+  case "${1:-}" in
+    selftest) _gfx_selftest ;;
+    *) printf 'bd-gfx: source this file for helpers, or run: bd-gfx selftest\n' >&2; exit 2 ;;
+  esac
+fi

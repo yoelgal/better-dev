@@ -1,0 +1,92 @@
+#!/usr/bin/env bash
+# SessionStart hook: refresh domain graphs whose built_at_commit has drifted from
+# HEAD (e.g. after a merge/pull/checkout moved the tree). AST-only - runs
+# `graphify update` (free, diff-aware), never the semantic LLM pass. Scoped to
+# domains the built-to-HEAD delta actually touched, and the whole detection and
+# refresh runs in the background so session start is never blocked (reading
+# provenance from a large graph.json can take a moment). No-op when nothing
+# drifted, when graphify is absent, or in a repo that isn't set up.
+#
+# Ported from orrgal1/claude-plugins graphify-wrapper (MIT), see NOTICE.
+
+case "$0" in /*) SELF="$0" ;; *) SELF="$PWD/$0" ;; esac
+
+# --- selftest: exercises the true main path (real lib sourced from the repo
+# root derived from $SELF) plus a registry-present, no-graphify case that must
+# stop before spawning any child. Offline: no network, no graphify binary.
+if [ "${1:-}" = "selftest" ]; then
+  fail() { echo "selftest FAIL: $1" >&2; exit 1; }
+  root=$(cd "$(dirname "$SELF")/.." && pwd) || fail "could not resolve repo root"
+
+  # no registry -> the real main path runs and stops at the missing registry.
+  tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
+  ( cd "$tmp" && git init -q ) || fail "could not init temp repo"
+  empty="$(mktemp -d)"
+  out="$(cd "$tmp" && CLAUDE_PLUGIN_ROOT="$root" GRAPHIFY_HOME="$empty" "$SELF" 2>&1)"; rc=$?
+  rm -rf "$empty"
+  [ "$rc" = 0 ] || fail "main path exited $rc with no registry"
+  [ -z "$out" ] || fail "main path emitted output with no registry: $out"
+
+  # registry present but no graphify on a scrubbed PATH -> stops before any child.
+  # PATH kept minimal (system bins only) so env/bash still resolve while a
+  # uv-installed graphify (in ~/.local/bin and the like) drops off.
+  reghome="$(mktemp -d)"
+  printf '%s\n' '{"indexes":{"x":{"path":"pkg/x"}}}' >"$reghome/registry.json"
+  out="$(cd "$tmp" && PATH="/usr/bin:/bin" CLAUDE_PLUGIN_ROOT="$root" GRAPHIFY_HOME="$reghome" "$SELF" 2>&1)"; rc=$?
+  rm -rf "$reghome"
+  [ "$rc" = 0 ] || fail "registry present, no graphify exited $rc"
+  [ -z "$out" ] || fail "registry present, no graphify emitted output: $out"
+
+  echo "bd-graphify-refresh-stale selftest: ok"
+  exit 0
+fi
+
+# Never let a hook failure disrupt the session: any unexpected error exits 0.
+set -euo pipefail
+trap 'exit 0' ERR
+
+# Resolve the lib once; when the plugin env is absent (running from the clone)
+# fall back to the sibling script.
+GFX_LIB="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}/scripts/bd-gfx"
+. "$GFX_LIB" 2>/dev/null || exit 0
+command -v graphify >/dev/null 2>&1 || exit 0
+reg=$(gfx_registry 2>/dev/null) || exit 0
+[ -f "$reg" ] || exit 0
+this=$(gfx_this_worktree 2>/dev/null) || exit 0
+[ -n "$this" ] || exit 0
+names=$(gfx_index_names 2>/dev/null) || exit 0
+[ -n "$names" ] || exit 0
+
+# Newline-safe: names carried as positional args, never a split of $names.
+set --
+while IFS= read -r name; do
+  [ -n "$name" ] || continue
+  set -- "$@" "$name"
+done <<EOF
+$names
+EOF
+[ "$#" -gt 0 ] || exit 0
+
+# The nohup'd child re-sources the same resolved lib via GFX_LIB so gfx_ helpers
+# stay available off the background shell.
+GFX_LIB="$GFX_LIB" nohup bash -c '
+  . "$GFX_LIB" 2>/dev/null || exit 0
+  this=$1; shift
+  cd "$this" 2>/dev/null || exit 0                      # gfx_/git resolve to this worktree
+  head=$(git rev-parse HEAD 2>/dev/null) || exit 0
+  [ -n "$head" ] || exit 0
+  for name in "$@"; do
+    path=$(gfx_index_field "$name" path); [ -n "$path" ] || continue
+    g="$this/$path/graphify-out/graph.json"; [ -f "$g" ] || continue   # missing -> seed hook
+    built=$(jq -r ".built_at_commit // empty" "$g" 2>/dev/null)
+    [ -n "$built" ] || continue                          # no provenance -> leave alone
+    [ "$built" = "$head" ] && continue
+    # If built is a real commit, only refresh when the delta touches this path.
+    if git rev-parse --verify -q "$built^{commit}" >/dev/null 2>&1; then
+      [ -n "$(git diff --name-only "$built" "$head" -- "$path" 2>/dev/null)" ] || continue
+    fi
+    graphify update "$this/$path" >/dev/null 2>&1        # AST reconcile; never semantic
+  done
+' _ "$this" "$@" >/dev/null 2>&1 &
+
+exit 0

@@ -1,0 +1,120 @@
+#!/usr/bin/env bash
+# SessionStart hook: make registered domain graphs available in any worktree.
+#
+# A worktree's graphs live in-tree (gitignored) and so are absent in a fresh
+# checkout. This seeds them from the main worktree's graphs when missing - a
+# plain copy, cheap and done in the background so session start is never blocked.
+# It never *builds*: reconciling a seeded graph to the branch diff stays on-demand
+# via /graphify-wrapper-sync. No-op on main, or in a repo that isn't set up.
+#
+# The background child receives every registered domain and self-heals: a valid
+# graph.json is left alone, a torn one (fails jq) is removed so the dir returns
+# to the missing state a later session re-seeds, and a missing one is seeded by
+# copying main's siblings first then installing graph.json last via a same-dir
+# temp + mv, so a killed copy never leaves an unparsable graph a later path trusts.
+#
+# Ported from orrgal1/claude-plugins graphify-wrapper (MIT), see NOTICE.
+
+case "$0" in /*) SELF="$0" ;; *) SELF="$PWD/$0" ;; esac
+
+# --- selftest: exercises the true main path (real lib sourced from the repo
+# root derived from $SELF) plus a registry-present, nothing-to-seed case.
+# Offline: no network, no graphify binary needed.
+if [ "${1:-}" = "selftest" ]; then
+  fail() { echo "selftest FAIL: $1" >&2; exit 1; }
+  root=$(cd "$(dirname "$SELF")/.." && pwd) || fail "could not resolve repo root"
+
+  # no registry -> the real main path runs and stops at the missing registry.
+  tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
+  ( cd "$tmp" && git init -q ) || fail "could not init temp repo"
+  empty="$(mktemp -d)"
+  out="$(cd "$tmp" && CLAUDE_PLUGIN_ROOT="$root" GRAPHIFY_HOME="$empty" "$SELF" 2>&1)"; rc=$?
+  rm -rf "$empty"
+  [ "$rc" = 0 ] || fail "main path exited $rc with no registry"
+  [ -z "$out" ] || fail "main path emitted output with no registry: $out"
+
+  # registry present but main == this worktree -> the non-main gate holds, silent.
+  reghome="$(mktemp -d)"
+  printf '%s\n' '{"indexes":{"x":{"path":"pkg/x"}}}' >"$reghome/registry.json"
+  wt="$(mktemp -d)"
+  ( cd "$wt" && git init -q && git symbolic-ref HEAD refs/heads/main \
+      && git commit -q --allow-empty -m init ) || fail "could not init main worktree"
+  out="$(cd "$wt" && CLAUDE_PLUGIN_ROOT="$root" GRAPHIFY_HOME="$reghome" "$SELF" 2>&1)"; rc=$?
+  rm -rf "$reghome" "$wt"
+  [ "$rc" = 0 ] || fail "registry present (main==this) exited $rc"
+  [ -z "$out" ] || fail "registry present (main==this) emitted output: $out"
+
+  echo "bd-graphify-seed-worktree selftest: ok"
+  exit 0
+fi
+
+# Never let a hook failure disrupt the session: any unexpected error exits 0.
+set -euo pipefail
+trap 'exit 0' ERR
+
+# Resolve the lib once; when the plugin env is absent (running from the clone)
+# fall back to the sibling script.
+GFX_LIB="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}/scripts/bd-gfx"
+. "$GFX_LIB" 2>/dev/null || exit 0
+
+reg=$(gfx_registry 2>/dev/null) || exit 0
+[ -f "$reg" ] || exit 0
+this=$(gfx_this_worktree 2>/dev/null) || exit 0
+main=$(gfx_main_worktree 2>/dev/null) || true
+[ -n "$this" ] || exit 0
+[ -n "$main" ] && [ "$main" != "$this" ] || exit 0   # only non-main worktrees
+
+names=$(gfx_index_names 2>/dev/null) || exit 0
+[ -n "$names" ] || exit 0
+
+# Full registered path list for the child; seed = the cheap [ -f ] count for the
+# user message only (missing here, present on main). Repairs are silent healing.
+seed=0
+set --
+while IFS= read -r name; do
+  [ -n "$name" ] || continue
+  path=$(gfx_index_field "$name" path) || continue
+  [ -n "$path" ] || continue
+  set -- "$@" "$path"
+  if [ ! -f "$this/$path/graphify-out/graph.json" ] \
+     && [ -f "$main/$path/graphify-out/graph.json" ]; then
+    seed=$((seed + 1))
+  fi
+done <<EOF
+$names
+EOF
+
+[ "$#" -gt 0 ] || exit 0
+
+# Background self-heal: skip valid, remove torn, seed missing. Paths passed as
+# args so spaces are safe. graph.json installed last via same-dir temp + mv so a
+# killed copy never strands an unparsable graph a later path treats as complete.
+nohup bash -c '
+  main=$1; this=$2; shift 2
+  for path in "$@"; do
+    src="$main/$path/graphify-out"; dst="$this/$path/graphify-out"
+    if [ -f "$dst/graph.json" ]; then
+      jq -e . "$dst/graph.json" >/dev/null 2>&1 && continue   # valid -> leave alone
+      rm -f "$dst/graph.json"                                 # torn -> heal to missing
+      continue
+    fi
+    [ -f "$src/graph.json" ] || continue                      # nothing to seed from
+    jq -e . "$src/graph.json" >/dev/null 2>&1 || continue     # main torn -> skip
+    mkdir -p "$dst" 2>/dev/null || continue
+    for f in "$src"/* "$src"/.*; do
+      b=${f##*/}
+      case "$b" in "*"|.|..|graph.json) continue;; esac
+      [ -e "$f" ] || continue
+      cp -R "$f" "$dst/" 2>/dev/null || true
+    done
+    tmp="$dst/.graph.$$.$RANDOM.tmp"
+    if cp "$src/graph.json" "$tmp" 2>/dev/null; then
+      mv "$tmp" "$dst/graph.json" 2>/dev/null || rm -f "$tmp"
+    else
+      rm -f "$tmp"
+    fi
+  done
+' _ "$main" "$this" "$@" >/dev/null 2>&1 &
+
+[ "$seed" -gt 0 ] && echo "graphify-wrapper: seeding $seed domain graph(s) from main into this worktree (background copy). Run /graphify-wrapper-sync to reconcile them to this branch."
+exit 0

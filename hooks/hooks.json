@@ -13,6 +13,27 @@
             "statusMessage": "Checking for better-dev practices..."
           }
         ]
+      },
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/bd-graphify-seed-worktree\"",
+            "commandWindows": "if (Get-Command bash -ErrorAction SilentlyContinue) { bash \"$env:CLAUDE_PLUGIN_ROOT\\hooks\\bd-graphify-seed-worktree\" }",
+            "async": false,
+            "timeout": 5,
+            "statusMessage": "Checking worktree graphs..."
+          },
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/bd-graphify-refresh-stale\"",
+            "commandWindows": "if (Get-Command bash -ErrorAction SilentlyContinue) { bash \"$env:CLAUDE_PLUGIN_ROOT\\hooks\\bd-graphify-refresh-stale\" }",
+            "async": false,
+            "timeout": 5,
+            "statusMessage": "Checking graph freshness..."
+          }
+        ]
       }
     ],
     "SubagentStart": [
