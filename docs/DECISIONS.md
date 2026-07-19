@@ -416,6 +416,33 @@ start, so a mid-session knob change never takes effect anyway; Claude Code's `En
 parameter accepts `/`-separated segments, so naming the worktree with the resolved branch directly
 needs no separate relocation step.
 
+## D23 - wayfinder-flow harvest rulings (2026-07-18)
+Sources: mattpocockuk tweet 2075856898142740821 (the /wayfinder pipeline clarification + its reply
+thread), Whamp/wayfinder-to-spec gist, mattpocock/skills v1.2 unreleased delta (dossier at
+`raw/synthesis/2026-07-18-wayfinder-flow.md`). Adopted: carved-item entry hydration + pause-the-wave
+conflict stop (plan-grill, diagnose, groundwork handoff rewrite); groundwork's build-pull drift tell;
+pass/refuse/pass gate proof (guardrails-install); commit-history hot-spot scoping (codebase-audit);
+prototype branch-parking option at seal, third-party questionnaire unblock, fenced background fact
+lookup (plan-grill); one-word-one-unit chain rule (writing-skills). Watch condition (standing): if a
+third seam shows the missing handoff-contract bug - candidates: loop -> pr-and-verify, worktree
+handoff pickup - extract the audit/hydrate/stop stage-boundary pattern into a shared doctrine doc.
+
+Rejected-with-reasons (one row each):
+- Chart-time research subagents writing remote branches (wayfinder v1.2) - an unfenced background write path; shipped a filed side effect (their #576, unwanted draft PRs) within days; our dispatch stays read-only for fact-finding and writes go through the loop's protect-set.
+- batch-grill-me frontier-rounds interview - in-progress draft upstream; one-question-at-a-time with unblock-first ordering is the deliberate interactive discipline; revisit if it graduates and the round-batching survives their own use.
+- Per-host metadata sidecars (agents/openai.yaml beside every SKILL.md) - no second harness reads better-dev skills today; the agentskills.io format is the agnostic layer; revisit when a real Codex consumer exists (their "keep the two in sync" rule is the shape to copy then).
+- One-file-per-ticket local tracker - better-dev has no local ticket artifact; the ledger is the store; nothing to change.
+- Self-hosted single-plugin marketplace (.claude-plugin/marketplace.json) - distribution already ships via install.sh + the plugin manifest; a marketplace wrapper adds a surface with no second consumer.
+
+Covered, not re-filed (so the next harvest does not re-litigate):
+- Spec-first-then-AFK-agent (the post's core preference) - is the plan-grill -> autonomous-loop architecture; validation, not a gap.
+- Remote writes without consent (their #599) - operator-run/paste-ready + recorded-allowance policy (D16/D22) already holds this line.
+- Durable context diverging across concurrent worktrees (their #579) - the primary-checkout shared ledger is the standing answer (bd-mem resolution rule).
+- Prose router friction (their #591) - the CLAUDE.md routing table is already the deterministic form.
+- "design tree" -> "decision tree" rename - plan-grill already says decision tree.
+- New-map-per-epic, labels-over-segregation, spec-slicing-by-review Q&A - ledger keys per epic and the carve gate's granularity ask already carry these.
+- ADR ends in checkable invariants - D-entries already function as rulings with teeth.
+
 ## Tracer-bullet findings (2026-07-03, on the papers.town clone) - bind Phase 1
 Ran `onboard` + one feature slice → staging end-to-end on the real clone (locally, no push). Proven, plus:
 1. **Helpers → `.better-dev/bin/`** (bare `scripts/` collides with the project's own - see D0 install contract).

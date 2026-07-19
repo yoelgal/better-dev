@@ -78,6 +78,12 @@ Never put `version`, `license`, or prose in frontmatter.
   outright bans for gates you cannot phrase positively; a gate that survives always pairs with the move
   to make instead. The voice rule above governs how a gate sounds; this governs when a ban is the wrong
   shape at all.
+- One word, one unit. When a term this skill introduces already denotes a different unit in a skill it
+  chains with, qualify the colliding term at first use rather than sharing the bare word - readers meet
+  the chain, not one file, and the collision reads as sameness (observed upstream: users worked a
+  planning skill's decision questions as build tickets until its unit was renamed "decision ticket",
+  because the next skill in the chain also said "ticket"). The everyday word may return once the
+  qualified form has fixed the meaning.
 - Read the finished draft for its silences. Every decision a skill declines to make is not left neutral -
   it is delegated to the executor's priors. Walk what the draft never says (output shape, scope boundary,
   the failure path, who approves) and make each omission deliberate: fill it, or leave it open on purpose

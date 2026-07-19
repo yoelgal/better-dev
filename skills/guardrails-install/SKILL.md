@@ -138,6 +138,14 @@ stays exactly as the operator wrote it.
 Full commit-time coverage costs the least when the hook stays fast: format only the staged files, run
 lint / typecheck / a quick test. Leave a slow full test suite to CI unless the operator asks otherwise.
 
+**Prove each installed gate guards before recording it.** A gate that has never been seen refusing is a
+config, not a guardrail - a mis-shaped pattern runs clean forever. So the install of any local gate ends
+with three observations: run it clean and see it pass, stage a violation shaped for exactly that gate (a
+fake key in the diff for the secret scan, a lint error for the lint hook) and see it refuse, then revert
+and see it pass again. Done is having observed all three states; a gate that would not refuse its own
+violation goes back for fixing, or is recorded as a gap - never as installed. CI-side gates get the same
+proof where a push is cheap, and an explicit "unproven: CI gate observed clean only" line where it is not.
+
 ## Confirm, then record
 
 Show the operator what you propose to write - the hook body, the CI file - before writing it. One

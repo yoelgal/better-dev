@@ -84,6 +84,15 @@ the scope line, and branch/commit conventions become premises like any other. Ei
 contract carries one census line - "contribution guide: `CONTRIBUTING.md`" or "no contribution
 guide found" - so a missed guide is a visible miss, not a silent one.
 
+A carved work-item's baseline starts one level up. When the item came out of a `/groundwork` carve,
+the epic's record is settled ground, not conversation history a fresh session may drop: read it
+before grilling (`.better-dev/bin/bd-mem ledger read <epic> groundwork.md`) and carry its decisions
+as settled - never re-asked, never silently reopened - with the frozen surface and the cross-cutting
+policy entering as premises. A need this item can't meet without contradicting a settled decision is
+groundwork's pause-the-wave signal: stop and show the conflict rather than widening the answer inside
+this item. The carve's readiness gate is checked here too, not assumed: a foundation not yet merged
+green to the integration branch means this item isn't ready to grill.
+
 ## 2. Ideate - propose, then pick one to grill
 
 Before sketching options, put the premise itself on trial in two lines: the outcome this feature
@@ -135,7 +144,10 @@ done-criteria will turn on and skip exhaustive branch-walking.
   corrects a default faster than they fill a blank. If the user answers "whatever you think," they
   lack confidence too - don't take it as a blank cheque; re-ask as a choice between two concrete options.
 - **Ask only what you can't discover.** A fact about this repo or system is yours to find, not the
-  user's to answer - go read it (this is where premise-checking pays off again). Type each remaining
+  user's to answer - go read it (this is where premise-checking pays off again). A lookup slow enough
+  to stall the interview goes to a background worker while the questions continue - only questions
+  downstream of that fact wait for it, and the dispatched worker reads, never writes: an unfenced
+  background errand fills its silence with side effects. Type each remaining
   ambiguity by one key: would its readings change a done-criterion? If yes, it is a must-ask, asked
   before the gate closes - two readings that grade differently are two different contracts. If no,
   pick one and record the pick as a named assumption in the contract. On a must-ask, offer
@@ -181,9 +193,12 @@ done-criteria will turn on and skip exhaustive branch-walking.
   artifact is throwaway from its first line and marked so, runs with one command, and persists
   nothing. When it answers, keep the answer, not the code: the decision goes to `decisions.md`, the
   decision-rich snippet may inline into the contract (the step-4 exception), and the artifact is
-  deleted or absorbed before the gate closes - a prototype still sitting in the tree at contract seal
-  is an unfinished decision. UI direction still belongs to `/design-brief`; this move settles a
-  single question, not the aesthetic.
+  deleted, absorbed, or - when re-deriving it would cost real time, a multi-variant UI set being the
+  usual case - parked as evidence on a throwaway `prototype/<slug>` branch, its pointer recorded
+  beside the decision in `decisions.md`. Whichever way, the working tree is clean of it before the
+  gate closes - a prototype still sitting in the tree at contract seal is an
+  unfinished decision. UI direction still belongs to `/design-brief`; this move
+  settles a single question, not the aesthetic.
 - **Attack the plan before you close.** The grill so far argued *for* the design - it walked the
   tree and filled each node with your recommended answer. Spend one pass arguing against it, through
   the four lenses in `lenses.md` - worth, engineering, design, and developer experience; the last two
@@ -257,7 +272,11 @@ A `NEEDS_INPUT` record is a handoff, not a shrug - four fields, each checkable b
 names the blocked question, who answers it, what unblocks it - a decision to make, or manual work
 spelled as a precise checklist (sign up for the service, provision the access, move the data),
 including the facts the answer must come back with - and the re-entry point that resumes the grill
-when it does.
+when it does. When the who is a third party - a stakeholder, an expert, a client not in this chat -
+the unblock artifact is an async questionnaire drafted now: questions ordered most-important-first
+(async may get one pass), one idea per question, an answer stub under each. Grill the user only
+about the send - who it goes to and what must come back - never about answers that are the
+recipient's to give.
 
 Write the contract to the **primary checkout's** shared ledger so every worktree sees it. Resolve the
 item's ledger directory with `.better-dev/bin/bd-mem ledger dir <work-item>` - it returns the
