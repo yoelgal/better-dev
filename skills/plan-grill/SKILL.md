@@ -196,8 +196,9 @@ done-criteria will turn on and skip exhaustive branch-walking.
   deleted, absorbed, or - when re-deriving it would cost real time, a multi-variant UI set being the
   usual case - parked as evidence on a throwaway `prototype/<slug>` branch, its pointer recorded
   beside the decision in `decisions.md`. Whichever way, the working tree is clean of it before the
-  gate closes - a prototype still sitting in the tree at contract seal is an unfinished decision. UI direction still belongs to `/design-brief`; this move settles a
-  single question, not the aesthetic.
+  gate closes - a prototype still sitting in the tree at contract seal is an
+  unfinished decision. UI direction still belongs to `/design-brief`; this move
+  settles a single question, not the aesthetic.
 - **Attack the plan before you close.** The grill so far argued *for* the design - it walked the
   tree and filled each node with your recommended answer. Spend one pass arguing against it, through
   the four lenses in `lenses.md` - worth, engineering, design, and developer experience; the last two
