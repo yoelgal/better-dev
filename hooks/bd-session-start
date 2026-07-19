@@ -484,6 +484,13 @@ if [ "${1:-}" = "selftest" ]; then
   printf '0.9.0\n' > "$tmp/proj/.better-dev/wired-version"
   out="$(cd "$tmp/proj" && HOME="$home3" CLAUDE_PLUGIN_ROOT="$rclone" "$SELF")"
   printf '%s' "$out" | grep -q "0.10.0 changed the repo surface" || fail "numeric compare failed on a two-digit field (0.9.0 vs 0.10.0)"
+
+  # Newer install-only release above an already-wired reonboard line -> silent:
+  # the reonboard flag, not mere newness, is what fires the nudge.
+  printf '%s\n%s\n' '0.7.0 install - install-only release' '0.6.0 install,reonboard - earlier surface change' > "$rclone/docs/RELEASES.md"
+  printf '0.6.0\n' > "$tmp/proj/.better-dev/wired-version"
+  out="$(cd "$tmp/proj" && HOME="$home3" CLAUDE_PLUGIN_ROOT="$rclone" "$SELF")"
+  printf '%s' "$out" | grep -q "changed the repo surface" && fail "reonboard nudge fired on a newer install-only release"
   rm -f "$tmp/proj/.better-dev/wired-version"
 
   echo "bd-session-start selftest: ok"

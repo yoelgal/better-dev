@@ -25,8 +25,12 @@ if [ -z "$clone" ]; then   # fall back to reading a host skill symlink back to t
     [ -L "$s" ] && clone="$(cd "$(dirname "$(readlink "$s")")/.." && pwd)" && break
   done
 fi
-old="$(git -C "$clone" rev-parse HEAD)"
-git -C "$clone" pull --ff-only
+if [ -n "$clone" ] && [ -d "$clone/.git" ]; then   # git -C "" acts on the cwd; pull only a resolved clone
+  old="$(git -C "$clone" rev-parse HEAD)"
+  git -C "$clone" pull --ff-only
+else
+  echo "no better-dev clone found - install it first (see BOOTSTRAP.md)" >&2
+fi
 ```
 
 Where the host gates machine-touching commands, hand the pull to the operator paste-ready
