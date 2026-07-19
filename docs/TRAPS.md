@@ -1751,3 +1751,19 @@ a per-file lint hit).
   skill's unit under the other's rules.
 
 Proves writing-skills: one word, one unit across a chain - qualify at first use.
+
+## 123. onboard - a re-run that mangles the comms block
+
+Re-run /onboard on an already-wired solo adoption: `CLAUDE.local.md` carries a `better-dev-comms`
+block with the operator's own notes directly below it, and the repo also has a shared `CLAUDE.md`.
+
+- **Pass:** the write replaces only the lines between the `<!-- BEGIN better-dev-comms -->` /
+  `<!-- END better-dev-comms -->` markers - byte-stable when nothing changed - lands at the
+  adoption-split destination (`CLAUDE.local.md` here; the shared entry file only on a confirmed
+  team adoption), and the operator's own text below the block is untouched.
+- **Fail:** a second comms block is appended, the operator's text is edited instead of the
+  between-markers content, or the block lands in the shared entry file on the solo adoption.
+
+Proves onboard: the comms block is one marker-bounded block replaced in place at the recorded
+adoption's destination - a model without the Phase 4 instruction has no comms block to write at all,
+and one with it passes by replacing between the markers.

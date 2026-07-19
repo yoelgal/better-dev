@@ -322,8 +322,53 @@ to an open item rides that item's existing worktree. Branching is `<detected con
 better-dev is additive: it complements, never replaces, whatever else is installed.
 ```
 
+**Comms-style block.** Beside the discovery block, write a second marker-bounded block -
+`<!-- BEGIN better-dev-comms -->` / `<!-- END better-dev-comms -->` - carrying the ADHD-adapted
+communication style every later session in this repo speaks in. It is always written, no knob; only
+the destination follows the recorded adoption. Solo: it goes in the local-only entry file
+(`CLAUDE.local.md` on the Claude family), the same mechanism as above. Team: it goes in the shared
+entry file after one confirm at onboard - the style shapes every teammate's sessions, so the one
+adopter confirms before it lands shared; a declined confirm falls back to the local-only file, so
+the operator still gets it personally. A solo host with no local-only entry file skips this block
+too and names that in the Phase 5 recap, mirroring the discovery-block rule.
+
+The write mechanism is the discovery block's: the host's file-edit tool in an interactive session,
+`printf '%s\n' "$BODY" | .better-dev/bin/bd-block <entry-file> better-dev-comms` in scripted
+contexts. Replace in place between the markers, byte-stable across re-runs, never touching the
+operator's own text or the discovery block. The block is a per-turn tax deliberately capped small:
+at most 24 lines between the markers - cut a line before adding one. The template (adapted from
+ayghri/i-have-adhd, MIT; `bd-block` writes the markers itself, so the piped body is the lines
+between them):
+
+```markdown
+<!-- BEGIN better-dev-comms -->
+## Communication style
+
+The reader may have ADHD: shape output so the reader can act on it, not just read it.
+
+- Lead with the action: the first line is a command, path, or snippet to run - context after.
+- Number multi-step work; each step is one bounded action.
+- In interactive turns, end with one concrete next action doable in under two minutes.
+- One thing at a time: finish the issue at hand; offer a second issue as a separate question.
+- Open with a one-line state header ("Step 3 of 5 done: X. Next: Y") - that line is the
+  recap, and narrative recaps stay out.
+- Estimate effort in agent terms ("2 files, one command to verify"), not wall-clock promises.
+- Make wins visible and concrete: what now works, and the command that shows it.
+- State errors matter-of-fact: cause and fix, nothing more.
+- Cap lists at 5 items; past that, split into do-now vs later.
+- Skip preamble and closing pleasantries: start with the answer, end when it ends.
+
+Override when: asked to explain (full body with headers, still no preamble); a destructive
+action is ahead (confirm first); three turns of "still broken" (name the suspect assumption,
+ask one diagnostic question); the request is genuinely ambiguous (one short question beats
+guessing). An artifact a skill requires rendered in full (a contract at its gate, a required
+recap, a report) renders in full; these rules shape everything around it. This block composes
+with other active style skills, never replaces them.
+<!-- END better-dev-comms -->
+```
+
 Then confirm the `.better-dev/` scaffold exists (`bd-mem init` created it), the `bin` bridge resolves,
-and the block reads correctly in the entry file.
+and both blocks read correctly at their destinations.
 
 ---
 
