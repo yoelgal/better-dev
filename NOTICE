@@ -83,6 +83,7 @@ we actually copied verbatim/substantially, which MIT requires us to attribute, a
   Amp handoff pattern - Sourcegraph (ideas only; the handoff artifact that moves a
     half-finished item between machines - reimplemented in worktree-branching's handoff
     notes, with better-dev's own consent re-pin on pick-up)
+  ayghri/i-have-adhd - ayghri            (MIT; onboard's comms-style block adapts its rules)
 
 ── NOT copied - inspiration only, NOT redistributable ──
   Andrej Karpathy - LOOPS.md v060726 ("personal use permitted"). Concepts reimplemented

@@ -51,8 +51,8 @@ TOOL (skills + bd-* scripts + hooks) installs GLOBALLY once per machine and ever
    tool into the host's global skills dir. Update later with `git pull` in the clone.
 3. Run /onboard in this repo to wire it: create .better-dev/ for DATA only (rules.md, overrides.md,
    learnings.jsonl committed; ledger/ gitignored), create .better-dev/bin as a per-machine symlink to the
-   global install's scripts so .better-dev/bin/bd-mem resolves here, and write a discovery block into the
-   entry file (CLAUDE.md / AGENTS.md).
+   global install's scripts so .better-dev/bin/bd-mem resolves here, and write a discovery block and a
+   comms-style block into the entry file (CLAUDE.md / AGENTS.md).
 
 Adapt to whatever conventions already exist; ask me only on genuine ambiguity.
 ```
