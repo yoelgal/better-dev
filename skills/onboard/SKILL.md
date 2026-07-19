@@ -228,6 +228,13 @@ out of version control. What the rest does follows the recorded adoption:
   grep -qxF '.better-dev/' "$ex" 2>/dev/null || printf '%s\n' '.better-dev/' >> "$ex"
   ```
 
+**Stamp the wired version.** On every run, re-runs and top-ups included, write the installed
+clone's plugin-manifest version (read from `.claude-plugin/plugin.json` in the clone the install
+marker names) to `.better-dev/wired-version` as a plain string, e.g. `0.6.0`. `/update` and the
+session-start reonboard nudge compare releases against this stamp. It is repo wiring state, so on
+a team adoption it stays tracked - no gitignore entry, unlike the per-machine model-fingerprint -
+and a wired repo with no stamp reads as wired before 0.6.0.
+
 **Wire the minimum base.** With memory live, hand off to `/guardrails-install` - it records this repo's
 real verify command and its safety baseline (the denylist, the gated classes, the scope number) through
 `bd-mem`, filling only what's missing, so Phase 5's "guardrails/CI wired" and "verify command mapped"
@@ -315,8 +322,8 @@ to an open item rides that item's existing worktree. Branching is `<detected con
   project, `/groundwork` takes the idea to a shared foundation and parallelizable work-items.
 - `.better-dev/` holds tracked data (rules, overrides, learnings); `bin/` and `ledger/` are per-machine
   and gitignored. A fresh clone re-runs `/onboard` to rebuild the `bin` bridge.
-- Update the tool itself with `git pull` in the global clone; a new session picks it up, and re-run
-  `./install.sh` when the pull added or removed a skill.
+- Update the tool with `/update` - it pulls the global clone (`git pull` underneath), reconciles
+  skill links when needed, and tops up this repo's wiring when a release changed it.
 - Re-run `/onboard` any time to wire in what's missing.
 
 better-dev is additive: it complements, never replaces, whatever else is installed.

@@ -48,7 +48,7 @@ TOOL (skills + bd-* scripts + hooks) installs GLOBALLY once per machine and ever
    global skills dir, or an existing clone), run `git pull` in the clone and skip to step 3. Otherwise: on
    Claude Code install it as a plugin (add this repo as a marketplace, then install better-dev); on any host,
    `git clone https://github.com/yoelgal/better-dev ~/better-dev && ~/better-dev/install.sh`, which links the
-   tool into the host's global skills dir. Update later with `git pull` in the clone.
+   tool into the host's global skills dir. Update later with /update (a `git pull` in the clone underneath).
 3. Run /onboard in this repo to wire it: create .better-dev/ for DATA only (rules.md, overrides.md,
    learnings.jsonl committed; ledger/ gitignored), create .better-dev/bin as a per-machine symlink to the
    global install's scripts so .better-dev/bin/bd-mem resolves here, and write a discovery block and a

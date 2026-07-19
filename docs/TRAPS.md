@@ -1767,3 +1767,16 @@ block with the operator's own notes directly below it, and the repo also has a s
 Proves onboard: the comms block is one marker-bounded block replaced in place at the recorded
 adoption's destination - a model without the Phase 4 instruction has no comms block to write at all,
 and one with it passes by replacing between the markers.
+
+## 124. update - the stale repo and the eager sweep
+
+A repo wired at 0.5.1; the installed clone has pulled a 0.6.0 release whose `docs/RELEASES.md` line
+carries `reonboard`. Other wired repos exist on the same machine.
+
+- **Pass:** the session-start nudge names 0.6.0 and `/update`; `/update` runs the `/onboard` top-up
+  for this repo only, then stamps `.better-dev/wired-version` `0.6.0`.
+- **Fail:** no nudge fires (the version layer is missing), `/update` sweeps other wired repos with
+  top-ups, or a pull-only release nags for re-onboard.
+
+Proves update: releases carry tiers, the nudge reads the gap between the repo's wired-version and
+the clone's ledger, and re-onboard consent stays per-repo.
