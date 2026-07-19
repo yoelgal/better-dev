@@ -97,7 +97,7 @@ update_nudge() {
     printf ' better-dev: auto-updated %s commit(s) (ff-only).' "$behind"
     return 0
   fi
-  printf ' better-dev: update available (%s commit(s)) - git -C %s pull, then re-run its install.sh if the update added, removed, or renamed skills (it reconciles the links)' "$behind" "$clone"
+  printf ' better-dev: update available (%s commit(s)) - run /update (or: git -C %s pull, then re-run its install.sh only if skills were added, removed, or renamed).' "$behind" "$clone"
 }
 
 # --- link nudge: does the installed clone hold a skill this host never linked? -
@@ -139,6 +139,43 @@ link_nudge() {
   done
   [ "$n" -gt 0 ] || return 0
   printf ' better-dev: %s skill(s) in the installed clone have no link for this host (%s) - run %s/install.sh to reconcile.' "$n" "$missing" "$clone"
+}
+
+# --- reonboard nudge: did a release change the repo surface since /onboard? ---
+# docs/RELEASES.md in the installed clone lists flagged releases newest-first
+# (`<version> <flags> - <summary>`); .better-dev/wired-version stamps the tool
+# version /onboard last wired. A reonboard-flagged version strictly newer than
+# the stamp means the repo surface moved - say so once and name /update. A
+# missing stamp is a repo wired before 0.6.0, so any reonboard entry fires.
+# Pure local reads - no network, no fetch; anything missing or unparsable
+# stays silent, per the hook's best-effort contract.
+reonboard_nudge() {
+  local root="$1" clone="${CLAUDE_PLUGIN_ROOT:-}" releases wired newest
+  [ -n "$clone" ] && [ -f "$clone/docs/RELEASES.md" ] || clone="$(resolve_clone_via_symlink)"
+  [ -n "$clone" ] && [ -f "$clone/docs/RELEASES.md" ] || return 0
+  releases="$clone/docs/RELEASES.md"
+  wired="$(cat "$root/.better-dev/wired-version" 2>/dev/null | tr -d '[:space:]' || true)"
+  if [ -n "$wired" ]; then
+    printf '%s' "$wired" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$' || return 0
+  fi
+  # First qualifying line wins - the file is newest-first by contract. Numeric
+  # three-field compare, split on dots (no sort -V: BSD userlands run this too).
+  newest="$(awk -v wired="$wired" '
+    $2 !~ /(^|,)reonboard(,|$)/ { next }
+    $1 !~ /^[0-9]+\.[0-9]+\.[0-9]+$/ { next }
+    {
+      if (wired != "") {
+        split($1, r, "."); split(wired, w, "."); gt = 0
+        for (i = 1; i <= 3; i++) {
+          if (r[i] + 0 > w[i] + 0) { gt = 1; break }
+          if (r[i] + 0 < w[i] + 0) break
+        }
+        if (!gt) next
+      }
+      print $1; exit
+    }' "$releases" 2>/dev/null || true)"
+  [ -n "$newest" ] || return 0
+  printf ' better-dev: this repo was wired at %s; %s changed the repo surface - run /update to bring it current.' "${wired:-pre-0.6.0}" "$newest"
 }
 
 emit() {
@@ -220,6 +257,7 @@ emit() {
   # skill trigger - an orchestrator using the host's raw fan-out never loads tiers.md on its own.
   context="better-dev practices are installed in this repo. The project's conventions and the list of available skills (onboard, plan-grill, diagnose, autonomous-loop, review, orchestrating-agents, worktree-branching, and more) live in a managed better-dev block in this project's CLAUDE.md or AGENTS.md; each skill self-describes through its description. Dispatching workers or fanning out agents? run each stage at the least-capable tier that fits it and escalate at judgment points - the reference is orchestrating-agents' tiers.md and the recorded tier-map (.better-dev/bin/bd-mem recall \"tier-map\").${note}${lessons}${inflight}${papercut_nudge}${papercuts}${fpnote}"
   context="${context}$(update_nudge "$root/.better-dev/overrides.md")"
+  context="${context}$(reonboard_nudge "$root")"
   context="${context}$(link_nudge)"
   escaped=$(escape_for_json "$context")
 
@@ -412,6 +450,41 @@ if [ "${1:-}" = "selftest" ]; then
   home3="$tmp/home3"; mkdir -p "$home3"
   out="$(cd "$tmp/proj" && HOME="$home3" CLAUDE_PLUGIN_ROOT="$lclone" "$SELF")"
   printf '%s' "$out" | grep -q "no link for this host" && fail "link nudge fired with no host skills dir"
+
+  # Reonboard nudge: a reonboard-flagged release newer than the wired-version
+  # stamp names the newest such version and /update. HOME stays isolated (home3
+  # has no .claude/skills) so the symlink fallback can't wander into a real
+  # install on the machine running this.
+  rclone="$tmp/rclone"; mkdir -p "$rclone/docs"
+  printf '%s\n%s\n' '0.6.0 install,reonboard - /update verb and versioned update path' '0.5.0 install - earlier release' > "$rclone/docs/RELEASES.md"
+  printf '0.5.1\n' > "$tmp/proj/.better-dev/wired-version"
+  out="$(cd "$tmp/proj" && HOME="$home3" CLAUDE_PLUGIN_ROOT="$rclone" "$SELF")"
+  printf '%s' "$out" | jq -e . >/dev/null || fail "reonboard output not valid JSON"
+  printf '%s' "$out" | grep -q "wired at 0.5.1; 0.6.0 changed the repo surface" || fail "missing reonboard nudge behind a reonboard release"
+  printf '%s' "$out" | grep -q "run /update" || fail "reonboard nudge must name /update"
+
+  # Stamp already at the flagged version -> silent (strictly-greater only).
+  printf '0.6.0\n' > "$tmp/proj/.better-dev/wired-version"
+  out="$(cd "$tmp/proj" && HOME="$home3" CLAUDE_PLUGIN_ROOT="$rclone" "$SELF")"
+  printf '%s' "$out" | grep -q "changed the repo surface" && fail "reonboard nudge fired with a current stamp"
+
+  # No wired-version file (repo wired before 0.6.0) + a reonboard entry -> fires.
+  rm -f "$tmp/proj/.better-dev/wired-version"
+  out="$(cd "$tmp/proj" && HOME="$home3" CLAUDE_PLUGIN_ROOT="$rclone" "$SELF")"
+  printf '%s' "$out" | grep -q "wired at pre-0.6.0; 0.6.0 changed the repo surface" || fail "missing reonboard nudge with no wired-version stamp"
+
+  # Clone with no docs/RELEASES.md -> silent.
+  norel="$tmp/norel"; mkdir -p "$norel"
+  out="$(cd "$tmp/proj" && HOME="$home3" CLAUDE_PLUGIN_ROOT="$norel" "$SELF")"
+  printf '%s' "$out" | grep -q "changed the repo surface" && fail "reonboard nudge fired with no RELEASES.md"
+
+  # Two-digit field: 0.10.0 > 0.9.0 numerically though not lexicographically -
+  # proves the three-field numeric compare.
+  printf '%s\n' '0.10.0 reonboard - two-digit minor field' > "$rclone/docs/RELEASES.md"
+  printf '0.9.0\n' > "$tmp/proj/.better-dev/wired-version"
+  out="$(cd "$tmp/proj" && HOME="$home3" CLAUDE_PLUGIN_ROOT="$rclone" "$SELF")"
+  printf '%s' "$out" | grep -q "0.10.0 changed the repo surface" || fail "numeric compare failed on a two-digit field (0.9.0 vs 0.10.0)"
+  rm -f "$tmp/proj/.better-dev/wired-version"
 
   echo "bd-session-start selftest: ok"
   exit 0
