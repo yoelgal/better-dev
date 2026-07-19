@@ -59,6 +59,14 @@ Bump the `version` in `.claude-plugin/plugin.json` per release; tag through `/re
 gate also refuses an empty manifest `version`, holds the no-em/en-dash rule over shipped text, and runs an
 install/uninstall roundtrip in a throwaway `HOME` so a broken installer can't ship green.
 
+Every version bump lands with a matching `docs/RELEASES.md` line declaring its needs flags -
+`install` when the release added, removed, or renamed a skill dir, `reonboard` when it changed a
+repo surface - and a pull-only release needs no line at all. That line is a release-step
+requirement the releaser confirms when tagging through `/release-promotion`, not a mechanical
+check: `bd-package-check` does not read `RELEASES.md`, and the session-start nudge and `/update`
+do, so a missing-but-needed line silently downgrades the release to pull-only for every wired
+repo - a defect to fix before tagging.
+
 ## Updating and breaking changes
 
 `git pull` in the clone is the update, but a running session keeps the text it loaded at start - only a

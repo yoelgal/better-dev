@@ -48,7 +48,7 @@ TOOL (skills + bd-* scripts + hooks) installs GLOBALLY once per machine and ever
    global skills dir, or an existing clone), run `git pull` in the clone and skip to step 3. Otherwise: on
    Claude Code install it as a plugin (add this repo as a marketplace, then install better-dev); on any host,
    `git clone https://github.com/yoelgal/better-dev ~/better-dev && ~/better-dev/install.sh`, which links the
-   tool into the host's global skills dir. Update later with `git pull` in the clone.
+   tool into the host's global skills dir. Update later with /update (a `git pull` in the clone underneath).
 3. Run /onboard in this repo to wire it: create .better-dev/ for DATA only (rules.md, overrides.md,
    learnings.jsonl committed; ledger/ gitignored), create .better-dev/bin as a per-machine symlink to the
    global install's scripts so .better-dev/bin/bd-mem resolves here, and write a discovery block and a
@@ -109,9 +109,10 @@ Two layers, so the tool updates once and your data travels with the repo:
 - **The tool - global, once per machine.** The skills, `bd-*` scripts, and hooks live in one clone and link
   into your host's global skills dir, one symlink per skill (`~/.claude/skills/<skill>`,
   `~/.codex/skills/<skill>`, …), so every repo shares one copy. Claude Code users can install the plugin
-  ([`.claude-plugin/plugin.json`](.claude-plugin/plugin.json)) instead - same skill contract. Update with a
-  single `git pull` in the clone - picked up by a session that starts fresh after the pull; re-run
-  `./install.sh` when the pull added or removed a skill.
+  ([`.claude-plugin/plugin.json`](.claude-plugin/plugin.json)) instead - same skill contract. Update with
+  `/update` - it pulls the clone, has you re-run `./install.sh` only when a release added or removed a
+  skill, and tops up a repo's wiring when a release changed it ([`docs/RELEASES.md`](docs/RELEASES.md)
+  flags each release; the session-start hook nags when you're behind).
 - **The repo - data only.** `/onboard` creates `.better-dev/` for *this repo's data* (`rules.md`,
   `overrides.md`, `learnings.jsonl` committed; loop `ledger/` gitignored) plus `.better-dev/bin`, a
   per-machine symlink to the global tool. No practices are ever copied into the repo.

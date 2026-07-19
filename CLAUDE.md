@@ -45,8 +45,8 @@ its own git worktree, off `staging` (`/worktree-branching` sets it up first); br
 - `.better-dev/` holds better-dev data (rules, overrides, learnings); in **this** repo the whole dir is
   gitignored as local runtime state (`bin/` and `ledger/` are per-machine regardless). A fresh clone
   re-runs `/onboard` to rebuild the `bin` bridge.
-- Update the tool itself with `git pull` in the global clone; a new session picks it up, and re-run
-  `./install.sh` when the pull added or removed a skill.
+- Update the tool with `/update` - it pulls the global clone (`git pull` underneath), reconciles
+  skill links when needed, and tops up this repo's wiring when a release changed it.
 - Re-run `/onboard` any time to wire in what's missing.
 
 better-dev is additive: it complements, never replaces, whatever else is installed.
