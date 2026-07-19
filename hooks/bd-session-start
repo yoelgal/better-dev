@@ -142,7 +142,7 @@ link_nudge() {
 }
 
 emit() {
-  local root="$1" note lessons n inflight bdm rows cnt oldest fpnote fpcur fprec context escaped welcome custom
+  local root="$1" note lessons n inflight bdm rows cnt oldest papercut_nudge papercuts fpnote fpcur fprec context escaped welcome custom
   # Per-repo welcome wording: a "better-dev welcome: <text>" line in overrides.md
   # replaces the default (same knob style as "better-dev auto-update:"). Only the
   # wired message is overridable - an unwired repo has no overrides to read.
@@ -183,6 +183,17 @@ emit() {
       inflight=" $cnt work-item(s) in flight (oldest: $oldest) - .better-dev/bin/bd-mem ledger status lists them; resume one with: .better-dev/bin/bd-mem ledger resume <slug>."
     fi
   fi
+  # Papercut nudge: static write-nudge, emitted for every wired repo - an agent cannot log to a
+  # channel it never heard of. No escaping concerns (static text, spaced hyphens per repo law).
+  papercut_nudge=' Hit friction mid-work - a dead-end tool call, a broken doc link, a flaky command - that you would otherwise push through silently? Log it in one line and keep going: .better-dev/bin/bd-mem papercut add "<what happened>" [context]. The operator triages the queue; logging is never a failure.'
+  # Unresolved count: mirrors the lessons clause - a plain local grep -c over the queue file, no
+  # subprocess to bd-mem (the hook runs under a 5s budget); a grep failure never blocks the note.
+  papercuts=""
+  n="$(grep -c '"kind":"papercut"' "$root/.better-dev/papercuts.jsonl" 2>/dev/null || true)"
+  case "$n" in
+    '' | 0 | *[!0-9]*) ;;
+    *) papercuts=" $n unresolved papercut(s) - triage: .better-dev/bin/bd-mem papercut list; clear fixed ones with: .better-dev/bin/bd-mem papercut resolve <id>." ;;
+  esac
   # Model fingerprint: tier calibration and the trap suite were validated against a specific
   # executing model, so a model swap makes both stale until revalidated. Compare the host's
   # model name - CLAUDE_MODEL, else ANTHROPIC_MODEL - when the env carries one; most hosts
@@ -207,7 +218,7 @@ emit() {
   fi
   # Tier disposition rides the session note because dispatch decisions also happen outside any
   # skill trigger - an orchestrator using the host's raw fan-out never loads tiers.md on its own.
-  context="better-dev practices are installed in this repo. The project's conventions and the list of available skills (onboard, plan-grill, diagnose, autonomous-loop, review, orchestrating-agents, worktree-branching, and more) live in a managed better-dev block in this project's CLAUDE.md or AGENTS.md; each skill self-describes through its description. Dispatching workers or fanning out agents? run each stage at the least-capable tier that fits it and escalate at judgment points - the reference is orchestrating-agents' tiers.md and the recorded tier-map (.better-dev/bin/bd-mem recall \"tier-map\").${note}${lessons}${inflight}${fpnote}"
+  context="better-dev practices are installed in this repo. The project's conventions and the list of available skills (onboard, plan-grill, diagnose, autonomous-loop, review, orchestrating-agents, worktree-branching, and more) live in a managed better-dev block in this project's CLAUDE.md or AGENTS.md; each skill self-describes through its description. Dispatching workers or fanning out agents? run each stage at the least-capable tier that fits it and escalate at judgment points - the reference is orchestrating-agents' tiers.md and the recorded tier-map (.better-dev/bin/bd-mem recall \"tier-map\").${note}${lessons}${inflight}${papercut_nudge}${papercuts}${fpnote}"
   context="${context}$(update_nudge "$root/.better-dev/overrides.md")"
   context="${context}$(link_nudge)"
   escaped=$(escape_for_json "$context")
@@ -281,6 +292,21 @@ if [ "${1:-}" = "selftest" ]; then
   printf '%s' "$out" | jq -e . >/dev/null || fail "memory-clause output not valid JSON"
   printf '%s' "$out" | grep -q "2 recorded lesson" || fail "missing lesson count"
   printf '%s' "$out" | grep -q "bd-mem recall" || fail "missing recall pointer"
+
+  # Papercut clause: the write-nudge is unconditional (every wired repo); the unresolved-count
+  # clause is absent with no queue file and when the queue is empty, present once a papercut line
+  # exists. Clean up the fixture after - later sections reuse $tmp/proj.
+  printf '%s' "$out" | grep -q "papercut add" || fail "missing papercut write-nudge"
+  printf '%s' "$out" | grep -q "unresolved papercut" && fail "unresolved-count clause with no papercuts file"
+  : > "$tmp/proj/.better-dev/papercuts.jsonl"
+  out="$(cd "$tmp/proj" && CLAUDE_PLUGIN_ROOT=x "$SELF")" || fail "errored with empty papercuts"
+  printf '%s' "$out" | grep -q "unresolved papercut" && fail "unresolved-count clause with empty papercuts"
+  printf '%s\n' '{"kind":"papercut","id":"1","text":"x","ctx":"","ts":"2026-07-18T00:00:00Z"}' > "$tmp/proj/.better-dev/papercuts.jsonl"
+  out="$(cd "$tmp/proj" && CLAUDE_PLUGIN_ROOT=x "$SELF")" || fail "errored with papercut present"
+  printf '%s' "$out" | jq -e . >/dev/null || fail "papercut-clause output not valid JSON"
+  printf '%s' "$out" | grep -q "1 unresolved papercut" || fail "missing papercut count"
+  printf '%s' "$out" | grep -q "papercut list" || fail "missing papercut list pointer"
+  rm -f "$tmp/proj/.better-dev/papercuts.jsonl"
 
   # In-flight ledger clause: absent with no ledger; present (count + oldest) once an item is
   # in flight; cleared by a terminal state in progress.md. Bridge = the repo's own scripts/bd-mem.

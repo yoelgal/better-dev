@@ -184,8 +184,11 @@ Then each pass:
    give a settled step one line in `progress.md` stamped with an explicit status marker (`settled`,
    `blocked`, `needs-input`) rather than buried in prose, so a resume reads each step's state at a glance.
    The receipt lands before the next pass picks - it is part of this pass, not paperwork to batch at the
-   end. A `receipts.md` still at pass 0 after several implementation passes is the tell that recording
-   is deferred; the settle-time backstop (write receipts from the actual trail) exists for a crashed
+   end. Friction the pass pushed through - a dead-end tool call, a broken doc link, a flaky command -
+   gets one line too: `.better-dev/bin/bd-mem papercut add "<what happened>"`, the low-bar sibling of
+   `bd-mem learn` (a papercut is an annoyance the operator triages, not a lesson recall replays). A
+   `receipts.md` still at pass 0 after several implementation passes is the tell that recording is
+   deferred; the settle-time backstop (write receipts from the actual trail) exists for a crashed
    loop, not as an alternative cadence, and a compaction mid-run loses everything a deferred receipt
    never wrote.
 6. **Commit** one step per commit (`<work-item>: <step>`), staging only the files that step touched plus

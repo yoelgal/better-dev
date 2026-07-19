@@ -57,10 +57,11 @@ main. (Prefix naming is a per-project override - e.g. papers.town uses `feat/`.)
 ## 5. Memory - bring-your-own, files by default
 
 No memory engine. Skills call the **contract** via `scripts/bd-mem`:
-`init · remember <rule> · learn <lesson> [conf] · recall <query> · persist-override <line> · read rules|overrides|learnings|ledger`.
+`init · remember <rule> · learn <lesson> [conf] · recall <query> · persist-override <line> · papercut add|list|resolve · read rules|overrides|learnings|papercuts|ledger`.
 Backend via `BETTER_DEV_MEMORY`: `files` (default) · `cmd:<command>` · `mcp:<server>`.
 **Files layout** under `.better-dev/`: `rules.md` (promoted, human-readable) · `learnings.jsonl`
-(append-only, confidence-scored) · `overrides.md` (managed block, principle #7) · `ledger/<feature>/`
+(append-only, confidence-scored) · `papercuts.jsonl` (friction queue, resolve-to-drop) ·
+`overrides.md` (managed block, principle #7) · `ledger/<feature>/`
 (loop state: `contract.md`, progress, receipts). It's just repo files the host agent already ingests -
 composes with standard memory by *being part of it*. `bd-mem` exists and passes `bd-mem selftest`.
 
