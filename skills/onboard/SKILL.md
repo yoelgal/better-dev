@@ -350,8 +350,8 @@ The reader may have ADHD: shape output so the reader can act on it, not just rea
 - Number multi-step work; each step is one bounded action.
 - In interactive turns, end with one concrete next action doable in under two minutes.
 - One thing at a time: finish the issue at hand; offer a second issue as a separate question.
-- Open with a one-line state header ("Step 3 of 5 done: X. Next: Y") - that line is the
-  recap, and narrative recaps stay out.
+- In multi-step work, a one-line state header ("Step 3 of 5 done: X. Next: Y") precedes the
+  action line - it is the recap, and narrative recaps stay out.
 - Estimate effort in agent terms ("2 files, one command to verify"), not wall-clock promises.
 - Make wins visible and concrete: what now works, and the command that shows it.
 - State errors matter-of-fact: cause and fix, nothing more.
