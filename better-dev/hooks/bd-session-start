@@ -222,7 +222,7 @@ reonboard_nudge() {
 }
 
 emit() {
-  local root="$1" note lessons n inflight bdm rows cnt oldest papercut_nudge papercuts fpnote fpcur fprec context escaped welcome custom upd rnb lnk mark ver
+  local root="$1" note lessons n inflight bdm rows cnt oldest papercut_nudge papercuts parked fpnote fpcur fprec context escaped welcome custom upd rnb lnk mark ver
   # Per-repo welcome wording: a "better-dev welcome: <text>" line in overrides.md
   # replaces the default (same knob style as "better-dev auto-update:"). Only the
   # wired message is overridable - an unwired repo has no overrides to read.
@@ -274,6 +274,17 @@ emit() {
     '' | 0 | *[!0-9]*) ;;
     *) papercuts=" $n unresolved papercut(s) - triage: .better-dev/bin/bd-mem papercut list; clear fixed ones with: .better-dev/bin/bd-mem papercut resolve <id>." ;;
   esac
+  # Parked decisions: /onboard and /guardrails-install defer a question the repo cannot answer yet
+  # (merge policy on a repo with no PR to merge) and record it for "the first skill that needs the
+  # answer" to ask. That promise is only as good as someone reading the record, and a greenfield repo
+  # can run for weeks before any skill recalls it - so the parked line silently becomes a decision
+  # nobody made. Same cheap local grep as the lessons clause, no bd-mem subprocess.
+  parked=""
+  n="$(grep -c '^- *pending-decision:' "$root/.better-dev/rules.md" 2>/dev/null || true)"
+  case "$n" in
+    '' | 0 | *[!0-9]*) ;;
+    *) parked=" $n parked decision(s) awaiting an answer (.better-dev/bin/bd-mem recall \"pending-decision\") - each was deferred because the repo could not answer it yet, so before applying an autonomous default in the area one names, ask the operator instead and record the answer through the skill that owns the key." ;;
+  esac
   # Model fingerprint: tier calibration and the trap suite were validated against a specific
   # executing model, so a model swap makes both stale until revalidated. Compare the host's
   # model name - CLAUDE_MODEL, else ANTHROPIC_MODEL - when the env carries one; most hosts
@@ -298,7 +309,7 @@ emit() {
   fi
   # Tier disposition rides the session note because dispatch decisions also happen outside any
   # skill trigger - an orchestrator using the host's raw fan-out never loads tiers.md on its own.
-  context="better-dev practices are installed in this repo. The project's conventions and the list of available skills (onboard, plan-grill, diagnose, autonomous-loop, review, orchestrating-agents, worktree-branching, and more) live in a managed better-dev block in this project's CLAUDE.md or AGENTS.md; each skill self-describes through its description. Dispatching workers or fanning out agents? run each stage at the least-capable tier that fits it and escalate at judgment points - the reference is orchestrating-agents' tiers.md and the recorded tier-map (.better-dev/bin/bd-mem recall \"tier-map\").${note}${lessons}${inflight}${papercut_nudge}${papercuts}${fpnote}"
+  context="better-dev practices are installed in this repo. The project's conventions and the list of available skills (onboard, plan-grill, diagnose, autonomous-loop, review, orchestrating-agents, worktree-branching, and more) live in a managed better-dev block in this project's CLAUDE.md or AGENTS.md; each skill self-describes through its description. Dispatching workers or fanning out agents? run each stage at the least-capable tier that fits it and escalate at judgment points - the reference is orchestrating-agents' tiers.md and the recorded tier-map (.better-dev/bin/bd-mem recall \"tier-map\").${note}${lessons}${inflight}${papercut_nudge}${papercuts}${parked}${fpnote}"
   upd="$(update_nudge "$root/.better-dev/overrides.md")"
   rnb="$(reonboard_nudge "$root")"
   lnk="$(link_nudge)"
@@ -401,6 +412,20 @@ if [ "${1:-}" = "selftest" ]; then
   printf '%s' "$out" | jq -e . >/dev/null || fail "memory-clause output not valid JSON"
   printf '%s' "$out" | grep -q "2 recorded lesson" || fail "missing lesson count"
   printf '%s' "$out" | grep -q "bd-mem recall" || fail "missing recall pointer"
+
+  # Parked-decision clause: absent with no rules file, absent when rules.md holds only ordinary
+  # rules, present with the count once a pending-decision line exists in bd-mem's own `- <text>`
+  # shape. Clean up after - later sections reuse $tmp/proj.
+  printf '%s' "$out" | grep -q "parked decision" && fail "parked clause with no rules file"
+  printf -- '- verify: make test\n' > "$tmp/proj/.better-dev/rules.md"
+  out="$(cd "$tmp/proj" && CLAUDE_PLUGIN_ROOT=x "$SELF")" || fail "errored with ordinary rules"
+  printf '%s' "$out" | grep -q "parked decision" && fail "parked clause with no pending-decision line"
+  printf -- '- verify: make test\n- pending-decision: merge-policy - auto or human? (parked at onboard)\n' > "$tmp/proj/.better-dev/rules.md"
+  out="$(cd "$tmp/proj" && CLAUDE_PLUGIN_ROOT=x "$SELF")" || fail "errored with a parked decision"
+  printf '%s' "$out" | jq -e . >/dev/null || fail "parked-clause output not valid JSON"
+  printf '%s' "$out" | grep -q "1 parked decision" || fail "missing parked-decision count"
+  printf '%s' "$out" | grep -q 'recall .*pending-decision' || fail "missing parked-decision recall pointer"
+  rm -f "$tmp/proj/.better-dev/rules.md"
 
   # Papercut clause: the write-nudge is unconditional (every wired repo); the unresolved-count
   # clause is absent with no queue file and when the queue is empty, present once a papercut line

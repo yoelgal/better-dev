@@ -9,3 +9,8 @@ bd_host_cli="codex"                         # PATH probe for --host auto
 bd_host_skills_dir="$HOME/.codex/skills"    # native global skills dir
 bd_host_dir_policy="create"                 # convention verified on a real install - install.sh may mkdir
 bd_host_global_entry="$HOME/.codex/AGENTS.md"    # global instructions file loaded in every session
+# No verified machine-global hook config: Codex registers hooks through its own TOML config, whose
+# schema for a session-start event is unverified here. Empty means install.sh skips hook wiring for
+# this host and names the gap rather than writing a file shaped from a guess - same posture as
+# hermes' empty global entry. Skills still install; the session note waits on a verified format.
+bd_host_hook_settings=""

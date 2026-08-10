@@ -44,9 +44,18 @@ shippable before a release.
   single source for name, version, and description - the marketplace entry carries only name and source,
   so the two manifests cannot drift.
 
-**Hook caveat.** The SessionStart/SubagentStart awareness hooks are wired only by the Claude Code plugin
-(via `hooks/hooks.json`). `install.sh` links skills, not hooks, so a clone install gets the practices but
-not the session nudge; wire hooks with the plugin or the `/bootstrap-hooks` skill when you want them.
+**Both channels carry the hooks.** The plugin registers the SessionStart/SubagentStart awareness hooks
+from `hooks/hooks.json`; the clone channel registers the same two events itself, through
+`scripts/bd-hook-wire`, into each host's verified machine-global hook config (`bd_host_hook_settings`
+in `hosts/<name>`). Keep them in step - the shipped `hooks.json` is the reference, and `bd-hook-wire`'s
+`WANT` table mirrors its awareness half. It deliberately omits the `bd-guard` PreToolUse entries: those
+enforce a *repo's* blast-radius policy and belong to `/guardrails-install`, not to a machine-global install.
+
+Channel parity is a release-gate property, not a nicety. Until 0.10.1 only the plugin wired hooks, and
+because an agent told "install better-dev" reads `BOOTSTRAP.md` and cannot drive an interactive plugin
+installer, it always took the clone path - so the common install shipped no session hook in any repo
+while `BOOTSTRAP.md` claimed the tool installs them. A host with no verified hook config (`codex`,
+`hermes`) still declines by design and says so; that is a named gap, not a silent one.
 
 Either way, `/onboard` then wires a repo's `.better-dev/` data and its `bin` symlink. The one-paste
 front door - `BOOTSTRAP.md` - sequences the whole thing (detect host, install globally, onboard the

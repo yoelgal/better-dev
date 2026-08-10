@@ -66,7 +66,18 @@ So on a no-stack repo, split the skill:
   govern something that cannot happen yet - there is no PR to merge and no release to cut. Park each
   as a `pending-decision` so the first skill that actually needs the answer must ask it
   (`/onboard` Phase 5's mechanism), instead of spending the operator's attention now on a choice they
-  have no context to make.
+  have no context to make. Park them by writing the record, not by intending to - an unwritten park is
+  indistinguishable from a policy the operator deliberately left unset, and the difference is the whole
+  point of parking:
+
+  ```bash
+  .better-dev/bin/bd-mem remember "pending-decision: merge-policy - may the agent merge a gates-passed green PR, or does a human click it? (parked at onboard, no stack yet)"
+  .better-dev/bin/bd-mem remember "pending-decision: release-cadence - does a merge continue into a release, or wait to be asked? (parked at onboard, no stack yet)"
+  ```
+
+  Name each parked line in the close-out too. A park is a promise that someone asks later; the skills
+  that collect it are `/plan-grill`'s contract seal (merge policy, at the first item that can merge)
+  and this skill's own re-run - so the promise is kept by a named collector, not by hope.
 - **Do not emit the enforcement paste block.** `bd-guard` mechanically checks the blast-radius policy;
   with no code, the policy is prospective and the hook has nothing to catch. It rides the re-run.
 

@@ -62,9 +62,18 @@ and that the emitted JSON parses.
 
 ## Installing and adapting to other hosts
 
-On Claude Code, point the plugin at `hooks/hooks.json` (the packaging step wires this) and the two
-events register themselves. For the mechanics of why the payloads are shaped the way they are, and
-how to port them, read `porting.md` in this folder.
+Both install channels wire these already, so reach for this skill to *repair* a host, not to complete a
+routine install. The plugin registers them from `hooks/hooks.json`; `install.sh` registers the same two
+events through `scripts/bd-hook-wire`, into the machine-global hook config named by
+`bd_host_hook_settings` in `hosts/<name>`. Adding a host means adding that variable - and only once its
+config path and format are verified on a real machine, never inferred, the same posture as
+`bd_host_dir_policy`. An empty value makes the installer skip and say so.
+
+That leaves three cases for this skill: a host whose hook config exists but has no adapter variable
+yet, a machine with no `python3` (the installer says so and skips), and a config the installer refused
+to parse. `install.sh --verify` reports each as a failure rather than passing an install that linked
+every skill and registered no hook. For the mechanics of why the payloads are shaped the way they are,
+and how to port them, read `porting.md` in this folder.
 
 The SessionStart script already branches its output field for Cursor, Claude Code, and Copilot, so
 session-level awareness is cross-host today. SubagentStart is a Claude-Code (and Codex) event; hosts

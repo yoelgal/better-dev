@@ -132,6 +132,12 @@ not, by itself, a reason to raise it.
 If the feature has UI surface and its visual direction isn't settled, run `/design-brief` before the
 grill closes - the design read and system choice belong in the plan, not discovered mid-implementation.
 
+When the user asks what a component in the design actually does, or why it is there at all - a managed
+service, a queue, a broker, an extra hop - answer it with a picture, not a paragraph
+(`wait-what`'s `visuals.md`). That question is not a detour from the grill; it is the grill, arriving
+from the other side. A design the user cannot picture is one they cannot grill, so their yes is
+deference, and the misunderstanding is discovered at review with the code already written.
+
 ## 3. Grill - work the frontier in rounds
 
 Interview the design down every branch of its decision tree. At any moment some decisions are
