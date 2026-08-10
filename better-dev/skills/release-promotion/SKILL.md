@@ -164,6 +164,23 @@ One command per line here, not a `&&` chain, for the same reason the paragraph a
 the push echo is the only thing you would read, and a tag that never left the machine looks
 identical to one that did.
 
+With the tag pushed, the release branch has nothing left to do here, so put the checkout back where
+work happens:
+
+```bash
+git switch "$integration"
+git pull --ff-only          # the promote moved origin/$integration too if it was behind
+git log --oneline -1        # confirm: on integration, level with origin
+```
+
+Leaving the primary checkout on `$release` is not neutral. Every later step still owes work on
+integration - the receipt below, a fix-forward for anything the tag exposed, the next work-item's
+worktree, which `/worktree-branching` bases on the integration head. A session that ends on the
+release branch hands the next one a stale local `$integration` ref and a checkout one wrong `commit`
+away from putting work straight onto the release branch. Do this before the receipt, not after: the
+sections that follow can stop on a `NEEDS_INPUT`, and a stop should not be what strands the
+checkout.
+
 Record the promote so a later session can see what shipped. The `deploy:` and `health:` values
 come from the deploy-verify pass in the next section - write the receipt once that pass settles
 its verdict:
