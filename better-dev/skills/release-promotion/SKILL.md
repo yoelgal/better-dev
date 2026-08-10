@@ -302,7 +302,8 @@ revert would walk back integration instead. A fast-forward promote carried a ran
 range (`git revert --no-commit <prev-tag>..<release>`, or `git revert <bad-sha>` for a single culprit);
 a merge-commit promote or a hotfix merge is `git revert -m 1 <merge-sha>`. Re-run verification on
 the revert, tag it as a new patch release, and push - a new tag forward, never a moved or deleted
-one. Then back-merge the revert into integration so the two histories stay reconciled, the same
+one. Then back-merge the revert into integration (`git switch "$integration"` first, which is also
+where the checkout belongs when this is over) so the two histories stay reconciled, the same
 both-branches discipline a hotfix uses; skip that and the next promote silently re-ships the bad
 commit. If the release sits behind a feature flag, killing the flag is the faster rollback -
 record the flag's path in the release receipt so the next operator finds it without spelunking.
