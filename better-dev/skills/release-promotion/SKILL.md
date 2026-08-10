@@ -164,6 +164,19 @@ One command per line here, not a `&&` chain, for the same reason the paragraph a
 the push echo is the only thing you would read, and a tag that never left the machine looks
 identical to one that did.
 
+With the tag pushed, the release branch has nothing left to do here, so put the checkout back where
+work happens - before the receipt, not after, since every section below can stop on a `NEEDS_INPUT`
+and a stop should not be what strands the checkout:
+
+```bash
+git switch "$integration"
+git pull --ff-only     # the local ref still sits where it did before the promote
+git status -sb         # the authority: names the branch AND its ahead/behind, which git log -1 can't
+```
+
+Left on `$release`, the checkout hands the next session a stale local `$integration` ref and a tree
+one commit away from landing work on the release branch.
+
 Record the promote so a later session can see what shipped. The `deploy:` and `health:` values
 come from the deploy-verify pass in the next section - write the receipt once that pass settles
 its verdict:
@@ -283,11 +296,14 @@ instead of reverting, or restore the snapshot the migration gate receipted. Reco
 the release receipt (`rollback-schema: down-migrated | rolled-forward | restored <ref>`). A clean
 diff reverts without ceremony.
 
-Revert the commits that shipped: a fast-forward promote carried a range, so revert that range
-(`git revert --no-commit <prev-tag>..<release>`, or `git revert <bad-sha>` for a single culprit);
+Revert the commits that shipped, on the release branch - `git switch "$release"` first, since a
+promote in this same session has already put the checkout back on integration and an unswitched
+revert would walk back integration instead. A fast-forward promote carried a range, so revert that
+range (`git revert --no-commit <prev-tag>..<release>`, or `git revert <bad-sha>` for a single culprit);
 a merge-commit promote or a hotfix merge is `git revert -m 1 <merge-sha>`. Re-run verification on
 the revert, tag it as a new patch release, and push - a new tag forward, never a moved or deleted
-one. Then back-merge the revert into integration so the two histories stay reconciled, the same
+one. Then back-merge the revert into integration (`git switch "$integration"` first, which is also
+where the checkout belongs when this is over) so the two histories stay reconciled, the same
 both-branches discipline a hotfix uses; skip that and the next promote silently re-ships the bad
 commit. If the release sits behind a feature flag, killing the flag is the faster rollback -
 record the flag's path in the release receipt so the next operator finds it without spelunking.
