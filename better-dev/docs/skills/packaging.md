@@ -21,7 +21,7 @@ Near neighbours:
 | Situation | Route |
 |---|---|
 | Wiring a single repo's `.better-dev/` data once the tool itself is installed | `/onboard` |
-| Wiring the session-start awareness hooks that the installer leaves unwired | `/bootstrap-hooks` |
+| Repairing the awareness hooks on a host both install channels could not wire | `/bootstrap-hooks` |
 | Tagging and promoting once the gate is green | `/release-promotion` |
 
 ## Where it fits

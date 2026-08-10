@@ -343,6 +343,38 @@ for j in .claude-plugin/plugin.json hooks/hooks.json; do
   jq -e . "$j" >/dev/null 2>&1 && ok "$j" || bad "$j invalid JSON"
 done
 
+echo "== install-channel hook parity =="
+# The two install channels must deliver the same awareness hooks. Until 0.10.1 only the plugin wired
+# them: an agent told "install better-dev" reads BOOTSTRAP, cannot drive an interactive plugin
+# installer, takes the clone path, and so shipped a hookless install in every repo while BOOTSTRAP
+# claimed otherwise. Nothing caught it because the parity lived in prose. It lives here now: every
+# awareness hook hooks.json registers must also appear in bd-hook-wire's WANT table, and vice versa.
+# bd-guard's PreToolUse entries are deliberately out of scope - those are /guardrails-install's
+# per-repo enforcement, not a machine-global install - so compare only the two awareness events.
+# One code path, no outer existence guard: a missing file has to reach the SAME bad, or the check
+# skips at base instead of failing there and proves nothing (prove-new mode enforces exactly this).
+json_hooks="$(jq -r '.hooks | to_entries[] | select(.key == "SessionStart" or .key == "SubagentStart")
+                     | .value[].hooks[].command' hooks/hooks.json 2>/dev/null \
+              | sed -E 's#.*/hooks/([a-z-]+).*#\1#' | sort -u || true)"
+wire_hooks="$(sed -n '/^WANT = {/,/^}/p' scripts/bd-hook-wire 2>/dev/null \
+              | grep -oE '"bd-[a-z-]+"' | tr -d '"' | sort -u || true)"
+if [ -n "$json_hooks" ] && [ "$json_hooks" = "$wire_hooks" ]; then
+  ok "both install channels register the same awareness hooks"
+else
+  bad "install-channel hook drift: a clone install would ship a different awareness hook set than the plugin - hooks.json and bd-hook-wire's WANT table must name the same scripts"
+fi
+
+# Every host adapter declares its hook-config stance explicitly. An adapter that simply omits
+# bd_host_hook_settings is indistinguishable from one whose author forgot, and the failure is silent:
+# skills install, no hook is ever registered, and the operator sees a successful install.
+for a in hosts/*; do
+  [ -f "$a" ] || continue
+  h="$(basename "$a")"
+  grep -q '^bd_host_hook_settings=' "$a" \
+    && ok "hosts/$h declares a hook-config stance" \
+    || bad "host adapter declares no hook-config stance: hosts/$h needs a bd_host_hook_settings line - the verified path, or an empty value to decline explicitly"
+done
+
 echo "== host adapters =="
 # hosts/ is the single host registry (install.sh and bd-uninstall enumerate it), so a broken adapter
 # ships breakage to a user machine unless it fails here: source-clean, required fields, name equals

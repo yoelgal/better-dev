@@ -9,3 +9,4 @@ bd_host_cli="claude"                        # PATH probe for --host auto
 bd_host_skills_dir="$HOME/.claude/skills"   # native global skills dir
 bd_host_dir_policy="create"                 # convention verified on a real install - install.sh may mkdir
 bd_host_global_entry="$HOME/.claude/CLAUDE.md"   # user-memory file loaded in every session on this machine
+bd_host_hook_settings="$HOME/.claude/settings.json"   # machine-global hook config; install.sh registers the awareness hooks here

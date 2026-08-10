@@ -14,3 +14,6 @@ bd_host_dir_policy="require-existing"       # never mkdir - decline and name the
 # the global comms-block option declines for this host and names the gap - same posture as the
 # require-existing dir policy above: never a path we invented.
 bd_host_global_entry=""
+# Same reason, same posture: no verified machine-global hook config for hermes, so install.sh skips
+# hook wiring here and names the gap instead of inventing a schema.
+bd_host_hook_settings=""

@@ -9,12 +9,14 @@ loudly, and stay completely silent in any repo without a `.better-dev/` scaffold
 
 ## When to reach for it
 
-Reach here when a host is being wired for better-dev for the first time and needs its
-sessions and dispatched workers to notice the practices are present, or when adapting the
-hook pair to a host other than Claude Code. It is not the enforcement layer - a host that
-needs to veto or ask before a risky tool call wants the `bd-guard` pair described in
-`porting.md`, not this skill. `/onboard` calls this as part of wiring a fresh repo; running it
-directly is for adapting or re-registering the hooks themselves.
+Reach here to **repair** a host, not to complete a routine install: since 0.11.0 both install
+channels register these hooks themselves - the plugin from `hooks.json`, `install.sh` through
+`scripts/bd-hook-wire`. That leaves three cases for this skill: a host whose hook config exists
+but has no `bd_host_hook_settings` entry in its adapter yet, a machine with no `python3` (the
+installer says so and skips), and a config the installer refused to parse. Also reach here when
+adapting the hook pair to a host other than Claude Code. It is not the enforcement layer - a host
+that needs to veto or ask before a risky tool call wants the `bd-guard` pair described in
+`porting.md`, not this skill.
 
 ## Where it fits
 

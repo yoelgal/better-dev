@@ -12,15 +12,17 @@
 # ./install.sh too: it links the new one and prunes a link whose skill was removed upstream, and also
 # reclaims a moved clone's stale links.
 #
-# This script installs skills only. It does NOT wire the SessionStart/SubagentStart awareness hooks -
-# those ride the Claude Code plugin (hooks.json) or the bootstrap-hooks skill. A clone install gets the
-# practices; wire the hooks separately if you want the session nudge.
+# It also registers the SessionStart/SubagentStart awareness hooks in the host's machine-global hook
+# config, for every host whose config file and format are verified (hosts/<name>'s
+# bd_host_hook_settings). The plugin channel gets the same hooks from hooks.json; this is the clone
+# channel's half, so both front doors deliver what BOOTSTRAP promises. Pass --no-hooks to skip it.
 #
 #   ./install.sh [--host <name>|auto]         # <name> = any adapter file in hosts/; default: auto
 #                                              # (each host whose CLI is on PATH or home dir exists)
 #   ./install.sh --list    [--host ...]       # show current state per host; change nothing
 #   ./install.sh --verify  [--host ...]       # assert every better-dev link resolves + bd-package-check passes
 #   ./install.sh --dry-run [--host ...]       # print the link / skip / prune plan; touch nothing
+#   ./install.sh --no-hooks [--host ...]      # link skills only; leave the host's hook config alone
 #
 # A repo opts in later with /onboard, which creates a per-repo .better-dev/bin symlink back to this
 # clone's scripts (see scripts/bd-link) so the portable path .better-dev/bin/bd-mem resolves there.
@@ -33,6 +35,7 @@ HOSTS_DIR="$SRC/hosts"
 
 HOST="auto"
 MODE="install"   # install | dryrun | list | verify
+WIRE_HOOKS=1
 while [ $# -gt 0 ]; do
   case "$1" in
     --host) HOST="${2:-}"; shift 2 ;;
@@ -40,6 +43,7 @@ while [ $# -gt 0 ]; do
     --dry-run) MODE="dryrun"; shift ;;
     --list) MODE="list"; shift ;;
     --verify) MODE="verify"; shift ;;
+    --no-hooks) WIRE_HOOKS=0; shift ;;
     -h|--help) awk 'NR>1 && /^#/{sub(/^# ?/,""); print; next} NR>1{exit}' "$0"; exit 0 ;;
     *) echo "install: unknown argument '$1'" >&2; exit 1 ;;
   esac
@@ -169,7 +173,41 @@ host_apply() {
   [ -n "$skipped" ] && { echo "    skipped (name already used by a non-better-dev skill):$skipped"
     echo "      better-dev's own references to those names now reach the other skill - /review is the"
     echo "      loop's merge gate. Rename or move the other one, then re-run install."; }
+  host_hooks "$dry"
   installed=$((installed + 1))
+}
+
+# ── register the awareness hooks for one host ────────────────────────────────
+# Why this lives in the installer and not in a doc step: an agent told "install better-dev" reads
+# BOOTSTRAP and takes the clone path, because it cannot drive an interactive plugin installer. If
+# hooks were a separate manual step, that install - the common one - would end hookless in every repo
+# while BOOTSTRAP claims the tool ships hooks. So the installer the operator ran does the write.
+# Only a host with a VERIFIED hook config carries bd_host_hook_settings; empty means skip and name the
+# gap, the same premise-verify posture as bd_host_dir_policy. arg1: 1 = dry-run (report only).
+host_hooks() {
+  dry="$1"
+  [ "$WIRE_HOOKS" = 1 ] || return 0
+  if [ -z "${bd_host_hook_settings:-}" ]; then
+    echo "    hooks: $bd_host_display has no verified machine-global hook config - skipped (skills still installed)"
+    return 0
+  fi
+  if ! command -v python3 >/dev/null 2>&1; then
+    echo "    hooks: python3 not found - skipped. Wire them by hand with /bootstrap-hooks, or install the plugin."
+    return 0
+  fi
+  hookverb=wire; [ "$dry" = 1 ] && hookverb=plan
+  hookout=""
+  if ! hookout="$(python3 "$SRC/scripts/bd-hook-wire" "$hookverb" "$SRC" "$bd_host_hook_settings" 2>/dev/null)"; then
+    echo "    hooks: could not update $bd_host_hook_settings - skipped. /bootstrap-hooks wires them by hand."
+    return 0
+  fi
+  case "$hookout" in
+    wired)      echo "    hooks: SessionStart + SubagentStart registered in $bd_host_hook_settings" ;;
+    would-wire) echo "    would register SessionStart + SubagentStart hooks in $bd_host_hook_settings" ;;
+    current)    echo "    hooks: already registered in $bd_host_hook_settings" ;;
+    unreadable) echo "    hooks: $bd_host_hook_settings is not readable JSON - left untouched. Fix it and re-run, or use /bootstrap-hooks." ;;
+    *)          echo "    hooks: unexpected installer state ('$hookout') - left untouched; /bootstrap-hooks wires them by hand." ;;
+  esac
 }
 
 # print current state for one host; change nothing.
@@ -201,6 +239,16 @@ host_verify() {
     esac
   done
   if [ "$vbad" = 0 ]; then echo "  ok $bd_host_display: all skills resolve"; else verify_fail=1; fi
+  # Hooks are half the install, so verify asserts them too - an install that links every skill and
+  # registers no hook is exactly the silent half-install this flag exists to catch.
+  if [ -n "${bd_host_hook_settings:-}" ] && [ "$WIRE_HOOKS" = 1 ]; then
+    if grep -q "hooks/bd-session-start" "$bd_host_hook_settings" 2>/dev/null; then
+      echo "  ok $bd_host_display: awareness hooks registered"
+    else
+      echo "  x $bd_host_display: awareness hooks NOT registered in $bd_host_hook_settings - re-run install.sh (or /bootstrap-hooks)"
+      verify_fail=1
+    fi
+  fi
 }
 
 installed=0
@@ -210,7 +258,7 @@ verify_fail=0
 for h in $hosts; do
   adapter="$HOSTS_DIR/$h"
   [ -f "$adapter" ] || { echo "install: no adapter for host '$h'" >&2; continue; }
-  bd_host_cli=""; bd_host_display=""; bd_host_skills_dir=""; bd_host_dir_policy=""
+  bd_host_cli=""; bd_host_display=""; bd_host_skills_dir=""; bd_host_dir_policy=""; bd_host_hook_settings=""
   . "$adapter"
   dir="$bd_host_skills_dir"
   # auto installs for a host whose CLI is on PATH OR whose home dir already exists (GUI-managed CLI,
@@ -255,7 +303,7 @@ else
   echo "  fresh session picks up the pull. Re-run ./install.sh after a pull that adds or removes a skill,"
   echo "  so the new one links and orphans prune)."
 fi
-echo "Hooks: this installer wires skills only. For the SessionStart/SubagentStart nudge, use the Claude"
-echo "  Code plugin (.claude-plugin/plugin.json + hooks.json) or the bootstrap-hooks skill."
+echo "Hooks: the SessionStart/SubagentStart nudge is registered above for every host with a verified"
+echo "  hook config; a host reported as skipped has none yet, and /bootstrap-hooks wires one by hand."
 echo "In a repo, run  /onboard  once to wire it (creates .better-dev/bin -> this clone's scripts)."
 echo "To remove better-dev later, run  /uninstall  (or scripts/bd-uninstall; dry-run by default)."

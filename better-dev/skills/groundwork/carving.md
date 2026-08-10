@@ -95,10 +95,12 @@ check in step 3 still runs across batches.
 
 ## Approve before it lands
 
-The carve above is a draft until the user confirms it. Present the work-item list - owns, depends-on,
-base, wave - and ask the three questions from groundwork step 5: is the granularity right (too coarse
-/ too fine), does each dependency edge gate only the item it blocks, should anything merge or split.
-Iterate until approved; only the approved list goes to the ledger (groundwork step 5).
+The carve above is a draft until the user confirms it. Render the work-item list - owns, depends-on,
+base, wave - as a table in a turn that asks nothing, then ask the three questions from groundwork
+step 5 in the next turn: is the granularity right (too coarse / too fine), does each dependency edge
+gate only the item it blocks, should anything merge or split. The two-turn order is groundwork step
+5's, and it is what stops the table collapsing into the question prompt - read it there before
+running this gate. Iterate until approved; only the approved list goes to the ledger.
 
 ## When two items can't be made disjoint
 

@@ -14,6 +14,7 @@ background it needed, in less space.
 | Situation | Route |
 |---|---|
 | A reply just lost you - "wait", "what?", "you lost me", "what does that mean?" | here; it fires on the signal itself, and `/wait-what` by name works too |
+| What lost you is a shape - a component's role, a boundary, an order of events ("what does KMS actually do here?") | still here, but drawn: `visuals.md` in the skill folder. Reached mid-grill too, from `/plan-grill` and `/groundwork` |
 | Shaping how every message reads, before anything fails to land | the comms style block `/onboard` writes |
 | An artifact its owning skill renders in full (a contract at its gate, a review verdict) | still rendered in full - the re-pitch wraps it, never replaces it |
 
@@ -24,6 +25,12 @@ the way a correction pairs with a habit: the block is the standing preventive sh
 named move for the moment the shape still failed.
 
 ## Common questions
+
+**If the skill must stay small, why does it now ship a `visuals.md`?** The size rule governs the
+body - the standing shape of a re-pitch, which is what grows into the volume it corrects. `visuals.md`
+is a different instrument, not more of the same one: it fires when the gap is structural, where
+shorter prose re-pitches the same wrong shape and a picture answers in one pass. It sits in a sibling
+file for exactly that reason, and the body names it in one line.
 
 **Why is the skill only a few lines long?** By design, and the design is recorded
 (`docs/DECISIONS.md` D30): a corrective against volume that itself grows teaches the volume, not

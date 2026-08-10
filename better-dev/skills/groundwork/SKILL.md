@@ -162,10 +162,19 @@ starts. Every carved work-item then bases off staging-with-foundation, so the sh
 once, in one place, instead of being invented N different ways in N worktrees. This is the
 foundation-first order the branching model already anticipates (`/worktree-branching`).
 
-The foundation is ready to fan out on when three things hold: a fresh checkout builds and its pipeline runs
-green, the frozen surface is named in the record, and an independent reader could rebuild the same substrate
-from the record alone. Until all three hold, hold the wave - N loops on an unsettled foundation is N times the
-rework, invented N different ways.
+**Once the foundation lands, re-run `/guardrails-install`.** On a greenfield repo that skill installed
+its stack-agnostic half only and recorded one deferred line, because at `/onboard` time there was no
+stack to detect: no verify command, no `dev-run` or `seed-reset`, no real denylist. The foundation is
+what makes them detectable, and this is the named trigger the deferred record itself points at
+(`recall "guardrails"`). Skipping it fans N work-items out onto a loop whose verify command is
+unrecorded and whose blast-radius policy is empty - every item then re-guesses both, differently. Do it
+before the wave, not after: it is one run, and it is the difference between N loops that grade against
+a recorded bar and N that invent one.
+
+The foundation is ready to fan out on when four things hold: a fresh checkout builds and its pipeline runs
+green, the frozen surface is named in the record, an independent reader could rebuild the same substrate
+from the record alone, and the deferred guardrails are recorded against the stack that now exists. Until all
+four hold, hold the wave - N loops on an unsettled foundation is N times the rework, invented N different ways.
 
 ## 4. Carve the remainder into disjoint work-items
 
@@ -202,18 +211,34 @@ transfer - the receiving front-end loads it and enters the epic's settled decisi
 feature itself, and mid-groundwork the pull to just start building one of the features is the signal the
 carve's edge is reached: hand off, don't build.
 
-Present the carve before recording it: the numbered work-item list, each with its owns, depends-on,
-base, and wave - rendered in full as message text the user reads *before or alongside* the approval
-ask. A one-line synopsis folded into a question prompt ("does the carve look right - foundation
-first, then 5 items?") is not presentation, and neither is the list sitting in a file or ledger the
-user hasn't opened; approval of an artifact the user never saw on screen is blind approval, not a
-gate. Then ask three things - is the granularity right (too coarse / too fine); does each
-dependency edge gate the item it blocks and nothing else; should any items merge or split? The carve
-gate is its own ask: never batched into one prompt with preference questions (a provider choice, a
-product name), and never with an "approve as-is" preselected beside unresolved design choices - a
-gate bundled with preferences collects a reflex click, not a decision. Iterate
-until the user approves; only the approved list goes to the ledger. A wrong carve costs N worktrees,
+Present the carve before recording it, in **two separate turns, in this order**:
+
+1. **Render the table, and stop.** One message whose content is the numbered work-item list - a row
+   per item carrying its owns, depends-on, base, wave, and front-end - and no question. End the turn
+   there. The table is the deliverable of this step; a turn that renders it has done its job.
+2. **Then ask, in the next turn.** Three things: is the granularity right (too coarse / too fine);
+   does each dependency edge gate the item it blocks and nothing else; should any items merge or
+   split?
+
+The split is the mechanism, and it is not stylistic. Rendering and asking in one turn reliably
+collapses into the ask alone: the question is a tool call whose natural shape is short options, so the
+table gets compressed into its own prompt ("does the carve look right - foundation first, then 5
+items?") and the user approves a summary of a list they never saw. Observed in a real run, 2026-08.
+Two turns cannot collapse that way - the table exists on screen before a question is available to
+answer. So: no synopsis standing in for the list, no list that lives only in a file or ledger the user
+hasn't opened, and no question in the turn that renders. Approval of an artifact the user never saw on
+screen is blind approval, not a gate.
+
+The carve gate is also its own ask: never batched into one prompt with preference questions (a
+provider choice, a product name), and never with an "approve as-is" preselected beside unresolved
+design choices - a gate bundled with preferences collects a reflex click, not a decision. Iterate
+until the user approves, re-rendering the table on each revision so what they approve is always
+what is on screen; only the approved list goes to the ledger. A wrong carve costs N worktrees,
 not one - it is the cheapest expensive thing in the epic to get confirmed.
+
+If the carve is large or the dependency edges are what the user has to judge, draw it as well as
+tabulate it - a wave-by-wave diagram of items and the edges between them, per `wait-what`'s `visuals.md`. The table
+is what they approve; the picture is what makes a wrong edge visible.
 
 Record the groundwork as the project's map so it survives a compaction and the fan-out stays
 coordinated. Write the foundation contract (its substrate spec from step 2) and the parallel work-item

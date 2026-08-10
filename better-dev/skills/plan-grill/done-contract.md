@@ -337,9 +337,22 @@ At the same confirmation, settle the Merge line. Where the repo records
 `merge-policy: auto-on-green` (`.better-dev/bin/bd-mem recall "merge-policy"`), ask one question
 beside the contract confirm: when the loop settles DONE and every gate passes - independent review,
 CI, the driven done-criteria - merge into the integration branch automatically, or hold the green PR
-for your look? Record the answer as the contract's `merge:` line. Where the policy is `human` or
-nothing is recorded, skip the question and write `merge: hold` with the reason - the standing
-allowance is `/guardrails-install`'s to grant, never this seal's to improvise.
+for your look? Record the answer as the contract's `merge:` line. Where the policy is `human`, skip the question and
+write `merge: hold` with the reason - the standing allowance is `/guardrails-install`'s to grant,
+never this seal's to improvise.
+
+Nothing recorded splits in two, and the split is load-bearing. Recall it
+(`.better-dev/bin/bd-mem recall "pending-decision"`): where a parked `pending-decision` names the merge
+policy - what a greenfield `/onboard` writes, having deferred the question because the repo then had no
+PR to merge - **this seal is the collector**. There is a PR to merge now, so ask the standing question
+here, once, and write the answer through its owner (`/guardrails-install`'s
+`remember "merge-policy: <auto-on-green | human>"`), then clear the parked line and settle the `merge:`
+line from it. A park is a deferral with a named collector; a collector that quietly writes `hold`
+instead of asking converts it into a decision the operator never made, and the repo then carries a
+policy nobody chose - the outcome parking exists to prevent.
+
+Where nothing is recorded and nothing was parked, the policy is genuinely unset: write `merge: hold`
+with the reason, and name the `/guardrails-install` run that would record one.
 
 When the user confirms the contract, pin the approval to its bytes with
 `.better-dev/bin/bd-mem ledger approve <work-item>` - it records a content hash of `contract.md` beside
