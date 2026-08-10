@@ -165,21 +165,17 @@ the push echo is the only thing you would read, and a tag that never left the ma
 identical to one that did.
 
 With the tag pushed, the release branch has nothing left to do here, so put the checkout back where
-work happens:
+work happens - before the receipt, not after, since every section below can stop on a `NEEDS_INPUT`
+and a stop should not be what strands the checkout:
 
 ```bash
 git switch "$integration"
-git pull --ff-only          # the promote moved origin/$integration too if it was behind
-git log --oneline -1        # confirm: on integration, level with origin
+git pull --ff-only     # the local ref still sits where it did before the promote
+git status -sb         # the authority: names the branch AND its ahead/behind, which git log -1 can't
 ```
 
-Leaving the primary checkout on `$release` is not neutral. Every later step still owes work on
-integration - the receipt below, a fix-forward for anything the tag exposed, the next work-item's
-worktree, which `/worktree-branching` bases on the integration head. A session that ends on the
-release branch hands the next one a stale local `$integration` ref and a checkout one wrong `commit`
-away from putting work straight onto the release branch. Do this before the receipt, not after: the
-sections that follow can stop on a `NEEDS_INPUT`, and a stop should not be what strands the
-checkout.
+Left on `$release`, the checkout hands the next session a stale local `$integration` ref and a tree
+one commit away from landing work on the release branch.
 
 Record the promote so a later session can see what shipped. The `deploy:` and `health:` values
 come from the deploy-verify pass in the next section - write the receipt once that pass settles
@@ -300,8 +296,10 @@ instead of reverting, or restore the snapshot the migration gate receipted. Reco
 the release receipt (`rollback-schema: down-migrated | rolled-forward | restored <ref>`). A clean
 diff reverts without ceremony.
 
-Revert the commits that shipped: a fast-forward promote carried a range, so revert that range
-(`git revert --no-commit <prev-tag>..<release>`, or `git revert <bad-sha>` for a single culprit);
+Revert the commits that shipped, on the release branch - `git switch "$release"` first, since a
+promote in this same session has already put the checkout back on integration and an unswitched
+revert would walk back integration instead. A fast-forward promote carried a range, so revert that
+range (`git revert --no-commit <prev-tag>..<release>`, or `git revert <bad-sha>` for a single culprit);
 a merge-commit promote or a hotfix merge is `git revert -m 1 <merge-sha>`. Re-run verification on
 the revert, tag it as a new patch release, and push - a new tag forward, never a moved or deleted
 one. Then back-merge the revert into integration so the two histories stay reconciled, the same
