@@ -199,6 +199,16 @@ hook_nudge() {
   # delivers all three through the plugin - so the shared guard keeps this nudge
   # off that host, and off the install.sh run that would double-register them.
   host_installed "$clone" || return 0
+  # The guard above asks "does this host link into the clone", which still says yes
+  # when the plugin root IS that clone. There the plugin already delivers the hooks
+  # and install.sh:200 wires unconditionally with no cross-channel dedupe, so the
+  # nudge would buy a second executing copy of all three, running twice per session
+  # for good. Relinking skills is idempotent and a duplicate hook is not, so this
+  # asymmetry earns its own gate rather than riding link_nudge's posture.
+  if [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] && [ -f "$clone/hooks/hooks.json" ] \
+     && [ "$clone" = "$(normalize_clone "${CLAUDE_PLUGIN_ROOT:-}")" ]; then
+    return 0
+  fi
   command -v python3 >/dev/null 2>&1 || return 0
   settings="$HOME/.claude/settings.json"   # this hook runs under Claude Code; other hosts declare their own
   [ -f "$settings" ] || return 0
@@ -452,7 +462,7 @@ if [ "${1:-}" = "selftest" ]; then
     ln -sfn "$clone_st/skills/onboard" "$tmp/h/.claude/skills/onboard"
     printf '{}' > "$tmp/h/.claude/settings.json"
     python3 "$clone_st/scripts/bd-hook-wire" wire "$clone_st" "$tmp/h/.claude/settings.json" >/dev/null 2>&1
-    out="$(cd "$tmp/proj" && HOME="$tmp/h" CLAUDE_PLUGIN_ROOT="$clone_st" "$SELF")" || fail "errored with hooks current"
+    out="$(cd "$tmp/proj" && HOME="$tmp/h" CLAUDE_PLUGIN_ROOT= "$SELF")" || fail "errored with hooks current"
     printf '%s' "$out" | grep -q "missing awareness hooks" && fail "hook nudge fired while hooks were current"
     python3 - "$tmp/h/.claude/settings.json" <<'PYST' || fail "could not build the incomplete hook set"
 import json,sys
@@ -460,7 +470,7 @@ p=sys.argv[1]; d=json.load(open(p))
 d['hooks']['SessionStart']=d['hooks']['SessionStart'][:1]
 json.dump(d,open(p,'w'))
 PYST
-    out="$(cd "$tmp/proj" && HOME="$tmp/h" CLAUDE_PLUGIN_ROOT="$clone_st" "$SELF")" || fail "errored with hooks incomplete"
+    out="$(cd "$tmp/proj" && HOME="$tmp/h" CLAUDE_PLUGIN_ROOT= "$SELF")" || fail "errored with hooks incomplete"
     printf '%s' "$out" | jq -e . >/dev/null || fail "hook nudge output is not valid JSON"
     printf '%s' "$out" | grep -q "missing awareness hooks" || fail "hook nudge silent on an incomplete hook set"
     # ...and the operator sees it: install.sh writes settings.json, a machine-
@@ -495,13 +505,26 @@ PYST
     mkdir -p "$tmp/hbare"
     # (no JSON-validity assert here: the unwired branch is one printf, already
     # asserted valid above and again at the unwired update-nudge case below.)
-    out="$(cd "$tmp/hbare" && HOME="$tmp/h" CLAUDE_PLUGIN_ROOT="$clone_st" "$SELF")" || fail "errored when unwired with hooks incomplete"
+    out="$(cd "$tmp/hbare" && HOME="$tmp/h" CLAUDE_PLUGIN_ROOT= "$SELF")" || fail "errored when unwired with hooks incomplete"
     printf '%s' "$out" | jq -r '.systemMessage' | grep -q 'awareness hooks missing, run install.sh' \
       || fail "no hook nudge in an unwired repo"
 
     rm -f "$tmp/h/.claude/settings.json"
-    out="$(cd "$tmp/proj" && HOME="$tmp/h" CLAUDE_PLUGIN_ROOT="$clone_st" "$SELF")" || fail "errored with no settings file"
+    out="$(cd "$tmp/proj" && HOME="$tmp/h" CLAUDE_PLUGIN_ROOT= "$SELF")" || fail "errored with no settings file"
     printf '%s' "$out" | grep -q "missing awareness hooks" && fail "hook nudge fired with no settings file"
+
+    # The plugin root IS the clone the host links into: the plugin already delivers
+    # the hooks, so nudging here would buy a second executing copy of all three.
+    # Same incomplete settings that fires on a clone install above.
+    python3 "$clone_st/scripts/bd-hook-wire" wire "$clone_st" "$tmp/h/.claude/settings.json" >/dev/null 2>&1
+    python3 - "$tmp/h/.claude/settings.json" <<'PYPL' || fail "could not build the incomplete hook set for the plugin case"
+import json,sys
+p=sys.argv[1]; d=json.load(open(p))
+d['hooks']['SessionStart']=d['hooks']['SessionStart'][:1]
+json.dump(d,open(p,'w'))
+PYPL
+    out="$(cd "$tmp/proj" && HOME="$tmp/h" CLAUDE_PLUGIN_ROOT="$clone_st" "$SELF")" || fail "errored when the plugin root is the linked clone"
+    printf '%s' "$out" | grep -q "missing awareness hooks" && fail "hook nudge fired when the plugin root is the linked clone"
   fi
 
   # Overrides present -> the note points at them, still valid JSON.
