@@ -119,6 +119,32 @@ update_nudge() {
   printf ' better-dev: update available (%s commit(s)) - run /update (or: git -C %s pull, then re-run its install.sh only if skills were added, removed, or renamed).' "$behind" "$clone"
 }
 
+# --- shared install-channel guard: did install.sh run on this host, or is this a
+# plugin-only install? A host link into the resolved clone (or a copy-install
+# marker file) means the former; nothing under $HOME/.claude/skills means the
+# latter, where skills AND hooks both ride the plugin update. Every nudge whose
+# remedy is install.sh must skip a plugin-only host: the remedy is merely wrong
+# for skills, and actively harmful for hooks - hooks/hooks.json already delivers
+# all three, so wiring would register a second copy of each and run every hook
+# twice per session. One guard, all callers route through it. Callers pass the
+# clone they resolved; returns 1 (skip) when this host has no install of its own.
+host_installed() {
+  local clone="$1" hostdir="$HOME/.claude/skills" entry target
+  [ -d "$hostdir" ] || return 1
+  for entry in "$hostdir"/*; do
+    [ -e "$entry" ] || [ -L "$entry" ] || continue
+    if [ -L "$entry" ]; then
+      target="$(readlink "$entry" 2>/dev/null)"
+      # match the normalized clone AND its pre-0.7.0 root: after the monorepo
+      # move every old link's target prefix is the root, not better-dev/.
+      case "$target" in "$clone"/skills/* | "${clone%/better-dev}"/skills/*) return 0 ;; esac
+    elif [ -f "$entry/.better-dev-skill" ]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
 # --- link nudge: does the installed clone hold a skill this host never linked? -
 # Covers the gap update_nudge leaves: after a pull, a brand-new skills/<name>/ in
 # the clone has no host link yet, the behind-count is zero, and nothing else
@@ -126,7 +152,7 @@ update_nudge() {
 # link-install hosts (codex, hermes) get the same treatment when it bites - the
 # hosts/ adapters own their own dir names.
 link_nudge() {
-  local clone hostdir="$HOME/.claude/skills" entry name target found missing n skill
+  local clone hostdir="$HOME/.claude/skills" name missing n skill
   # Locate the clone: the plugin root if it looks like one, else the fallback above.
   clone="$(normalize_clone "${CLAUDE_PLUGIN_ROOT:-}")"
   [ -n "$clone" ] || clone="$(normalize_clone "$(resolve_clone_via_symlink)")"
@@ -134,22 +160,7 @@ link_nudge() {
 
   # Guard: a plugin-only install with no host links skips silently - those skills
   # ride the plugin update, not install.sh.
-  [ -d "$hostdir" ] || return 0
-  found=0
-  for entry in "$hostdir"/*; do
-    [ -e "$entry" ] || [ -L "$entry" ] || continue
-    name="$(basename "$entry")"
-    if [ -L "$entry" ]; then
-      target="$(readlink "$entry" 2>/dev/null)"
-      # match the normalized clone AND its pre-0.7.0 root: after the monorepo
-      # move every old link's target prefix is the root, not better-dev/.
-      case "$target" in "$clone"/skills/* | "${clone%/better-dev}"/skills/*) found=1 ;; esac
-    elif [ -f "$entry/.better-dev-skill" ]; then
-      found=1
-    fi
-    [ "$found" = 1 ] && break
-  done
-  [ "$found" = 1 ] || return 0
+  host_installed "$clone" || return 0
 
   # Detect: existence under any form (link, dir, file) is enough here - the
   # classify-grade ours-vs-foreign call is install.sh --verify's job.
@@ -163,6 +174,60 @@ link_nudge() {
   done
   [ "$n" -gt 0 ] || return 0
   printf ' better-dev: %s skill(s) in the installed clone have no link for this host (%s) - run %s/install.sh to reconcile.' "$n" "$missing" "$clone"
+}
+
+# --- hook nudge: are this host's wired hooks the set the clone expects? --------
+# The gap link_nudge leaves: skills can be linked while the awareness hooks are
+# absent or incomplete, which is the state 0.11.0 shipped to every clone install
+# before install.sh learned to wire them. install.sh --verify does not close it -
+# its hook assertion greps for bd-session-start alone, so it passes while a newly
+# added hook is missing. bd-hook-wire's plan mode is the real comparison (whole
+# entries against its WANT table, the same table the installer writes from), so
+# ask it rather than re-deriving the answer here and drifting from WANT the way
+# --verify already has. Silent on every missing premise: a pre-0.11.0 clone has no
+# bd-hook-wire, a host may have no python3, and the settings file may be absent or
+# unreadable - none of those is this hook's business to report.
+hook_nudge() {
+  local clone settings verdict tobin
+  # Same retry rule as update_nudge and reonboard_nudge: fall back when the plugin
+  # root fails THIS nudge's predicate (no scripts/bd-hook-wire - a pre-0.11.0
+  # clone), not only when it lacks skills/.
+  clone="$(normalize_clone "${CLAUDE_PLUGIN_ROOT:-}")"
+  [ -n "$clone" ] && [ -f "$clone/scripts/bd-hook-wire" ] || clone="$(normalize_clone "$(resolve_clone_via_symlink)")"
+  [ -n "$clone" ] && [ -f "$clone/scripts/bd-hook-wire" ] || return 0
+  # A plugin-only install has NO settings entries by design - hooks/hooks.json
+  # delivers all three through the plugin - so the shared guard keeps this nudge
+  # off that host, and off the install.sh run that would double-register them.
+  host_installed "$clone" || return 0
+  # The guard above asks "does this host link into the clone", which still says yes
+  # when the plugin root IS that clone. There the plugin already delivers the hooks
+  # and install.sh:200 wires unconditionally with no cross-channel dedupe, so the
+  # nudge would buy a second executing copy of all three, running twice per session
+  # for good. Relinking skills is idempotent and a duplicate hook is not, so this
+  # asymmetry earns its own gate rather than riding link_nudge's posture.
+  if [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] && [ -f "$clone/hooks/hooks.json" ] \
+     && [ "$clone" = "$(normalize_clone "${CLAUDE_PLUGIN_ROOT:-}")" ]; then
+    return 0
+  fi
+  command -v python3 >/dev/null 2>&1 || return 0
+  settings="$HOME/.claude/settings.json"   # this hook runs under Claude Code; other hosts declare their own
+  [ -f "$settings" ] || return 0
+  # `plan` writes nothing and reads one small local JSON file with no network and
+  # no children - not the trade the fetch above makes, which bounds a network call
+  # that can genuinely hang. So `timeout` is a nice-to-have here, not a premise:
+  # requiring it would make the whole nudge inert on stock macOS, which ships
+  # neither timeout nor gtimeout. Use one when the host has it, at 1s - the two
+  # bounds are serial, and 2s + 1s keeps the worst case inside the hook's 5s
+  # budget where 2s + 2s did not. `-f` above already excludes the one local read
+  # that can block forever (a FIFO). Any non-zero exit or unexpected word stays
+  # silent. Built through the positional params so the bounded and unbounded forms
+  # share one command line (a function's $@ is its own).
+  tobin="$(command -v timeout || command -v gtimeout || true)"
+  set -- python3 "$clone/scripts/bd-hook-wire" plan "$clone" "$settings"
+  [ -n "$tobin" ] && set -- "$tobin" 1 "$@"
+  verdict="$("$@" 2>/dev/null)" || return 0
+  [ "$verdict" = "would-wire" ] || return 0
+  printf ' better-dev: this host is missing awareness hooks the installed clone expects - run %s/install.sh to register them (it writes %s).' "$clone" "$settings"
 }
 
 # --- reonboard nudge: did a release change the repo surface since /onboard? ---
@@ -222,7 +287,7 @@ reonboard_nudge() {
 }
 
 emit() {
-  local root="$1" note lessons n inflight bdm rows cnt oldest papercut_nudge papercuts parked fpnote fpcur fprec context escaped welcome custom upd rnb lnk mark ver
+  local root="$1" note lessons n inflight bdm rows cnt oldest papercut_nudge papercuts parked fpnote fpcur fprec context escaped welcome custom upd rnb lnk hks mark ver
   # Per-repo welcome wording: a "better-dev welcome: <text>" line in overrides.md
   # replaces the default (same knob style as "better-dev auto-update:"). Only the
   # wired message is overridable - an unwired repo has no overrides to read.
@@ -313,7 +378,8 @@ emit() {
   upd="$(update_nudge "$root/.better-dev/overrides.md")"
   rnb="$(reonboard_nudge "$root")"
   lnk="$(link_nudge)"
-  context="${context}${upd}${rnb}${lnk}"
+  hks="$(hook_nudge)"
+  context="${context}${upd}${rnb}${lnk}${hks}"
   escaped=$(escape_for_json "$context")
 
   # A nudge asks a HUMAN to run /update or install.sh, but additionalContext only
@@ -339,6 +405,9 @@ emit() {
     case "$upd" in *'update available'*) mark=" - update available, run /update" ;; esac
   fi
   [ -n "$lnk" ] && mark="${mark} - skill links missing, run install.sh"
+  # install.sh writes $HOME/.claude/settings.json - a machine-touching path that
+  # keeps its human gate - so the agent cannot stand in for the operator here.
+  [ -n "$hks" ] && mark="${mark} - awareness hooks missing, run install.sh"
   welcome="${welcome}${mark}"
 
   # Emit only the field the current host reads. Cursor wants snake_case
@@ -379,6 +448,84 @@ if [ "${1:-}" = "selftest" ]; then
   mkdir -p "$tmp/proj/src/deep"
   out="$(cd "$tmp/proj/src/deep" && CLAUDE_PLUGIN_ROOT=x "$SELF")" || fail "errored in subdir"
   printf '%s' "$out" | jq -e . >/dev/null || fail "subdir output not valid JSON"
+
+  # hook_nudge: an incomplete hook set fires, a current one is silent. The
+  # incomplete case is the one install.sh --verify cannot see - bd-session-start
+  # is present and only the second SessionStart entry is missing - so it is the
+  # case worth pinning. Needs the real clone; skipped where this file is running
+  # detached from one, which is how the not-installed case above invokes it.
+  # `timeout` is deliberately NOT a premise here - the nudge no longer needs one,
+  # and gating on it would redden this file's own gate on a stock macOS host.
+  clone_st="$(cd "$(dirname "$SELF")/.." 2>/dev/null && pwd)"
+  if [ -f "$clone_st/scripts/bd-hook-wire" ] && command -v python3 >/dev/null 2>&1; then
+    mkdir -p "$tmp/h/.claude/skills"
+    ln -sfn "$clone_st/skills/onboard" "$tmp/h/.claude/skills/onboard"
+    printf '{}' > "$tmp/h/.claude/settings.json"
+    python3 "$clone_st/scripts/bd-hook-wire" wire "$clone_st" "$tmp/h/.claude/settings.json" >/dev/null 2>&1
+    out="$(cd "$tmp/proj" && HOME="$tmp/h" CLAUDE_PLUGIN_ROOT= "$SELF")" || fail "errored with hooks current"
+    printf '%s' "$out" | grep -q "missing awareness hooks" && fail "hook nudge fired while hooks were current"
+    python3 - "$tmp/h/.claude/settings.json" <<'PYST' || fail "could not build the incomplete hook set"
+import json,sys
+p=sys.argv[1]; d=json.load(open(p))
+d['hooks']['SessionStart']=d['hooks']['SessionStart'][:1]
+json.dump(d,open(p,'w'))
+PYST
+    out="$(cd "$tmp/proj" && HOME="$tmp/h" CLAUDE_PLUGIN_ROOT= "$SELF")" || fail "errored with hooks incomplete"
+    printf '%s' "$out" | jq -e . >/dev/null || fail "hook nudge output is not valid JSON"
+    printf '%s' "$out" | grep -q "missing awareness hooks" || fail "hook nudge silent on an incomplete hook set"
+    # ...and the operator sees it: install.sh writes settings.json, a machine-
+    # touching path with a human gate, so additionalContext alone cannot deliver.
+    printf '%s' "$out" | jq -r '.systemMessage' | grep -q 'awareness hooks missing, run install.sh' \
+      || fail "missing hook nudge from the operator-visible welcome"
+
+    # Plugin-only install: hooks/hooks.json delivers all three hooks through the
+    # plugin, so NO settings entries is the correct state there - and the remedy
+    # this nudge names would register a second copy of each. Same settings.json
+    # that fires above, on a host holding no links into the clone -> silent.
+    mkdir -p "$tmp/ph/.claude/skills/unrelated"
+    cp "$tmp/h/.claude/settings.json" "$tmp/ph/.claude/settings.json"
+    out="$(cd "$tmp/proj" && HOME="$tmp/ph" CLAUDE_PLUGIN_ROOT="$clone_st" "$SELF")" || fail "errored on a plugin-only install"
+    printf '%s' "$out" | grep -q "missing awareness hooks" && fail "hook nudge fired on a plugin-only install"
+    # ...and the same with no host skills dir at all (the pure plugin host).
+    mkdir -p "$tmp/ph2/.claude"
+    cp "$tmp/h/.claude/settings.json" "$tmp/ph2/.claude/settings.json"
+    out="$(cd "$tmp/proj" && HOME="$tmp/ph2" CLAUDE_PLUGIN_ROOT="$clone_st" "$SELF")" || fail "errored with no host skills dir"
+    printf '%s' "$out" | grep -q "missing awareness hooks" && fail "hook nudge fired with no host skills dir"
+
+    # Clone-resolution retry on THIS nudge's predicate: a pre-0.11.0-shaped plugin
+    # root (skills/ present, scripts/bd-hook-wire absent) must fall back to the
+    # symlink-resolved clone that has the script, not go silent.
+    mkdir -p "$tmp/noscript/skills"
+    out="$(cd "$tmp/proj" && HOME="$tmp/h" CLAUDE_PLUGIN_ROOT="$tmp/noscript" "$SELF")" || fail "errored with a scriptless plugin root"
+    printf '%s' "$out" | grep -q "missing awareness hooks" || fail "no hook nudge when the plugin root lacks bd-hook-wire"
+
+    # An unwired repo gets it too (mirrors 73779af for the other two nudges):
+    # hooks are machine-global, and the next action in an unwired repo is
+    # /onboard, which is exactly when the awareness hooks want to be present.
+    mkdir -p "$tmp/hbare"
+    # (no JSON-validity assert here: the unwired branch is one printf, already
+    # asserted valid above and again at the unwired update-nudge case below.)
+    out="$(cd "$tmp/hbare" && HOME="$tmp/h" CLAUDE_PLUGIN_ROOT= "$SELF")" || fail "errored when unwired with hooks incomplete"
+    printf '%s' "$out" | jq -r '.systemMessage' | grep -q 'awareness hooks missing, run install.sh' \
+      || fail "no hook nudge in an unwired repo"
+
+    rm -f "$tmp/h/.claude/settings.json"
+    out="$(cd "$tmp/proj" && HOME="$tmp/h" CLAUDE_PLUGIN_ROOT= "$SELF")" || fail "errored with no settings file"
+    printf '%s' "$out" | grep -q "missing awareness hooks" && fail "hook nudge fired with no settings file"
+
+    # The plugin root IS the clone the host links into: the plugin already delivers
+    # the hooks, so nudging here would buy a second executing copy of all three.
+    # Same incomplete settings that fires on a clone install above.
+    python3 "$clone_st/scripts/bd-hook-wire" wire "$clone_st" "$tmp/h/.claude/settings.json" >/dev/null 2>&1
+    python3 - "$tmp/h/.claude/settings.json" <<'PYPL' || fail "could not build the incomplete hook set for the plugin case"
+import json,sys
+p=sys.argv[1]; d=json.load(open(p))
+d['hooks']['SessionStart']=d['hooks']['SessionStart'][:1]
+json.dump(d,open(p,'w'))
+PYPL
+    out="$(cd "$tmp/proj" && HOME="$tmp/h" CLAUDE_PLUGIN_ROOT="$clone_st" "$SELF")" || fail "errored when the plugin root is the linked clone"
+    printf '%s' "$out" | grep -q "missing awareness hooks" && fail "hook nudge fired when the plugin root is the linked clone"
+  fi
 
   # Overrides present -> the note points at them, still valid JSON.
   printf 'use tabs\n' > "$tmp/proj/.better-dev/overrides.md"
@@ -710,6 +857,9 @@ if ! bd_root="$(find_bd_root)"; then
     *'update available'*) unwired_mark=" - update available, run /update before /onboard" ;;
   esac
   [ -n "$(link_nudge)" ] && unwired_mark="${unwired_mark} - skill links missing, run install.sh"
+  # Same reasoning for the hook set, and more so: hooks are machine-global, so
+  # their absence does not depend on this repo being wired at all.
+  [ -n "$(hook_nudge)" ] && unwired_mark="${unwired_mark} - awareness hooks missing, run install.sh"
   printf '{ "systemMessage": "%s%s" }\n' "$WELCOME_UNWIRED" "$unwired_mark"
   exit 0
 fi
