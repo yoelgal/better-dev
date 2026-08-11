@@ -444,6 +444,8 @@ if [ "${1:-}" = "selftest" ]; then
   # is present and only the second SessionStart entry is missing - so it is the
   # case worth pinning. Needs the real clone; skipped where this file is running
   # detached from one, which is how the not-installed case above invokes it.
+  # `timeout` is deliberately NOT a premise here - the nudge no longer needs one,
+  # and gating on it would redden this file's own gate on a stock macOS host.
   clone_st="$(cd "$(dirname "$SELF")/.." 2>/dev/null && pwd)"
   if [ -f "$clone_st/scripts/bd-hook-wire" ] && command -v python3 >/dev/null 2>&1; then
     mkdir -p "$tmp/h/.claude/skills"
@@ -461,6 +463,42 @@ PYST
     out="$(cd "$tmp/proj" && HOME="$tmp/h" CLAUDE_PLUGIN_ROOT="$clone_st" "$SELF")" || fail "errored with hooks incomplete"
     printf '%s' "$out" | jq -e . >/dev/null || fail "hook nudge output is not valid JSON"
     printf '%s' "$out" | grep -q "missing awareness hooks" || fail "hook nudge silent on an incomplete hook set"
+    # ...and the operator sees it: install.sh writes settings.json, a machine-
+    # touching path with a human gate, so additionalContext alone cannot deliver.
+    printf '%s' "$out" | jq -r '.systemMessage' | grep -q 'awareness hooks missing, run install.sh' \
+      || fail "missing hook nudge from the operator-visible welcome"
+
+    # Plugin-only install: hooks/hooks.json delivers all three hooks through the
+    # plugin, so NO settings entries is the correct state there - and the remedy
+    # this nudge names would register a second copy of each. Same settings.json
+    # that fires above, on a host holding no links into the clone -> silent.
+    mkdir -p "$tmp/ph/.claude/skills/unrelated"
+    cp "$tmp/h/.claude/settings.json" "$tmp/ph/.claude/settings.json"
+    out="$(cd "$tmp/proj" && HOME="$tmp/ph" CLAUDE_PLUGIN_ROOT="$clone_st" "$SELF")" || fail "errored on a plugin-only install"
+    printf '%s' "$out" | grep -q "missing awareness hooks" && fail "hook nudge fired on a plugin-only install"
+    # ...and the same with no host skills dir at all (the pure plugin host).
+    mkdir -p "$tmp/ph2/.claude"
+    cp "$tmp/h/.claude/settings.json" "$tmp/ph2/.claude/settings.json"
+    out="$(cd "$tmp/proj" && HOME="$tmp/ph2" CLAUDE_PLUGIN_ROOT="$clone_st" "$SELF")" || fail "errored with no host skills dir"
+    printf '%s' "$out" | grep -q "missing awareness hooks" && fail "hook nudge fired with no host skills dir"
+
+    # Clone-resolution retry on THIS nudge's predicate: a pre-0.11.0-shaped plugin
+    # root (skills/ present, scripts/bd-hook-wire absent) must fall back to the
+    # symlink-resolved clone that has the script, not go silent.
+    mkdir -p "$tmp/noscript/skills"
+    out="$(cd "$tmp/proj" && HOME="$tmp/h" CLAUDE_PLUGIN_ROOT="$tmp/noscript" "$SELF")" || fail "errored with a scriptless plugin root"
+    printf '%s' "$out" | grep -q "missing awareness hooks" || fail "no hook nudge when the plugin root lacks bd-hook-wire"
+
+    # An unwired repo gets it too (mirrors 73779af for the other two nudges):
+    # hooks are machine-global, and the next action in an unwired repo is
+    # /onboard, which is exactly when the awareness hooks want to be present.
+    mkdir -p "$tmp/hbare"
+    # (no JSON-validity assert here: the unwired branch is one printf, already
+    # asserted valid above and again at the unwired update-nudge case below.)
+    out="$(cd "$tmp/hbare" && HOME="$tmp/h" CLAUDE_PLUGIN_ROOT="$clone_st" "$SELF")" || fail "errored when unwired with hooks incomplete"
+    printf '%s' "$out" | jq -r '.systemMessage' | grep -q 'awareness hooks missing, run install.sh' \
+      || fail "no hook nudge in an unwired repo"
+
     rm -f "$tmp/h/.claude/settings.json"
     out="$(cd "$tmp/proj" && HOME="$tmp/h" CLAUDE_PLUGIN_ROOT="$clone_st" "$SELF")" || fail "errored with no settings file"
     printf '%s' "$out" | grep -q "missing awareness hooks" && fail "hook nudge fired with no settings file"
