@@ -165,6 +165,37 @@ link_nudge() {
   printf ' better-dev: %s skill(s) in the installed clone have no link for this host (%s) - run %s/install.sh to reconcile.' "$n" "$missing" "$clone"
 }
 
+# --- hook nudge: are this host's wired hooks the set the clone expects? --------
+# The gap link_nudge leaves: skills can be linked while the awareness hooks are
+# absent or incomplete, which is the state 0.11.0 shipped to every clone install
+# before install.sh learned to wire them. install.sh --verify does not close it -
+# its hook assertion greps for bd-session-start alone, so it passes while a newly
+# added hook is missing. bd-hook-wire's plan mode is the real comparison (whole
+# entries against its WANT table, the same table the installer writes from), so
+# ask it rather than re-deriving the answer here and drifting from WANT the way
+# --verify already has. Silent on every missing premise: a pre-0.11.0 clone has no
+# bd-hook-wire, a host may have no python3, and the settings file may be absent or
+# unreadable - none of those is this hook's business to report.
+hook_nudge() {
+  local clone settings verdict tobin
+  clone="$(normalize_clone "${CLAUDE_PLUGIN_ROOT:-}")"
+  [ -n "$clone" ] || clone="$(normalize_clone "$(resolve_clone_via_symlink)")"
+  [ -n "$clone" ] || return 0
+  [ -f "$clone/scripts/bd-hook-wire" ] || return 0
+  command -v python3 >/dev/null 2>&1 || return 0
+  settings="$HOME/.claude/settings.json"   # this hook runs under Claude Code; other hosts declare their own
+  [ -f "$settings" ] || return 0
+  # plan writes nothing. Bounded the same way the fetch above is, so a slow
+  # filesystem cannot eat the hook's 5s budget; any non-zero exit or unexpected
+  # word stays silent. No `timeout` binary means unbounded, so skip rather than
+  # risk the whole note - the same trade the fetch makes.
+  tobin="$(command -v timeout || command -v gtimeout || true)"
+  [ -n "$tobin" ] || return 0
+  verdict="$("$tobin" 2 python3 "$clone/scripts/bd-hook-wire" plan "$clone" "$settings" 2>/dev/null)" || return 0
+  [ "$verdict" = "would-wire" ] || return 0
+  printf ' better-dev: this host is missing awareness hooks the installed clone expects - run %s/install.sh to register them (it writes %s).' "$clone" "$settings"
+}
+
 # --- reonboard nudge: did a release change the repo surface since /onboard? ---
 # docs/RELEASES.md in the installed clone lists flagged releases newest-first
 # (`<version> <flags> - <summary>`); .better-dev/wired-version stamps the tool
@@ -313,7 +344,8 @@ emit() {
   upd="$(update_nudge "$root/.better-dev/overrides.md")"
   rnb="$(reonboard_nudge "$root")"
   lnk="$(link_nudge)"
-  context="${context}${upd}${rnb}${lnk}"
+  hks="$(hook_nudge)"
+  context="${context}${upd}${rnb}${lnk}${hks}"
   escaped=$(escape_for_json "$context")
 
   # A nudge asks a HUMAN to run /update or install.sh, but additionalContext only
@@ -379,6 +411,33 @@ if [ "${1:-}" = "selftest" ]; then
   mkdir -p "$tmp/proj/src/deep"
   out="$(cd "$tmp/proj/src/deep" && CLAUDE_PLUGIN_ROOT=x "$SELF")" || fail "errored in subdir"
   printf '%s' "$out" | jq -e . >/dev/null || fail "subdir output not valid JSON"
+
+  # hook_nudge: an incomplete hook set fires, a current one is silent. The
+  # incomplete case is the one install.sh --verify cannot see - bd-session-start
+  # is present and only the second SessionStart entry is missing - so it is the
+  # case worth pinning. Needs the real clone; skipped where this file is running
+  # detached from one, which is how the not-installed case above invokes it.
+  clone_st="$(cd "$(dirname "$SELF")/.." 2>/dev/null && pwd)"
+  if [ -f "$clone_st/scripts/bd-hook-wire" ] && command -v python3 >/dev/null 2>&1; then
+    mkdir -p "$tmp/h/.claude/skills"
+    ln -sfn "$clone_st/skills/onboard" "$tmp/h/.claude/skills/onboard"
+    printf '{}' > "$tmp/h/.claude/settings.json"
+    python3 "$clone_st/scripts/bd-hook-wire" wire "$clone_st" "$tmp/h/.claude/settings.json" >/dev/null 2>&1
+    out="$(cd "$tmp/proj" && HOME="$tmp/h" CLAUDE_PLUGIN_ROOT="$clone_st" "$SELF")" || fail "errored with hooks current"
+    printf '%s' "$out" | grep -q "missing awareness hooks" && fail "hook nudge fired while hooks were current"
+    python3 - "$tmp/h/.claude/settings.json" <<'PYST' || fail "could not build the incomplete hook set"
+import json,sys
+p=sys.argv[1]; d=json.load(open(p))
+d['hooks']['SessionStart']=d['hooks']['SessionStart'][:1]
+json.dump(d,open(p,'w'))
+PYST
+    out="$(cd "$tmp/proj" && HOME="$tmp/h" CLAUDE_PLUGIN_ROOT="$clone_st" "$SELF")" || fail "errored with hooks incomplete"
+    printf '%s' "$out" | jq -e . >/dev/null || fail "hook nudge output is not valid JSON"
+    printf '%s' "$out" | grep -q "missing awareness hooks" || fail "hook nudge silent on an incomplete hook set"
+    rm -f "$tmp/h/.claude/settings.json"
+    out="$(cd "$tmp/proj" && HOME="$tmp/h" CLAUDE_PLUGIN_ROOT="$clone_st" "$SELF")" || fail "errored with no settings file"
+    printf '%s' "$out" | grep -q "missing awareness hooks" && fail "hook nudge fired with no settings file"
+  fi
 
   # Overrides present -> the note points at them, still valid JSON.
   printf 'use tabs\n' > "$tmp/proj/.better-dev/overrides.md"
