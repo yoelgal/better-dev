@@ -36,7 +36,11 @@ Look for a structural source the project or host already provides, and prefer it
   that has never been indexed is not a reason to skip it. Its verbs map straight onto the four
   questions below: `query` (callers), `--affected` (blast radius), `--path` (how A reaches B),
   `--hubs` (where the architecture concentrates). Reach for it before a wide grep, not after one
-  came back too big to read.
+  came back too big to read. One first-use failure is recoverable in a single command and must never
+  be read as "no map here": `graphify CLI not installed - run /graphify-wrapper-setup`. The registry,
+  the domain and the graph self-heal on the question; the CLI does not. Run that setup once and
+  re-ask. Falling through to section 3 there trades a budgeted traversal for reading the whole
+  subtree, on every later question, in a repo that was one command away from having the map.
 - The language's own index - an LSP / IDE symbol index, `ctags`, or a framework's route and schema
   introspection.
 
