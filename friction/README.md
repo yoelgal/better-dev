@@ -41,7 +41,7 @@ Then hand `facts.md`, the transcripts, and the left-behind repos to a reviewer r
 | `polyglot` | Python `api/` + React `web/`, no root test command, stale Makefile | the "never guess a command" rule under real pressure |
 
 The greenfield fixture has no `.git` of its own. That is why runs live outside this repo - inside it,
-the agent under test would walk up and discover `agent-tools`, and the fixture would be a lie.
+the agent under test would walk up and discover `better-dev`, and the fixture would be a lie.
 
 ## Permission profiles
 

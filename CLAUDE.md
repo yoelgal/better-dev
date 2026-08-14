@@ -59,10 +59,10 @@ promoted to `main` on release.
 better-dev is additive: it complements, never replaces, whatever else is installed.
 <!-- END better-dev -->
 
-## Monorepo layout
+## Repo layout
 
-This repo (`agent-tools`) is a monorepo of independently installable agent tools; it doubles as a
-Claude Code plugin marketplace (root `.claude-plugin/marketplace.json`). Each top-level directory is
-one tool - `better-dev/` holds the better-dev library (its skills, scripts, hooks, installer, docs,
-and gitignored `raw/` research archive all live under it). Branch discipline is repo-wide
-(`feat/*` off `staging`, promoted to `main`); version stamps and release ledgers are per tool.
+This repo (`better-dev`) is the better-dev tool itself, laid out flat at the root: `skills/`,
+`scripts/`, `hooks/`, `hosts/`, `docs/`, `browse/`, `ios-qa/`, and the gitignored `raw/` research
+archive are its own parts, not separate tools. There is one version, stamped in
+`.claude-plugin/plugin.json`, and one release ledger, `docs/RELEASES.md`. Branch discipline is
+`feat/*` off `staging`, promoted to `main`.

@@ -193,10 +193,10 @@ approximation from the summary or from memory.
 foundations proven before consumers build on them. Use **subagents/workflows** for fan-out (one component per
 agent, worktree-isolated when writing files); **every build-agent prompt points it at `harvest.json` + the
 source repos + this PLAN and tells it to opensrc the real files before writing.** Then a verify/synthesis
-pass. Commit clean per component (Co-Authored-By trailer). Repo layout (since the 2026-07-30
-monorepo move, all under `better-dev/`): `better-dev/skills/<name>/SKILL.md`, `better-dev/scripts/`,
-`better-dev/hooks/`, `better-dev/.claude-plugin/`, `better-dev/NOTICE README.md install.sh`; LICENSE and
-the marketplace manifest sit at the monorepo root.
+pass. Commit clean per component (Co-Authored-By trailer). Repo layout (flat at the repo root again
+since the 2026-08-14 extraction; it sat under `better-dev/` from the 2026-07-30 monorepo move until
+then): `skills/<name>/SKILL.md`, `scripts/`, `hooks/`, `.claude-plugin/plugin.json`,
+`NOTICE README.md LICENSE install.sh`, all at the root.
 
 ## 13. What still needs the human (can't do autonomously)
 
@@ -215,7 +215,7 @@ in-agent invocation proof (I validate structure + dry-run; live Claude-Code/Code
 
 ## 15. Environment
 
-Repo `github.com/yoelgal/agent-tools` (public monorepo; better-dev lives in `better-dev/`). `gh` authed as **yoelgal** with `delete_repo`+`repo`+`workflow`.
+Repo `github.com/yoelgal/better-dev` (public; the tool lives at the repo root). `gh` authed as **yoelgal** with `delete_repo`+`repo`+`workflow`.
 Working dir `/Users/yoelgal/Developer/better-dev`. `raw/` is gitignored - **never commit it**. Memory dir:
 `~/.claude/projects/-Users-yoelgal-Developer-better-dev/memory/`. Toolchain verified: `yt-dlp`, `ffmpeg`,
 `whisper-cli`, `gh`, `jq`, `node`, Playwright (for agent-browser-style work: prefix with

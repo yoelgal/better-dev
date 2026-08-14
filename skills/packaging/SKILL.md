@@ -23,43 +23,29 @@ shippable before a release.
   per-machine symlink back to the global tool. Skills keep referencing helpers at `.better-dev/bin/bd-mem`
   unchanged, and that path resolves through the symlink.
 
-## Two ways in
+## One way in
 
 - **Installer (any host).** `install.sh` links the tool into the host's global skills directory, falling
-  back to a copy where symlinks aren't available. It's idempotent.
-- **Claude Code plugin (convenience).** `.claude-plugin/plugin.json` lets a Claude Code user install the
-  same skills and `hooks/hooks.json` as a plugin. Skills are discovered from `skills/` and hooks from
-  `hooks/hooks.json` by convention - no per-skill list to maintain in the manifest. Every skill this
-  channel installs shows up host-namespaced there (`better-dev:review`, not `/review`), so a bare chain
-  reference resolves there by description match rather than by name, and a foreign skill holding the
-  same bare name wins it outright over ours; the installer above holds the bare names directly.
+  back to a copy where symlinks aren't available. It's idempotent. Updating is a `git pull` in the
+  clone. It registers the SessionStart/SubagentStart awareness hooks too, through `scripts/bd-hook-wire`,
+  into each host's verified machine-global hook config (`bd_host_hook_settings` in `hosts/<name>`). It
+  deliberately omits the `bd-guard` PreToolUse entries: those enforce a *repo's* blast-radius policy and
+  belong to `/guardrails-install`, not to a machine-global install. A host with no verified hook config
+  (`codex`, `hermes`) still declines by design and says so; that is a named gap, not a silent one.
 
-  The skill contract is identical across both paths; the update contract is not. The installer's clone
-  is yours to read and patch, and `/update` brings it current with a `git pull`; the plugin is a managed
-  checkout the host owns, refreshed through the host's own plugin update rather than a pull. Pick the
-  clone when you want to read or patch the tool, the plugin when you want it to keep itself current.
-- **Marketplace manifest (monorepo root).** The agent-tools monorepo root ships
-  `.claude-plugin/marketplace.json` listing each tool as a plugin (`"source": "./better-dev"`); a Claude
-  Code user adds the repo as a marketplace and installs from it. The plugin's own `plugin.json` stays the
-  single source for name, version, and description - the marketplace entry carries only name and source,
-  so the two manifests cannot drift.
+better-dev used to also ship as a Claude Code plugin, added through a self-hosted marketplace manifest
+at the monorepo root. Both are deleted (D32): the marketplace existed only because the monorepo
+supplied a second consumer for it, and the extraction to this repo's own removes that predicate. A
+structural finding independently condemns the plugin channel for this tool regardless: the plugin
+cache is version-pinned one directory per version, while `scripts/bd-link` bakes an absolute
+`.better-dev/bin` symlink at wiring time, so a plugin update would strand every wired repo on the
+previous version's scripts. `.claude-plugin/plugin.json` stays - `hooks/bd-session-start` reads it for
+the installed version stamp - but it names no install channel any more; better-dev is a clone-installed
+tool, full stop.
 
-**Both channels carry the hooks.** The plugin registers the SessionStart/SubagentStart awareness hooks
-from `hooks/hooks.json`; the clone channel registers the same two events itself, through
-`scripts/bd-hook-wire`, into each host's verified machine-global hook config (`bd_host_hook_settings`
-in `hosts/<name>`). Keep them in step - the shipped `hooks.json` is the reference, and `bd-hook-wire`'s
-`WANT` table mirrors its awareness half. It deliberately omits the `bd-guard` PreToolUse entries: those
-enforce a *repo's* blast-radius policy and belong to `/guardrails-install`, not to a machine-global install.
-
-Channel parity is a release-gate property, not a nicety. Until 0.10.1 only the plugin wired hooks, and
-because an agent told "install better-dev" reads `BOOTSTRAP.md` and cannot drive an interactive plugin
-installer, it always took the clone path - so the common install shipped no session hook in any repo
-while `BOOTSTRAP.md` claimed the tool installs them. A host with no verified hook config (`codex`,
-`hermes`) still declines by design and says so; that is a named gap, not a silent one.
-
-Either way, `/onboard` then wires a repo's `.better-dev/` data and its `bin` symlink. The one-paste
-front door - `BOOTSTRAP.md` - sequences the whole thing (detect host, install globally, onboard the
-repo) for a user who just pastes a prompt.
+`/onboard` then wires a repo's `.better-dev/` data and its `bin` symlink. The one-paste front door -
+`BOOTSTRAP.md` - sequences the whole thing (detect host, install globally, onboard the repo) for a
+user who just pastes a prompt.
 
 `install.sh` also carries `--dry-run` (print the link/skip/prune plan), `--list` (current state per
 host), and `--verify` (assert every better-dev link resolves and the package gate passes). A shipped
@@ -74,7 +60,7 @@ there. Promoting one to the global tool is a separate, deliberate step.
 
 ## The release gate
 
-`.better-dev/bin/bd-package-check` (dev: `better-dev/scripts/bd-package-check`) validates the whole package: every
+`.better-dev/bin/bd-package-check` (dev: `scripts/bd-package-check`) validates the whole package: every
 skill lints (minimal frontmatter, `name` matches its folder, a "Use when" description, no `@`-links, calm
 voice), every helper and hook passes its `selftest`, the JSON manifests parse, and every backtick-wrapped
 `/skill` reference resolves to a shipped skill or a known host-optional builtin. It exits non-zero on any

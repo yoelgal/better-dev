@@ -37,7 +37,7 @@ every domain and every repo into one dir. Never set it outside the loop.
 ```bash
 backend=$(gfx_backend)
 # The wired path first, the plugin dir as the dev/unwired fallback - the same split as the
-# bd-gfx source line above. `better-dev/scripts/bd-atlas` exists only in the source repo.
+# bd-gfx source line above. `scripts/bd-atlas` exists only in the source repo.
 atlas=.better-dev/bin/bd-atlas; [ -x "$atlas" ] || atlas="${CLAUDE_PLUGIN_ROOT}/scripts/bd-atlas"
 # Image/asset files graphify would otherwise read as text "docs" - token noise
 # with no architectural signal, and the source of oversized chunks that time out.

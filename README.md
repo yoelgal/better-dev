@@ -29,7 +29,7 @@ From inside the repo you want to set up, paste this into your agent. It installs
 machine, then wires the repo:
 
 ```
-Set up better-dev in this repo. Read https://raw.githubusercontent.com/yoelgal/agent-tools/main/better-dev/BOOTSTRAP.md
+Set up better-dev in this repo. Read https://raw.githubusercontent.com/yoelgal/better-dev/main/BOOTSTRAP.md
 and follow it exactly: detect my coding agent, install better-dev globally for it if it isn't already, then
 run /onboard to wire this repo. Ask me only if something is genuinely ambiguous.
 ```
@@ -47,11 +47,10 @@ TOOL (skills + bd-* scripts + hooks) installs GLOBALLY once per machine and ever
 1. Detect which coding agent I'm in (Claude Code ~/.claude, Codex ~/.codex, or other) - that decides the
    install command and the global skills directory.
 2. Install the tool globally, once per machine. If it's already installed (a better-dev entry in the host's
-   global skills dir, or an existing clone), run `git pull` in the clone and skip to step 4. Otherwise: on
-   Claude Code install it as a plugin (add this repo as a marketplace, then install better-dev); on any host,
-   `git clone https://github.com/yoelgal/agent-tools ~/agent-tools && ~/agent-tools/better-dev/install.sh`, which links the
+   global skills dir, or an existing clone), run `git pull` in the clone and skip to step 4. Otherwise:
+   `git clone https://github.com/yoelgal/better-dev ~/better-dev && ~/better-dev/install.sh`, which links the
    tool into the host's global skills dir. Update later with /update - a `git pull` in the clone
-   underneath, or the host's own plugin refresh where you installed the plugin.
+   underneath.
 3. Offer, once, to allow better-dev's own memory scripts (bd-mem, bd-guard) to run without prompting on
    every repo this machine wires - without it the operator is prompted by better-dev's own memory spine on
    nearly every step, forever. On yes, add the two allow rules to the host's global settings.json
@@ -117,8 +116,7 @@ Two layers, so the tool updates once and your data travels with the repo:
 
 - **The tool - global, once per machine.** The skills, `bd-*` scripts, and hooks live in one clone and link
   into your host's global skills dir, one symlink per skill (`~/.claude/skills/<skill>`,
-  `~/.codex/skills/<skill>`, …), so every repo shares one copy. Claude Code users can install the plugin
-  ([`.claude-plugin/plugin.json`](.claude-plugin/plugin.json)) instead - same skill contract. Update with
+  `~/.codex/skills/<skill>`, …), so every repo shares one copy. Update with
   `/update` - it pulls the clone, has you re-run `./install.sh` only when a release added or removed a
   skill, and tops up a repo's wiring when a release changed it ([`docs/RELEASES.md`](docs/RELEASES.md)
   flags each release; the session-start hook nags when you're behind).
@@ -137,7 +135,7 @@ Skills you later mint with `/self-extension` are **repo-scoped** by default - co
 | `scripts/` | the `bd-*` spine - `bd-mem` (memory + ledger), `bd-block`, `bd-dispatch`, `bd-guard` (enforced guardrails), `bd-worktree-guard`, `bd-review-package`, `bd-skill-stage`, `bd-link`, `bd-package-check`, `bd-uninstall`, `bd-gfx` (shared graphify helpers), `bd-atlas` (offline codebase atlas from a graphify graph) |
 | `hooks/` · `hosts/` | session awareness + PreToolUse guard hooks · per-host install adapters (declarative, enumerated) |
 | `browse/` · `ios-qa/` | vendored daemons (gstack, MIT - see `NOTICE`): headless-browser QA · on-device iOS QA; compiled on first need, never in CI |
-| `install.sh` · `BOOTSTRAP.md` · `.claude-plugin/` | installer · one-paste bootstrap · Claude Code plugin manifest |
+| `install.sh` · `BOOTSTRAP.md` · `.claude-plugin/` | installer · one-paste bootstrap · version stamp (`plugin.json`) read by the session-start hook |
 | [`docs/`](docs/) · [`NOTICE`](NOTICE) | design plan + decisions · attribution |
 
 ---

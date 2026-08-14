@@ -71,11 +71,12 @@ resolve_clone_via_symlink() {
   [ -n "$clone" ] && printf '%s' "$clone"
 }
 
-# --- normalize a clone candidate to the dir that actually holds the tool. A
-# pre-0.7.0 install (plugin root or symlink prefix) resolves to the old repo
-# root; since the agent-tools monorepo move the tool lives one level down in
-# better-dev/. Anchoring on skills/ also keeps the git probe from adopting an
-# unrelated repo (e.g. a git-managed $HOME) as a better-dev clone.
+# --- normalize a clone candidate to the dir that actually holds the tool. The
+# current (post-flatten) layout has skills/ at the clone root; a clone still on
+# the 0.7.0-through-0.12.x monorepo layout, not yet re-pulled, has it one level
+# down in better-dev/ instead. Anchoring on skills/ also keeps the git probe
+# from adopting an unrelated repo (e.g. a git-managed $HOME) as a better-dev
+# clone.
 normalize_clone() {
   [ -n "${1:-}" ] || return 0
   if [ -d "$1/skills" ]; then printf '%s' "$1"

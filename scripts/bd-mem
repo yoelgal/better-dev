@@ -789,13 +789,13 @@ case "$op" in
       "$SELF" learn "fetch the origin/staging ref before rebuilding the package" 0.9 gitref-key >/dev/null
       "$SELF" learn "a personal ~/.claude/skills dir is a machine path, not a repo path" 0.9 homepath-key >/dev/null
       "$SELF" learn 'artifacts land under $src/build-out/cache at run time' 0.9 dollarpath-key >/dev/null   # $-anchored but src/ exists: only the $ guard saves it
-      "$SELF" learn "ported from yoelgal/agent-tools upstream" 0.9 slug-key >/dev/null
+      "$SELF" learn "ported from yoelgal/better-dev upstream" 0.9 slug-key >/dev/null
       pv="$("$SELF" prune)"
       printf '%s' "$pv" | grep -qF "mtime/stat" && { echo "FAIL: word-pair token flagged as a path"; exit 1; }
       printf '%s' "$pv" | grep -qF "origin/staging" && { echo "FAIL: git ref flagged as a path"; exit 1; }
       printf '%s' "$pv" | grep -qF ".claude/skills" && { echo "FAIL: home path flagged as a repo path"; exit 1; }
       printf '%s' "$pv" | grep -qF "src/build-out/cache" && { echo "FAIL: env-var path flagged as a repo path"; exit 1; }
-      printf '%s' "$pv" | grep -qF "yoelgal/agent-tools" && { echo "FAIL: repo slug flagged as a path"; exit 1; }
+      printf '%s' "$pv" | grep -qF "yoelgal/better-dev" && { echo "FAIL: repo slug flagged as a path"; exit 1; }
       printf '%s' "$pv" | grep -q "SUPERSEDED: wr-key" || { echo "FAIL: prune preview missing superseded"; exit 1; }
       printf '%s' "$pv" | grep -q "STALE: missing path src/gone-file.js" || { echo "FAIL: prune preview missing stale"; exit 1; }
       mkdir -p src && : > src/gone-file.js

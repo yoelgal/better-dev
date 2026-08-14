@@ -434,7 +434,7 @@ Rejected-with-reasons (one row each):
 - batch-grill-me frontier-rounds interview - in-progress draft upstream; one-question-at-a-time with unblock-first ordering is the deliberate interactive discipline; revisit if it graduates and the round-batching survives their own use. Re-grounded by D27 ruling 12 (2026-08-05): the draft shipped upstream, and the rejection now stands on the interactive discipline itself plus the observed form-answering failure of batched rounds.
 - Per-host metadata sidecars (agents/openai.yaml beside every SKILL.md) - no second harness reads better-dev skills today; the agentskills.io format is the agnostic layer; revisit when a real Codex consumer exists (their "keep the two in sync" rule is the shape to copy then).
 - One-file-per-ticket local tracker - better-dev has no local ticket artifact; the ledger is the store; nothing to change.
-- Self-hosted single-plugin marketplace (.claude-plugin/marketplace.json) - REVERSED by D24 (2026-07-30): the agent-tools monorepo supplies the second consumer the rejection was predicated on; the marketplace manifest now ships at the monorepo root.
+- Self-hosted single-plugin marketplace (.claude-plugin/marketplace.json) - REVERSED by D24 (2026-07-30): the agent-tools monorepo supplies the second consumer the rejection was predicated on; the marketplace manifest now ships at the monorepo root. RE-REVERSED by D32 (2026-08-14): the extraction to its own repo removes that second consumer and the manifest is deleted, so this rejection stands again on its own terms.
 
 Covered, not re-filed (so the next harvest does not re-litigate):
 - Spec-first-then-AFK-agent (the post's core preference) - is the plan-grill -> autonomous-loop architecture; validation, not a gap.
@@ -495,6 +495,8 @@ the second-consumer case the earlier rejection named as its predicate, so that r
 overridden. Branch discipline stays repo-wide (feat/* off staging, promoted to main); version stamps and
 release ledgers stay per tool. Clone detection accepts both shapes (a pre-0.7.0 install resolves the old
 repo root; `normalize_clone` in bd-session-start and the /update snippet step down into `better-dev/`).
+- REVISED by D32 (2026-08-14): better-dev is extracted to its own repo and flattened back to the root,
+  and the marketplace reversal recorded here is reversed with it; this entry describes 2026-07-30 to then.
 
 ## D25 - the chain continues by default; a known gate is asked at seal (2026-08-01; user-ratified)
 
@@ -1037,3 +1039,41 @@ Applied in this branch: the four passages the earlier rounds reworded are restor
 wording and credited (wait-what's leading framing on both surfaces, the grill's question format,
 trap 153's send-not-subject antithesis and its questionnaire phrasing). The three F1 rewordings that
 lost nothing stay as they are - the ruling permits verbatim, it does not require it.
+
+## D32 - better-dev is its own repo, flat at the root; the marketplace channel is deleted (revises D24; 2026-08-14)
+
+better-dev leaves the monorepo. The GitHub repo is renamed `yoelgal/better-dev`, and everything that
+sat under `better-dev/` moves back to the repo root - `skills/`, `scripts/`, `hosts/`, `hooks/`,
+`docs/`, `.claude-plugin/plugin.json`, `NOTICE README.md LICENSE install.sh BOOTSTRAP.md`, plus the
+gitignored `raw/` archive. D0's tree is literally true again; D24's relocation held from 2026-07-30
+to today. The install one-liner is now
+`git clone https://github.com/yoelgal/better-dev ~/better-dev && ~/better-dev/install.sh`.
+
+**The move is an ordinary `git mv` (323 renames), not a history rewrite, and that is a choice.** A
+rewrite would produce a history where the files always sat at the root, and it would invalidate every
+clone already on a machine. Truthful history wins over a uniform-looking one: the cost is that the log
+shows the files at the root, then under `better-dev/`, then at the root again, which is what actually
+happened. The `better-dev/` branches in `normalize_clone` (bd-session-start) and in the `/update`
+snippet stay for the same reason - they resolve an already-installed pre-flatten clone, not this
+repo's layout, so removing them would strand every host still pointing at one.
+
+**The self-hosted marketplace is deleted, and D24's reversal is itself reversed.** D24 overturned D0's
+rejection of a single-plugin marketplace on one predicate: the monorepo supplied a second consumer, so
+the manifest listed more than better-dev. The extraction removes that predicate, so the rejection
+stands again on its own terms rather than being re-argued. `.claude-plugin/marketplace.json` is gone,
+and any instruction to `/plugin marketplace add` or `/plugin install better-dev@agent-tools` is removed
+rather than retargeted. better-dev is a clone-installed tool, full stop.
+
+**A structural finding independently condemns the plugin channel for this tool** - recorded here
+because it is the durable reason and must not be re-litigated. The Claude Code plugin cache is
+version-pinned, one directory per version, while `scripts/bd-link:47` bakes an absolute symlink
+`.better-dev/bin -> <scripts dir resolved at wiring time>`. So every plugin update would strand each
+wired repo on the previous version's scripts, and reaping an old version directory would dangle
+`.better-dev/bin/bd-mem`, which every skill calls through. Skills and hooks do survive the channel -
+`hooks/hooks.json` uses `${CLAUDE_PLUGIN_ROOT}`, expanded at runtime - but the scripts bridge does not,
+and the bridge is the part skills depend on. `install.sh:182` already recorded the other half: an agent
+told "install better-dev" cannot drive an interactive plugin installer and always takes the clone path,
+so the channel was carrying the rarer install while owing the same maintenance.
+
+`.claude-plugin/plugin.json` **stays.** `hooks/bd-session-start:250` reads it for the installed version
+stamp, so it is load-bearing independently of the plugin channel it was originally written for.

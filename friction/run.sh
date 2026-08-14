@@ -71,7 +71,7 @@ for f in $FIXTURES; do [ -f "$ROOT/fixtures/$f.sh" ] || die "no such fixture: $f
 
 STAMP="$(date +%Y%m%d-%H%M%S)"
 # Runs live OUTSIDE this repo on purpose: the greenfield fixture has no .git of its own, and a run dir
-# inside the repo would let the agent under test walk up and discover agent-tools itself.
+# inside the repo would let the agent under test walk up and discover better-dev itself.
 RUNS_ROOT="${BD_FRICTION_RUNS:-${TMPDIR:-/tmp}/bd-friction}"
 RUN="$RUNS_ROOT/$STAMP"
 mkdir -p "$RUN/repos" "$RUN/transcripts" "$RUN/probe"

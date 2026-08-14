@@ -203,11 +203,10 @@ the host's global skills dir, the practices can't load. Hand the operator the on
 let them run it - you can't change their machine globally on your own:
 
 ```bash
-git clone https://github.com/yoelgal/agent-tools ~/agent-tools && ~/agent-tools/better-dev/install.sh
+git clone https://github.com/yoelgal/better-dev ~/better-dev && ~/better-dev/install.sh
 ```
 
-On Claude Code, installing the plugin manifest (`.claude-plugin/plugin.json`, added as a plugin
-marketplace) is an equally valid path. Either way, updates are a plain `git pull` in that clone.
+Updates are a plain `git pull` in that clone.
 
 **Then wire this repo's `.better-dev/bin` bridge.** The scripts live beside the globally-linked
 skills; resolve them and let `bd-link` create the per-machine symlink (or a copy where symlinks don't

@@ -11,7 +11,7 @@ and to say what in the shipped text or scripts causes it.
 - `transcripts/<fixture>/` - `human-N.txt` and `agent-N.txt` are the conversation; `turn-N.jsonl` is
   the full event stream; `tools.tsv` and `denials.txt` are the reductions
 - `repos/<fixture>/` - the repo as the agent left it. Diff it against what the fixture script created.
-- the library itself: `better-dev/skills/*/SKILL.md`, `install.sh`, `scripts/bd-*`, `hooks/`
+- the library itself: `skills/*/SKILL.md`, `install.sh`, `scripts/bd-*`, `hooks/`
 
 ## The rule that matters
 

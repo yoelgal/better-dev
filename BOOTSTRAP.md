@@ -25,38 +25,29 @@ First check whether it's already installed: look for the `.better-dev-install` m
 global skills directory (e.g. `~/.claude/skills/.better-dev-install`) or an existing clone. If it's
 there, run `git pull` in the clone to update and move to step 3; nothing is installed twice.
 
-Otherwise install it. Two paths:
+Otherwise install it - clone once to a stable location and run its installer:
 
-- **Any host, including Claude Code** - clone once to a stable location and run its installer. This is
-  the path to take when *you*, the agent, are doing the install, because the plugin path below needs an
-  interactive installer you cannot drive:
+```sh
+git clone https://github.com/yoelgal/better-dev ~/better-dev
+~/better-dev/install.sh
+```
 
-  ```sh
-  git clone https://github.com/yoelgal/agent-tools ~/agent-tools
-  ~/agent-tools/better-dev/install.sh
-  ```
+The installer links each skill into the host's global skills directory one level deep
+(`~/.claude/skills/<skill>`, `~/.codex/skills/<skill>`, and so on), since hosts only discover a skill
+at `<skills-dir>/<name>/SKILL.md`; it copies instead of linking where symlinks aren't available. It
+then registers the SessionStart/SubagentStart awareness hooks in the host's machine-global hook
+config, for each host whose config file and format are verified - so the session note fires from the
+next session on. Read its output: a host reported as *skipped* (no verified hook config, or no
+`python3`) got skills but no hooks, and `/bootstrap-hooks` is the by-hand path. `--no-hooks` opts out.
 
-  The installer links each skill into the host's global skills directory one level deep
-  (`~/.claude/skills/<skill>`, `~/.codex/skills/<skill>`, and so on), since hosts only discover a skill
-  at `<skills-dir>/<name>/SKILL.md`; it copies instead of linking where symlinks aren't available. It
-  then registers the SessionStart/SubagentStart awareness hooks in the host's machine-global hook
-  config, for each host whose config file and format are verified - so the session note fires from the
-  next session on. Read its output: a host reported as *skipped* (no verified hook config, or no
-  `python3`) got skills but no hooks, and `/bootstrap-hooks` is the by-hand path. `--no-hooks` opts out.
-- **Claude Code, as a plugin** - add this repo as a plugin marketplace, then install `better-dev`. That
-  clones and registers the skills and hooks for you. The skill contract is identical to the clone path;
-  the installer is interactive, so hand the operator a paste-ready command rather than driving it.
+Updating later is `/update` - a `git pull` in the clone underneath. A session started after the pull
+picks up the new text, though a session already running keeps what it loaded at start. A pull that
+adds or removes skills needs a re-run of `./install.sh` too, so new ones link and orphans prune. The
+full install contract lives in `/packaging`.
 
-Updating later is `/update` - a `git pull` in the clone underneath, or the host's own plugin refresh
-where you installed the plugin. A session started after the pull picks up the new text, though a
-session already running keeps what it loaded at start. A pull that adds or removes skills
-needs a re-run of `./install.sh` too, so new ones link and orphans prune. When an interactive
-installer is needed, hand the operator a paste-ready command and continue once they confirm. The full
-channel contract lives in `/packaging`'s "Two ways in".
-
-Either channel is complete on its own: both deliver the skills *and* the hooks. Confirm it rather than
-assume it - `./install.sh --verify` fails when a host has skills linked but no awareness hooks
-registered, which is the one half-install that otherwise looks entirely successful.
+Confirm the install rather than assume it - `./install.sh --verify` fails when a host has skills
+linked but no awareness hooks registered, which is the one half-install that otherwise looks entirely
+successful.
 
 ## 2b. Offer the communication style, machine-wide (ask once)
 
@@ -69,11 +60,10 @@ want it on **every** session on this machine instead - including repos that neve
 This is the one thing better-dev writes outside a repo, into the operator's own global entry file, so
 it happens only on an explicit yes - never as a side effect of installing. On a yes, read the host's
 `bd_host_global_entry` from its `hosts/*` adapter and write the shipped body into it. `bd` is the
-better-dev dir inside whichever clone step 2 produced (`~/agent-tools/better-dev` on the clone path,
-the plugin's own checkout on the plugin path), not a fixed location:
+clone step 2 produced, not a fixed location:
 
 ```sh
-bd=~/agent-tools/better-dev                                    # or the plugin clone's better-dev/
+bd=~/better-dev
 entry=$(. "$bd/hosts/<host>" && printf %s "$bd_host_global_entry")
 if [ -n "$entry" ]; then
   mkdir -p "$(dirname "$entry")"                               # the host's config dir may not exist yet
