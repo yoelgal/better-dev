@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """bd-hook-wire - register better-dev's awareness hooks in a host's machine-global hook config.
 
-The plugin channel gets the SessionStart/SubagentStart hooks from hooks/hooks.json. The clone channel
-(git clone + install.sh) has no equivalent, and it is the channel an agent takes: told "install
-better-dev", an agent reads BOOTSTRAP and cannot drive an interactive plugin installer, so it clones.
-Without this, that install links every skill and registers no hook - in every repo, forever, while
+better-dev installs from a clone (git clone + install.sh), and a host only fires the hooks named in
+its own machine-global config - hooks/hooks.json declares the SessionStart/SubagentStart hooks the
+tool ships, but nothing reads that file out of the clone. This script is what puts them in the host's
+config. Without it an install links every skill and registers no hook - in every repo, forever, while
 BOOTSTRAP claims the tool ships hooks. install.sh calls this; /bootstrap-hooks is the by-hand path.
 
   bd-hook-wire wire   <clone-dir> <settings.json>   merge our entries in; print a status word

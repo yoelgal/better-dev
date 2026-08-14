@@ -386,12 +386,13 @@ for j in .claude-plugin/plugin.json hooks/hooks.json; do
   jq -e . "$j" >/dev/null 2>&1 && ok "$j" || bad "$j invalid JSON"
 done
 
-echo "== install-channel hook parity =="
-# The two install channels must deliver the same awareness hooks. Until 0.10.1 only the plugin wired
-# them: an agent told "install better-dev" reads BOOTSTRAP, cannot drive an interactive plugin
-# installer, takes the clone path, and so shipped a hookless install in every repo while BOOTSTRAP
-# claimed otherwise. Nothing caught it because the parity lived in prose. It lives here now: every
-# awareness hook hooks.json registers must also appear in bd-hook-wire's WANT table, and vice versa.
+echo "== awareness hooks: declaration vs wiring =="
+# The awareness hook set is written down twice: hooks/hooks.json declares what the tool ships, and
+# bd-hook-wire's WANT table is what actually gets merged into a host's machine-global config at
+# install time. Only the table runs, so a hook added to the declaration alone is a hook no install
+# ever registers - the hookless-install failure of 0.10.1, invisible because the two lists agreed
+# only in prose. They agree here now: every awareness hook hooks.json declares must also appear in
+# bd-hook-wire's WANT table, and vice versa.
 # bd-guard's PreToolUse entries are deliberately out of scope - those are /guardrails-install's
 # per-repo enforcement, not a machine-global install - so compare only the two awareness events.
 # One code path, no outer existence guard: a missing file has to reach the SAME bad, or the check
@@ -402,9 +403,9 @@ json_hooks="$(jq -r '.hooks | to_entries[] | select(.key == "SessionStart" or .k
 wire_hooks="$(sed -n '/^WANT = {/,/^}/p' scripts/bd-hook-wire 2>/dev/null \
               | grep -oE '"bd-[a-z-]+"' | tr -d '"' | sort -u || true)"
 if [ -n "$json_hooks" ] && [ "$json_hooks" = "$wire_hooks" ]; then
-  ok "both install channels register the same awareness hooks"
+  ok "hooks.json and bd-hook-wire's WANT table name the same awareness hooks"
 else
-  bad "install-channel hook drift: a clone install would ship a different awareness hook set than the plugin - hooks.json and bd-hook-wire's WANT table must name the same scripts"
+  bad "awareness hook drift: hooks/hooks.json declares a different hook set than bd-hook-wire's WANT table wires - reconcile the WANT table against hooks.json so an install registers exactly what the tool ships"
 fi
 
 # Every host adapter declares its hook-config stance explicitly. An adapter that simply omits

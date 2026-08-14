@@ -160,7 +160,7 @@ hardening in groundwork; concurrent-actor + rollback discipline in worktree/rele
 three new skills (D12: security-pass, design-brief, uninstall); disposition menu + proving bar in
 writing-skills; `docs/TRAPS.md`. `bd-package-check` green.
 
-**Build complete + quality-upgraded + install reworked.** 24 skills (the roster in `skills/` is the count of record - stale numbers here have burned us twice) + the `bd-*` script spine + hooks; `bd-package-check` green. **Install model (D10):** the tool installs **globally per host** (`install.sh` + `hosts/` adapters + `bd-link`, or the Claude plugin); a repo's `.better-dev/` is **data only** + a per-machine `bin` symlink; repo-authored skills stay repo-local; one-paste `BOOTSTRAP.md` is the front door. **In flight:** `groundwork` (idea→foundation→parallelization front-end) and a loop-engineering audit. A forge+devloop audit (175 mechanisms; 59 already-covered, 15 skipped as plumbing) drove a quality pass - proof-realism (test-body-realizes-criterion), adversarial refutation for non-runnable claims, diff-fingerprint review scrutiny, red-triage (flake/infra/genuine), deslop-on-green, bounded wait-for, content-pinned contract approval (`bd-mem ledger approve`/`check-approval`) - plus `codebase-map` (sourced structural orientation, sibling to `browser-capability`). Remaining is human-only (see §13): publish, real-remote branch protection, live multi-harness runs.
+**Build complete + quality-upgraded + install reworked.** 24 skills (the roster in `skills/` is the count of record - stale numbers here have burned us twice) + the `bd-*` script spine + hooks; `bd-package-check` green. **Install model (D10):** the tool installs **globally per host** (`install.sh` + `hosts/` adapters + `bd-link`) from a clone; a repo's `.better-dev/` is **data only** + a per-machine `bin` symlink; repo-authored skills stay repo-local; one-paste `BOOTSTRAP.md` is the front door. **In flight:** `groundwork` (idea→foundation→parallelization front-end) and a loop-engineering audit. A forge+devloop audit (175 mechanisms; 59 already-covered, 15 skipped as plumbing) drove a quality pass - proof-realism (test-body-realizes-criterion), adversarial refutation for non-runnable claims, diff-fingerprint review scrutiny, red-triage (flake/infra/genuine), deslop-on-green, bounded wait-for, content-pinned contract approval (`bd-mem ledger approve`/`check-approval`) - plus `codebase-map` (sourced structural orientation, sibling to `browser-capability`). Remaining is human-only (see §13): real-remote branch protection, live multi-harness runs.
 
 **Tracer-bullet gate (after Phase 0): ✅ PASSED** - ran `onboard` + one feature slice → staging on the
 papers.town clone, locally, no push. onboard adapted (didn't impose), wrote an idempotent non-clobbering
@@ -200,12 +200,13 @@ then): `skills/<name>/SKILL.md`, `scripts/`, `hooks/`, `.claude-plugin/plugin.js
 
 ## 13. What still needs the human (can't do autonomously)
 
-Publishing to a marketplace/npm · pushing/branch-protection on a *real* remote repo · true multi-harness
-in-agent invocation proof (I validate structure + dry-run; live Claude-Code/Codex/pi runs need you).
+Pushing/branch-protection on a *real* remote repo · true multi-harness in-agent invocation proof
+(I validate structure + dry-run; live Claude-Code/Codex/pi runs need you). Distribution is not on this
+list: D32 settled it as a clone of the public repo, so there is nothing to publish to a registry.
 
 ## 14. On-disk detail (read for depth; survives compaction)
 
-- **This file** - master plan. **`DECISIONS.md`** - locked build decisions (D0-D8). **`README.md`** / **`NOTICE`** / **`LICENSE`**.
+- **This file** - master plan. **`DECISIONS.md`** - locked build decisions, D0 onward. **`README.md`** / **`NOTICE`** / **`LICENSE`**.
 - **`raw/better-dev-design-principles.md`** - the full design spec (raw/ is gitignored, local-only).
 - **`raw/sources/2026-07-03-harvest-manifest/`** - `manifest.md` (per-component sources, coverage, build order, attribution, completeness critic) + `harvest.json` (~100 sources: repo:path, license, copy_mode, adapt_notes, gaps).
 - **`raw/sources/2026-07-03-opensrc-scan/`** - `report.md` (11-repo real-source synthesis) + `extractions.json`.

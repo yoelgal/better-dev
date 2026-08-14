@@ -13,8 +13,9 @@
 #
 # It also registers the SessionStart/SubagentStart awareness hooks in the host's machine-global hook
 # config, for every host whose config file and format are verified (hosts/<name>'s
-# bd_host_hook_settings) - this is what turns the hooks shipped in hooks/hooks.json into a working
-# install; there is no other door that wires them. Pass --no-hooks to skip it.
+# bd_host_hook_settings) - scripts/bd-hook-wire does that merge, from its own table of the awareness
+# hooks hooks/hooks.json declares. A host with no verified config is reported as skipped, and
+# /bootstrap-hooks wires it by hand. Pass --no-hooks to skip it.
 #
 #   ./install.sh [--host <name>|auto]         # <name> = any adapter file in hosts/; default: auto
 #                                              # (each host whose CLI is on PATH or home dir exists)
