@@ -127,29 +127,36 @@ recorded as an override rather than overwritten:
   `.better-dev/bin/bd-mem remember "branch-model: staged"`. Don't force `feature/`.
 - **Wired staged, and the operator asks to move to trunk?** Migrate it rather than re-recording
   `staged` - the keep-it above stays what happens by default, and a repo whose operator never asks
-  is untouched. Resolve the release branch from the recorded override, never from the literal name
-  `main`, so a repo whose default is `master` migrates onto `master`. Then, in this order: (1) run
-  `git log <release>..<integration>` for commits the integration branch carries and the release
-  branch does not; (2) if there are any, offer to guide the operator through merging them to the
-  release branch first - a suggestion, not a refusal, so a decline still migrates, and an accept
-  merges first so the steps below run against the merged tip; (3) tag the integration branch's tip
-  `archive/<integration branch>-<date>` - the branch's own name, not a literal `staging`, for the
-  same reason the release branch is resolved rather than assumed - and push the tag; (4) record
-  `integration branch = <release branch>` via `.better-dev/bin/bd-mem persist-override "<line>"`
-  and `.better-dev/bin/bd-mem remember "branch-model: trunk"`; (5) rewrite the entry file's
-  discovery block so its routing text names the new integration branch; (6) check the working tree
-  out onto the release branch, then delete the integration branch, local and remote - the checkout
-  is part of the step, since the tree cannot stand on a branch it is deleting.
-  **Step 3 lands before step 6 every time** - where the operator declined
-  the guided merge and the branch still carries unmerged work, and equally where step 1 found
-  nothing at all, since the tag preserves the branch itself rather than whatever happened to be
-  unmerged. The pushed tag is the only
-  reason the deletion is safe, since `git branch <integration branch> <the tag>` puts the branch
-  back exactly where it stood. So a tag push that fails - no write access, or the tag already
-  exists - stops the migration before anything is deleted; the delete is safe only once the tag is
-  on the remote. If branch protection refuses the remote delete, the migration is complete locally
-  and that refusal is the report - name it and hand the operator the one command to finish it,
-  rather than reporting a clean migration.
+  is untouched. Resolve `<release>` from the recorded override, never from the literal name `main`,
+  so a repo whose default is `master` migrates onto `master`; `<integration>` is the branch being
+  retired. **Everything below reads the remote refs, never the local ones.** A local
+  `<integration>` on a shared branch is routinely behind what teammates have pushed, and every
+  destructive step here would then act on a tip that is not the real one - so `git fetch origin`
+  first, read `origin/<integration>`, and treat a non-empty
+  `git rev-list --count <integration>..origin/<integration>` as a stop, not a warning.
+  Then, in this order: (1) `git log origin/<release>..origin/<integration>` for commits the
+  integration branch carries and the release branch does not; (2) if there are any, offer to guide
+  the operator through merging them to `<release>` first - a suggestion, not a refusal, so a
+  decline still migrates, and an accept merges first, pushes, and re-reads step 1 before going on;
+  (3) confirm nothing still depends on the branch - `gh pr list --base <integration>` is empty and
+  `git worktree list` shows no tree on it - since deleting a base branch closes every open PR
+  targeting it and the archive tag restores none of them; (4) tag `origin/<integration>`'s tip
+  `archive/<integration>-<YYYY-MM-DD>` and push the tag; (5) check the working tree out onto
+  `<release>`, since the tree cannot stand on a branch it is deleting, and only then rewrite the
+  entry file's discovery block so its routing text names the new integration branch - rewriting it
+  first strands the edit on a branch about to be deleted, or blocks the checkout outright;
+  (6) record `integration branch = <release>` via `.better-dev/bin/bd-mem persist-override
+  "<line>"` and `.better-dev/bin/bd-mem remember "branch-model: trunk"`; (7) delete
+  `<integration>`, local and remote.
+  **Step 4 lands before step 7 every time** - where the operator declined the guided merge and the
+  branch still carries unmerged work, and equally where step 1 found nothing at all, since the tag
+  preserves the branch itself rather than whatever happened to be unmerged. The pushed tag is the
+  only reason the deletion is safe, since `git branch <integration> archive/<integration>-<date>`
+  puts the branch back exactly where it stood. So a tag push that fails - no write access, or the
+  tag already exists - stops the migration before anything is deleted; the delete is safe only once
+  the tag is on the remote. If branch protection refuses the remote delete, the migration is
+  complete locally and that refusal is the report - name it and hand the operator the one command
+  to finish it, rather than reporting a clean migration.
 - **Only `main`, no integration branch?** Two shapes fit, and git - not prose - says which (the
   branches that exist, the base merged PRs actually target, from Phase 1). A team already running
   trunk-based - PRs merge to `main`, `main` releases - is a first-class model, not a gap: record
