@@ -17,15 +17,15 @@ jobs:
           git config --global user.email ci@better-dev.local
           git config --global user.name better-dev-ci
           git config --global init.defaultBranch main
-      - name: monorepo root surface
+      - name: repo root surface
         run: |
-          jq -e . .claude-plugin/marketplace.json >/dev/null
+          jq -e . .claude-plugin/plugin.json >/dev/null
           dash="$(printf '\342\200\223\|\342\200\224')"
           if LC_ALL=C grep -n "$dash" README.md CLAUDE.md; then
-            echo "em/en dash in a monorepo root doc - use a spaced hyphen" >&2; exit 1
+            echo "em/en dash in a root doc - use a spaced hyphen" >&2; exit 1
           fi
       - name: package gate
-        run: better-dev/scripts/bd-package-check
+        run: scripts/bd-package-check
       # A check that is green before the thing it guards exists proves nothing and reads exactly
       # like one that works. Every check this diff adds has to come back red against the base tree.
       - name: new checks must have been red before their implementation
@@ -34,11 +34,11 @@ jobs:
         run: |
           base="$BASE_SHA"
           [ -n "$base" ] || base="$(git rev-parse HEAD~1)"
-          better-dev/scripts/bd-package-check --prove-new "$base"
+          scripts/bd-package-check --prove-new "$base"
       - name: script and hook selftests
         run: |
           matched=0
-          for s in better-dev/scripts/bd-* better-dev/hooks/bd-*; do
+          for s in scripts/bd-* hooks/bd-*; do
             [ -e "$s" ] || { echo "selftest glob matched nothing: $s" >&2; exit 1; }
             grep -q '"selftest"' "$s" || grep -q "selftest)" "$s" || continue
             matched=1

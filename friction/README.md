@@ -7,10 +7,10 @@ does a new user get stuck?**
 Nothing here is used at runtime. It is a release gate you point at a version.
 
 ```sh
-better-dev/friction/run.sh                     # all four fixtures
-better-dev/friction/run.sh --fixture messy     # just one
-better-dev/friction/run.sh --perm typical      # the permission audit (see below)
-better-dev/friction/run.sh --help
+friction/run.sh                     # all four fixtures
+friction/run.sh --fixture messy     # just one
+friction/run.sh --perm typical      # the permission audit (see below)
+friction/run.sh --help
 ```
 
 ## What it actually does
