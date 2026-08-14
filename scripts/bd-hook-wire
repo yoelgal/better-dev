@@ -2,10 +2,14 @@
 """bd-hook-wire - register better-dev's awareness hooks in a host's machine-global hook config.
 
 better-dev installs from a clone (git clone + install.sh), and a host only fires the hooks named in
-its own machine-global config - hooks/hooks.json declares the SessionStart/SubagentStart hooks the
-tool ships, but nothing reads that file out of the clone. This script is what puts them in the host's
-config. Without it an install links every skill and registers no hook - in every repo, forever, while
-BOOTSTRAP claims the tool ships hooks. install.sh calls this; /bootstrap-hooks is the by-hand path.
+its own machine-global config. hooks/hooks.json declares the SessionStart/SubagentStart hooks the
+tool ships, but no install path reads it: this script's WANT table below is what actually reaches a
+host config, which is why the package gate checks the two against each other. Without this script an
+install links every skill and registers no hook - in every repo, forever, while BOOTSTRAP claims the
+tool ships hooks. install.sh calls this; /bootstrap-hooks is the by-hand path.
+
+hooks.json is not dead weight, so do not delete it as plugin residue: friction/run.sh reads it out of
+the clone to give its throwaway sandbox better-dev's hooks, and bd-session-start probes for it.
 
   bd-hook-wire wire   <clone-dir> <settings.json>   merge our entries in; print a status word
   bd-hook-wire plan   <clone-dir> <settings.json>   same, but write nothing

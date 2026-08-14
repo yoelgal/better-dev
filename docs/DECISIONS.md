@@ -909,6 +909,12 @@ plugin channel's host-namespacing fact is recorded in packaging. **Open verifica
 machine with no clone symlinks, install better-dev as a plugin, route "review this diff", record
 which skill enters. No chain rewrite until that observable fails. No writing-skills clause about
 generic slugs is owed (resolved by the packaging sentence; do not add one later).
+   **CLOSED by D32 (2026-08-14)**: the plugin channel is deleted, so a fresh install cannot be made
+   through it and the verification row can never be run. The row is retired rather than left open on
+   an impossible observation - and with one channel there is no host-namespacing to sidestep the
+   collision, so the collision is answered by install.sh's skip report and `/review` alone, exactly as
+   the rest of this ruling already says. A legacy plugin install predating D32 keeps whatever
+   namespacing it had; nothing new acquires it.
 5. **The #693 coordinator-mode exposure** (Claude desktop/web drops user-invoked skills from the
 listing) is answered by a fallback route in the always-loaded routing row - terse form - and a trap;
 `/uninstall` keeps its flag: user-invoked-for-destructive-acts is right, the harness owns the fix.

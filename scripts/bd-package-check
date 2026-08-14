@@ -58,10 +58,12 @@ _check_tokens() {
   # tracked path ending in this basename (a fixture, a vendored copy); their hunks would pool into one
   # flat line set and mark this file's pre-existing checks as added. So the pathspec stays wide enough
   # for the rename and the awk keeps only the hunks whose destination IS this script - `--no-prefix`
-  # so the `+++ ` header carries the bare path to compare against.
+  # so the `+++ ` header carries the bare path to compare against. Git appends a TAB to that header
+  # when the path contains a space, so strip from the first tab or the compare silently never matches
+  # and the mode returns a vacuous "adds no checks" on a diff that added some.
   addedlines="$(git -C "$root" diff --unified=0 --no-prefix "$base" -- "*${script_rel##*/}" \
     | awk -v want="$script_rel" '
-        /^\+\+\+ / { dst = substr($0, 5); next }
+        /^\+\+\+ / { dst = substr($0, 5); sub(/\t.*$/, "", dst); next }
         dst == want && /^@@/ { if (match($0, /\+[0-9]+(,[0-9]+)?/)) {
               spec = substr($0, RSTART + 1, RLENGTH - 1)
               n = split(spec, a, ","); start = a[1] + 0; count = (n > 1 ? a[2] + 0 : 1)
@@ -395,6 +397,11 @@ echo "== awareness hooks: declaration vs wiring =="
 # bd-hook-wire's WANT table, and vice versa.
 # bd-guard's PreToolUse entries are deliberately out of scope - those are /guardrails-install's
 # per-repo enforcement, not a machine-global install - so compare only the two awareness events.
+# Known limit, deliberately not widened here: this compares NAME SETS. It is an allowlist of two
+# events, so an awareness hook declared under a third one is invisible to it, and it drops the event
+# and matcher, so the two sides can disagree about WHERE a hook fires and still pass. Both predate
+# the flatten. Strengthening it to event|matcher|name tuples is its own work-item; until then this
+# check says the two lists name the same hooks, and does not claim more.
 # One code path, no outer existence guard: a missing file has to reach the SAME bad, or the check
 # skips at base instead of failing there and proves nothing (prove-new mode enforces exactly this).
 json_hooks="$(jq -r '.hooks | to_entries[] | select(.key == "SessionStart" or .key == "SubagentStart")
@@ -405,7 +412,7 @@ wire_hooks="$(sed -n '/^WANT = {/,/^}/p' scripts/bd-hook-wire 2>/dev/null \
 if [ -n "$json_hooks" ] && [ "$json_hooks" = "$wire_hooks" ]; then
   ok "hooks.json and bd-hook-wire's WANT table name the same awareness hooks"
 else
-  bad "awareness hook drift: hooks/hooks.json declares a different hook set than bd-hook-wire's WANT table wires - reconcile the WANT table against hooks.json so an install registers exactly what the tool ships"
+  bad "awareness hook drift: hooks/hooks.json declares a different set of hook NAMES than bd-hook-wire's WANT table wires - reconcile the WANT table against hooks.json so an install registers the hooks the tool ships. Check the event and matcher by hand: this compares names only"
 fi
 
 # Every host adapter declares its hook-config stance explicitly. An adapter that simply omits

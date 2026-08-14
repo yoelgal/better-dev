@@ -46,6 +46,12 @@ Where the host gates machine-touching commands, hand the pull to the operator pa
 the clone carries local work - report that and stop rather than merging or resetting on the
 operator's behalf. A pull that fails offline: report it and stop; never guess what the remote holds.
 
+One shape is not local work: a clone resolved from a **legacy plugin install** - the marketplace
+channel better-dev shipped from 0.7.0 until D32 deleted it - is a host-managed, version-pinned
+checkout, so a refused or unavailable pull there is that channel working as designed. Say so and move
+to step 3 rather than reporting a dirty clone. The channel is gone for new installs, but the installs
+themselves are not, which is why `normalize_clone` and the guard above still resolve one.
+
 The full install contract lives in `/packaging`.
 
 ## 2. Reconcile links only when needed
