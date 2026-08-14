@@ -1,0 +1,483 @@
+#!/usr/bin/env bash
+# bd-migrate-branch-model - retire a staged integration branch so the release branch becomes trunk.
+#
+#   bd-migrate-branch-model check [--repo <dir>] [--release <branch>] [--skip-pr-check]
+#   bd-migrate-branch-model apply --yes [--repo <dir>] [--release <branch>] [--skip-pr-check]
+#   bd-migrate-branch-model selftest
+#
+# `check` runs every precondition, prints one verdict line each, and exits 0 only if all pass.
+# `apply` re-runs the full check and aborts on any failure; it refuses without --yes.
+#
+# This deletes branches, so every precondition is a real check with a real exit code rather than a
+# prose instruction: the prose version resolved the release branch from "the recorded override",
+# which only ever names the INTEGRATION branch, so release == integration and the migration deleted
+# the release branch while reporting success. Resolution here is by named mechanism, and a release
+# that resolves equal to the integration branch is a hard stop.
+#
+# Fails closed everywhere. The one loss class no archive tag covers is a dirty tree, so a dirty tree
+# stops rather than being stashed on the operator's behalf.
+set -euo pipefail
+
+case "$0" in /*) SELF="$0" ;; *) SELF="$PWD/$0" ;; esac
+ME="bd-migrate-branch-model"
+die() { printf '%s: %s\n' "$ME" "$*" >&2; exit 1; }
+
+REPO="$PWD"; RELEASE_OPT=""; SKIP_PR_CHECK=0; CONFIRMED=0
+REMOTE=""; INTEGRATION=""; RELEASE=""; TAG=""; REF_INT=""; REF_REL=""; FAILS=0
+
+ok()   { printf '  ok    %s\n' "$*"; }
+warn() { printf '  warn  %s\n' "$*"; }
+stop() { printf '  STOP  %s\n' "$*"; FAILS=$((FAILS + 1)); }
+# A resolution failure makes every later verdict meaningless, so it exits on the spot.
+fatal() { printf '  STOP  %s\n' "$*"; printf '%s: cannot proceed.\n' "$ME" >&2; exit 1; }
+
+canon() { ( cd "$1" 2>/dev/null && pwd -P ) || printf '%s' "$1"; }
+g() { git -C "$REPO" "$@"; }
+has_ref() { g rev-parse --verify --quiet "$1" >/dev/null 2>&1; }
+
+# .better-dev resolution mirrors bd-mem: the primary checkout's dir, so a linked worktree shares it.
+bd_dir() {
+  local common
+  if common="$(g rev-parse --git-common-dir 2>/dev/null)"; then
+    case "$common" in /*) ;; *) common="$(canon "$REPO")/$common" ;; esac
+    printf '%s/.better-dev' "$(cd "$(dirname "$common")" && pwd -P)"
+  else
+    printf '%s/.better-dev' "$(canon "$REPO")"
+  fi
+}
+
+# --- resolution, each by a named mechanism ----------------------------------------------------------
+
+resolve_remote() {
+  local remotes n
+  remotes="$(g remote 2>/dev/null || true)"
+  n=0; [ -n "$remotes" ] && n="$(printf '%s\n' "$remotes" | wc -l | tr -d ' ')"
+  if [ "$n" -eq 0 ]; then
+    REMOTE=""; warn "[remote] no git remote - supported local-only case, the archive tag stays local"
+  elif [ "$n" -eq 1 ]; then
+    REMOTE="$remotes"; ok "[remote] $REMOTE (the only remote)"
+  elif printf '%s\n' "$remotes" | grep -qx origin; then
+    REMOTE=origin; ok "[remote] origin (preferred among: $(printf '%s' "$remotes" | tr '\n' ' '))"
+  else
+    fatal "[remote] several remotes and none is 'origin': $(printf '%s' "$remotes" | tr '\n' ' ') - pick one and re-run in a repo with a single remote"
+  fi
+}
+
+resolve_integration() {
+  local over
+  over="$(bd_dir)/overrides.md"
+  INTEGRATION="$(sed -n 's/.*integration branch *= *\([A-Za-z0-9._/-][A-Za-z0-9._/-]*\).*/\1/p' "$over" | head -1)"
+  [ -n "$INTEGRATION" ] || fatal "[integration] no 'integration branch = <x>' line in $over - nothing to migrate from"
+  ok "[integration] $INTEGRATION (from $over)"
+}
+
+# Never guess main. symbolic-ref first, then `git remote show`, then the operator via --release.
+resolve_release() {
+  local ref
+  if [ -n "$RELEASE_OPT" ]; then
+    RELEASE="$RELEASE_OPT"; ok "[release] $RELEASE (passed with --release)"
+  elif [ -n "$REMOTE" ] && ref="$(g symbolic-ref --quiet "refs/remotes/$REMOTE/HEAD" 2>/dev/null)"; then
+    RELEASE="${ref#refs/remotes/$REMOTE/}"; ok "[release] $RELEASE (from refs/remotes/$REMOTE/HEAD)"
+  elif [ -n "$REMOTE" ] && RELEASE="$(g remote show "$REMOTE" 2>/dev/null | sed -n 's/.*HEAD branch: *//p' | head -1)" \
+       && [ -n "$RELEASE" ] && [ "$RELEASE" != "(unknown)" ]; then
+    ok "[release] $RELEASE (from 'git remote show $REMOTE')"
+  else
+    RELEASE=""
+    if [ -z "$REMOTE" ]; then
+      fatal "[release] cannot resolve the release branch - there is no remote to read a default HEAD from. Pass it: --release <branch>. It is never guessed."
+    fi
+    fatal "[release] cannot resolve the release branch - 'refs/remotes/$REMOTE/HEAD' is unset and 'git remote show $REMOTE' did not name one. Pass it: --release <branch>. It is never guessed."
+  fi
+  if [ "$RELEASE" = "$INTEGRATION" ]; then
+    fatal "[same-branch] release and integration both resolved to '$RELEASE' - migrating would DELETE the release branch. Pass the real release branch with --release, or fix the 'integration branch =' override."
+  fi
+  ok "[same-branch] release ($RELEASE) is not the integration branch ($INTEGRATION)"
+}
+
+# --- preconditions -----------------------------------------------------------------------------------
+
+check_repo() {
+  g rev-parse --is-inside-work-tree >/dev/null 2>&1 || die "'$REPO' is not a git work tree"
+  local over; over="$(bd_dir)/overrides.md"
+  [ -f "$over" ] || die "no $over - this repo is not wired for better-dev, so no branch model is recorded"
+  ok "[repo] git work tree with $over"
+}
+
+# Already trunk is a no-op success, not an error - and it runs BEFORE resolution, because a trunk repo
+# records integration == release by definition and would trip the same-branch stop.
+check_already_trunk() {
+  local bd; bd="$(bd_dir)"
+  if grep -qs 'branch-model: *trunk' "$bd/rules.md" "$bd/overrides.md"; then
+    printf '  ok    [branch-model] already recorded as trunk - nothing to do.\n'
+    exit 0
+  fi
+  ok "[branch-model] staged model recorded (no 'branch-model: trunk')"
+}
+
+check_branches_exist() {
+  local int_local=0 int_remote=0
+  has_ref "refs/heads/$INTEGRATION" && int_local=1
+  [ -n "$REMOTE" ] && has_ref "refs/remotes/$REMOTE/$INTEGRATION" && int_remote=1
+  if [ "$int_local" -eq 0 ] && [ "$int_remote" -eq 0 ]; then
+    stop "[exists] integration branch '$INTEGRATION' exists neither locally nor on ${REMOTE:-<no remote>} - nothing to retire"
+  else
+    ok "[exists] integration '$INTEGRATION' (local=$int_local remote=$int_remote)"
+  fi
+
+  if [ -n "$REMOTE" ]; then
+    if has_ref "refs/remotes/$REMOTE/$RELEASE"; then
+      REF_INT="$REMOTE/$INTEGRATION"; REF_REL="$REMOTE/$RELEASE"
+      ok "[exists] release '$REMOTE/$RELEASE'"
+    else
+      # Without this, the "commits not in release" report compares against nothing and looks empty.
+      stop "[exists] '$REMOTE/$RELEASE' does not exist - run 'git fetch $REMOTE', or the release branch is wrong. The unmerged-commit report would silently read empty."
+      REF_INT="$INTEGRATION"; REF_REL="$RELEASE"
+    fi
+  else
+    REF_INT="$INTEGRATION"; REF_REL="$RELEASE"
+    if has_ref "refs/heads/$RELEASE"; then
+      ok "[exists] release '$RELEASE' (local, no remote)"
+    else
+      stop "[exists] release branch '$RELEASE' does not exist locally and there is no remote to read it from"
+    fi
+  fi
+}
+
+# The counts, not the output. `rev-list --count --left-right` ALWAYS prints (e.g. "0	1"), so a
+# non-empty test on it is true for every repo and would stop every migration.
+check_divergence() {
+  if [ -z "$REMOTE" ] || ! has_ref "refs/remotes/$REMOTE/$INTEGRATION" || ! has_ref "refs/heads/$INTEGRATION"; then
+    ok "[divergence] no local+remote pair for '$INTEGRATION' to compare"
+    return 0
+  fi
+  local counts ahead behind
+  counts="$(g rev-list --count --left-right "$INTEGRATION...$REMOTE/$INTEGRATION")"
+  ahead="$(printf '%s\n' "$counts" | awk '{print $1}')"
+  behind="$(printf '%s\n' "$counts" | awk '{print $2}')"
+  if [ "${behind:-0}" -gt 0 ]; then
+    stop "[divergence] local '$INTEGRATION' is $behind commit(s) BEHIND $REMOTE/$INTEGRATION - a tag cut from the remote would not match what you checked. Run 'git -C $REPO pull' and re-run."
+  fi
+  if [ "${ahead:-0}" -gt 0 ]; then
+    stop "[divergence] local '$INTEGRATION' is $ahead commit(s) AHEAD of $REMOTE/$INTEGRATION - an origin-derived tag cannot preserve them and the local delete would destroy them. Push or drop them and re-run."
+  fi
+  [ "${ahead:-0}" -eq 0 ] && [ "${behind:-0}" -eq 0 ] && ok "[divergence] local and $REMOTE '$INTEGRATION' are in sync (ahead=$ahead behind=$behind)"
+  return 0
+}
+
+check_clean_tree() {
+  if [ -n "$(g status --porcelain)" ]; then
+    stop "[dirty] working tree is not clean. The archive tag cannot cover uncommitted work: the checkout of '$RELEASE' either carries it onto a branch whose base is about to be deleted, or refuses. Commit or stash it yourself and re-run - this command will not do it for you."
+  else
+    ok "[dirty] working tree clean"
+  fi
+}
+
+# Deleting a base branch closes every PR against it and no tag restores them, so a check that CANNOT
+# run is a stop, not a pass.
+check_open_prs() {
+  if [ "$SKIP_PR_CHECK" -eq 1 ]; then
+    printf '  WARN  [open-prs] SKIPPED via --skip-pr-check. Open PRs based on %s WILL be closed by the delete and no tag restores them. You are asserting there are none.\n' "$INTEGRATION"
+    return 0
+  fi
+  if [ -z "$REMOTE" ]; then
+    ok "[open-prs] no remote, so no forge and no pull requests to close"
+    return 0
+  fi
+  local url
+  url="$(g remote get-url "$REMOTE" 2>/dev/null || true)"
+  case "$url" in
+    *github.com*|*github.*) ;;
+    *) stop "[open-prs] remote '$REMOTE' ($url) is not GitHub, so open PRs cannot be listed. Confirm manually that nothing targets '$INTEGRATION', then re-run with --skip-pr-check."; return 0 ;;
+  esac
+  command -v gh >/dev/null 2>&1 || {
+    stop "[open-prs] 'gh' is not installed, so open PRs cannot be listed. Install it and re-run, or confirm manually and re-run with --skip-pr-check."; return 0; }
+  gh auth status >/dev/null 2>&1 || {
+    stop "[open-prs] 'gh' is not authenticated, so open PRs cannot be listed. Run 'gh auth login' and re-run, or confirm manually and re-run with --skip-pr-check."; return 0; }
+  local prs
+  prs="$(gh pr list --repo "$url" --base "$INTEGRATION" --state open --json number --jq 'length' 2>/dev/null \
+        || gh pr list --base "$INTEGRATION" --state open 2>/dev/null | wc -l | tr -d ' ')"
+  if [ "${prs:-0}" -gt 0 ] 2>/dev/null; then
+    stop "[open-prs] $prs open PR(s) target '$INTEGRATION'. Deleting it closes them all and no tag restores them - retarget or merge them first."
+  else
+    ok "[open-prs] none target '$INTEGRATION'"
+  fi
+}
+
+check_worktrees() {
+  local self p b others=0
+  self="$(canon "$(g rev-parse --show-toplevel)")"
+  while IFS="$(printf '\t')" read -r p b; do
+    [ -n "$p" ] || continue
+    p="$(canon "$p")"
+    if [ "$b" = "refs/heads/$INTEGRATION" ]; then
+      # The migrating repo's own tree must be excluded: this library parks the main checkout on the
+      # integration branch by design, so a naive check trips on itself every time.
+      if [ "$p" != "$self" ]; then
+        stop "[worktrees] another worktree sits on '$INTEGRATION': $p - move or remove it before the branch is deleted"
+      fi
+    elif [ "$p" != "$self" ]; then
+      others=$((others + 1))
+    fi
+  done <<EOF
+$(g worktree list --porcelain | awk '/^worktree /{p=substr($0,10)} /^branch /{print p "\t" substr($0,8)} /^detached$/{print p "\t-"}')
+EOF
+  [ "$others" -gt 0 ] && warn "[worktrees] $others other worktree(s) are on some other branch. Whether they were BRANCHED OFF '$INTEGRATION' is not detectable here, so this was not checked - they may need rebasing onto '$RELEASE' after the migration."
+  ok "[worktrees] no foreign worktree is on '$INTEGRATION'"
+}
+
+check_archive_tag() {
+  TAG="archive/$INTEGRATION-$(date +%Y-%m-%d)"
+  local tip
+  if ! has_ref "refs/tags/$TAG"; then
+    ok "[tag] '$TAG' is free"
+    return 0
+  fi
+  if ! has_ref "$REF_INT"; then
+    stop "[tag] '$TAG' exists but '$REF_INT' does not resolve, so it cannot be compared"
+    return 0
+  fi
+  tip="$(g rev-parse "$REF_INT^{commit}")"
+  if [ "$(g rev-parse "$TAG^{commit}")" = "$tip" ]; then
+    ok "[tag] '$TAG' already points at $REF_INT ($(g rev-parse --short "$tip")) - treating this as a resumed run"
+  else
+    stop "[tag] '$TAG' exists at $(g rev-parse --short "$TAG^{commit}") but $REF_INT is at $(g rev-parse --short "$tip") - a different day's or a different tip's tag. Rename or delete it deliberately."
+  fi
+}
+
+do_check() {
+  printf '%s check: %s\n' "$ME" "$(canon "$REPO")"
+  FAILS=0
+  check_repo
+  check_already_trunk
+  resolve_remote
+  resolve_integration
+  resolve_release
+  check_branches_exist
+  check_divergence
+  check_clean_tree
+  check_open_prs
+  check_worktrees
+  check_archive_tag
+  if [ "$FAILS" -gt 0 ]; then
+    printf '%s: %s precondition(s) failed - nothing was changed.\n' "$ME" "$FAILS" >&2
+    exit 1
+  fi
+  printf '%s: all preconditions pass (%s -> %s, archive tag %s)\n' "$ME" "$INTEGRATION" "$RELEASE" "$TAG"
+}
+
+# --- apply --------------------------------------------------------------------------------------------
+
+bd_mem_bin() {
+  local repo_bin clone_bin
+  repo_bin="$(canon "$REPO")/.better-dev/bin/bd-mem"
+  clone_bin="$(dirname "$SELF")/bd-mem"
+  if [ -x "$repo_bin" ]; then printf '%s' "$repo_bin"
+  elif [ -x "$clone_bin" ]; then printf '%s' "$clone_bin"
+  else printf ''; fi
+}
+
+do_apply() {
+  [ "$CONFIRMED" -eq 1 ] || die "apply refuses without --yes (this deletes '$INTEGRATION' locally and on the remote). Run 'check' first."
+  do_check
+
+  if [ -n "$REMOTE" ]; then
+    printf '\n1. fetching %s\n' "$REMOTE"
+    g fetch "$REMOTE" || die "git fetch $REMOTE failed - aborting before anything is changed"
+  else
+    printf '\n1. no remote - skipping fetch\n'
+  fi
+
+  printf '\n2. commits in %s not in %s:\n' "$REF_INT" "$REF_REL"
+  local unmerged count
+  unmerged="$(g log --oneline "$REF_REL..$REF_INT" || true)"
+  count=0; [ -n "$unmerged" ] && count="$(printf '%s\n' "$unmerged" | wc -l | tr -d ' ')"
+  if [ "$count" -gt 0 ]; then
+    printf '%s\n' "$unmerged"
+    printf '   WARNING: %s commit(s) live in %s but not in %s. They are NOT merged here - the archive tag preserves them and the caller decides what to do.\n' \
+      "$count" "$REF_INT" "$REF_REL"
+  else
+    printf '   (none)\n'
+  fi
+
+  printf '\n3. archive tag %s at %s\n' "$TAG" "$REF_INT"
+  if has_ref "refs/tags/$TAG"; then
+    printf '   tag already exists at the same commit (resumed run)\n'
+  else
+    g tag "$TAG" "$REF_INT" || die "could not create tag $TAG - aborting before any delete"
+  fi
+  if [ -n "$REMOTE" ]; then
+    # A failed tag push aborts BEFORE anything is deleted: the tag is the only restore path.
+    g push "$REMOTE" "refs/tags/$TAG" || die "could not push tag $TAG to $REMOTE - ABORTING before any branch is deleted. Nothing was destroyed."
+    printf '   pushed to %s\n' "$REMOTE"
+  else
+    printf '   NOTE: no remote - the safety net is LOCAL ONLY. This tag is the sole copy of %s.\n' "$INTEGRATION"
+  fi
+
+  printf '\n4. checking out %s\n' "$RELEASE"
+  g checkout "$RELEASE" || die "could not check out $RELEASE - stopping; the archive tag $TAG is in place and no branch was deleted"
+
+  printf '\n5. recording the new model\n'
+  local mem; mem="$(bd_mem_bin)"
+  if [ -n "$mem" ]; then
+    # bd-mem persist-override APPENDS; it has no replace and no remove (verified 2026-08-14: two
+    # calls with the same key leave two contradictory lines). Left alone, the repo would carry both
+    # "integration branch = <old>" and "integration branch = <new>", and every skill reading that
+    # override would get an ambiguous answer. So drop the stale line first, inside the managed
+    # block, then let bd-mem append the new one through its own validated path.
+    local over="$REPO/.better-dev/overrides.md" tmp
+    if [ -f "$over" ] && grep -q '^- integration branch = ' "$over"; then
+      tmp="$over.bd-migrate.$$"
+      grep -v '^- integration branch = ' "$over" >"$tmp" \
+        || { rm -f "$tmp"; die "could not rewrite $over - stopping before the delete"; }
+      mv "$tmp" "$over" || { rm -f "$tmp"; die "could not replace $over - stopping before the delete"; }
+      printf '   dropped the stale integration-branch override line\n'
+    fi
+    ( cd "$REPO" && "$mem" persist-override "integration branch = $RELEASE" ) || die "bd-mem persist-override failed - stopping before the delete"
+    ( cd "$REPO" && "$mem" remember "branch-model: trunk" ) || die "bd-mem remember failed - stopping before the delete"
+    if [ "$(grep -c '^- integration branch = ' "$over" 2>/dev/null || echo 0)" != "1" ]; then
+      die "after recording, $over does not carry exactly one integration-branch line - stopping before the delete"
+    fi
+    printf '   recorded via %s\n' "$mem"
+  else
+    die "no bd-mem found (neither .better-dev/bin/bd-mem nor $(dirname "$SELF")/bd-mem) - stopping before the delete; the model must be recorded first"
+  fi
+
+  printf '\n6. deleting %s\n' "$INTEGRATION"
+  if has_ref "refs/heads/$INTEGRATION"; then
+    g branch -D "$INTEGRATION" || die "could not delete local '$INTEGRATION' - restore point: git branch $INTEGRATION $TAG"
+    printf '   local branch deleted\n'
+  else
+    printf '   no local branch to delete\n'
+  fi
+  if [ -n "$REMOTE" ]; then
+    if ! g push "$REMOTE" --delete "$INTEGRATION"; then
+      printf '\n%s: MIGRATION INCOMPLETE. The remote branch %s/%s still exists (branch protection is the usual cause).\n' "$ME" "$REMOTE" "$INTEGRATION" >&2
+      printf 'Everything else is done. Finish it with:\n  git -C %s push %s --delete %s\n' "$(canon "$REPO")" "$REMOTE" "$INTEGRATION" >&2
+      printf 'Restore point if you want to undo:\n  git -C %s branch %s %s\n' "$(canon "$REPO")" "$INTEGRATION" "$TAG" >&2
+      exit 1
+    fi
+    printf '   remote branch deleted\n'
+  fi
+
+  printf '\n%s: migrated to trunk.\n' "$ME"
+  printf '  trunk:    %s (now the integration branch)\n' "$RELEASE"
+  printf '  retired:  %s\n' "$INTEGRATION"
+  printf '  archive:  %s\n' "$TAG"
+  printf '  restore:  git branch %s %s\n' "$INTEGRATION" "$TAG"
+  printf '  NOT DONE HERE: the entry file discovery block still describes the staged model. The\n'
+  printf '  caller rewrites it. The overrides file is already correct - it carries exactly one\n'
+  printf '  integration-branch line, checked before anything was deleted.\n'
+}
+
+# --- selftest -------------------------------------------------------------------------------------------
+
+# Fixture: repo on <int> with a file-URL "origin" bare remote, remote HEAD set to <rel> with no network.
+fixture() {
+  local d="$1" int="$2" rel="$3"
+  mkdir -p "$d/repo" "$d/origin.git"
+  git -c init.defaultBranch=main init -q --bare "$d/origin.git"
+  git -c init.defaultBranch=main init -q "$d/repo"
+  (
+    set -e
+    cd "$d/repo"
+    git config user.email t@t; git config user.name t
+    git checkout -q -B "$rel"
+    echo base >base.txt; printf '.better-dev/\n' >.gitignore
+    git add base.txt .gitignore; git commit -qm base
+    git checkout -q -B "$int"
+    echo work >work.txt; git add work.txt; git commit -qm work
+    mkdir -p .better-dev
+    printf '<!-- BEGIN better-dev overrides -->\n- integration branch = %s\n<!-- END better-dev overrides -->\n' "$int" >.better-dev/overrides.md
+    git remote add origin "$d/origin.git"
+    if [ "$int" = "$rel" ]; then git push -q origin "$rel"; else git push -q origin "$rel" "$int"; fi
+    git remote set-head origin "$rel"
+  )
+}
+
+selftest() {
+  local root rc=0 out d
+  root="$(mktemp -d)"
+  (
+    set -e
+
+    # 1. release == integration is refused (the Critical: this deleted the release branch).
+    d="$root/same"; fixture "$d" main main
+    out="$("$SELF" check --repo "$d/repo" --skip-pr-check 2>&1)" && { echo "FAIL: release==integration accepted"; exit 1; }
+    printf '%s' "$out" | grep -q 'same-branch' || { echo "FAIL: no same-branch verdict: $out"; exit 1; }
+
+    # 2. a clean, synced repo passes - and specifically is NOT stopped by [divergence].
+    d="$root/clean"; fixture "$d" staging main
+    out="$("$SELF" check --repo "$d/repo" --skip-pr-check 2>&1)" || { echo "FAIL: clean repo refused: $out"; exit 1; }
+    printf '%s' "$out" | grep -q 'STOP  \[divergence\]' && { echo "FAIL: synced repo stopped by divergence - the counts test is always-true"; exit 1; }
+    printf '%s' "$out" | grep -q 'ok    \[divergence\]' || { echo "FAIL: divergence check did not run: $out"; exit 1; }
+
+    # 3. a dirty tree is refused.
+    d="$root/dirty"; fixture "$d" staging main
+    echo scratch >"$d/repo/dirty.txt"; git -C "$d/repo" add dirty.txt
+    out="$("$SELF" check --repo "$d/repo" --skip-pr-check 2>&1)" && { echo "FAIL: dirty tree accepted"; exit 1; }
+    printf '%s' "$out" | grep -q 'STOP  \[dirty\]' || { echo "FAIL: no dirty verdict: $out"; exit 1; }
+
+    # 4. local AHEAD of the remote is refused.
+    d="$root/ahead"; fixture "$d" staging main
+    ( cd "$d/repo" && echo more >more.txt && git add more.txt && git commit -qm more )
+    out="$("$SELF" check --repo "$d/repo" --skip-pr-check 2>&1)" && { echo "FAIL: local-ahead accepted"; exit 1; }
+    printf '%s' "$out" | grep -q 'STOP  \[divergence\].*AHEAD' || { echo "FAIL: no ahead verdict: $out"; exit 1; }
+
+    # 5. local BEHIND the remote is refused.
+    d="$root/behind"; fixture "$d" staging main
+    ( cd "$d/repo" && echo more >more.txt && git add more.txt && git commit -qm more && git push -q origin staging \
+        && git reset -q --hard HEAD~1 )
+    out="$("$SELF" check --repo "$d/repo" --skip-pr-check 2>&1)" && { echo "FAIL: local-behind accepted"; exit 1; }
+    printf '%s' "$out" | grep -q 'STOP  \[divergence\].*BEHIND' || { echo "FAIL: no behind verdict: $out"; exit 1; }
+
+    # 6. a repo already on trunk exits 0 with nothing to do.
+    d="$root/trunk"; fixture "$d" staging main
+    printf -- '- branch-model: trunk\n' >"$d/repo/.better-dev/rules.md"
+    out="$("$SELF" check --repo "$d/repo" --skip-pr-check 2>&1)" || { echo "FAIL: trunk repo exited non-zero: $out"; exit 1; }
+    printf '%s' "$out" | grep -q 'nothing to do' || { echo "FAIL: no nothing-to-do message: $out"; exit 1; }
+
+    # 7. an archive tag at a DIFFERENT commit is refused; at the SAME commit it is a resumed run.
+    d="$root/tag"; fixture "$d" staging main
+    git -C "$d/repo" tag "archive/staging-$(date +%Y-%m-%d)" main
+    out="$("$SELF" check --repo "$d/repo" --skip-pr-check 2>&1)" && { echo "FAIL: stale archive tag accepted"; exit 1; }
+    printf '%s' "$out" | grep -q 'STOP  \[tag\]' || { echo "FAIL: no tag verdict: $out"; exit 1; }
+    git -C "$d/repo" tag -f "archive/staging-$(date +%Y-%m-%d)" origin/staging >/dev/null 2>&1
+    out="$("$SELF" check --repo "$d/repo" --skip-pr-check 2>&1)" || { echo "FAIL: same-commit archive tag refused: $out"; exit 1; }
+    printf '%s' "$out" | grep -q 'resumed run' || { echo "FAIL: same-commit tag not treated as resumed: $out"; exit 1; }
+
+    # 8. apply without --yes refuses.
+    d="$root/noyes"; fixture "$d" staging main
+    "$SELF" apply --repo "$d/repo" --skip-pr-check >/dev/null 2>&1 && { echo "FAIL: apply ran without --yes"; exit 1; }
+
+    # 9. a missing 'integration branch =' line is a stop.
+    d="$root/noover"; fixture "$d" staging main
+    printf '<!-- BEGIN better-dev overrides -->\n<!-- END better-dev overrides -->\n' >"$d/repo/.better-dev/overrides.md"
+    "$SELF" check --repo "$d/repo" --skip-pr-check >/dev/null 2>&1 && { echo "FAIL: missing integration override accepted"; exit 1; }
+
+    exit 0
+  ) || rc=1
+  rm -rf "$root"
+  [ "$rc" = 0 ] && echo "selftest OK" || { echo "selftest FAILED" >&2; exit 1; }
+}
+
+# --- cli --------------------------------------------------------------------------------------------
+
+CMD="${1:-}"; [ $# -gt 0 ] && shift || true
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --repo) [ $# -ge 2 ] || die "--repo needs a directory"; REPO="$2"; shift 2 ;;
+    --release) [ $# -ge 2 ] || die "--release needs a branch"; RELEASE_OPT="$2"; shift 2 ;;
+    --skip-pr-check) SKIP_PR_CHECK=1; shift ;;
+    --yes) CONFIRMED=1; shift ;;
+    *) die "unknown option '$1'" ;;
+  esac
+done
+[ -d "$REPO" ] || die "--repo '$REPO' is not a directory"
+
+case "$CMD" in
+  check) do_check ;;
+  apply) do_apply ;;
+  selftest) selftest ;;
+  ""|-h|--help) sed -n '2,18p' "$SELF" ;;
+  *) die "unknown command '$CMD' (check | apply | selftest)" ;;
+esac

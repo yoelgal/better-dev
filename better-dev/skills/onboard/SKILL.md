@@ -127,42 +127,32 @@ recorded as an override rather than overwritten:
   `.better-dev/bin/bd-mem remember "branch-model: staged"`. Don't force `feature/`.
 - **Wired staged, and the operator asks to move to trunk?** Migrate it rather than re-recording
   `staged` - the keep-it above stays what happens by default, and a repo whose operator never asks
-  is untouched. Resolve `<release>` from the recorded override, never from the literal name `main`,
-  so a repo whose default is `master` migrates onto `master`; `<integration>` is the branch being
-  retired. **Everything below reads the remote refs, never the local ones.** A local
-  `<integration>` on a shared branch is routinely behind what teammates have pushed, and every
-  destructive step here would then act on a tip that is not the real one - so `git fetch origin`
-  first, read `origin/<integration>`, and treat a non-empty
-  `git rev-list --count --left-right <integration>...origin/<integration>` as a stop, not a
-  warning, **in either direction**. Behind means the tag would cover a tip that is not the real
-  one; ahead means local commits nobody has pushed, which an `origin`-derived tag cannot preserve
-  and step 7's local delete would take with it.
-  Then, in this order: (1) `git log origin/<release>..origin/<integration>` for commits the
-  integration branch carries and the release branch does not; (2) if there are any, offer to guide
-  the operator through merging them to `<release>` first - a suggestion, not a refusal, so a
-  decline still migrates, and an accept merges first, pushes, and re-reads step 1 - a re-read that
-  still finds commits means the merge was partial, which returns to this same offer rather than
-  falling through; (3) confirm nothing still depends on the branch - `gh pr list --base
-  <integration>` is empty and `git worktree list` shows no tree on it - and treat a failed confirm
-  as a stop like the ref check above, not a warning, since deleting a base branch closes every open
-  PR targeting it and the archive tag restores none of them; (4) tag `origin/<integration>`'s tip
-  `archive/<integration>-<YYYY-MM-DD>` and push the tag; (5) check the working tree out onto
-  `<release>`, since the tree cannot stand on a branch it is deleting, and only then rewrite the
-  entry file's discovery block so its routing text names the new integration branch - rewriting it
-  first strands the edit on a branch about to be deleted, or blocks the checkout outright;
-  (6) record `integration branch = <release>` via `.better-dev/bin/bd-mem persist-override
-  "<line>"` and `.better-dev/bin/bd-mem remember "branch-model: trunk"`; (7) delete
-  `<integration>`, local and remote.
-  **Step 4 lands before step 7 every time** - where the operator declined the guided merge and the
-  branch still carries unmerged work, and equally where step 1 found nothing at all, since the tag
-  preserves the branch itself rather than whatever happened to be unmerged. The pushed tag is the
-  only reason the deletion is safe, since
-  `git branch <integration> archive/<integration>-<YYYY-MM-DD>` puts the branch back exactly where
-  it stood. So a tag push that fails - no write access, or the
-  tag already exists - stops the migration before anything is deleted; the delete is safe only once
-  the tag is on the remote. If branch protection refuses the remote delete, the migration is
-  complete locally and that refusal is the report - name it and hand the operator the one command
-  to finish it, rather than reporting a clean migration.
+  is untouched. **Do not hand-run the steps.** This retires a shared branch, and the preconditions
+  are the whole job: which remote, whether the release branch resolves at all, whether local and
+  remote have diverged in either direction, an unclean tree, open PRs the delete would close, a
+  colleague's worktree, a half-finished earlier attempt. Prose has nowhere for a precondition to
+  fail, so the procedure is a script that fails closed:
+
+  ```bash
+  .better-dev/bin/bd-migrate-branch-model check        # every precondition, one verdict each
+  .better-dev/bin/bd-migrate-branch-model apply --yes  # re-runs check, then migrates
+  ```
+
+  `check` is read-only and safe to run for the answer alone; show the operator its output before
+  asking for the yes. It stops rather than guesses - it resolves the release branch from
+  `refs/remotes/<remote>/HEAD` and never from the literal name `main`, and refuses outright when
+  that resolves to the integration branch itself. `apply` archives the branch tip as
+  `archive/<integration>-<YYYY-MM-DD>` and pushes that tag *before* deleting anything, so
+  `git branch <integration> <tag>` puts the branch back exactly where it stood; a tag push that
+  fails aborts before any delete, and a remote delete refused by branch protection reports the
+  migration **incomplete** with the command to finish it, never as a clean run.
+
+  Two things the script deliberately leaves to you. It reports commits the integration branch
+  carries that the release branch does not, but never merges them - offer to guide that merge
+  first, as a suggestion rather than a refusal. And it does not touch the entry file: once it
+  returns success, rewrite the discovery block so its routing text names the new integration
+  branch. Read `--help` before passing `--skip-pr-check`; it exists for a non-GitHub remote and it
+  asserts something the script could not check.
 - **Only `main`, no integration branch?** Two shapes fit, and git - not prose - says which (the
   branches that exist, the base merged PRs actually target, from Phase 1). A team already running
   trunk-based - PRs merge to `main`, `main` releases - is a first-class model, not a gap: record
