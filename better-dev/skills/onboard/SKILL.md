@@ -133,14 +133,19 @@ recorded as an override rather than overwritten:
   `<integration>` on a shared branch is routinely behind what teammates have pushed, and every
   destructive step here would then act on a tip that is not the real one - so `git fetch origin`
   first, read `origin/<integration>`, and treat a non-empty
-  `git rev-list --count <integration>..origin/<integration>` as a stop, not a warning.
+  `git rev-list --count --left-right <integration>...origin/<integration>` as a stop, not a
+  warning, **in either direction**. Behind means the tag would cover a tip that is not the real
+  one; ahead means local commits nobody has pushed, which an `origin`-derived tag cannot preserve
+  and step 7's local delete would take with it.
   Then, in this order: (1) `git log origin/<release>..origin/<integration>` for commits the
   integration branch carries and the release branch does not; (2) if there are any, offer to guide
   the operator through merging them to `<release>` first - a suggestion, not a refusal, so a
-  decline still migrates, and an accept merges first, pushes, and re-reads step 1 before going on;
-  (3) confirm nothing still depends on the branch - `gh pr list --base <integration>` is empty and
-  `git worktree list` shows no tree on it - since deleting a base branch closes every open PR
-  targeting it and the archive tag restores none of them; (4) tag `origin/<integration>`'s tip
+  decline still migrates, and an accept merges first, pushes, and re-reads step 1 - a re-read that
+  still finds commits means the merge was partial, which returns to this same offer rather than
+  falling through; (3) confirm nothing still depends on the branch - `gh pr list --base
+  <integration>` is empty and `git worktree list` shows no tree on it - and treat a failed confirm
+  as a stop like the ref check above, not a warning, since deleting a base branch closes every open
+  PR targeting it and the archive tag restores none of them; (4) tag `origin/<integration>`'s tip
   `archive/<integration>-<YYYY-MM-DD>` and push the tag; (5) check the working tree out onto
   `<release>`, since the tree cannot stand on a branch it is deleting, and only then rewrite the
   entry file's discovery block so its routing text names the new integration branch - rewriting it
@@ -151,8 +156,9 @@ recorded as an override rather than overwritten:
   **Step 4 lands before step 7 every time** - where the operator declined the guided merge and the
   branch still carries unmerged work, and equally where step 1 found nothing at all, since the tag
   preserves the branch itself rather than whatever happened to be unmerged. The pushed tag is the
-  only reason the deletion is safe, since `git branch <integration> archive/<integration>-<date>`
-  puts the branch back exactly where it stood. So a tag push that fails - no write access, or the
+  only reason the deletion is safe, since
+  `git branch <integration> archive/<integration>-<YYYY-MM-DD>` puts the branch back exactly where
+  it stood. So a tag push that fails - no write access, or the
   tag already exists - stops the migration before anything is deleted; the delete is safe only once
   the tag is on the remote. If branch protection refuses the remote delete, the migration is
   complete locally and that refusal is the report - name it and hand the operator the one command
