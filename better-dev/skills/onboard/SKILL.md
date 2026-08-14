@@ -140,8 +140,10 @@ recorded as an override rather than overwritten:
   discovery block so its routing text names the new integration branch; (6) check the working tree
   out onto the release branch, then delete the integration branch, local and remote - the checkout
   is part of the step, since the tree cannot stand on a branch it is deleting.
-  **Step 3 lands before step 6 every time**, including where the operator
-  declined the guided merge and the branch still carries unmerged work: the pushed tag is the only
+  **Step 3 lands before step 6 every time** - where the operator declined
+  the guided merge and the branch still carries unmerged work, and equally where step 1 found
+  nothing at all, since the tag preserves the branch itself rather than whatever happened to be
+  unmerged. The pushed tag is the only
   reason the deletion is safe, since `git branch <integration branch> <the tag>` puts the branch
   back exactly where it stood. So a tag push that fails - no write access, or the tag already
   exists - stops the migration before anything is deleted; the delete is safe only once the tag is
