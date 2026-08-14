@@ -26,7 +26,7 @@ if [ -z "$clone" ]; then   # fall back to reading a host skill symlink back to t
   done
 fi
 if [ -n "$clone" ] && [ ! -d "$clone/skills" ] && [ -d "$clone/better-dev/skills" ]; then
-  clone="$clone/better-dev"   # pre-0.7.0 install: the tool moved one level down in the monorepo
+  clone="$clone/better-dev"   # legacy monorepo layout: the tool lived one level down in better-dev/ before the flatten
 fi
 if [ -n "$clone" ] && [ -d "$clone/skills" ] && git -C "$clone" rev-parse --git-dir >/dev/null 2>&1; then   # git -C "" acts on the cwd; pull only a resolved clone
   old="$(git -C "$clone" rev-parse HEAD)"
@@ -36,20 +36,17 @@ else
 fi
 ```
 
-Since the 0.7.0 monorepo move the clone dir a host resolves may be the repo root (pre-0.7.0
-install) or the `better-dev/` subdir inside it (fresh install, plugin root) - the snippet's first
-guard normalizes either to the dir that holds `skills/`, which is also why the git probe is not a
-`.git` dir check: a subdir of a checkout has none of its own.
+Since the 0.7.0 monorepo move the clone dir a host resolves may be the repo root (current, post-flatten
+install) or the `better-dev/` subdir inside it (a clone still on the 0.7.0-era monorepo layout, not yet
+re-pulled) - the snippet's first guard normalizes either to the dir that holds `skills/`, which is also
+why the git probe is not a `.git` dir check: a subdir of a checkout has none of its own.
 
 Where the host gates machine-touching commands, hand the pull to the operator paste-ready
 (`git -C <clone> pull --ff-only`). `--ff-only` never clobbers local edits: a refused pull means
 the clone carries local work - report that and stop rather than merging or resetting on the
 operator's behalf. A pull that fails offline: report it and stop; never guess what the remote holds.
 
-Where the resolved clone is a host-managed plugin checkout rather than your own clone, a refused
-or unavailable pull is the channel working as designed, not local work in the way - say so and
-move to step 3 rather than reporting a dirty clone. The full channel contract lives in
-`/packaging`'s "Two ways in".
+The full install contract lives in `/packaging`.
 
 ## 2. Reconcile links only when needed
 

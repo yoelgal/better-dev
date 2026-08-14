@@ -9,10 +9,10 @@ loudly, and stay completely silent in any repo without a `.better-dev/` scaffold
 
 ## When to reach for it
 
-Reach here to **repair** a host, not to complete a routine install: since 0.11.0 both install
-channels register these hooks themselves - the plugin from `hooks.json`, `install.sh` through
-`scripts/bd-hook-wire`. That leaves three cases for this skill: a host whose hook config exists
-but has no `bd_host_hook_settings` entry in its adapter yet, a machine with no `python3` (the
+Reach here to **repair** a host, not to complete a routine install: since 0.11.0 the installer
+registers these hooks itself, through `install.sh` and `scripts/bd-hook-wire`. That leaves three
+cases for this skill: a host whose hook config exists but has no `bd_host_hook_settings` entry in
+its adapter yet, a machine with no `python3` (the
 installer says so and skips), and a config the installer refused to parse. Also reach here when
 adapting the hook pair to a host other than Claude Code. It is not the enforcement layer - a host
 that needs to veto or ask before a risky tool call wants the `bd-guard` pair described in

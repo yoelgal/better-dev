@@ -54,9 +54,15 @@ _check_tokens() {
   # Basename glob, not the literal path. An exact pathspec defeats git's rename detection on a commit
   # that MOVES this script, so the whole file reads as added lines and every pre-existing check counts
   # as new. The glob matches both spellings, git pairs them as a rename, and the added-line set is
-  # correctly empty.
-  addedlines="$(git -C "$root" diff --unified=0 "$base" -- "*${script_rel##*/}" \
-    | awk '/^@@/ { if (match($0, /\+[0-9]+(,[0-9]+)?/)) {
+  # correctly empty. But a leading `*` matches across `/` too, so the glob also drags in every OTHER
+  # tracked path ending in this basename (a fixture, a vendored copy); their hunks would pool into one
+  # flat line set and mark this file's pre-existing checks as added. So the pathspec stays wide enough
+  # for the rename and the awk keeps only the hunks whose destination IS this script - `--no-prefix`
+  # so the `+++ ` header carries the bare path to compare against.
+  addedlines="$(git -C "$root" diff --unified=0 --no-prefix "$base" -- "*${script_rel##*/}" \
+    | awk -v want="$script_rel" '
+        /^\+\+\+ / { dst = substr($0, 5); next }
+        dst == want && /^@@/ { if (match($0, /\+[0-9]+(,[0-9]+)?/)) {
               spec = substr($0, RSTART + 1, RLENGTH - 1)
               n = split(spec, a, ","); start = a[1] + 0; count = (n > 1 ? a[2] + 0 : 1)
               for (i = 0; i < count; i++) print start + i } }' | tr '\n' ' ')"
@@ -242,8 +248,41 @@ STUB
   prove_new "$fx" "scripts/stub" "$base" >/dev/null 2>&1 \
     && { bad "prove-new selftest: the mode exited 0 with unproven checks present"; rc=1; }
 
-  [ $rc = 0 ] && ok "prove-new: discriminates vacuous / genuine / skipped / unattributable / exempt"
   rm -rf "$fx"
+
+  # A commit that MOVES the script, with an unrelated file sharing its basename alongside. Both halves
+  # of the pathspec are pinned here: too tight and the move reads as a whole-file addition, too loose
+  # and the fixture's hunks land on this file's line numbers. Either way the untouched pre-existing
+  # check gets reported as newly added, and the gate blocks a diff that added no check at all.
+  local fx2 base2 out2
+  fx2="$(mktemp -d)"
+  (
+    cd "$fx2" || exit 1
+    git init -q . && git config user.email t@t && git config user.name t
+    mkdir -p old/scripts fixtures
+    cat > old/scripts/stub <<'STUB'
+#!/usr/bin/env bash
+ok()  { printf '  \342\234\223 %s\n' "$*"; }
+bad() { printf '  \342\234\227 %s\n' "$*"; }
+ok "a pre-existing check nobody touched"
+STUB
+    chmod +x old/scripts/stub
+    # Same basename, unrelated content, edited in the HEAD commit so its hunk covers the stub's lines.
+    printf 'fixture line %s\n' 1 2 3 4 5 6 7 8 9 10 > fixtures/stub
+    git add -A && git commit -qm base
+    mkdir -p scripts
+    git mv old/scripts/stub scripts/stub
+    printf 'rewritten fixture line %s\n' 1 2 3 4 5 6 7 8 > fixtures/stub
+    git add -A && git commit -qm move
+  ) || { printf 'prove-new selftest: rename fixture setup failed\n' >&2; rm -rf "$fx2"; return 1; }
+  base2="$(git -C "$fx2" rev-parse HEAD~1)"
+
+  out2="$(prove_new "$fx2" "scripts/stub" "$base2" 2>&1)"
+  printf '%s' "$out2" | grep -q 'a pre-existing check nobody touched' \
+    && { bad "prove-new selftest: a moved script's untouched checks were read as newly added"; rc=1; }
+  rm -rf "$fx2"
+
+  [ $rc = 0 ] && ok "prove-new: discriminates vacuous / genuine / skipped / unattributable / exempt, and reads a moved script as a rename"
   return $rc
 }
 

@@ -1044,8 +1044,10 @@ lost nothing stay as they are - the ruling permits verbatim, it does not require
 
 better-dev leaves the monorepo. The GitHub repo is renamed `yoelgal/better-dev`, and everything that
 sat under `better-dev/` moves back to the repo root - `skills/`, `scripts/`, `hosts/`, `hooks/`,
-`docs/`, `.claude-plugin/plugin.json`, `NOTICE README.md LICENSE install.sh BOOTSTRAP.md`, plus the
-gitignored `raw/` archive. D0's tree is literally true again; D24's relocation held from 2026-07-30
+`docs/`, `.claude-plugin/plugin.json`, `NOTICE README.md install.sh BOOTSTRAP.md`. `LICENSE` and
+`.gitignore` never moved in the first place: they stayed at the root through D24 and needed no change
+here. The gitignored `raw/` archive follows too, but by hand - `git mv` does not carry an untracked
+tree. D0's tree is literally true again; D24's relocation held from 2026-07-30
 to today. The install one-liner is now
 `git clone https://github.com/yoelgal/better-dev ~/better-dev && ~/better-dev/install.sh`.
 

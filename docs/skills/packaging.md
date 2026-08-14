@@ -21,13 +21,13 @@ Near neighbours:
 | Situation | Route |
 |---|---|
 | Wiring a single repo's `.better-dev/` data once the tool itself is installed | `/onboard` |
-| Repairing the awareness hooks on a host both install channels could not wire | `/bootstrap-hooks` |
+| Repairing the awareness hooks on a host the installer could not wire | `/bootstrap-hooks` |
 | Tagging and promoting once the gate is green | `/release-promotion` |
 
 ## Where it fits
 
 Meta and upkeep, alongside `/writing-skills`, `/overrides`, `/bootstrap-hooks`, `/update`, and
-`/uninstall`: packaging owns the install channels (global clone, plugin manifest) and the release
+`/uninstall`: packaging owns the install (global clone, plugin manifest as a version stamp) and the release
 gate, not a step any of the build-loop or shipping skills wait on in normal use. `/release-promotion`
 composes it at tag time to prove the package installs clean before a version ships, and `/update`
 composes it after a pull to catch anything the new version broke. `/self-extension` also runs
@@ -40,9 +40,7 @@ rather than clobbering the existing one, and the install verification step fails
 collision doesn't go unnoticed. This is a known, unfixed edge rather than a resolved one: generic
 names carry real risk, since the name now resolves to the other skill for every chain reference that
 names it, and there is no automatic reconciliation. The stopgap is manual - rename or move the
-colliding skill, then reinstall. Whether the plugin channel's host-namespacing sidesteps this for a
-given machine (one with no clone symlinks at all) is still an open question the library has flagged
-for direct verification rather than assumed.
+colliding skill, then reinstall.
 
 ## It's working if
 

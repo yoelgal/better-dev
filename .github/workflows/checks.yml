@@ -17,9 +17,10 @@ jobs:
           git config --global user.email ci@better-dev.local
           git config --global user.name better-dev-ci
           git config --global init.defaultBranch main
+      # The package gate below already validates every manifest. This step exists for one thing the
+      # gate does not cover: CLAUDE.md is outside bd-package-check's dash sweep.
       - name: repo root surface
         run: |
-          jq -e . .claude-plugin/plugin.json >/dev/null
           dash="$(printf '\342\200\223\|\342\200\224')"
           if LC_ALL=C grep -n "$dash" README.md CLAUDE.md; then
             echo "em/en dash in a root doc - use a spaced hyphen" >&2; exit 1

@@ -62,9 +62,9 @@ and that the emitted JSON parses.
 
 ## Installing and adapting to other hosts
 
-Both install channels wire these already, so reach for this skill to *repair* a host, not to complete a
-routine install. The plugin registers them from `hooks/hooks.json`; `install.sh` registers the same two
-events through `scripts/bd-hook-wire`, into the machine-global hook config named by
+The installer wires these already, so reach for this skill to *repair* a host, not to complete a
+routine install. `install.sh` registers the two events through `scripts/bd-hook-wire`, into the
+machine-global hook config named by
 `bd_host_hook_settings` in `hosts/<name>`. Adding a host means adding that variable - and only once its
 config path and format are verified on a real machine, never inferred, the same posture as
 `bd_host_dir_policy`. An empty value makes the installer skip and say so.

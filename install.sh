@@ -6,16 +6,15 @@
 # dir, ONE LEVEL DEEP (~/.claude/skills/<skill>, ~/.codex/skills/<skill>) - hosts discover a skill only at
 # <skills-dir>/<name>/SKILL.md, never nested under a namespace folder - so every repo you open sees the
 # practices, and nothing is ever vendored per project. Update with /update - a git pull in the clone
-# underneath, or the host's plugin refresh. The per-skill symlinks mean a session started after the
-# pull picks up the new text - a session already
-# running keeps the text it loaded at start. A pull that adds or removes a skill needs a re-run of
-# ./install.sh too: it links the new one and prunes a link whose skill was removed upstream, and also
-# reclaims a moved clone's stale links.
+# underneath. The per-skill symlinks mean a session started after the pull picks up the new text - a
+# session already running keeps the text it loaded at start. A pull that adds or removes a skill
+# needs a re-run of ./install.sh too: it links the new one and prunes a link whose skill was removed
+# upstream, and also reclaims a moved clone's stale links.
 #
 # It also registers the SessionStart/SubagentStart awareness hooks in the host's machine-global hook
 # config, for every host whose config file and format are verified (hosts/<name>'s
-# bd_host_hook_settings). The plugin channel gets the same hooks from hooks.json; this is the clone
-# channel's half, so both front doors deliver what BOOTSTRAP promises. Pass --no-hooks to skip it.
+# bd_host_hook_settings) - this is what turns the hooks shipped in hooks/hooks.json into a working
+# install; there is no other door that wires them. Pass --no-hooks to skip it.
 #
 #   ./install.sh [--host <name>|auto]         # <name> = any adapter file in hosts/; default: auto
 #                                              # (each host whose CLI is on PATH or home dir exists)
@@ -179,9 +178,9 @@ host_apply() {
 
 # ── register the awareness hooks for one host ────────────────────────────────
 # Why this lives in the installer and not in a doc step: an agent told "install better-dev" reads
-# BOOTSTRAP and takes the clone path, because it cannot drive an interactive plugin installer. If
-# hooks were a separate manual step, that install - the common one - would end hookless in every repo
-# while BOOTSTRAP claims the tool ships hooks. So the installer the operator ran does the write.
+# BOOTSTRAP and runs this script - it is the only install path there is. If hooks were a separate
+# manual step, that install would end hookless in every repo while BOOTSTRAP claims the tool ships
+# hooks. So the installer the operator ran does the write.
 # Only a host with a VERIFIED hook config carries bd_host_hook_settings; empty means skip and name the
 # gap, the same premise-verify posture as bd_host_dir_policy. arg1: 1 = dry-run (report only).
 host_hooks() {
@@ -192,7 +191,7 @@ host_hooks() {
     return 0
   fi
   if ! command -v python3 >/dev/null 2>&1; then
-    echo "    hooks: python3 not found - skipped. Wire them by hand with /bootstrap-hooks, or install the plugin."
+    echo "    hooks: python3 not found - skipped. Wire them by hand with /bootstrap-hooks."
     return 0
   fi
   hookverb=wire; [ "$dry" = 1 ] && hookverb=plan

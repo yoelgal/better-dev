@@ -35,7 +35,7 @@ shippable before a release.
 
 better-dev used to also ship as a Claude Code plugin, added through a self-hosted marketplace manifest
 at the monorepo root. Both are deleted (D32): the marketplace existed only because the monorepo
-supplied a second consumer for it, and the extraction to this repo's own removes that predicate. A
+supplied a second consumer for it, and the extraction to its own repo removes that predicate. A
 structural finding independently condemns the plugin channel for this tool regardless: the plugin
 cache is version-pinned one directory per version, while `scripts/bd-link` bakes an absolute
 `.better-dev/bin` symlink at wiring time, so a plugin update would strand every wired repo on the
