@@ -138,7 +138,8 @@ recorded as an override rather than overwritten:
   .better-dev/bin/bd-migrate-branch-model apply --yes  # re-runs check, then migrates
   ```
 
-  `check` is read-only and safe to run for the answer alone; show the operator its output before
+  `check` is read-only as to branches and history - it only ever retires its own stale
+  unfinished-migration marker - so it is safe to run for the answer alone; show its output before
   asking for the yes. It stops rather than guesses - it resolves the release branch from
   `refs/remotes/<remote>/HEAD` and never from the literal name `main`, and refuses outright when
   that resolves to the integration branch itself. `apply` archives the branch tip as

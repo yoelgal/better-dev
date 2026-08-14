@@ -29,9 +29,11 @@ INT_LINE_RE='integration branch *= *\([A-Za-z0-9._/-][A-Za-z0-9._/-]*\)'
 
 # Whether a migration finished is RECORDED, never guessed: apply writes this marker under bd_dir()
 # the moment the migration is irreversible but unfinished, and removes it once both deletes land.
-# bd_dir() resolves the primary checkout so linked worktrees share it, and .better-dev/ is local
-# runtime state, so the marker is never committed.
-MARKER_NAME="migrate-branch-model.incomplete"
+# bd_dir() resolves the primary checkout so linked worktrees share it. It sits under ledger/, which
+# every adoption gitignores: a TEAM adoption tracks .better-dev/, so a marker at the top of that dir
+# rides the next `git add -A` into a commit and hands every teammate who pulls it the
+# unfinished-migration stop, for a migration that was never theirs.
+MARKER_NAME="ledger/migrate-branch-model.incomplete"
 
 REPO="$PWD"; RELEASE_OPT=""; SKIP_PR_CHECK=0; CONFIRMED=0
 REMOTE=""; INTEGRATION=""; RELEASE=""; TAG=""; REF_INT=""; REF_REL=""; FAILS=0
@@ -129,7 +131,10 @@ check_already_trunk() {
   # interrupted run and an operator who ran this script's own printed restore command
   # (`git branch <int> <tag>`) leave byte-identical states - the model recorded and a branch sitting
   # at the archive tag's commit. The difference is intent, so apply RECORDS it in a marker file and
-  # this reads it. No marker means the migration completed, restored branch or not.
+  # this reads it. No marker means the migration completed ON THIS MACHINE, restored branch or not -
+  # a clone that never ran apply has no marker to read, so a migration another machine left
+  # unfinished reads here as nothing to do. Inherent: once the override names the release branch, no
+  # other clone knows the retired branch's name to look for.
   marker="$bd/$MARKER_NAME"
   if [ -f "$marker" ]; then
     int="$(sed -n 's/^integration=//p' "$marker" | head -1)"
@@ -145,7 +150,7 @@ check_already_trunk() {
       left=1
     fi
     if [ -n "$rem" ] && has_ref "refs/remotes/$rem/$int"; then
-      stop "[branch-model] trunk is recorded but the last migration did not finish: '$rem/$int' still exists (archived at ${tag:-<no tag recorded>}). Delete it: git -C $(canon "$REPO") push $rem --delete $int"
+      stop "[branch-model] trunk is recorded but the last migration did not finish: '$rem/$int' still exists (archived at ${tag:-<no tag recorded>}). This is read from a remote-tracking ref, so if the branch is already gone from the forge the likely cause is a stale tracking ref that nothing pruned - try this FIRST: git -C $(canon "$REPO") fetch --prune $rem. If it really is still on the forge, delete it: git -C $(canon "$REPO") push $rem --delete $int"
       left=1
     fi
     if [ "$left" -ne 0 ]; then
@@ -356,7 +361,10 @@ do_apply() {
   # against remote-tracking refs, so checking first certifies a state the fetch then moves.
   if [ -n "$(g remote 2>/dev/null || true)" ]; then
     printf '1. fetching\n'
-    g fetch --all --tags || die "git fetch failed - aborting before anything is changed"
+    # --prune is load-bearing: the unfinished-migration gate judges the retired branch by its
+    # remote-tracking ref, so a branch deleted in the forge by hand leaves a stale ref that wedges
+    # every later run behind a delete command the forge answers 'remote ref does not exist'.
+    g fetch --all --tags --prune || die "git fetch failed - aborting before anything is changed"
   else
     printf '1. no remote - skipping fetch\n'
   fi
@@ -428,6 +436,7 @@ do_apply() {
   # instead of trying to infer it from branches and tags, which cannot tell this apart from an
   # operator running the printed restore command.
   local marker; marker="$(bd_dir)/$MARKER_NAME"
+  mkdir -p "$(dirname "$marker")" || die "could not create $(dirname "$marker") - stopping before the delete"
   printf 'integration=%s\nremote=%s\ntag=%s\nrelease=%s\n' "$INTEGRATION" "$REMOTE" "$TAG" "$RELEASE" >"$marker" \
     || die "could not write $marker - stopping before the delete"
 
@@ -589,10 +598,10 @@ selftest() {
     git -C "$d/origin.git" config receive.denyDeletes true
     out="$("$SELF" apply --yes --repo "$d/repo" --skip-pr-check 2>&1)" && { echo "FAIL: apply passed with the remote delete refused"; exit 1; }
     printf '%s' "$out" | grep -q 'MIGRATION INCOMPLETE' || { echo "FAIL: no incomplete report: $out"; exit 1; }
-    [ -f "$d/repo/.better-dev/migrate-branch-model.incomplete" ] \
+    [ -f "$d/repo/.better-dev/ledger/migrate-branch-model.incomplete" ] \
       || { echo "FAIL: no unfinished-migration marker after a refused remote delete"; exit 1; }
-    grep -q '^integration=staging$' "$d/repo/.better-dev/migrate-branch-model.incomplete" \
-      || { echo "FAIL: the marker does not name the integration branch: $(cat "$d/repo/.better-dev/migrate-branch-model.incomplete")"; exit 1; }
+    grep -q '^integration=staging$' "$d/repo/.better-dev/ledger/migrate-branch-model.incomplete" \
+      || { echo "FAIL: the marker does not name the integration branch: $(cat "$d/repo/.better-dev/ledger/migrate-branch-model.incomplete")"; exit 1; }
     out="$("$SELF" apply --yes --repo "$d/repo" --skip-pr-check 2>&1)" && { echo "FAIL: the incomplete migration re-ran as a success"; exit 1; }
     printf '%s' "$out" | grep -q 'the last migration did not finish' || { echo "FAIL: no unfinished-migration verdict: $out"; exit 1; }
     printf '%s' "$out" | grep -q "push origin --delete staging" || { echo "FAIL: the verdict does not name the branch and remote to finish: $out"; exit 1; }
@@ -614,7 +623,7 @@ selftest() {
     d="$root/restored"; fixture "$d" staging main
     "$SELF" apply --yes --repo "$d/repo" --skip-pr-check >/dev/null 2>&1 \
       || { echo "FAIL: a clean apply was refused"; exit 1; }
-    [ -f "$d/repo/.better-dev/migrate-branch-model.incomplete" ] \
+    [ -f "$d/repo/.better-dev/ledger/migrate-branch-model.incomplete" ] \
       && { echo "FAIL: the marker survived a fully successful migration"; exit 1; }
     git -C "$d/repo" branch staging "archive/staging-$(date +%Y-%m-%d)"
     out="$("$SELF" check --repo "$d/repo" --skip-pr-check 2>&1)" || { echo "FAIL: a restored branch was refused: $out"; exit 1; }
@@ -628,13 +637,47 @@ selftest() {
     d="$root/stalemarker"; fixture "$d" staging main
     "$SELF" apply --yes --repo "$d/repo" --skip-pr-check >/dev/null 2>&1 \
       || { echo "FAIL: a clean apply was refused before the stale-marker case"; exit 1; }
+    mkdir -p "$d/repo/.better-dev/ledger"
     printf 'integration=staging\nremote=origin\ntag=archive/staging-stale\nrelease=main\n' \
-      >"$d/repo/.better-dev/migrate-branch-model.incomplete"
+      >"$d/repo/.better-dev/ledger/migrate-branch-model.incomplete"
     out="$("$SELF" check --repo "$d/repo" --skip-pr-check 2>&1)" || { echo "FAIL: a stale marker refused the run: $out"; exit 1; }
     printf '%s' "$out" | grep -q 'stale unfinished-migration marker' || { echo "FAIL: the stale marker was not reported: $out"; exit 1; }
     printf '%s' "$out" | grep -q 'already recorded as trunk - nothing to do' \
       || { echo "FAIL: no nothing-to-do after a stale marker: $out"; exit 1; }
-    [ -f "$d/repo/.better-dev/migrate-branch-model.incomplete" ] && { echo "FAIL: the stale marker was not removed"; exit 1; }
+    [ -f "$d/repo/.better-dev/ledger/migrate-branch-model.incomplete" ] && { echo "FAIL: the stale marker was not removed"; exit 1; }
+
+    # 18. the remote branch is gone from the FORGE but the remote-tracking ref that reports it was
+    #     never pruned. Nothing in this repo prunes on its own, so without the fetch --prune advice
+    #     the operator is wedged: the printed delete answers 'remote ref does not exist' forever.
+    d="$root/staleref"; fixture "$d" staging main
+    git -C "$d/origin.git" config receive.denyDeletes true
+    "$SELF" apply --yes --repo "$d/repo" --skip-pr-check >/dev/null 2>&1 \
+      && { echo "FAIL: apply passed with the remote delete refused"; exit 1; }
+    # the admin lifts protection and deletes the branch in the forge UI; the tracking ref survives.
+    git -C "$d/origin.git" update-ref -d refs/heads/staging
+    out="$("$SELF" check --repo "$d/repo" --skip-pr-check 2>&1)" \
+      && { echo "FAIL: a stale tracking ref did not stop the run: $out"; exit 1; }
+    printf '%s' "$out" | grep -q 'fetch --prune origin' \
+      || { echo "FAIL: the stop text does not name 'fetch --prune' as the first thing to try: $out"; exit 1; }
+    git -C "$d/repo" fetch --prune origin >/dev/null 2>&1 || { echo "FAIL: fetch --prune failed"; exit 1; }
+    out="$("$SELF" check --repo "$d/repo" --skip-pr-check 2>&1)" \
+      || { echo "FAIL: check still refuses after the advice it printed was followed: $out"; exit 1; }
+    printf '%s' "$out" | grep -q 'already recorded as trunk - nothing to do' \
+      || { echo "FAIL: no nothing-to-do after the prune: $out"; exit 1; }
+    [ -f "$d/repo/.better-dev/ledger/migrate-branch-model.incomplete" ] \
+      && { echo "FAIL: the marker was not retired after the prune"; exit 1; }
+
+    # 19. the same state, fixed by 'apply' alone: its own fetch prunes, so the operator never has to
+    #     know about the stale ref to get unstuck.
+    d="$root/staleref2"; fixture "$d" staging main
+    git -C "$d/origin.git" config receive.denyDeletes true
+    "$SELF" apply --yes --repo "$d/repo" --skip-pr-check >/dev/null 2>&1 \
+      && { echo "FAIL: apply passed with the remote delete refused"; exit 1; }
+    git -C "$d/origin.git" update-ref -d refs/heads/staging
+    out="$("$SELF" apply --yes --repo "$d/repo" --skip-pr-check 2>&1)" \
+      || { echo "FAIL: apply's fetch does not prune, so the repo stays wedged: $out"; exit 1; }
+    printf '%s' "$out" | grep -q 'already recorded as trunk - nothing to do' \
+      || { echo "FAIL: no nothing-to-do from the pruning apply: $out"; exit 1; }
 
     exit 0
   ) || rc=1
