@@ -125,6 +125,35 @@ recorded as an override rather than overwritten:
 - Repo uses `feat/* → staging → main`? Keep it. Record `feature branch prefix = feat/` and
   `integration branch = staging` via `.better-dev/bin/bd-mem persist-override "<line>"`, plus
   `.better-dev/bin/bd-mem remember "branch-model: staged"`. Don't force `feature/`.
+- **Wired staged, and the operator asks to move to trunk?** Migrate it rather than re-recording
+  `staged` - the keep-it above stays what happens by default, and a repo whose operator never asks
+  is untouched. **Do not hand-run the steps.** This retires a shared branch, and the preconditions
+  are the whole job: which remote, whether the release branch resolves at all, whether local and
+  remote have diverged in either direction, an unclean tree, open PRs the delete would close, a
+  colleague's worktree, a half-finished earlier attempt. Prose has nowhere for a precondition to
+  fail, so the procedure is a script that fails closed:
+
+  ```bash
+  .better-dev/bin/bd-migrate-branch-model check        # every precondition, one verdict each
+  .better-dev/bin/bd-migrate-branch-model apply --yes  # re-runs check, then migrates
+  ```
+
+  `check` is read-only as to branches and history - it only ever retires its own stale
+  unfinished-migration marker - so it is safe to run for the answer alone; show its output before
+  asking for the yes. It stops rather than guesses - it resolves the release branch from
+  `refs/remotes/<remote>/HEAD` and never from the literal name `main`, and refuses outright when
+  that resolves to the integration branch itself. `apply` archives the branch tip as
+  `archive/<integration>-<YYYY-MM-DD>` and pushes that tag *before* deleting anything, so
+  `git branch <integration> <tag>` puts the branch back exactly where it stood; a tag push that
+  fails aborts before any delete, and a remote delete refused by branch protection reports the
+  migration **incomplete** with the command to finish it, never as a clean run.
+
+  Two things the script deliberately leaves to you. It reports commits the integration branch
+  carries that the release branch does not, but never merges them - offer to guide that merge
+  first, as a suggestion rather than a refusal. And it does not touch the entry file: once it
+  returns success, rewrite the discovery block so its routing text names the new integration
+  branch. Read `--help` before passing `--skip-pr-check`; it exists for a non-GitHub remote and it
+  asserts something the script could not check.
 - **Only `main`, no integration branch?** Two shapes fit, and git - not prose - says which (the
   branches that exist, the base merged PRs actually target, from Phase 1). A team already running
   trunk-based - PRs merge to `main`, `main` releases - is a first-class model, not a gap: record
