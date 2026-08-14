@@ -130,14 +130,21 @@ recorded as an override rather than overwritten:
   trunk-based - PRs merge to `main`, `main` releases - is a first-class model, not a gap: record
   `integration branch = main` via `persist-override` and `branch-model: trunk` via `remember`
   (`/worktree-branching` then bases worktrees off the trunk; `/release-promotion` reduces to
-  tag-plus-verify). Otherwise suggest the staged mechanism: a `staging` branch off `main` that
-  feature/fix worktrees branch from and merge back into, promoted to `main` on release, with work
-  on `feat/*` (`fix/*`). Greenfield: scaffold it under quiet defaults. An existing repo with real
-  history: confirm once before creating `staging` off the default branch (a choice that genuinely
-  matters); a declined offer is a trunk repo - record it as one. Once `staging` exists - the quiet
-  scaffold or the confirmed yes - record `integration branch = staging`,
-  `feature branch prefix = feat/`, and `branch-model: staged`.
-  Solo adoption skips the offer entirely: a shared branch created on one person's yes imposes a
+  tag-plus-verify). An existing repo with real history that isn't already trunk: suggest the staged
+  mechanism - a `staging` branch off `main` that feature/fix worktrees branch from and merge back
+  into, promoted to `main` on release, with work on `feat/*` (`fix/*`) - and confirm once before
+  creating it (a choice that genuinely matters); a declined offer is a trunk repo - record it as one.
+  Greenfield has nothing to detect, so what onboard picks there is a pure default, and a silent
+  shared `staging` on a repo with no history commits a team to a ladder nobody chose: team adoption
+  gets one question of its own, asked once - trunk or staged, the two named side by side with trunk
+  marked the recommendation, not the staged suggestion above with trunk as its decline - a branch
+  living hours rather than days keeps an agent's assumptions from going stale against a moving
+  `main`, and `/release-promotion` already degenerates to tag-plus-verify under it; staged stays
+  one answer away for a team that wants a soak point. Trunk, or no answer, records
+  `integration branch = main` and `branch-model: trunk` with no `staging` created. Once `staging`
+  exists - confirmed on an existing repo or chosen on greenfield - record
+  `integration branch = staging`, `feature branch prefix = feat/`, and `branch-model: staged`.
+  Solo adoption skips both offers entirely: a shared branch created on one person's yes imposes a
   workflow the team never chose - record `branch-model: trunk` on the default branch.
 - **End the run standing on the integration branch.** Whichever shape resolved, check the working
   tree out onto the branch just recorded (`git checkout staging`, or the trunk) *before* this run's
