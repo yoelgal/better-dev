@@ -51,10 +51,10 @@ _static_run() {
 # then get intersected with the lines the diff actually added.
 _check_tokens() {
   local root="$1" script_rel="$2" base="$3" addedlines
-  # Basename glob, not the literal path: a commit that MOVES this script (the 0.13.0 flatten) breaks
-  # rename detection under an exact pathspec, so every pre-existing check reads as newly added and
-  # the mode fails 30 findings deep. The glob matches both spellings, so git pairs them as a rename
-  # and reports zero added lines - which is the truth. Self-healing for any future move.
+  # Basename glob, not the literal path. An exact pathspec defeats git's rename detection on a commit
+  # that MOVES this script, so the whole file reads as added lines and every pre-existing check counts
+  # as new. The glob matches both spellings, git pairs them as a rename, and the added-line set is
+  # correctly empty.
   addedlines="$(git -C "$root" diff --unified=0 "$base" -- "*${script_rel##*/}" \
     | awk '/^@@/ { if (match($0, /\+[0-9]+(,[0-9]+)?/)) {
               spec = substr($0, RSTART + 1, RLENGTH - 1)
