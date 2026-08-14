@@ -193,27 +193,36 @@ fi
 If the loop leaves `$sd` empty, no marker resolved and the tool is not installed for this host - loop
 back to the bootstrap block above rather than running `bd-link` against an empty path.
 
-**Graphify only where a graph would have something to say.** The capability indexes a codebase, so a
-repo with no code yet - a greenfield scaffold, a README and nothing else - gets `/graphify-wrapper-setup`
-**deferred, not run**. Installing a CLI, resolving its version floor, and initializing a registry over an
-empty tree spends the operator's attention on a capability that cannot answer a question until code
-exists, and a version-floor upgrade surfacing there reads as an onboarding blocker rather than the
-unrelated errand it is. Defer by recording the gap and naming it in the Phase 5 recap:
+**Wire graphify where a graph would have something to say.** It answers structural questions by
+traversing a built index under a token budget instead of reading the subtree, which is where the
+saving is, and `/codebase-map`, `/review`'s ripple step and `/autonomous-loop`'s triage all reach for
+it. Probe both halves before deciding - the CLI is machine-global, the registry is per repo:
 
 ```bash
-.better-dev/bin/bd-mem remember "graphify: deferred at onboard - no code to index yet; the first /graphify-wrapper-query builds it, or run /graphify-wrapper-setup once the stack lands"
+command -v graphify >/dev/null && echo "graphify CLI: present $(graphify --version 2>&1 | grep -oE '[0-9.]+' | head -1)" || echo "graphify CLI: ABSENT"
+. .better-dev/bin/bd-gfx 2>/dev/null && r=$(gfx_registry 2>/dev/null) \
+  && { [ -f "$r" ] && echo "registry: $r ($(jq -r '.indexes|keys|length' "$r" 2>/dev/null) domains)" || echo "registry: ABSENT"; }
 ```
 
-Deferring costs nothing, because the query path self-heals: `gfx_ensure_graph` creates the registry,
-carves a whole-repo domain, and runs an AST build the first time anything actually asks the graph a
-question. The operator never has to remember this - the first structural question wires it.
+**CLI absent and this repo carries code → run `/graphify-wrapper-setup` now**, as part of this same
+wiring. It is idempotent, D26 authorizes its writes, and it is the one link in the chain nothing else
+recovers. The registry, the domain carve and the graph build all self-heal on the first real question
+(`gfx_ensure_graph`); the CLI does not - `bd-gfx` returns 1 naming this skill, and the SessionStart
+refresh hook exits silently without it. Skipping this step is what leaves a fully wired repo quietly
+grepping where it should be querying, with nothing anywhere reporting a gap. A registry that then
+holds **no domains needs no action** - the first question carves one; offer `/graphify-wrapper-map`
+only where the repo is big enough to earn a deliberate split.
 
-Where the repo does carry code, run it as part of the same wiring - idempotent, so a re-run is safe:
-it installs the graphify CLI and inits the per-repo domain registry (graph output lands outside
-every repo, so there is nothing to gitignore). When that registry holds no domains yet, offer
-`/graphify-wrapper-map` to build the first graph; a re-run treats a missing registry as a gap to
-fill, which is how an existing repo picks the capability up - and how a deferred greenfield repo
-picks it up once `/groundwork` has landed a stack.
+**No code yet** - a greenfield scaffold, a README and nothing else - defers it, because installing a
+CLI and resolving its version floor over an empty tree spends the operator's attention on a
+capability that cannot answer a question until code exists, and a version-floor upgrade surfacing
+there reads as an onboarding blocker rather than the unrelated errand it is. Defer by recording the
+gap and naming it in the Phase 5 recap, alongside guardrails' - `/groundwork` lands the stack and
+both re-run against something real:
+
+```bash
+.better-dev/bin/bd-mem remember "graphify: deferred at onboard - no code to index yet; run /graphify-wrapper-setup once the stack lands (the CLI is the half no first question self-heals)"
+```
 
 With the bridge resolving, offer the standing allowance so its own calls never trip the permission
 gate: two allow rules, `"Bash(.better-dev/bin/bd-mem:*)"` and `"Bash(.better-dev/bin/bd-guard:*)"`,
@@ -387,7 +396,7 @@ itself - a tool you name wins over a row:
 | "make it look good", "design the page" | `/design-brief` | -> `/plan-grill` or the loop |
 | "is this safe", a security pass on a risky diff | `/security-pass` | composed by `/review` automatically |
 | "is there a tool or skill for X" | `/tool-sourcing` | -> `/self-extension` only if discovery is empty |
-| "who calls this / what breaks if I change X" | `/codebase-map` | orientation, changes nothing |
+| "who calls this / what breaks if I change X" | `/codebase-map` | queries the code graph before grepping; changes nothing |
 | "index the repo", "build / refresh the code graph" | `/graphify-wrapper-map` (or `-sync`) | `/graphify-wrapper-query` answers from it; hooks keep worktree graphs fresh |
 | "what's worth doing here", "audit this codebase" | `/codebase-audit` | ranked findings; you pick -> front-ends |
 | "here are some links / ingest these / harvest this", a link or dump of source material for the library - even one framed as "implement this" | `/source-harvest` | captures verbatim -> critical synthesis; a build ask then -> `/plan-grill` |
@@ -519,7 +528,7 @@ doesn't stop onboarding; it's just the thing to fix before a PR or push, surface
 first failed `gh pr create`.
 
 Close with a **loop-readiness** read - a short prose check on whether this repo can actually drive the
-loop, not a score. Five signals, each drawn from what the phases above already turned up:
+loop, not a score. Six signals, each drawn from what the phases above already turned up:
 
 - **Integration branch** - one exists (the `staging`/`develop` or the recorded integration branch) for
   feature worktrees to branch off, and the working tree is standing on it; without it
@@ -533,12 +542,18 @@ loop, not a score. Five signals, each drawn from what the phases above already t
   grade against.
 - **Memory wired** - `.better-dev/bin/bd-mem` resolves and is initialized to the detected backend, so
   overrides, rules, and the shared ledger survive across sessions.
+- **Structural graph reachable** - `command -v graphify` resolves, so `/codebase-map`, `/review`'s
+  ripple step and `/autonomous-loop`'s triage answer from a budgeted traversal rather than falling
+  back to grep. This is the one signal with a silent failure mode: without the CLI every one of those
+  degrades without saying so, which is why it is checked here rather than left to be noticed. Report
+  it from the Phase 3 probe, and name `/graphify-wrapper-setup` as the one command that closes it.
 - **Red-capable-signal discipline** - the operator understands that each work-item names a check already
   seen to go red before the loop drives it; without one, a "green" run proves nothing (`/autonomous-loop`,
   `/diagnose`).
 
-All five clear → the repo is ready to drive the loop. A gap isn't a blocker: name it alongside the
-`/onboard <phase>` or `/guardrails-install` that closes it, and let the operator decide when to.
+All six clear → the repo is ready to drive the loop. A gap isn't a blocker: name it alongside the
+`/onboard <phase>`, `/guardrails-install` or `/graphify-wrapper-setup` that closes it, and let the
+operator decide when to.
 
 When this was a greenfield or brand-new project, the next step is `/groundwork` - and name, in the
 same breath, that it opens by asking *how* the thing gets built, because the two routes cost the

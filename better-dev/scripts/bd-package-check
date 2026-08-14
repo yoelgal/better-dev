@@ -902,5 +902,28 @@ else
   bad "structural-consult escape hatch still present in /diagnose or /plan-grill (or a delegating skill was renamed out from under this check)"
 fi
 
+# The CLI is the ONLY link in the chain nothing self-heals: gfx_ensure_graph writes a missing
+# registry, carves a missing domain and builds a missing graph, but returns 1 when the binary is
+# absent, and bd-graphify-refresh-stale exits 0 on the same test - silently, by design. install.sh
+# does not install it either. So the whole integration rests on /onboard actually running
+# /graphify-wrapper-setup, and until 0.12.0 that was one prose sentence with no command block, no
+# Phase 1 detection and no Phase 5 signal, while the DEFERRAL branch beside it got the executable
+# block. Every consumer (/codebase-map, /review's ripple, /autonomous-loop's triage) then degraded to
+# grep with nothing anywhere reporting a gap. Assert the delivery chain by its links, not by the word
+# "graphify" appearing: the probe, the imperative to run it, the signal that collects it, and the
+# retired claim that deferring is free (it was free only where the CLI happened to be installed).
+if [ -f skills/onboard/SKILL.md ] && [ -f skills/codebase-map/SKILL.md ] \
+   && grep -qF 'command -v graphify' skills/onboard/SKILL.md \
+   && grep -qF 'run `/graphify-wrapper-setup` now' skills/onboard/SKILL.md \
+   && grep -qF 'Structural graph reachable' skills/onboard/SKILL.md \
+   && grep -qF 'Six signals' skills/onboard/SKILL.md \
+   && grep -qF 'All six clear' skills/onboard/SKILL.md \
+   && grep -qF 'graphify CLI not installed - run /graphify-wrapper-setup' skills/codebase-map/SKILL.md \
+   && ! grep -qF 'Deferring costs nothing' skills/onboard/SKILL.md; then
+  ok "/onboard probes for the graphify CLI, runs the setup that installs it, and collects it as a loop-readiness signal - and /codebase-map names the one recoverable first-use failure"
+else
+  bad "the graphify CLI reaches no repo: /onboard is missing the probe, the run instruction or the 'Structural graph reachable' signal (count wording out of step with the list), or /codebase-map lets a CLI-absent query fall through to grep - the CLI is the one link no first question heals"
+fi
+
 echo
 [ $fail = 0 ] && echo "package-check: PASS ($(ls skills/ | wc -l | tr -d ' ') skills)" || { echo "package-check: FAIL"; exit 1; }
