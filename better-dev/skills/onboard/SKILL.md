@@ -141,9 +141,10 @@ recorded as an override rather than overwritten:
   living hours rather than days keeps an agent's assumptions from going stale against a moving
   `main`, and `/release-promotion` already degenerates to tag-plus-verify under it; staged stays
   one answer away for a team that wants a soak point. Trunk, or no answer, records
-  `integration branch = main` and `branch-model: trunk` with no `staging` created. Once `staging`
-  exists - confirmed on an existing repo or chosen on greenfield - record
-  `integration branch = staging`, `feature branch prefix = feat/`, and `branch-model: staged`.
+  `integration branch = main` and `branch-model: trunk` with no `staging` created. Staged creates
+  `staging` off the default branch, on greenfield and on a confirmed existing repo alike, and
+  once it exists, record `integration branch = staging`, `feature branch prefix = feat/`, and
+  `branch-model: staged`.
   Solo adoption skips both offers entirely: a shared branch created on one person's yes imposes a
   workflow the team never chose - record `branch-model: trunk` on the default branch.
 - **End the run standing on the integration branch.** Whichever shape resolved, check the working
