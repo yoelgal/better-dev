@@ -2,12 +2,12 @@
 # Legacy-path shim - re-exposes the root hook of the same name at the path better-dev occupied under
 # the 0.7.0 monorepo layout. New behaviour: none. Rationale and removal condition: D34.
 #
-# Do not delete this because the tree looks flat now. A host installed before the flatten runs an
-# ABSOLUTE command pointing here, so without this file it exits 127 and no hook code runs at all -
-# which is the one state from which no nudge can ever reach that operator.
+# The one thing worth knowing here: do not delete this because the tree looks flat. A host installed
+# before the flatten runs an ABSOLUTE command pointing at this path, so without this file it exits 127
+# and no hook code runs at all.
 #
-# Deliberately silent: the real hook emits a strict JSON object, so anything printed here would
-# corrupt it. exec, never echo.
+# Silent by construction - exec, never echo. One of the three hooks this stands in for emits a strict
+# JSON object, so any output added here would corrupt it.
 set -eu
 root="$(cd "$(dirname "$0")/../.." 2>/dev/null && pwd -P)" || exit 0
 real="$root/hooks/$(basename "$0")"
