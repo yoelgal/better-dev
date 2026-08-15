@@ -697,6 +697,52 @@ else
   rm -rf "$rt"
 fi
 
+echo "== moved clone (pre-flatten host) =="
+# The flatten deleted <clone>/better-dev/, and a host installed before it holds ABSOLUTE paths into
+# that directory: every skill link, and the three hook commands install.sh wrote into the host's
+# machine-global config. Those hook commands are the load-bearing half - a dead one exits 127, so no
+# hook code runs and no nudge can reach the operator, however correct the nudge is. The legacy-path
+# shims exist for exactly that, and this proves the whole chain end to end on a throwaway HOME:
+# the pre-flatten hook path still executes, what it prints names the repair, and running that repair
+# repoints the links and the hook entries with nothing stale left beside them. Asserting the hook
+# entries through bd-hook-wire's `plan`, never a grep for one hook name - `install.sh --verify`
+# drifted from the WANT table doing precisely that, and plan compares whole entries against it.
+mc="$(mktemp -d)"
+mc_hd="$(HOME="$mc" bash -c 'source "$1" && printf %s "$bd_host_skills_dir"' _ hosts/claude 2>/dev/null)"
+mc_settings="$(HOME="$mc" bash -c 'source "$1" && printf %s "$bd_host_hook_settings"' _ hosts/claude 2>/dev/null)"
+# One check, not two: an adapter that yields no paths reports through the same bad below rather than
+# earning a label of its own. A second label here would be one that never RUNS at base, which
+# --prove-new reads as a silent skip and refuses - correctly, since a check that cannot fail at base
+# proves nothing about the diff that added it.
+mc_ok=0
+if [ -n "$mc_hd" ] && [ -n "$mc_settings" ]; then
+  mkdir -p "$mc_hd" "$(dirname "$mc_settings")"
+  # A host wired on the 0.7.0 layout: link target and hook commands both one level down.
+  ln -sfn "$ROOT/better-dev/skills/onboard" "$mc_hd/onboard"
+  printf '{}' > "$mc_settings"
+  python3 "$ROOT/scripts/bd-hook-wire" wire "$ROOT/better-dev" "$mc_settings" >/dev/null 2>&1
+  # cd into the throwaway HOME, not the repo: an unwired cwd is the honest case (the operator's own
+  # project), and it keeps this repo's .better-dev out of the hook's walk-up.
+  mc_out="$(cd "$mc" && HOME="$mc" CLAUDE_PLUGIN_ROOT= bash "$ROOT/better-dev/hooks/bd-session-start" 2>/dev/null)" || true
+  # Assert on systemMessage, not additionalContext: install.sh writes the host's machine-global
+  # config, so the repair is the operator's to run and a mark only the agent can see does not deliver
+  # it. Both marks, because the two losses are independent - skills and hooks.
+  mc_msg="$(printf '%s' "$mc_out" | jq -r '.systemMessage' 2>/dev/null || true)"
+  if printf '%s' "$mc_msg" | grep -q 'skill links missing, run install.sh' \
+     && printf '%s' "$mc_msg" | grep -q 'awareness hooks missing, run install.sh' \
+     && HOME="$mc" "$ROOT/install.sh" --host claude >/dev/null 2>&1 \
+     && [ -e "$mc_hd/onboard/SKILL.md" ] \
+     && [ "$(readlink "$mc_hd/onboard")" = "$ROOT/skills/onboard" ] \
+     && ! grep -q 'better-dev/hooks/' "$mc_settings" \
+     && [ "$(python3 "$ROOT/scripts/bd-hook-wire" plan "$ROOT" "$mc_settings" 2>/dev/null)" = current ]; then
+    mc_ok=1
+  fi
+fi
+[ "$mc_ok" = 1 ] \
+  && ok "moved clone: the pre-flatten hook path still runs and names install.sh, and that run repoints every link and hook entry with no stale entry beside them" \
+  || bad "moved clone: a host wired on the pre-flatten layout is not reached or does not repair - the legacy hook path is dead (nothing can nudge the operator), its output does not name install.sh, the repair left a link or hook entry pointing into the deleted better-dev/ directory, or hosts/claude yields no skills dir"
+rm -rf "$mc"
+
 echo "== comms-style block =="
 # The block ships from exactly one file. onboard writes it per repo and BOOTSTRAP offers it globally;
 # two copies of the body would drift, and the drift only shows up on a user machine. Also gate the
