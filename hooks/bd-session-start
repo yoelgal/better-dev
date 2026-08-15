@@ -562,7 +562,9 @@ PYPL
     printf '%s' "$out" | jq -e . >/dev/null || fail "moved-clone output is not valid JSON"
     printf '%s' "$out" | grep -q "no link for this host" || fail "link nudge silent on a moved clone"
     printf '%s' "$out" | grep -q "missing awareness hooks" || fail "hook nudge silent on a moved clone"
-    printf '%s' "$out" | grep -q "$clone_st/install.sh" || fail "moved-clone nudge names no runnable install.sh path"
+    # -F: $clone_st is a filesystem path, not a pattern. This worktree's own path carries a `+` and
+    # dots, which a BRE would read as metacharacters and match over-permissively.
+    printf '%s' "$out" | grep -qF "$clone_st/install.sh" || fail "moved-clone nudge names no runnable install.sh path"
   fi
 
   # Overrides present -> the note points at them, still valid JSON.
