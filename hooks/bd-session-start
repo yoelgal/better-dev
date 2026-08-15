@@ -49,6 +49,34 @@ escape_for_json() {
   printf '%s' "$s"
 }
 
+# --- nudge collection: one append point, both audiences -----------------------
+# A nudge speaks to the agent (additionalContext) and to the operator (the
+# one-line systemMessage), so the nudge that owns the message owns its mark and
+# writes both here in one call. Nothing downstream infers one audience's line
+# from the other's, and no mark is chosen by testing which channel came back
+# non-empty - that inference is what told a plugin host to "run install.sh" when
+# the migration line rode hook_nudge's channel, and install.sh wires all three
+# hooks unconditionally, so the advice double-registers every one of them. Pass
+# an empty mark for an agent-only nudge. Strings, not arrays: "${a[@]}" on an
+# empty array is an unbound-variable error under set -u on bash 3.2, which is
+# still /bin/bash on a stock macOS host.
+NUDGE_CONTEXT=""
+NUDGE_MARK=""
+# /update is one remedy with two triggers (a clone behind its origin, repo wiring
+# a release moved on), so both nudges write this one slot and the operator reads
+# one line. update_nudge runs first - its opt-in ff-only merge has to land before
+# reonboard_nudge reads the ledger - and reonboard_nudge overwrites the slot with
+# the better wording when it fires. Two owners of one remedy writing one named
+# slot, never an emptiness test on the other's prose.
+UPDATE_MARK=""
+nudge() {
+  NUDGE_CONTEXT="${NUDGE_CONTEXT}${1:+ $1}"
+  NUDGE_MARK="${NUDGE_MARK}${2:+ - $2}"
+}
+# The only place the operator's render order lives, so the wired and unwired
+# branches cannot drift the way four duplicated mark literals did.
+marks() { printf '%s%s' "${UPDATE_MARK:+ - $UPDATE_MARK}" "$NUDGE_MARK"; }
+
 # --- shared clone resolution fallback: does an existing host skill symlink under
 # $HOME/.claude/skills point into a better-dev clone? Read the link and take its
 # target's prefix before /skills/<name>. Covers the clone install path (skills
@@ -101,7 +129,7 @@ normalize_clone() {
 # unless the project opted into ff-only auto-update in overrides, which can
 # only fast-forward, never clobber.
 update_nudge() {
-  local overrides="$1" clone tobin behind
+  local overrides="$1" mark="$2" clone tobin behind msg
   # Fall back on THIS nudge's usability predicate, not mere skills/ presence: a
   # copy-fallback plugin root has skills/ but no git, and the linked clone must
   # still get its pull nudge. The probe is git, not a .git dir - the clone may
@@ -121,10 +149,15 @@ update_nudge() {
 
   if [ -n "$overrides" ] && grep -qiE 'better-dev[[:space:]]+auto-update:[[:space:]]*ff-only' "$overrides" 2>/dev/null \
      && git -C "$clone" merge --ff-only --quiet '@{u}' 2>/dev/null; then
-    printf ' better-dev: auto-updated %s commit(s) (ff-only).' "$behind"
+    printf -v msg 'better-dev: auto-updated %s commit(s) (ff-only).' "$behind"
+    nudge "$msg" ""   # the merge already landed - nothing left for the operator to run
     return 0
   fi
-  printf ' better-dev: update available (%s commit(s)) - run /update (or: git -C %s pull, then re-run its install.sh only if skills were added, removed, or renamed).' "$behind" "$clone"
+  printf -v msg 'better-dev: update available (%s commit(s)) - run /update (or: git -C %s pull, then re-run its install.sh only if skills were added, removed, or renamed).' "$behind" "$clone"
+  nudge "$msg" ""
+  # The wording is the caller's (an unwired repo says "before /onboard"); the slot
+  # is shared with reonboard_nudge, which overwrites it rather than reading it.
+  UPDATE_MARK="$mark"
 }
 
 # --- shared install-channel guard: did install.sh run on this host, or is this a
@@ -165,7 +198,7 @@ host_installed() {
 # link-install hosts (codex, hermes) get the same treatment when it bites - the
 # hosts/ adapters own their own dir names.
 link_nudge() {
-  local clone hostdir="$HOME/.claude/skills" name missing n skill
+  local clone hostdir="$HOME/.claude/skills" name missing n skill msg
   # Locate the clone: the plugin root if it looks like one, else the fallback above.
   clone="$(normalize_clone "${CLAUDE_PLUGIN_ROOT:-}")"
   [ -n "$clone" ] || clone="$(normalize_clone "$(resolve_clone_via_symlink)")"
@@ -186,7 +219,8 @@ link_nudge() {
     [ -e "$hostdir/$name" ] || { missing="$missing${missing:+, }$name"; n=$((n + 1)); }
   done
   [ "$n" -gt 0 ] || return 0
-  printf ' better-dev: %s skill(s) in the installed clone have no link for this host (%s) - run %s/install.sh to reconcile.' "$n" "$missing" "$clone"
+  printf -v msg 'better-dev: %s skill(s) in the installed clone have no link for this host (%s) - run %s/install.sh to reconcile.' "$n" "$missing" "$clone"
+  nudge "$msg" 'skill links missing, run install.sh'
 }
 
 # --- hook nudge: are this host's wired hooks the set the clone expects? --------
@@ -201,7 +235,7 @@ link_nudge() {
 # bd-hook-wire, a host may have no python3, and the settings file may be absent or
 # unreadable - none of those is this hook's business to report.
 hook_nudge() {
-  local clone settings verdict tobin
+  local clone settings verdict tobin msg
   # Same retry rule as update_nudge and reonboard_nudge: fall back when the plugin
   # root fails THIS nudge's predicate (no scripts/bd-hook-wire - a pre-0.11.0
   # clone), not only when it lacks skills/.
@@ -218,10 +252,10 @@ hook_nudge() {
   # nudge would buy a second executing copy of all three, running twice per session
   # for good. Relinking skills is idempotent and a duplicate hook is not, so this
   # asymmetry earns its own gate rather than riding link_nudge's posture.
-  # A plugin install is not a supported state any more (D33), but it is NOT this
-  # nudge's business to say so - plugin_nudge below owns that. Everything printed on
-  # this channel drives the "awareness hooks missing, run install.sh" mark, and that
-  # remedy on a plugin host registers a second copy of all three hooks. Stay silent.
+  # A plugin install is not a supported state any more (D33), but saying so is
+  # plugin_nudge's job, not this one's: this nudge carries the "run install.sh"
+  # remedy with it, and that remedy on a plugin host registers a second copy of all
+  # three hooks. Stay silent and let the nudge that owns that message speak.
   if [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] && [ -f "$clone/hooks/hooks.json" ] \
      && [ "$clone" = "$(normalize_clone "${CLAUDE_PLUGIN_ROOT:-}")" ]; then
     return 0
@@ -244,7 +278,10 @@ hook_nudge() {
   [ -n "$tobin" ] && set -- "$tobin" 1 "$@"
   verdict="$("$@" 2>/dev/null)" || return 0
   [ "$verdict" = "would-wire" ] || return 0
-  printf ' better-dev: this host is missing awareness hooks the installed clone expects - run %s/install.sh to register them (it writes %s).' "$clone" "$settings"
+  printf -v msg 'better-dev: this host is missing awareness hooks the installed clone expects - run %s/install.sh to register them (it writes %s).' "$clone" "$settings"
+  # install.sh writes $HOME/.claude/settings.json - a machine-touching path that
+  # keeps its human gate - so the agent cannot stand in for the operator here.
+  nudge "$msg" 'awareness hooks missing, run install.sh'
 }
 
 # --- plugin nudge: is better-dev running from a plugin install at all? ----------
@@ -269,7 +306,9 @@ plugin_nudge() {
   # (bridge fine, plugin merely redundant). Asserting "already broken here" would be false every
   # session for the second, so state what is true of both - the channel is retired - and let the
   # remedy be the same for both.
-  printf ' better-dev: this session is running better-dev from a plugin install, a channel that is no longer supported (D33) - a version-pinned plugin cache cannot carry the .better-dev/bin scripts bridge, so a host relying on it alone has broken skills. Reinstall from a git clone (see BOOTSTRAP.md); do NOT run install.sh over the top of the plugin, it would register a second copy of every hook.'
+  # Its own mark, naming its own remedy. Never "run install.sh" - see above.
+  nudge 'better-dev: this session is running better-dev from a plugin install, a channel that is no longer supported (D33) - a version-pinned plugin cache cannot carry the .better-dev/bin scripts bridge, so a host relying on it alone has broken skills. Reinstall from a git clone (see BOOTSTRAP.md); do NOT run install.sh over the top of the plugin, it would register a second copy of every hook.' \
+        'plugin install unsupported, reinstall from a clone'
 }
 
 # --- reonboard nudge: did a release change the repo surface since /onboard? ---
@@ -297,7 +336,7 @@ clone_version() {
 }
 
 reonboard_nudge() {
-  local root="$1" clone releases wired newest
+  local root="$1" clone releases wired newest ver msg
   # Same retry rule as update_nudge: fall back when the plugin root fails THIS
   # nudge's predicate (no ledger file), not only when it lacks skills/.
   clone="$(normalize_clone "${CLAUDE_PLUGIN_ROOT:-}")"
@@ -325,11 +364,22 @@ reonboard_nudge() {
       print $1; exit
     }' "$releases" 2>/dev/null || true)"
   [ -n "$newest" ] || return 0
-  printf ' better-dev: this repo was wired at %s; %s changed the repo surface - run /update to bring it current.' "${wired:-pre-0.6.0}" "$newest"
+  # The version /update moves this repo TO, not the newest flagged release: a
+  # pull-only release has no RELEASES.md line, so the flagged one lags the clone
+  # and the mark read as staleness while the tool was already current. Fall back to
+  # the flagged version if the manifest cannot be read, so the mark names something
+  # rather than an empty pair of brackets. Read from the variable that holds it,
+  # never sliced back out of the sentence below.
+  ver="$(clone_version)"
+  printf '%s' "$ver" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$' || ver="$newest"
+  printf -v msg 'better-dev: this repo was wired at %s; %s changed the repo surface - run /update to bring it current.' "${wired:-pre-0.6.0}" "$newest"
+  nudge "$msg" ""
+  # Same remedy as update_nudge, better wording: one slot, and this one wins.
+  UPDATE_MARK="update pending ($ver), run /update"
 }
 
 emit() {
-  local root="$1" note lessons n inflight bdm rows cnt oldest papercut_nudge papercuts parked fpnote fpcur fprec context escaped welcome custom upd rnb lnk hks mark ver
+  local root="$1" note lessons n inflight bdm rows cnt oldest papercut_nudge papercuts parked fpnote fpcur fprec context escaped welcome custom
   # Per-repo welcome wording: a "better-dev welcome: <text>" line in overrides.md
   # replaces the default (same knob style as "better-dev auto-update:"). Only the
   # wired message is overridable - an unwired repo has no overrides to read.
@@ -417,43 +467,26 @@ emit() {
   # Tier disposition rides the session note because dispatch decisions also happen outside any
   # skill trigger - an orchestrator using the host's raw fan-out never loads tiers.md on its own.
   context="better-dev practices are installed in this repo. The project's conventions and the list of available skills (onboard, plan-grill, diagnose, autonomous-loop, review, orchestrating-agents, worktree-branching, and more) live in a managed better-dev block in this project's CLAUDE.md or AGENTS.md; each skill self-describes through its description. Dispatching workers or fanning out agents? run each stage at the least-capable tier that fits it and escalate at judgment points - the reference is orchestrating-agents' tiers.md and the recorded tier-map (.better-dev/bin/bd-mem recall \"tier-map\").${note}${lessons}${inflight}${papercut_nudge}${papercuts}${parked}${fpnote}"
-  upd="$(update_nudge "$root/.better-dev/overrides.md")"
-  rnb="$(reonboard_nudge "$root")"
-  lnk="$(link_nudge)"
-  hks="$(hook_nudge)"
-  plg="$(plugin_nudge)"
-  context="${context}${upd}${rnb}${lnk}${hks}${plg}"
+  # Fixed call order: update before reonboard, so an opt-in ff-only merge lands before
+  # the ledger is read. `|| true` is load-bearing, not decoration: the old x="$(nudge)"
+  # form was accidentally crash-tolerant (bash does not apply set -e inside a command
+  # substitution on an assignment's right-hand side) and a bare call is not - one
+  # failing command inside a nudge would trip set -e, hit the ERR trap, and emit no
+  # JSON at all.
+  update_nudge "$root/.better-dev/overrides.md" 'update available, run /update' || true
+  reonboard_nudge "$root" || true
+  link_nudge || true
+  hook_nudge || true
+  plugin_nudge || true
+  context="${context}${NUDGE_CONTEXT}"
   escaped=$(escape_for_json "$context")
 
-  # A nudge asks a HUMAN to run /update or install.sh, but additionalContext only
-  # ever reaches the agent - so a pending action also rides the one operator-visible
-  # line. The agent keeps its copy (it is the one that runs the thing); this stops
-  # delivery from depending on the agent choosing to relay it. Silent when nothing
-  # is pending, and appended after the welcome so a custom welcome still wins the
-  # wording. Static text plus a dotted version already matched against
-  # ^[0-9]+\.[0-9]+\.[0-9]+$ - no JSON-special characters to escape.
-  mark=""
-  if [ -n "$rnb" ]; then
-    # The version /update moves this repo TO, not the newest flagged release: a
-    # pull-only release has no RELEASES.md line, so the flagged one lags the clone
-    # and the mark read as staleness while the tool was already current. Fall back
-    # to the flagged version if the manifest cannot be read, so the nudge still
-    # names something rather than an empty pair of brackets.
-    ver="$(clone_version)"
-    if ! printf '%s' "$ver" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-      ver="${rnb#*; }"; ver="${ver%% *}"
-    fi
-    mark=" - update pending ($ver), run /update"
-  else
-    case "$upd" in *'update available'*) mark=" - update available, run /update" ;; esac
-  fi
-  [ -n "$lnk" ] && mark="${mark} - skill links missing, run install.sh"
-  # install.sh writes $HOME/.claude/settings.json - a machine-touching path that
-  # keeps its human gate - so the agent cannot stand in for the operator here.
-  [ -n "$hks" ] && mark="${mark} - awareness hooks missing, run install.sh"
-  # Its own mark, naming its own remedy. Never "run install.sh" - see plugin_nudge.
-  [ -n "$plg" ] && mark="${mark} - plugin install unsupported, reinstall from a clone"
-  welcome="${welcome}${mark}"
+  # A nudge asks a HUMAN to run /update or install.sh, but additionalContext only ever
+  # reaches the agent, so every pending action rides the one operator-visible line too
+  # rather than depending on the agent choosing to relay it. Appended after the welcome,
+  # so a custom welcome still wins the wording. Static text plus a dotted version already
+  # matched against ^[0-9]+\.[0-9]+\.[0-9]+$ - nothing here to JSON-escape.
+  welcome="${welcome}$(marks)"
 
   # Emit only the field the current host reads. Cursor wants snake_case
   # additional_context; Claude Code wants nested hookSpecificOutput; Copilot and
@@ -473,6 +506,16 @@ emit() {
 # --- selftest: run in a temp repo, assert install-aware + valid JSON ----------
 if [ "${1:-}" = "selftest" ]; then
   fail() { echo "selftest FAIL: $1" >&2; exit 1; }
+  # Drop the second SessionStart entry: the incomplete hook set install.sh --verify
+  # cannot see. Two fixtures need it, so it lives here once.
+  trim_hooks() {
+    python3 - "$1" <<'PYST'
+import json,sys
+p=sys.argv[1]; d=json.load(open(p))
+d['hooks']['SessionStart']=d['hooks']['SessionStart'][:1]
+json.dump(d,open(p,'w'))
+PYST
+  }
   tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 
   # No .better-dev anywhere -> welcome only: valid JSON with a systemMessage,
@@ -494,6 +537,44 @@ if [ "${1:-}" = "selftest" ]; then
   out="$(cd "$tmp/proj/src/deep" && CLAUDE_PLUGIN_ROOT=x "$SELF")" || fail "errored in subdir"
   printf '%s' "$out" | jq -e . >/dev/null || fail "subdir output not valid JSON"
 
+  # Class guard, structural: every operator mark is defined exactly once, inside the
+  # nudge that owns it. Two definitions is how the wired and unwired mark builders
+  # drifted - the plugin fix had to be written into both - and a mark selected by
+  # testing which channel came back non-empty is how a plugin host was told to run
+  # install.sh, the advice that registers a permanent second copy of all three hooks.
+  # Reads the production path with comments stripped, so prose about a remedy is
+  # never counted as a definition. Both halves of it: the functions above the
+  # selftest banner AND the main flow below the block's closing `fi` - the unwired
+  # branch lives down there, and it is exactly the half the wired builder drifted
+  # from, so a check that stopped at the banner would grade only one copy.
+  prod="$(awk '/^# --- selftest/{s=1} !s{print} s&&/^fi$/{s=0}' "$SELF" | grep -vE '^[[:space:]]*#' || true)"
+  # Not the update mark: "update available, run /update" is a substring of the
+  # unwired wording, so -F would count two legitimate definitions.
+  for mk in 'skill links missing, run install.sh' \
+            'awareness hooks missing, run install.sh' \
+            'plugin install unsupported, reinstall from a clone'; do
+    mdef="$(printf '%s\n' "$prod" | grep -cF -- "$mk" | tr -d ' ' || true)"
+    [ "$mdef" = 1 ] || fail "operator mark '$mk' is defined $mdef time(s) in the production path - it must live once, in the nudge that owns it"
+  done
+
+  # Two nudges with something to say at once -> two lines, each carrying its OWN
+  # remedy, in the fixed order link then plugin. Exact equality, so a mark that is
+  # duplicated, dropped, reordered or attributed to the wrong nudge all fail here.
+  # A plugin-shaped clone (skills/ + hooks/hooks.json, no scripts/bd-hook-wire) that
+  # this host links one skill into: link_nudge fires on the unlinked one, plugin_nudge
+  # fires on the channel, hook_nudge has no bd-hook-wire to ask and stays silent.
+  mkdir -p "$tmp/pl/skills/a" "$tmp/pl/skills/b" "$tmp/pl/hooks" "$tmp/plh/.claude/skills"
+  : > "$tmp/pl/skills/a/SKILL.md"; : > "$tmp/pl/skills/b/SKILL.md"; : > "$tmp/pl/hooks/hooks.json"
+  ln -s "$tmp/pl/skills/a" "$tmp/plh/.claude/skills/a"
+  out="$(cd "$tmp/proj" && HOME="$tmp/plh" CLAUDE_PLUGIN_ROOT="$tmp/pl" "$SELF")" || fail "errored with two nudges pending"
+  printf '%s' "$out" | jq -e . >/dev/null || fail "two-nudge output is not valid JSON"
+  [ "$(printf '%s' "$out" | jq -r '.systemMessage')" = "$WELCOME_WIRED - skill links missing, run install.sh - plugin install unsupported, reinstall from a clone" ] \
+    || fail "two pending nudges must produce two correctly-attributed marks in link-then-plugin order, got: $(printf '%s' "$out" | jq -r '.systemMessage')"
+  # ...and each mark's own sentence reached the agent, so the pairing is real and not
+  # two marks over one message.
+  printf '%s' "$out" | grep -q "no link for this host (b)" || fail "link mark without the link nudge's own sentence"
+  printf '%s' "$out" | grep -q "no longer supported" || fail "plugin mark without the plugin nudge's own sentence"
+
   # hook_nudge: an incomplete hook set fires, a current one is silent. The
   # incomplete case is the one install.sh --verify cannot see - bd-session-start
   # is present and only the second SessionStart entry is missing - so it is the
@@ -509,12 +590,7 @@ if [ "${1:-}" = "selftest" ]; then
     python3 "$clone_st/scripts/bd-hook-wire" wire "$clone_st" "$tmp/h/.claude/settings.json" >/dev/null 2>&1
     out="$(cd "$tmp/proj" && HOME="$tmp/h" CLAUDE_PLUGIN_ROOT= "$SELF")" || fail "errored with hooks current"
     printf '%s' "$out" | grep -q "missing awareness hooks" && fail "hook nudge fired while hooks were current"
-    python3 - "$tmp/h/.claude/settings.json" <<'PYST' || fail "could not build the incomplete hook set"
-import json,sys
-p=sys.argv[1]; d=json.load(open(p))
-d['hooks']['SessionStart']=d['hooks']['SessionStart'][:1]
-json.dump(d,open(p,'w'))
-PYST
+    trim_hooks "$tmp/h/.claude/settings.json" || fail "could not build the incomplete hook set"
     out="$(cd "$tmp/proj" && HOME="$tmp/h" CLAUDE_PLUGIN_ROOT= "$SELF")" || fail "errored with hooks incomplete"
     printf '%s' "$out" | jq -e . >/dev/null || fail "hook nudge output is not valid JSON"
     printf '%s' "$out" | grep -q "missing awareness hooks" || fail "hook nudge silent on an incomplete hook set"
@@ -562,12 +638,7 @@ PYST
     # the hooks, so nudging here would buy a second executing copy of all three.
     # Same incomplete settings that fires on a clone install above.
     python3 "$clone_st/scripts/bd-hook-wire" wire "$clone_st" "$tmp/h/.claude/settings.json" >/dev/null 2>&1
-    python3 - "$tmp/h/.claude/settings.json" <<'PYPL' || fail "could not build the incomplete hook set for the plugin case"
-import json,sys
-p=sys.argv[1]; d=json.load(open(p))
-d['hooks']['SessionStart']=d['hooks']['SessionStart'][:1]
-json.dump(d,open(p,'w'))
-PYPL
+    trim_hooks "$tmp/h/.claude/settings.json" || fail "could not build the incomplete hook set for the plugin case"
     out="$(cd "$tmp/proj" && HOME="$tmp/h" CLAUDE_PLUGIN_ROOT="$clone_st" "$SELF")" || fail "errored when the plugin root is the linked clone"
     printf '%s' "$out" | grep -q "missing awareness hooks" && fail "hook nudge fired when the plugin root is the linked clone"
     # ...but not silent either: a plugin install is not a supported state, and saying
@@ -581,6 +652,16 @@ PYPL
       && fail "plugin install told to run install.sh in the operator-visible line - that advice double-registers every hook"
     printf '%s' "$out" | jq -r '.systemMessage' | grep -q 'plugin install unsupported' \
       || fail "no operator-visible migration mark on a plugin install"
+    # Same host, unwired repo: the branch that used to carry its own copy of every
+    # mark, so the plugin fix had to be written there a second time. Nothing
+    # exercised it. Same verdict as the wired case above, from the same fixture -
+    # the migration mark, and never the hook remedy that double-registers hooks.
+    out="$(cd "$tmp/hbare" && HOME="$tmp/h" CLAUDE_PLUGIN_ROOT="$clone_st" "$SELF")" || fail "errored when unwired on a plugin install"
+    printf '%s' "$out" | jq -e . >/dev/null || fail "unwired plugin output is not valid JSON"
+    printf '%s' "$out" | jq -r '.systemMessage' | grep -q 'plugin install unsupported, reinstall from a clone' \
+      || fail "no operator-visible migration mark on an unwired plugin install"
+    printf '%s' "$out" | jq -r '.systemMessage' | grep -q 'awareness hooks missing' \
+      && fail "unwired plugin install told to run install.sh - that advice double-registers every hook"
 
     # Moved clone: the host was installed on the pre-flatten layout, so every link
     # and every wired hook path still points one level down into better-dev/. Both
@@ -599,6 +680,17 @@ PYPL
     # -F: $clone_st is a filesystem path, not a pattern. This worktree's own path carries a `+` and
     # dots, which a BRE would read as metacharacters and match over-permissively.
     printf '%s' "$out" | grep -qF "$clone_st/install.sh" || fail "moved-clone nudge names no runnable install.sh path"
+    # Both remedies pending at once: two marks, in the fixed order link then hook,
+    # each still naming its own loss. Contiguous substring, so an update mark ahead
+    # of them is fine and a swapped, merged or duplicated pair is not.
+    printf '%s' "$out" | jq -r '.systemMessage' | grep -qF 'skill links missing, run install.sh - awareness hooks missing, run install.sh' \
+      || fail "link and hook marks not both present in order on a moved clone: $(printf '%s' "$out" | jq -r '.systemMessage')"
+    # ...and the unwired branch renders the same two marks the same way. It used to
+    # build them from its own copy of the literals, which is how a fix landed in one
+    # branch and not the other.
+    out="$(cd "$tmp/hbare" && HOME="$tmp/stale" CLAUDE_PLUGIN_ROOT= "$SELF")" || fail "errored when unwired on a moved clone"
+    printf '%s' "$out" | jq -r '.systemMessage' | grep -qF 'skill links missing, run install.sh - awareness hooks missing, run install.sh' \
+      || fail "wired and unwired branches disagree on the link and hook marks: $(printf '%s' "$out" | jq -r '.systemMessage')"
   fi
 
   # Overrides present -> the note points at them, still valid JSON.
@@ -923,21 +1015,21 @@ if ! bd_root="$(find_bd_root)"; then
   # action is /onboard, and onboarding off a stale clone wires stale practices AND stamps
   # wired-version from that same stale manifest, so the reonboard nudge then compares two stale
   # values that agree and stays silent too. Gating these on wiring hid the staleness twice over.
-  # No overrides file exists in an unwired repo, so ff-only auto-update cannot apply: pass none
-  # and let the nudge only report. Only static text reaches the JSON - update_nudge's own line
-  # carries the clone path, which is why we test it rather than interpolate it.
-  unwired_mark=""
-  case "$(update_nudge '')" in
-    *'update available'*) unwired_mark=" - update available, run /update before /onboard" ;;
-  esac
-  [ -n "$(link_nudge)" ] && unwired_mark="${unwired_mark} - skill links missing, run install.sh"
-  # Same reasoning for the hook set, and more so: hooks are machine-global, so
-  # their absence does not depend on this repo being wired at all.
-  [ -n "$(hook_nudge)" ] && unwired_mark="${unwired_mark} - awareness hooks missing, run install.sh"
-  # An unwired repo on a plugin host needs this more, not less: /onboard is the next
-  # action and it cannot wire a bridge into a version-pinned cache. Static text only.
-  [ -n "$(plugin_nudge)" ] && unwired_mark="${unwired_mark} - plugin install unsupported, reinstall from a clone"
-  printf '{ "systemMessage": "%s%s" }\n' "$WELCOME_UNWIRED" "$unwired_mark"
+  # No overrides file exists in an unwired repo, so ff-only auto-update cannot apply: pass none and
+  # let the nudge only report, under the one mark wording that differs from the wired path. Hooks
+  # are machine-global too, and a plugin host needs the migration line more here, not less -
+  # /onboard is the next action and it cannot wire a bridge into a version-pinned cache. Same marks,
+  # same order, one renderer as the wired path; only static text reaches this JSON, since each
+  # nudge's own sentence (which carries the clone path) is agent-facing and this branch emits no
+  # agent context. `|| true` as in emit: a failing nudge must not cost the operator the welcome.
+  # reonboard_nudge is the one deliberate absence - it asks whether THIS repo's wiring is stale and
+  # an unwired repo has none; called here it would read no stamp, treat the repo as pre-0.6.0, and
+  # fire on any flagged entry.
+  update_nudge '' 'update available, run /update before /onboard' || true
+  link_nudge || true
+  hook_nudge || true
+  plugin_nudge || true
+  printf '{ "systemMessage": "%s%s" }\n' "$WELCOME_UNWIRED" "$(marks)"
   exit 0
 fi
 FP_WRITE=""
