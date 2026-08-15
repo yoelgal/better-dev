@@ -2137,9 +2137,10 @@ an opt-out of freshness that produces no error at the time it is made.
 
 ## 143. bd-atlas - the atlas that outlived its graph
 
-**Retired 2026-08-15 (D35):** `scripts/bd-atlas` is deleted, so this scenario has no target left to
-run against. Kept, not removed, for the failure mode it names - a derived render is only as fresh as
-its regeneration trigger.
+**Retired 2026-08-15 (D35):** `scripts/bd-atlas` is deleted, and `/graphify-wrapper-sync` sweeps any
+`<domain>-atlas.html` an earlier sync left on disk - the artifact goes rather than sitting there
+unrefreshable. Kept, not removed, for the failure mode it names - a derived render is only as fresh
+as its regeneration trigger.
 
 A domain's graph gets re-synced - new nodes, new edges, a fresh `built_at_commit`. Nobody re-runs
 bd-atlas. The `<domain>-atlas.html` file is still sitting beside the new `graph.json`, opens fine,

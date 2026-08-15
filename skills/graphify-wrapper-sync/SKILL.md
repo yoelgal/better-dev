@@ -98,6 +98,11 @@ for name in $names; do
       echo "[$name] callflow export refused (semantic-only build, or zero-node/single-community graph) - page skipped"
     fi
   fi
+
+  # The atlas page and flows.json lost their producer (D35) and sit on no regen
+  # glob, so a copy left by an older sync would outlive every refresh and read as
+  # current. Sweep the orphans here, on the sync everyone already runs.
+  rm -f "$out"/*-atlas.html "$out"/flows.json
 done
 ```
 

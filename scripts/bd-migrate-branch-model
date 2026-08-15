@@ -26,8 +26,11 @@ stop() { printf '  STOP  %s\n' "$*"; FAILS=$((FAILS + 1)); }
 
 # Both are the RECORD form, line-anchored: bd-mem writes "- <line>". A substring scan matched the
 # sentence in rules.md that merely DESCRIBES the trunk default, so a staged repo read as migrated.
-TRUNK_RE='^- *branch-model: *trunk *$'
-INT_RE='^- *integration branch *= *\([A-Za-z0-9._/-][A-Za-z0-9._/-]*\)'
+# The prefix is loose (leading space, either bullet) because rules.md is markdown a formatter may
+# renormalize; the END anchor is not - a loose tail is what let the prose sentence match.
+BULLET='^[[:space:]]*[-*][[:space:]]*'
+TRUNK_RE="${BULLET}branch-model:[[:space:]]*trunk[[:space:]]*$"
+INT_RE="${BULLET}integration branch[[:space:]]*=[[:space:]]*\\([A-Za-z0-9._/-][A-Za-z0-9._/-]*\\)"
 
 REPO="$PWD"; RELEASE_OPT=""; CONFIRMED=0; CMD=""
 REMOTE=""; INTEGRATION=""; RELEASE=""; TAG=""; REF_INT=""; REF_REL=""; FAILS=0
@@ -50,13 +53,16 @@ bd_mem_bin() {
 # self-describing instead of a machine-local marker: the archive tag is PUSHED, so any clone reads it
 # and can name a branch an earlier migration left behind, with the commands that finish it.
 already_trunk() {
-  local bd t b; bd="$(bd_dir)"
+  local bd t b left=0; bd="$(bd_dir)"
   grep -qs "$TRUNK_RE" "$bd/rules.md" "$bd/overrides.md" || return 0
   for t in $(g tag -l 'archive/*'); do
     b="${t#archive/}"; b="${b%-[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]}"
-    if has_ref "refs/heads/$b"; then printf '  left over: local %s (archived at %s) - finish: git -C %s branch -D %s\n' "$b" "$t" "$(canon "$REPO")" "$b"; fi
-    if [ -n "$REMOTE" ] && has_ref "refs/remotes/$REMOTE/$b"; then printf '  left over: %s/%s (archived at %s) - finish: git -C %s push %s --delete %s\n' "$REMOTE" "$b" "$t" "$(canon "$REPO")" "$REMOTE" "$b"; fi
+    if has_ref "refs/heads/$b"; then left=1; printf '  left over: local %s (archived at %s) - finish: git -C %s branch -D %s (fails while another worktree has it checked out)\n' "$b" "$t" "$(canon "$REPO")" "$b"; fi
+    if [ -n "$REMOTE" ] && has_ref "refs/remotes/$REMOTE/$b"; then left=1; printf '  left over: %s/%s (archived at %s) - finish: git -C %s push %s --delete %s (run git fetch --prune first: an unpruned tracking ref prints a phantom leftover the forge answers "remote ref does not exist")\n' "$REMOTE" "$b" "$t" "$(canon "$REPO")" "$REMOTE" "$b"; fi
   done
+  # A leftover is an INCOMPLETE migration, not a clean run: exiting 0 here is what let the caller
+  # stamp the repo as trunk while teammates kept opening PRs into the branch that is still live.
+  [ "$left" -eq 0 ] || { printf '\n%s: MIGRATION INCOMPLETE - recorded as trunk, but the retired branch above is still there. Finish it with the command(s) above, then re-run.\n' "$ME" >&2; exit 1; }
   printf '  ok    [branch-model] already recorded as trunk - nothing to do.\n'
   exit 0
 }
@@ -66,7 +72,13 @@ do_check() {
   g rev-parse --is-inside-work-tree >/dev/null 2>&1 || die "'$REPO' is not a git work tree"
   local over ref counts ahead behind; over="$(bd_dir)/overrides.md"
   [ -f "$over" ] || die "no $over - this repo is not wired for better-dev, so no branch model is recorded"
-  REMOTE="$(g remote | head -1)"
+  # NEVER `git remote | head -1`: that is the alphabetically first remote, so a repo with a 'backup'
+  # remote pushed the archive tag where nobody clones, skipped [divergence], and left origin untouched.
+  if g remote | grep -qx origin; then REMOTE=origin
+  else
+    [ -z "$(g remote | sed -n 2p)" ] || die "[remote] several remotes and none is named 'origin' ($(g remote | tr '\n' ' ')) - the archive tag and the delete must both land on the forge everyone clones. Name it 'origin' and re-run."
+    REMOTE="$(g remote | head -1)"
+  fi
   # FETCH FIRST, above every gate: [divergence] and the tag are judged against remote-tracking refs.
   if [ "$CMD" = apply ] && [ -n "$REMOTE" ]; then
     g fetch --all --tags --prune || die "git fetch failed - aborting before anything is changed"
@@ -95,6 +107,12 @@ do_check() {
   fi
   [ -n "$(g status --porcelain)" ] && stop "[dirty] working tree is not clean. No archive tag covers uncommitted work - commit or stash it yourself and re-run; this will not do it for you." || ok "[dirty] working tree clean"
   TAG="archive/$INTEGRATION-$(date +%Y-%m-%d)"
+  # Judged HERE, not first inside apply: a [ready] verdict the operator confirms and apply then dies on
+  # spends their yes on a run that was never going to happen.
+  if has_ref "refs/tags/$TAG" && has_ref "$REF_INT" \
+     && [ "$(g rev-parse "$TAG^{commit}")" != "$(g rev-parse "$REF_INT^{commit}")" ]; then
+    stop "[tag] $TAG already exists at a different commit than $REF_INT - rename or delete it deliberately, then re-run"
+  fi
   [ "$FAILS" -eq 0 ] || die "$FAILS precondition(s) failed - nothing was changed."
   ok "[ready] $INTEGRATION -> $RELEASE, archive tag $TAG"
 }
@@ -134,14 +152,19 @@ do_apply() {
   ( cd "$REPO" && "$mem" remember "branch-model: trunk" ) || die "bd-mem remember failed - stopping before the delete"
 
   printf '\n4. deleting %s\n' "$INTEGRATION"
+  # Stated, never gated (a gh-based gate needs auth this script does not require): the consequence is
+  # invisible from here and irreversible from the forge's side.
+  printf '   OPEN PRs: the forge CLOSES every open PR based on %s the moment it is deleted. Retargeting or merging them is yours - the archive tag restores the branch, not the PRs, and each closed one is reopened by hand.\n' "$INTEGRATION"
   if has_ref "refs/heads/$INTEGRATION"; then
     g branch -D "$INTEGRATION" || die "could not delete local '$INTEGRATION' - restore point: git branch $INTEGRATION $TAG"
   fi
   # Guarded on the ref: a local-only branch otherwise fails the push and reports a correct migration
   # as incomplete, which the caller reads as stop.
   if [ -n "$REMOTE" ] && has_ref "$REMOTE/$INTEGRATION"; then
-    g push "$REMOTE" --delete "$INTEGRATION" || {
-      printf '\n%s: MIGRATION INCOMPLETE. %s/%s still exists (branch protection is the usual cause).\nFinish it with:\n  git -C %s push %s --delete %s\nUndo with:\n  git -C %s branch %s %s\n' \
+    # Leased on the sha the tag was cut from: a colleague pushing between the fetch and this delete
+    # otherwise loses commits no ref anywhere holds - the tag predates their push.
+    g push --force-with-lease="$INTEGRATION:$(g rev-parse "$TAG^{commit}")" "$REMOTE" --delete "$INTEGRATION" || {
+      printf '\n%s: MIGRATION INCOMPLETE. %s/%s still exists (branch protection is the usual cause; a rejected lease means someone pushed to it since the fetch - look before you delete).\nFinish it with:\n  git -C %s push %s --delete %s\nUndo with:\n  git -C %s branch %s %s\n' \
         "$ME" "$REMOTE" "$INTEGRATION" "$(canon "$REPO")" "$REMOTE" "$INTEGRATION" "$(canon "$REPO")" "$INTEGRATION" "$TAG" >&2
       exit 1; }
   fi
@@ -177,7 +200,7 @@ fixture() {
 }
 
 selftest() {
-  local root rc=0 out d sha today
+  local root rc=0 out d sha today n form
   root="$(mktemp -d)"; today="$(date +%Y-%m-%d)"
   (
     set -e
@@ -257,17 +280,37 @@ selftest() {
     [ "$(git -C "$d/origin.git" rev-parse refs/heads/staging)" = "$sha" ] \
       || { echo "FAIL: the commits pushed by someone else are no longer on origin/staging"; exit 1; }
 
-    # 9. ALREADY TRUNK is exit 0 - and a leftover branch alongside an archive tag is named, with the
-    #    commands that finish it, read from the PUSHED tag rather than a machine-local marker.
+    # 9. ALREADY TRUNK is exit 0 only when nothing is left behind: a leftover branch alongside an
+    #    archive tag is a HALF-FINISHED migration, so it is named - with the commands that finish it,
+    #    read from the PUSHED tag rather than a machine-local marker - and exits 1. Exiting 0 there is
+    #    what let the caller stamp the repo as trunk while the shared branch was still live.
     d="$root/trunk"; fixture "$d" staging main
     printf -- '- branch-model: trunk\n' >"$d/repo/.better-dev/rules.md"
     out="$("$SELF" check --repo "$d/repo" 2>&1)" || { echo "FAIL: a trunk repo exited non-zero: $out"; exit 1; }
     printf '%s' "$out" | grep -q 'nothing to do' || { echo "FAIL: no nothing-to-do message: $out"; exit 1; }
     printf '%s' "$out" | grep -q 'left over' && { echo "FAIL: a leftover was reported with no archive tag: $out"; exit 1; }
     git -C "$d/repo" tag "archive/staging-$today" staging
-    out="$("$SELF" check --repo "$d/repo" 2>&1)" || { echo "FAIL: a leftover branch made the trunk repo exit non-zero: $out"; exit 1; }
+    out="$("$SELF" check --repo "$d/repo" 2>&1)" && { echo "FAIL: a half-finished migration exited 0: $out"; exit 1; }
     printf '%s' "$out" | grep -q "left over: local staging .*branch -D staging" || { echo "FAIL: the local leftover is not named: $out"; exit 1; }
     printf '%s' "$out" | grep -q "left over: origin/staging .*push origin --delete staging" || { echo "FAIL: the remote leftover is not named: $out"; exit 1; }
+    printf '%s' "$out" | grep -q 'MIGRATION INCOMPLETE' || { echo "FAIL: no incomplete verdict: $out"; exit 1; }
+
+    # 10. rules.md is TRACKED markdown: a formatter renormalizing the bullet must not blind the
+    #     detector. The prose case above holds the other side of this - the END anchor stays.
+    n=0
+    for form in '  - branch-model: trunk' '* branch-model:trunk' '  *  branch-model:  trunk'; do
+      n=$((n + 1)); d="$root/bullet$n"; fixture "$d" staging main
+      printf '%s \n' "$form" >"$d/repo/.better-dev/rules.md"   # plus a trailing space a formatter leaves
+      out="$("$SELF" check --repo "$d/repo" 2>&1)" || { echo "FAIL: trunk unread in '$form': $out"; exit 1; }
+      printf '%s' "$out" | grep -q 'nothing to do' || { echo "FAIL: trunk unread in '$form': $out"; exit 1; }
+    done
+
+    # 11. THE REMOTE IS origin, not the alphabetically first one: with a 'backup' remote the tag was
+    #     pushed where nobody clones and origin/staging was never retired, at exit 0.
+    d="$root/tworemotes"; fixture "$d" staging main
+    git -C "$d/repo" remote add backup "$d/origin.git"
+    out="$("$SELF" check --repo "$d/repo" 2>&1)" || { echo "FAIL: two remotes with an origin were refused: $out"; exit 1; }
+    printf '%s' "$out" | grep -q 'remote origin' || { echo "FAIL: the remote did not resolve to origin: $out"; exit 1; }
 
     exit 0
   ) || rc=1
