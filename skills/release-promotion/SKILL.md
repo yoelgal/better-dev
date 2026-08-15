@@ -272,7 +272,7 @@ released_head="$(git rev-parse HEAD)"            # both paths: the head the tag 
 git show "$released_head:$version_surface"       # the surface AS IT IS on that head
 ```
 
-It must carry `$version`. Anything else is a **STOP**, not a fix-forward: the bump is not in the
+It must carry `$version`. Anything else **stops the release**, and is not a fix-forward: the bump is not in the
 released range, so the tag would name a tree whose manifest is a version behind and whose ledger has
 no line for it - and no gate above catches that, because the ahead-check passes when *both* surfaces
 are old. Reconcile the missing bump onto the head first, then come back. (A repo recorded
