@@ -2137,6 +2137,10 @@ an opt-out of freshness that produces no error at the time it is made.
 
 ## 143. bd-atlas - the atlas that outlived its graph
 
+**Retired 2026-08-15 (D35):** `scripts/bd-atlas` is deleted, so this scenario has no target left to
+run against. Kept, not removed, for the failure mode it names - a derived render is only as fresh as
+its regeneration trigger.
+
 A domain's graph gets re-synced - new nodes, new edges, a fresh `built_at_commit`. Nobody re-runs
 bd-atlas. The `<domain>-atlas.html` file is still sitting beside the new `graph.json`, opens fine,
 and shows a graph that no longer exists.
@@ -2154,6 +2158,10 @@ authoritative is the worst place to be silently wrong.
 
 ## 144. bd-atlas - the self-contained page with a CDN dependency
 
+**Re-pointed 2026-08-15 (D35):** with `scripts/bd-atlas` deleted, this rule now lives in
+`skills/graphify-wrapper-sync/SKILL.md`'s report section, over graph.html and the callflow page. The
+scenario below runs there unchanged.
+
 A rendered page's header text calls it "self-contained." The renderer's script tag actually points
 at a CDN-hosted library. The page opens fine on a machine with internet, so the claim looks true
 every time it gets checked.
@@ -2165,10 +2173,14 @@ every time it gets checked.
 - **Fail:** the claim is repeated on the strength of the page having rendered once, on a connected
   machine, which is not a network-off test at all.
 
-Proves bd-atlas: "self-contained" is earned by a network-disabled open, never asserted from a page
-that merely happened to load.
+Proves graphify-wrapper-sync: "self-contained" is earned by a network-disabled open, never asserted
+from a page that merely happened to load.
 
 ## 145. bd-atlas - the flows panel that made up its own steps
+
+**Retired 2026-08-15 (D35)** with the flows panel and `flows.json`, which went with
+`scripts/bd-atlas`. Kept, not removed, for the rule it proved - a computed claim about a graph is
+checked against the graph's own edges, never authored.
 
 A flows panel is requested for a graph. Asked to fill it in, a model writes plausible-looking step
 sequences between two named endpoints - the kind of steps that read right and match nothing in the

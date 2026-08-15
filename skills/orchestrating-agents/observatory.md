@@ -51,16 +51,14 @@ a series inside one run or one work-item, and it dies with that item. Nothing he
 items or charted across time; a store that outlives the work-item is a trend DB, which the library
 declines to keep.
 
-## The atlas is a different surface
+## The code-graph page is a different surface
 
-The RUN OBSERVATORY above renders a record that accumulates within one run. The CODEBASE ATLAS - the
-rendered code-graph page `.better-dev/bin/bd-atlas` (dev: `scripts/bd-atlas`) emits, and
-graphify's own graph.html and callflow
-pages - is a pure function of the graph and its commit and holds no history: delete it and rebuild it
-losslessly. The two never share a store, a page, or the word "observatory." A fact about the run goes on
-the record; a fact about the code is recomputed from the graph. This is the deletion test that keeps
-rendered surfaces honest: if deleting a page loses a fact no query can recompute, that fact belonged on
-the run's record, not on the atlas.
+The RUN OBSERVATORY above renders a record that accumulates within one run. The CODE-GRAPH PAGE -
+graphify's own graph.html and callflow pages - is a pure function of the graph and its commit and
+holds no history: delete it and rebuild it losslessly. The two never share a store, a page, or the
+word "observatory." A fact about the run goes on the record; a fact about the code is recomputed from
+the graph. This is the deletion test that keeps rendered surfaces honest: if deleting a page loses a
+fact no query can recompute, that fact belonged on the run's record, not on the code-graph page.
 
 ## The critic fence
 

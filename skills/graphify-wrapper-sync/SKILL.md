@@ -36,9 +36,6 @@ every domain and every repo into one dir. Never set it outside the loop.
 
 ```bash
 backend=$(gfx_backend)
-# The wired path first, the plugin dir as the dev/unwired fallback - the same split as the
-# bd-gfx source line above. `scripts/bd-atlas` exists only in the source repo.
-atlas=.better-dev/bin/bd-atlas; [ -x "$atlas" ] || atlas="${CLAUDE_PLUGIN_ROOT}/scripts/bd-atlas"
 # Image/asset files graphify would otherwise read as text "docs" - token noise
 # with no architectural signal, and the source of oversized chunks that time out.
 exc_args=(); while IFS= read -r p; do [ -n "$p" ] && exc_args+=(--exclude "$p"); done < <(gfx_extract_excludes)
@@ -59,8 +56,7 @@ for name in $names; do
     mv "$out/graph.json" "$trash/"  # rm on a just-created path trips destructive-action gates on hardened hosts
   # A graph left by a DIFFERENT tree at this worktree path parses fine, so only
   # provenance catches it (state 2). Refreshing on top of one would carry a dead
-  # codebase forward, so the graph and every cache go - but `memory/` and the
-  # operator-authored `flows.json` stay, which
+  # codebase forward, so the graph and every cache go - but `memory/` stays, which
   # is why this calls the shared helper rather than its own `rm -rf`.
   elif [ -f "$out/graph.json" ]; then
     st=0; gfx_graph_state "$out/graph.json" "$idx_path" || st=$?
@@ -102,17 +98,6 @@ for name in $names; do
       echo "[$name] callflow export refused (semantic-only build, or zero-node/single-community graph) - page skipped"
     fi
   fi
-
-  # bd-atlas isn't on graphify's auto-regen glob (deliberately) - re-render it
-  # here or the atlas page goes silently stale after this sync. Unconditional, unlike
-  # the callflow export: the page is a pure function of the graph (0.11s on a
-  # 1929-node graph), so re-rendering is always safe and this is also what creates
-  # the first one. if/fi, not `&&`, so the loop's status stays the build's.
-  if "$atlas" "$out/graph.json" >/dev/null; then
-    echo "[$name] atlas page rendered"
-  else
-    echo "[$name] atlas render failed - the atlas page may be stale"
-  fi
 done
 ```
 
@@ -141,13 +126,13 @@ Two lines per index, page first - the page is what a human opens, the JSON is
 what an agent reads - with the action taken, node+edge counts, and the
 cross-subtree edge count on the second line:
 
-    [api] page: ~/.claude/graphify/acme__mono/worktrees/9f2c1a7b40de/api/graph.html (+ api-callflow.html, api-atlas.html)
+    [api] page: ~/.claude/graphify/acme__mono/worktrees/9f2c1a7b40de/api/graph.html (+ api-callflow.html)
     [api] refresh, AST - 812 nodes / 3104 edges - ~/.claude/graphify/acme__mono/worktrees/9f2c1a7b40de/api/graph.json - cross-subtree edges: 1
 
 graph.html and the callflow page are serverless single-file pages whose
 renderer is fetched from a CDN on first open - call them that, never
 self-contained: that word is earned only by a page that opens with the
-network disabled, and graphify's own output doesn't (bd-atlas does).
+network disabled, and graphify's own output doesn't.
 
 For a domain spanning several subtrees that count is the carve check
 `/graphify-wrapper-map` deferred here: zero means the carve bought no

@@ -132,7 +132,7 @@ Skills you later mint with `/self-extension` are **repo-scoped** by default - co
 | Path | What |
 |------|------|
 | `skills/` | the practices, one dir per skill - the roster here is the count of record (agentskills.io: `name` + `description`, progressive disclosure) |
-| `scripts/` | the `bd-*` spine - `bd-mem` (memory + ledger), `bd-block`, `bd-dispatch`, `bd-guard` (enforced guardrails), `bd-worktree-guard`, `bd-review-package`, `bd-skill-stage`, `bd-link`, `bd-package-check`, `bd-uninstall`, `bd-gfx` (shared graphify helpers), `bd-atlas` (offline codebase atlas from a graphify graph) |
+| `scripts/` | the `bd-*` spine - `bd-mem` (memory + ledger), `bd-block`, `bd-dispatch`, `bd-guard` (enforced guardrails), `bd-worktree-guard`, `bd-review-package`, `bd-skill-stage`, `bd-link`, `bd-package-check`, `bd-uninstall`, `bd-gfx` (shared graphify helpers) |
 | `hooks/` · `hosts/` | session awareness + PreToolUse guard hooks · per-host install adapters (declarative, enumerated) |
 | `better-dev/hooks/` | three legacy-path shims, and nothing else. A host installed before the 0.13 flatten has an absolute hook command pointing here; without them its session hooks die silently. See D34 |
 | `browse/` · `ios-qa/` | vendored daemons (gstack, MIT - see `NOTICE`): headless-browser QA · on-device iOS QA; compiled on first need, never in CI |

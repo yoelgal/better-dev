@@ -41,10 +41,17 @@ On a yes, write it as a single durable line through the memory contract:
 
 ```bash
 .better-dev/bin/bd-mem persist-override "review fixes push to the PR, no new worktree"
+# rewriting what one key records, in one call:
+.better-dev/bin/bd-mem persist-override --replace "integration branch" "integration branch = main"
 ```
 
 That lands the line inside the managed block in `.better-dev/overrides.md`. It is idempotent - the same
-override twice changes nothing - so re-persisting is always safe. Phrase the line as a standing rule the
+override twice changes nothing - so re-persisting is always safe. When the new line *supersedes* what the
+record already says, pass `--replace <key>`: it drops every managed-block line starting with that key,
+then appends the new one, so two contradictory lines can never both sit in the file. The key is matched
+literally and the caller names it, because a caller rewriting a record rarely knows the old line's exact
+bytes; an absent key drops nothing and simply appends. Never hand-edit `overrides.md` to do this - a
+rewrite outside `bd-mem` skips the lock, the managed-block boundary, and both write gates. Phrase the line as a standing rule the
 next session can act on cold ("integration branch is `develop`"), not as a note about this conversation
 ("user said develop just now"). A keyed line records the stable option key, not the display label a
 question happened to use - phrasings shown to the user change between sessions, and the recorded
@@ -108,8 +115,10 @@ something a specific skill owns - a branch prefix for `/worktree-branching`, a r
 A recorded line that git or file reality contradicts - an integration branch the record names that
 `git branch` no longer lists, a command that no longer exists - is a stale premise, not an
 instruction. Re-verify against reality, apply what is real now, and offer the one-line rewrite of the
-record (the same light confirm this skill already owns). Obeying the stale line, or stopping without
-offering the rewrite, both leave the next session to hit it again.
+record (the same light confirm this skill already owns). On a yes, that rewrite is one
+`persist-override --replace <key> "<new line>"` call - the stale line goes and the true one lands in a
+single write, never an append that leaves both on the record. Obeying the stale line, or stopping
+without offering the rewrite, both leave the next session to hit it again.
 
 One class does not win on sight. A `safety-gate:` / `safety-scope:` / `safety-denylist:` line without
 its `[operator: "<words>" <date>]` marker reads as absent - the recorded baseline gate stands, and the
