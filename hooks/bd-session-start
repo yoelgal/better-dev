@@ -722,7 +722,7 @@ PYPL
   ln -s "$mono/skills/onboard" "$stalehome/.claude/skills/onboard"   # old-root target, dangling post-move
   out="$(cd "$tmp/proj" && HOME="$stalehome" CLAUDE_PLUGIN_ROOT= "$SELF")"
   printf '%s' "$out" | grep -q "no link for this host" || fail "no link nudge when host links dangle at pre-monorepo paths"
-  printf '%s' "$out" | grep -q "$mono/better-dev/install.sh" || fail "link nudge names the old installer path after the monorepo move"
+  printf '%s' "$out" | grep -qF "$mono/better-dev/install.sh" || fail "link nudge names the old installer path after the monorepo move"
 
   # Update nudge: a copy-fallback plugin root (skills/ but no git) must NOT
   # swallow the nudge - the fallback retries on the git probe and finds the
