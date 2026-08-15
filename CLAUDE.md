@@ -13,7 +13,7 @@ itself - a tool you name wins over a row:
 | "let's build an app that does Y", a new project or epic | `/groundwork` | asks steered or one-shot (`/gauntlet`) first, then sets the foundation |
 | "gauntlet this", "one-shot the whole thing", "write me a prompt to build X in a fresh session" | `/gauntlet` | grills goal + bar, hands you one loop prompt for a fresh session |
 | "ship it", "open a PR", "let's land this" | `/pr-and-verify` | -> `/release-promotion` on green |
-| "release this / promote to main", "roll back / revert the release", "hotfix prod", "did the deploy land / is prod healthy" | `/release-promotion` | tags, verifies live, reverts a bad release, double-merges the hotfix |
+| "release this", "cut a release", "roll back / revert the release", "hotfix prod", "did the deploy land / is prod healthy" | `/release-promotion` | derives the version and the release tier, tags, verifies live, reverts a bad release, lands the hotfix on the trunk |
 | "deploy this", "get it live", "set up hosting" | `/deploy-capability` | creates the surface; `/guardrails-install` records it |
 | "wire monitoring", "can I see prod errors?", "does anything page me?" | `/observability-install` | fills the recorded `obs-*` gaps |
 | "review this PR", "review my colleague's PR" | `/review` | inbound path: host mechanics + this repo's recorded policy |
@@ -35,9 +35,10 @@ itself - a tool you name wins over a row:
 You name the entry, not every step: each front-end hands to `/autonomous-loop`, which hands a DONE
 result to `/pr-and-verify`, which hands a green PR to `/release-promotion`. Every work-item - even a
 trivial one that skips the front-ends - runs in
-its own git worktree, off `staging` (`/worktree-branching` sets it up first); a follow-up to an open
-item rides that item's existing worktree. Branching is `feat/*` (`fix/*`), merged to `staging`,
-promoted to `main` on release.
+its own git worktree, off `main` (`/worktree-branching` sets it up first); a follow-up to an open
+item rides that item's existing worktree. Branching is `feat/*` (`fix/*`), merged to `main`, which is
+both the integration branch and the release branch - a release is a version commit and a tag on it,
+with no promote (D36).
 
 - Durable rules and lessons: `.better-dev/bin/bd-mem` (backend: files); `--help` prints the full
   command surface. Project overrides in
@@ -65,7 +66,9 @@ This repo (`better-dev`) is the better-dev tool itself, laid out flat at the roo
 `scripts/`, `hooks/`, `hosts/`, `docs/`, `browse/`, `ios-qa/`, and the gitignored `raw/` research
 archive are its own parts, not separate tools. There is one version, stamped in
 `.claude-plugin/plugin.json`, and one release ledger, `docs/RELEASES.md`. Branch discipline is
-`feat/*` off `staging`, promoted to `main`.
+trunk: `feat/*` off `main`, merged back to `main`, released by a version commit and a tag. `main` is
+the distribution channel - a merge is live to every user on their next `git pull` - so a red gate
+reaches people, and that is the cost trunk trades the staging buffer for.
 
 One exception to "flat at the root": `better-dev/hooks/` holds three legacy-path shims, and only
 those. A host installed before the flatten records an absolute hook command pointing there, so
