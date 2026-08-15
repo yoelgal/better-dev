@@ -81,6 +81,13 @@ normalize_clone() {
   [ -n "${1:-}" ] || return 0
   if [ -d "$1/skills" ]; then printf '%s' "$1"
   elif [ -d "$1/better-dev/skills" ]; then printf '%s' "$1/better-dev"
+  # ...and the mirror case, which is the one a moved clone lands in: the host was
+  # installed on the 0.7.0 layout, so every recorded path still ends in
+  # better-dev/, but the pull that flattened the repo deleted it. Stepping DOWN
+  # only made that path resolve to nothing and every nudge went silent on exactly
+  # the host with a repair to run. Gated on the basename, not on the parent merely
+  # holding skills/, so this never adopts an unrelated parent directory.
+  elif [ "${1##*/}" = better-dev ] && [ -d "${1%/*}/skills" ]; then printf '%s' "${1%/*}"
   fi
 }
 
@@ -136,9 +143,14 @@ host_installed() {
     [ -e "$entry" ] || [ -L "$entry" ] || continue
     if [ -L "$entry" ]; then
       target="$(readlink "$entry" 2>/dev/null)"
-      # match the normalized clone AND its pre-0.7.0 root: after the monorepo
-      # move every old link's target prefix is the root, not better-dev/.
-      case "$target" in "$clone"/skills/* | "${clone%/better-dev}"/skills/*) return 0 ;; esac
+      # match the normalized clone, its pre-0.7.0 root (after the monorepo move
+      # every old link's target prefix is the root, not better-dev/), AND its
+      # 0.7.0 subdir - a moved clone normalizes UP to the root while every host
+      # link still carries the better-dev/ prefix, and matching only the first two
+      # forms answers "no install here" for the host most in need of the nudge.
+      case "$target" in
+        "$clone"/skills/* | "${clone%/better-dev}"/skills/* | "$clone"/better-dev/skills/*) return 0 ;;
+      esac
     elif [ -f "$entry/.better-dev-skill" ]; then
       return 0
     fi
@@ -526,6 +538,22 @@ json.dump(d,open(p,'w'))
 PYPL
     out="$(cd "$tmp/proj" && HOME="$tmp/h" CLAUDE_PLUGIN_ROOT="$clone_st" "$SELF")" || fail "errored when the plugin root is the linked clone"
     printf '%s' "$out" | grep -q "missing awareness hooks" && fail "hook nudge fired when the plugin root is the linked clone"
+
+    # Moved clone: the host was installed on the pre-flatten layout, so every link
+    # and every wired hook path still points one level down into better-dev/. Both
+    # resolvers used to step DOWN only, so a stale path resolved to nothing and the
+    # two nudges that name the repair went silent on exactly the host that needed
+    # them. Drive it through the hook rather than the functions: what matters is
+    # that the stale host is TOLD, not which helper noticed.
+    mkdir -p "$tmp/stale/.claude/skills"
+    ln -sfn "$clone_st/better-dev/skills/onboard" "$tmp/stale/.claude/skills/onboard"
+    printf '{}' > "$tmp/stale/.claude/settings.json"
+    python3 "$clone_st/scripts/bd-hook-wire" wire "$clone_st/better-dev" "$tmp/stale/.claude/settings.json" >/dev/null 2>&1
+    out="$(cd "$tmp/proj" && HOME="$tmp/stale" CLAUDE_PLUGIN_ROOT= "$SELF")" || fail "errored on a moved clone"
+    printf '%s' "$out" | jq -e . >/dev/null || fail "moved-clone output is not valid JSON"
+    printf '%s' "$out" | grep -q "no link for this host" || fail "link nudge silent on a moved clone"
+    printf '%s' "$out" | grep -q "missing awareness hooks" || fail "hook nudge silent on a moved clone"
+    printf '%s' "$out" | grep -q "$clone_st/install.sh" || fail "moved-clone nudge names no runnable install.sh path"
   fi
 
   # Overrides present -> the note points at them, still valid JSON.
