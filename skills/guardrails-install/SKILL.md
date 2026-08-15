@@ -1,6 +1,6 @@
 ---
 name: guardrails-install
-description: Use when a repo needs its guardrails installed or recorded - a missing commit-time or CI gate (no pre-commit hook, no lint/typecheck gate, no CI workflow), the autonomous loop's blast-radius policy (the high-consequence paths it should escalate rather than auto-edit, the change classes that gate a human, the scope threshold), the enforcement wiring that mechanically checks that policy (bd-guard hooks, recorded as safety-enforcement), or the recorded rules downstream skills recall - deploy-* (including deploy-migrate and deploy-env, or deploy-surface: none), dev-run, seed-reset, ops-runner, and obs-* with absence as a named gap. Invoked by /onboard while bootstrapping the minimum base, run directly to fill a guardrail gap or record the safety policy without touching what the repo already has, or when the operator keeps answering the same non-safety gate yes run after run - a re-run then proposes the standing allowance the kept record has earned.
+description: Use when a repo needs its guardrails installed or recorded - a missing commit-time or CI gate (no pre-commit hook, no lint/typecheck gate, no CI workflow), the autonomous loop's blast-radius policy (the high-consequence paths it should escalate rather than auto-edit, the change classes that gate a human, the scope threshold), the enforcement wiring that mechanically checks that policy (bd-guard hooks, recorded as safety-enforcement), or the recorded rules downstream skills recall - deploy-* (including deploy-migrate and deploy-env, or deploy-surface: none), dev-run, seed-reset, ops-runner, version-surface, release-automation, and obs-* with absence as a named gap. Invoked by /onboard while bootstrapping the minimum base, run directly to fill a guardrail gap or record the safety policy without touching what the repo already has, or when the operator keeps answering the same non-safety gate yes run after run - a re-run then proposes the standing allowance the kept record has earned.
 allowed-tools:
   - Bash
   - Read
@@ -332,6 +332,41 @@ settle on instead of re-asking. Each recorded `none` is a named gap `/observabil
 fill; a production repo carrying `obs-alert-channel: none` learns of its incidents from users, so that
 line belongs in the close-out headline with the other operator-action items, never below a victory
 banner.
+
+## Record the version surface
+
+A release has to write the version somewhere, and the releaser should not re-derive it under tag-time
+pressure. Probe the root manifests at once (`ls .claude-plugin/plugin.json package.json pyproject.toml
+Cargo.toml VERSION`), read the version field out of each hit, and confirm it like any other key:
+
+```bash
+.better-dev/bin/bd-mem remember "version-surface: <file + where in it, or 'none'>"
+```
+
+The value is the path plus where in it - `.claude-plugin/plugin.json at $.version`, `package.json at
+$.version`, `pyproject.toml at $.project.version`, `Cargo.toml at $.package.version`, or a bare
+`VERSION` whose whole body is the version - and the hit count decides it, never the probe order: one
+hit is the answer, zero records `version-surface: none` (a repo that ships no version, which
+`/release-promotion` tags without a manifest to bump), and two or more - or a root that declares
+members (a `workspaces` field, a `[workspace]` table, a `packages/*` layout) - is an **ask**. Name
+every manifest you found with its observed value and let the operator pick the one a release bumps; a
+wrong pick bumps the wrong package at every release after it.
+
+## Record the release automation
+
+Whether a tool cuts the release or a human does decides which path `/release-promotion` takes, and
+tag time is the wrong moment to find out. Probe the tree for a release tool's config at once
+(`ls -d release-please-config.json .changeset .releaserc* 2>/dev/null`, plus a workflow that cuts
+tags - `grep -rl "git tag" .github/workflows 2>/dev/null`) and confirm it like any other key:
+
+```bash
+.better-dev/bin/bd-mem remember "release-automation: <the tool that cuts releases, or 'none'>"
+```
+
+A config found but unrecorded is an **ask**, never a silent yes: name what you found and let the
+operator say whether that tool actually cuts this repo's releases, since a config nobody has run is
+not the mechanism. Nothing found records `release-automation: none` - the fact that sends the
+releaser down its manual cut-and-tag path instead of re-probing for a tool every release.
 
 ## Record the blast-radius policy
 

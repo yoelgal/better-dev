@@ -17,7 +17,7 @@ is still missing.
 |---|---|
 | A repo has no pre-commit hook, no lint/typecheck gate, or no CI workflow | here |
 | The loop needs to know which paths to escalate on rather than auto-edit (denylist, human-gate classes, scope threshold) | here |
-| A repo keeps recording `deploy-*`, `dev-run`, `seed-reset`, `ops-runner`, or `obs-*` as gaps every session re-asks | here |
+| A repo keeps recording `deploy-*`, `dev-run`, `seed-reset`, `ops-runner`, `version-surface`, `release-automation`, or `obs-*` as gaps every session re-asks | here |
 | The operator keeps answering the same non-safety gate yes, run after run | here (it proposes the standing allowance the record earned) |
 | A deploy surface needs to exist, not just be recorded | `/deploy-capability` first, then this skill records what it hands back |
 | Production has no error tracker, alert channel, or health probe wired | `/observability-install` |

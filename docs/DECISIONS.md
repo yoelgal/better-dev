@@ -1139,3 +1139,54 @@ the root paths, and the shim is never executed on that machine again. They carry
 because the installed-user count is not measurable; the collector is a `legacy-hook-shim-removal`
 follow-up against the `better-dev-extraction` epic. Until then `git grep "better-dev/"` will keep
 hitting this directory, and that is expected rather than drift.
+
+## D35 - the script surface was over-built; cut it and keep cutting (operator ruling, 2026-08-15)
+
+An audit of `scripts/` and `hooks/` found **8,006 lines of shell and python** for a library whose
+product is markdown an agent reads. The operator's ruling, verbatim: *"I don't get why we need all
+these scripts. This thing should be able to be handled by the agent. I feel like making all these
+scripts just makes it brittle."*
+
+Three things were cut, and the pattern joining them is the finding.
+
+**`scripts/bd-atlas` (1,355 lines) is deleted.** A python generator turning a graphify graph into an
+offline HTML page. No automatic caller: no CI job, no hook, no installer referenced it, and the only
+mention inside the gate was a comment about its shebang. Five prose sites invited an operator to run
+it by hand. CI paid to run its selftest on every PR. graphify's own `graph.html` and callflow pages
+ride graphify's regen and were always the surfaces that mattered. D28's rulings 4, 5 and 9 lose their
+subject with it; ruling 3's two-surface firewall survives and now applies to those pages.
+
+**`scripts/bd-migrate-branch-model` goes from 491 logic lines to 173.** Its one job is retiring a
+staged integration branch. It carried a fifteen-precondition ladder, an incomplete-migration marker
+file with its own recovery and stale-detection logic, remote resolution by named mechanism, and
+post-write resolver assertions. All of it was defeated by **one grep**: the branch-model detector
+substring-matched `branch-model: trunk` across `rules.md` and `overrides.md`, so a recorded rule that
+merely *described* the trunk default made the tool report "already recorded as trunk - nothing to do"
+on a repo whose `overrides.md` said `integration branch = staging`. Reproduced live against this
+repo. That is the lesson: **defence in depth around a detector that reads prose is not defence.** The
+40-line machine-local marker block is replaced by 6 lines that read the pushed archive tag, which any
+clone can see.
+
+What survives is what prevents a witnessed loss, one comment line each naming the loss it prevents:
+refuse on a dirty tree, push the archive tag before any delete, refuse when release resolves equal to
+integration, assert the override rewrite before deleting, refuse without `--yes`, and fetch above
+every gate.
+
+**`bd-mem persist-override` gains `--replace`.** It only ever appended, which is why the migration
+hand-rolled a `grep -v` rewrite outside bd-mem's lock, not marker-aware and non-atomic. A missing
+verb had become a workaround in a caller; that is the same defect class as the other two.
+
+### The rule this sets
+
+A new `bd-*` script has to earn its existence against what skill prose plus the already-running gate
+already do. A proposed `scripts/bd-release-cut` was rejected under this rule the same day: version
+arithmetic is `git log` read by the agent, atomicity comes from the commit rather than a script, and
+the invariant it would have enforced is already enforced by `bd-package-check` on every PR. **Name the
+collector before reaching for a script; often CI already is one.**
+
+### Still open, deliberately
+
+Over half of `bd-package-check`'s checks assert that a phrase exists in skill prose rather than that
+anything works, and adding a check now needs its own documented protocol - a gate that needs rules
+about how to extend it has outgrown its job. Cutting those is a reduction of the repo's own CI safety
+net, so it waits on the operator naming the checks rather than riding a general mandate.
