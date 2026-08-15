@@ -489,11 +489,13 @@ construct outright - an assembled or hidden command is the injection vector, nev
 `check-edit` denies a write outside the active scope boundary and asks on a `safety-denylist` glob. Both
 fire only in repos carrying `.better-dev/`, fail open on parse failure, and stay silent otherwise.
 
-Detect which delivery this repo already has. There is no write-nothing branch: a plugin install is not
-a supported state (D32 deleted the marketplace channel, and a version-pinned plugin cache cannot carry
-the `.better-dev/bin` bridge these scripts are called through), so never decline to wire the guard on
-the belief that a plugin already delivered it. Declining is the failure direction that matters - it
-leaves a repo with no enforcement and a record saying it has some.
+Detect, in order, which of these two deliveries this host supports. Never decline to wire the guard on
+the belief that a plugin already delivered it: a plugin install is not a supported state (D32 deleted
+the marketplace channel, and a version-pinned plugin cache cannot carry the `.better-dev/bin` bridge
+these scripts are called through). Declining on that belief is the failure direction that matters - it
+leaves a repo with no enforcement and a record saying it has some. A host that genuinely has no
+pre-execution hook is the one case that writes nothing, and it says so out loud rather than inventing
+a hook config for a host whose convention was never verified:
 
 - **A clone install on a host with a pre-execution hook** - the agent never edits
   `.claude/settings.json` itself; it emits the wiring as a paste-ready operator-run step carrying
