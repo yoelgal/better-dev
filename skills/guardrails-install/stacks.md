@@ -161,8 +161,11 @@ and a known-vulnerable dependency fails the gate rather than shipping green.
 
 ## Enforcement wiring for a clone install (Claude Code)
 
-A plugin install already carries the two `PreToolUse` entries in its `hooks.json` - write nothing. A
-clone install needs the same script wired into the repo's `.claude/settings.json` - the agent never
+Wire this for every install; there is no case that writes nothing. A plugin install is not a supported
+state, so the presence of `hooks/hooks.json` in a checkout is never a reason to skip the wiring - that
+file is the tool's own declaration, not evidence a host registered anything.
+
+A clone install needs the script wired into the repo's `.claude/settings.json` - the agent never
 edits that file itself; it emits the block below as a paste-ready operator-run step and the operator
 applies it on their own explicit yes. The destructive-pattern set, the safe rm-target allowlist, and
 the obfuscated-shell deny all live inside `bd-guard` - the settings carry only the wiring, never a

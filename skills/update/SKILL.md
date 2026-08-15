@@ -22,11 +22,18 @@ setopt no_nomatch 2>/dev/null || true
 clone="${CLAUDE_PLUGIN_ROOT:-}"
 if [ -z "$clone" ]; then   # fall back to reading a host skill symlink back to the clone
   for s in "$HOME"/.*/skills/onboard "$HOME"/.config/*/skills/onboard; do
-    [ -L "$s" ] && clone="$(cd "$(dirname "$(readlink "$s")")/.." && pwd)" && break
+    [ -L "$s" ] || continue
+    t="$(readlink "$s")"; clone="${t%/skills/onboard}"   # strip, never cd: a moved clone's link is DANGLING, and cd into it fails
+    [ "$clone" != "$t" ] && break
+    clone=""
   done
 fi
-if [ -n "$clone" ] && [ ! -d "$clone/skills" ] && [ -d "$clone/better-dev/skills" ]; then
-  clone="$clone/better-dev"   # legacy monorepo layout: the tool lived one level down in better-dev/ before the flatten
+if [ -n "$clone" ] && [ ! -d "$clone/skills" ]; then
+  if [ -d "$clone/better-dev/skills" ]; then
+    clone="$clone/better-dev"   # 0.7.0 monorepo layout: the tool lived one level down, not yet re-pulled
+  elif [ "${clone##*/}" = better-dev ] && [ -d "${clone%/*}/skills" ]; then
+    clone="${clone%/*}"         # moved clone: recorded one level down, but the pull flattened it away
+  fi
 fi
 if [ -n "$clone" ] && [ -d "$clone/skills" ] && git -C "$clone" rev-parse --git-dir >/dev/null 2>&1; then   # git -C "" acts on the cwd; pull only a resolved clone
   old="$(git -C "$clone" rev-parse HEAD)"
@@ -36,21 +43,27 @@ else
 fi
 ```
 
-Since the 0.7.0 monorepo move the clone dir a host resolves may be the repo root (current, post-flatten
-install) or the `better-dev/` subdir inside it (a clone still on the 0.7.0-era monorepo layout, not yet
-re-pulled) - the snippet's first guard normalizes either to the dir that holds `skills/`, which is also
-why the git probe is not a `.git` dir check: a subdir of a checkout has none of its own.
+The clone dir a host resolves may be the repo root (current), or the `better-dev/` subdir inside it -
+either because the clone is still on the 0.7.0-era monorepo layout, or because it has already pulled
+the flatten and the recorded path now points at a directory that no longer exists. The guard
+normalizes all three to the dir that holds `skills/`, stepping down and up, which is also why the git
+probe is not a `.git` dir check: a subdir of a checkout has none of its own. The link is read as a
+string rather than followed with `cd` for the same reason - the third case's link is **dangling**, so
+`cd` into it fails and the whole resolution silently reports no clone found on exactly the install
+that most needs updating.
 
 Where the host gates machine-touching commands, hand the pull to the operator paste-ready
 (`git -C <clone> pull --ff-only`). `--ff-only` never clobbers local edits: a refused pull means
 the clone carries local work - report that and stop rather than merging or resetting on the
 operator's behalf. A pull that fails offline: report it and stop; never guess what the remote holds.
 
-One shape is not local work: a clone resolved from a **legacy plugin install** - the marketplace
-channel better-dev shipped from 0.7.0 until D32 deleted it - is a host-managed, version-pinned
-checkout, so a refused or unavailable pull there is that channel working as designed. Say so and move
-to step 3 rather than reporting a dirty clone. The channel is gone for new installs, but the installs
-themselves are not, which is why `normalize_clone` and the guard above still resolve one.
+One shape is not local work and is not updatable either: a clone resolved from a **legacy plugin
+install** - the marketplace channel better-dev shipped from 0.7.0 until D32 deleted it.
+A plugin checkout is not a supported install. Do not report a dirty clone, and do not try to
+update it in place. It is host-managed and version-pinned, which is why the pull is refused, and the
+same pinning means `.better-dev/bin` cannot bridge to it - so every skill that calls through
+`.better-dev/bin/bd-mem` is already broken there, update or no update. Say that plainly and hand the
+operator the clone install from `BOOTSTRAP.md`; the migration is the remedy, not a re-pull.
 
 The full install contract lives in `/packaging`.
 

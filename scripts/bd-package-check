@@ -361,7 +361,10 @@ echo "== shell parses (bash -n) =="
 # installer) and carries no shebang, and any future helper not named bd-* would otherwise ship
 # unparsed under a label claiming it was checked.
 unparseable=""
-for s in scripts/* hooks/* hosts/* install.sh; do
+# better-dev/hooks/* is in the sweep for the same reason the rest of it is: those are the legacy-path
+# shims a pre-flatten host actually executes, and an unparseable one there is a hook that dies exactly
+# where nothing else can report it - the failure mode the shims exist to end.
+for s in scripts/* hooks/* hosts/* better-dev/hooks/* install.sh; do
   [ -f "$s" ] || continue
   case "$s" in *.json) continue ;; esac
   # Parse each script with the language its shebang declares - bd-atlas is python,
@@ -373,7 +376,7 @@ for s in scripts/* hooks/* hosts/* install.sh; do
     bash -n "$s" 2>/dev/null || unparseable="$unparseable $s"
   fi
 done
-[ -z "$unparseable" ] && ok "every shipped script under scripts/, hooks/, hosts/ and install.sh parses (bash -n, or ast.parse per shebang)" || bad "syntax error in:$unparseable - a selftest cannot see this, it exits before the parse" # prove-new: regression-guard every shipped script parses at base, as it does after any change that did not break one; this catches the later edit that does, which the selftest runner structurally cannot see
+[ -z "$unparseable" ] && ok "every shipped script under scripts/, hooks/, hosts/, better-dev/hooks/ and install.sh parses (bash -n, or ast.parse per shebang)" || bad "syntax error in:$unparseable - a selftest cannot see this, it exits before the parse" # prove-new: regression-guard every shipped script parses at base, as it does after any change that did not break one; this catches the later edit that does, which the selftest runner structurally cannot see
 
 echo "== hook scripts (selftest) =="
 for s in hooks/bd-*; do
@@ -742,6 +745,33 @@ fi
   && ok "moved clone: the pre-flatten hook path still runs and names install.sh, and that run repoints every link and hook entry with no stale entry beside them" \
   || bad "moved clone: a host wired on the pre-flatten layout is not reached or does not repair - the legacy hook path is dead (nothing can nudge the operator), its output does not name install.sh, the repair left a link or hook entry pointing into the deleted better-dev/ directory, or hosts/claude yields no skills dir"
 rm -rf "$mc"
+
+# /update resolves the clone with its OWN standalone bash - it has to run before it knows where the
+# tool is, so it cannot call normalize_clone. That makes it a second copy of the same three-way
+# resolution, and the copy silently stepped down only: post-flatten it reported "no better-dev clone
+# found" and never reached its link reconcile, on the sanctioned update path. Assert both directions
+# and the string read - following the link with `cd` fails on the dangling one, which is the whole
+# case. Text-level, because the block is prose in a skill, not a shipped script.
+upd="skills/update/SKILL.md"
+if grep -q 'clone="$clone/better-dev"' "$upd" \
+   && grep -q 'clone="${clone%/\*}"' "$upd" \
+   && grep -q 'clone="${t%/skills/onboard}"' "$upd"; then
+  ok "/update's clone resolver normalizes in both directions and reads the link as a string, so a moved clone still resolves"
+else
+  bad "/update's clone resolver does not handle a moved clone: it steps only down (or follows the link with cd, which fails on the dangling link a moved clone leaves), so the sanctioned update path reports no clone found on exactly the install that needs updating"
+fi
+
+# The legacy-plugin decision, landed in one direction everywhere. The failure that matters is a skill
+# DECLINING to wire the guard because it believes a plugin already did - a repo left with no
+# enforcement and a record saying it has some. Assert the write-nothing branches are gone rather than
+# asserting new prose, so a reworded rewrite of the same instruction still fails.
+if ! grep -q 'nothing to do; enforcement is already always-on' skills/guardrails-install/SKILL.md \
+   && ! grep -q 'write nothing' skills/guardrails-install/stacks.md \
+   && grep -q 'not a supported install' skills/update/SKILL.md; then
+  ok "a legacy plugin install is settled as unsupported: no branch tells /guardrails-install to skip the wiring, and /update names the migration rather than calling a refused pull normal"
+else
+  bad "the legacy-plugin decision is not landed in all three places - /guardrails-install still declines to wire the guard on the belief a plugin delivered it (leaving a repo unenforced while recording that it is enforced), or /update still describes a plugin checkout as a normal state to leave alone"
+fi
 
 echo "== comms-style block =="
 # The block ships from exactly one file. onboard writes it per repo and BOOTSTRAP offers it globally;

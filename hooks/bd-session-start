@@ -218,8 +218,14 @@ hook_nudge() {
   # nudge would buy a second executing copy of all three, running twice per session
   # for good. Relinking skills is idempotent and a duplicate hook is not, so this
   # asymmetry earns its own gate rather than riding link_nudge's posture.
+  # Still no install.sh nudge here - but say the true thing instead of nothing. A
+  # plugin install is no longer a supported state: the marketplace channel is gone
+  # (D32), and a version-pinned plugin cache cannot carry .better-dev/bin, so every
+  # skill calling through that bridge is already broken on this host. Silence is
+  # what let that sit indefinitely; this is the one line that names the migration.
   if [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] && [ -f "$clone/hooks/hooks.json" ] \
      && [ "$clone" = "$(normalize_clone "${CLAUDE_PLUGIN_ROOT:-}")" ]; then
+    printf ' better-dev: this looks like a plugin install, which is no longer supported - the scripts bridge (.better-dev/bin) cannot resolve into a version-pinned plugin cache, so skills that call it are already broken here. Reinstall from a git clone (see BOOTSTRAP.md).'
     return 0
   fi
   command -v python3 >/dev/null 2>&1 || return 0
@@ -538,6 +544,9 @@ json.dump(d,open(p,'w'))
 PYPL
     out="$(cd "$tmp/proj" && HOME="$tmp/h" CLAUDE_PLUGIN_ROOT="$clone_st" "$SELF")" || fail "errored when the plugin root is the linked clone"
     printf '%s' "$out" | grep -q "missing awareness hooks" && fail "hook nudge fired when the plugin root is the linked clone"
+    # ...but not silent either: a plugin install is not a supported state, and saying
+    # nothing is what let one sit unmigrated indefinitely.
+    printf '%s' "$out" | grep -q "no longer supported" || fail "no migration line on a plugin install"
 
     # Moved clone: the host was installed on the pre-flatten layout, so every link
     # and every wired hook path still points one level down into better-dev/. Both
