@@ -5,7 +5,7 @@
 Builds or refreshes the graphs for a worktree's registered domains - the only skill that writes
 a graph. It runs an AST-only `update` by default, cheap and free of any model call, and only runs
 the full LLM `extract` pass when asked for `--semantic`. Each sync also keeps the human-openable
-pages beside the graph current - the callflow page and the atlas re-render with the build, so what
+pages beside the graph current - the callflow page re-renders with the build, so what
 a person opens never trails what an agent queries. The defining constraint: output never
 lands in the indexed tree - every graph is written to an absolute path under this repo's central
 home, keyed per worktree and per domain, so a build leaves the code it indexed byte-unchanged.

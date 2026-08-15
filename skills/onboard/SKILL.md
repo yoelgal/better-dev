@@ -122,42 +122,60 @@ recorded as an override rather than overwritten:
   mark where each lands. A repo whose history is all yours records `team` quietly, no question
   asked. Going team later is the team's call: re-run `/onboard`, answer team, and the tracked
   shape is written the normal way.
-- Repo uses `feat/* → staging → main`? Keep it. Record `feature branch prefix = feat/` and
-  `integration branch = staging` via `.better-dev/bin/bd-mem persist-override "<line>"`, plus
-  `.better-dev/bin/bd-mem remember "branch-model: staged"`. Don't force `feature/`.
+- Repo uses `feat/* → staging → main`? Keep it. Don't force `feature/`. Record it as three literal
+  calls - the `--replace` key is a **literal prefix match** that drops every line starting with it,
+  so one key reused for two records deletes the first one as it writes the second:
+
+  ```bash
+  .better-dev/bin/bd-mem persist-override --replace "feature branch prefix" "feature branch prefix = feat/"
+  .better-dev/bin/bd-mem persist-override --replace "integration branch" "integration branch = staging"
+  .better-dev/bin/bd-mem remember "branch-model: staged"
+  ```
+
+  Each key carries its own `--replace`, which is what keeps a re-run idempotent instead of appending
+  a second, contradictory line.
 - **Wired staged, and the operator asks to move to trunk?** Migrate it rather than re-recording
   `staged` - the keep-it above stays what happens by default, and a repo whose operator never asks
   is untouched. **Do not hand-run the steps.** This retires a shared branch, and the preconditions
-  are the whole job: which remote, whether the release branch resolves at all, whether local and
-  remote have diverged in either direction, an unclean tree, open PRs the delete would close, a
-  colleague's worktree, a half-finished earlier attempt. Prose has nowhere for a precondition to
-  fail, so the procedure is a script that fails closed:
+  are the whole job: whether the release branch resolves at all and to something other than the
+  integration branch, whether local and remote have diverged in either direction once a fetch has
+  refreshed the tracking refs, an unclean tree. One more is stated rather than gated, because
+  checking it needs forge auth the script deliberately does not want: **the open PRs the delete
+  would close.** The forge closes every PR based on the integration branch the moment it goes, and
+  the archive tag restores the branch but never the PRs - each one is reopened by hand. Retarget or
+  merge them *before* you ask for the yes. Prose has nowhere for a precondition to fail, so the
+  procedure is a script that fails closed:
 
   ```bash
   .better-dev/bin/bd-migrate-branch-model check        # every precondition, one verdict each
   .better-dev/bin/bd-migrate-branch-model apply --yes  # re-runs check, then migrates
   ```
 
-  `check` is read-only as to branches and history - it only ever retires its own stale
-  unfinished-migration marker - so it is safe to run for the answer alone; show its output before
+  `check` writes nothing at all, so it is safe to run for the answer alone; show its output before
   asking for the yes. It stops rather than guesses - it resolves the release branch from
   `refs/remotes/<remote>/HEAD` and never from the literal name `main`, and refuses outright when
-  that resolves to the integration branch itself. `apply` archives the branch tip as
-  `archive/<integration>-<YYYY-MM-DD>` and pushes that tag *before* deleting anything, so
-  `git branch <integration> <tag>` puts the branch back exactly where it stood; a tag push that
-  fails aborts before any delete, and a remote delete refused by branch protection reports the
-  migration **incomplete** with the command to finish it, never as a clean run.
+  that resolves to the integration branch itself. `apply` fetches before it judges anything (a
+  stale tracking ref otherwise passes the divergence gate and the delete takes a colleague's
+  commits with it), then archives the branch tip as `archive/<integration>-<YYYY-MM-DD>` and pushes
+  that tag *before* deleting anything, so `git branch <integration> <tag>` puts the branch back
+  exactly where it stood; a tag push that fails aborts before any delete, and a remote delete
+  refused by branch protection reports the migration **incomplete** with the command to finish it,
+  never as a clean run. A repo already recorded as trunk **with nothing left behind** is a clean
+  exit 0; where a pushed `archive/*` tag names a branch that is still live, local or on the remote,
+  the re-run names it with the exact commands that finish it and exits **non-zero** - so a
+  half-finished migration reads as incomplete on every later run too, never as a clean one. The tag
+  is pushed, so any clone reads that same aftermath; nothing about it is machine-local.
 
   Two things the script deliberately leaves to you. It reports commits the integration branch
   carries that the release branch does not, but never merges them - offer to guide that merge
   first, as a suggestion rather than a refusal. And it does not touch the entry file: once it
   returns success, rewrite the discovery block so its routing text names the new integration
-  branch. Read `--help` before passing `--skip-pr-check`; it exists for a non-GitHub remote and it
-  asserts something the script could not check.
+  branch.
 - **Only `main`, no integration branch?** Two shapes fit, and git - not prose - says which (the
   branches that exist, the base merged PRs actually target, from Phase 1). A team already running
   trunk-based - PRs merge to `main`, `main` releases - is a first-class model, not a gap: record
-  `integration branch = main` via `persist-override` and `branch-model: trunk` via `remember`
+  `integration branch = main` via `persist-override --replace "integration branch"` (the replace
+  keeps a re-run from leaving two contradictory lines) and `branch-model: trunk` via `remember`
   (`/worktree-branching` then bases worktrees off the trunk; `/release-promotion` reduces to
   tag-plus-verify). An existing repo with real history that isn't already trunk: suggest the staged
   mechanism - a `staging` branch off `main` that feature/fix worktrees branch from and merge back

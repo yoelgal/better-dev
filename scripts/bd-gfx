@@ -161,7 +161,7 @@ gfx_out_dir() {
 #     1 - stale for that domain: refresh in place (`graphify update` is diff-aware,
 #         so the semantic layer survives an AST refresh)
 #     2 - another tree's output: gfx_discard_graph (the graph and every cache go,
-#         `memory/` and `flows.json` stay) and build cold
+#         `memory/` stays) and build cold
 #
 # gfx_out_dir keys on the worktree's PATH, so output now OUTLIVES the tree it
 # describes: /worktree-branching names worktrees .claude/worktrees/feat+<slug> and
@@ -218,9 +218,9 @@ gfx_discard_graph() {
   # -mindepth 1 so `$out` itself survives; -maxdepth 1 so a nested `cache/memory`
   # is still dropped. find emits paths rooted at the quoted operand with no shell
   # re-parse, so a leading-dash or newline filename cannot escape it.
-  # `flows.json` survives with `memory/`: both are operator-authored, not derived
-  # from the graph, so a provenance discard has no business deleting them.
-  find "$out" -mindepth 1 -maxdepth 1 ! -name memory ! -name flows.json -exec rm -rf {} +
+  # `memory/` survives: it is operator-authored, not derived from the graph, so a
+  # provenance discard has no business deleting it.
+  find "$out" -mindepth 1 -maxdepth 1 ! -name memory -exec rm -rf {} +
 }
 
 gfx_graph_state() {

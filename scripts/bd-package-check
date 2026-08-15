@@ -375,7 +375,7 @@ unparseable=""
 for s in scripts/* hooks/* hosts/* better-dev/hooks/* install.sh; do
   [ -f "$s" ] || continue
   case "$s" in *.json) continue ;; esac
-  # Parse each script with the language its shebang declares - bd-atlas is python,
+  # Parse each script with the language its shebang declares - bd-hook-wire is python,
   # and `bash -n` on python rejects the first class statement, not a real defect.
   # ast.parse, not py_compile: a parse check must not write __pycache__ into the tree.
   if head -1 "$s" | grep -q python; then

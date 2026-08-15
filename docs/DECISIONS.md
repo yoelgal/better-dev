@@ -848,6 +848,12 @@ deterministic repair for `orchestrating-agents` - are recorded as an opportunity
 along: they change how every dispatch reports, so they earn their own grill and their own
 verification pass, not a slot in a visualization harvest.
 
+**Rulings 4, 5 and 9 are retired by D35 (2026-08-15):** `scripts/bd-atlas` is deleted as
+over-engineered, so those three rulings lose their subject (with the flows panel and `flows.json`
+that ruling 4 governed). graphify's own `graph.html` and callflow pages are the rendered surfaces
+that remain. Ruling 3's two-surface firewall and its deletion test stand, and now apply to those
+pages. This entry records what was decided on 2026-08-05 and is not rewritten.
+
 Rejected-with-reasons (one row each):
 - Attendance-style run knobs (per-run dials over what the observatory records, filed with ruling 3's
   naming call) - what the run record holds is a ruling, not a per-run preference, and a dial over it
@@ -873,10 +879,11 @@ shared "observatory" naming across the two surfaces (ruling 3).
 
 Recorded as opportunities, priced but unbuilt: a real path/affected visual export upstreamed to
 graphify itself (days, external review cycle; every graphify user would inherit it, and it could
-retire bd-atlas's overlay duty); an emission-contract grill for `orchestrating-agents` (arithmetic
-self-checks, ordered deterministic repair); an install-surface security audit of `install.sh`; a
-bd-atlas tour mode surfacing ruling 5's sort order as a "read in this order" strip; watching
-graphify 0.9.33's hosted-platform early access for a future serve story.
+retire bd-atlas's overlay duty) (moot under D35); an emission-contract grill for
+`orchestrating-agents` (arithmetic self-checks, ordered deterministic repair); an install-surface
+security audit of `install.sh`; a bd-atlas tour mode surfacing ruling 5's sort order as a "read in
+this order" strip (moot under D35); watching graphify 0.9.33's hosted-platform early access for a
+future serve story.
 
 ## D29 - mattpocock v1.2 release harvest rulings (2026-08-05 evening; four calls operator-ratified)
 
