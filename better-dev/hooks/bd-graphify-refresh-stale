@@ -1,18 +1,10 @@
 #!/usr/bin/env bash
-# Legacy-path shim. Nothing here is new behaviour - it re-exposes the root hook of the same name at
-# the path better-dev occupied under the 0.7.0 monorepo layout.
+# Legacy-path shim - re-exposes the root hook of the same name at the path better-dev occupied under
+# the 0.7.0 monorepo layout. New behaviour: none. Rationale and removal condition: D34.
 #
-# Why it has to exist at all: install.sh writes an ABSOLUTE command into the host's machine-global
-# hook config (bash "<clone>/better-dev/hooks/bd-session-start"), and the flatten deleted that path.
-# A host installed before the flatten therefore runs a command that exits 127, so NO hook code runs -
-# and the nudges that would name the repair (hook_nudge, link_nudge) can never be reached, however
-# correct they are. Fixing the resolvers alone reaches nobody whose hook is already dead. This file
-# is the only thing that can, because the path in their settings.json is fixed and points here.
-#
-# It self-retires per host: the nudges tell the operator to re-run install.sh, and that run rewrites
-# the hook commands to the root paths, after which this file is never executed again on that machine.
-# Delete the whole better-dev/ shim dir once no pre-flatten install plausibly remains - tracked as
-# `legacy-hook-shim-removal` against the better-dev-extraction epic.
+# Do not delete this because the tree looks flat now. A host installed before the flatten runs an
+# ABSOLUTE command pointing here, so without this file it exits 127 and no hook code runs at all -
+# which is the one state from which no nudge can ever reach that operator.
 #
 # Deliberately silent: the real hook emits a strict JSON object, so anything printed here would
 # corrupt it. exec, never echo.
