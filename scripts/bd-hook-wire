@@ -8,8 +8,11 @@ host config, which is why the package gate checks the two against each other. Wi
 install links every skill and registers no hook - in every repo, forever, while BOOTSTRAP claims the
 tool ships hooks. install.sh calls this; /bootstrap-hooks is the by-hand path.
 
-hooks.json is not dead weight, so do not delete it as plugin residue: friction/run.sh reads it out of
-the clone to give its throwaway sandbox better-dev's hooks, and bd-session-start probes for it.
+hooks/hooks.json is NOT a plugin manifest any more - D32 deleted the marketplace channel and a legacy
+plugin install is not a supported state. It is now two things, both live, so do not delete it as
+plugin residue: friction/run.sh reads it out of the clone to give its throwaway sandbox better-dev's
+hooks, and bd-package-check compares it against the WANT table below so the declaration and the
+wiring cannot drift. bd-session-start also probes for it to recognise a legacy plugin root.
 
   bd-hook-wire wire   <clone-dir> <settings.json>   merge our entries in; print a status word
   bd-hook-wire plan   <clone-dir> <settings.json>   same, but write nothing

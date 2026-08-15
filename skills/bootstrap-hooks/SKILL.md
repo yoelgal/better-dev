@@ -40,8 +40,12 @@ Two extensionless bash scripts and a manifest, all under `hooks/`:
   *short* note - the practices and overrides still apply, see `/orchestrating-agents` for how
   dispatch works - and deliberately tells the worker not to re-run onboarding. A dispatched worker
   should do its briefed task, not re-orient.
-- `hooks.json` - the Claude Code manifest registering both, each with a `commandWindows` fallback
-  and a 5-second timeout.
+- `hooks.json` - the shipped **declaration** of the hook set, each entry with a `commandWindows`
+  fallback and a 5-second timeout. It is not what registers them and no install path reads it (D33
+  retired the plugin channel it was written for): `scripts/bd-hook-wire`'s `WANT` table is what
+  reaches a host config, and the package gate holds the two against each other so they cannot drift.
+  It declares more than the two hooks above - the graphify refresh hook and `bd-guard`'s two
+  `PreToolUse` entries are in there too.
 
 ## Always on when installed, silent otherwise
 

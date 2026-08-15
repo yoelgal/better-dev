@@ -1086,3 +1086,49 @@ so the channel was carrying the rarer install while owing the same maintenance.
 
 `.claude-plugin/plugin.json` **stays.** `hooks/bd-session-start:250` reads it for the installed version
 stamp, so it is load-bearing independently of the plugin channel it was originally written for.
+
+## D33 - a legacy plugin install is not a supported state (2026-08-15)
+
+D32 deleted the marketplace channel, but not the installs made through it. Item 1's docs sweep found
+three places still branching on one, disagreeing about what it means, and left the question open
+rather than deciding it inside a sweep. Deciding it: **an install made through the plugin channel is
+not supported.** It is not merely legacy, it is already broken - the plugin cache is version-pinned one
+directory per version, so `.better-dev/bin` cannot bridge into it, and every skill that calls through
+`.better-dev/bin/bd-mem` fails on that host today. The remedy is a clone install, not an update.
+
+The three sites now agree:
+
+- `/guardrails-install` (`SKILL.md`, `stacks.md`) had a branch reading "a plugin install already
+  carries the two `PreToolUse` entries - write nothing". Both are removed and the wiring is always
+  emitted. That branch was the harmful direction: a skill declining to install enforcement because it
+  believed a plugin had, leaving a repo unenforced while recording that it was enforced.
+- `/update` no longer calls a refused pull on a plugin checkout normal. It names the migration.
+- `hooks/hooks.json` **stays**, for the same reason `plugin.json` did under D32: its consumers are no
+  longer the plugin. `friction/run.sh` reads it to give its sandbox better-dev's hooks, and
+  `bd-package-check` compares it against `bd-hook-wire`'s `WANT` table so the shipped declaration and
+  the actual wiring cannot drift. It is a declaration, never evidence a host registered anything.
+
+One nudge is added rather than removed: `hook_nudge` still suppresses its install.sh advice on a plugin
+root (a duplicate hook registration is not idempotent, and that is the worse failure), but it now says
+the install is unsupported and names the migration. Silence is what let such an install sit forever.
+
+## D34 - three legacy-path hook shims live under `better-dev/`, deliberately (amends D32; 2026-08-15)
+
+D32 moved everything to the repo root. `better-dev/hooks/` is back, holding three files and nothing
+else. It is a compatibility shim, not a reversal, and it exists because of an asymmetry D32 created:
+
+`install.sh` writes an **absolute** command into each host's machine-global hook config
+(`bash "<clone>/better-dev/hooks/bd-session-start"`), and D32's flatten deleted the directory it
+points into. A host installed before the flatten therefore runs a command that exits 127 - so no hook
+code runs, and no nudge can reach that operator however correct the nudge is. Every other repair
+depends on a hook that is already dead. Teaching the resolvers to step up (this item does that too)
+reaches nobody in that state; only a file at the path their config already names can.
+
+So the three shims `exec` their root namesakes and do nothing else - silent, non-writing, exiting 0
+if the target is missing so a partial pull cannot break a session. Nothing else moves back.
+
+**They self-retire per host.** The nudges say run `install.sh`; that run rewrites the hook commands to
+the root paths, and the shim is never executed on that machine again. They carry no expiry in code
+because the installed-user count is not measurable; the collector is a `legacy-hook-shim-removal`
+follow-up against the `better-dev-extraction` epic. Until then `git grep "better-dev/"` will keep
+hitting this directory, and that is expected rather than drift.

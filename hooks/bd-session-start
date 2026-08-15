@@ -81,6 +81,13 @@ normalize_clone() {
   [ -n "${1:-}" ] || return 0
   if [ -d "$1/skills" ]; then printf '%s' "$1"
   elif [ -d "$1/better-dev/skills" ]; then printf '%s' "$1/better-dev"
+  # ...and the mirror case, which is the one a moved clone lands in: the host was
+  # installed on the 0.7.0 layout, so every recorded path still ends in
+  # better-dev/, but the pull that flattened the repo deleted it. Stepping DOWN
+  # only made that path resolve to nothing and every nudge went silent on exactly
+  # the host with a repair to run. Gated on the basename, not on the parent merely
+  # holding skills/, so this never adopts an unrelated parent directory.
+  elif [ "${1##*/}" = better-dev ] && [ -d "${1%/*}/skills" ]; then printf '%s' "${1%/*}"
   fi
 }
 
@@ -136,9 +143,14 @@ host_installed() {
     [ -e "$entry" ] || [ -L "$entry" ] || continue
     if [ -L "$entry" ]; then
       target="$(readlink "$entry" 2>/dev/null)"
-      # match the normalized clone AND its pre-0.7.0 root: after the monorepo
-      # move every old link's target prefix is the root, not better-dev/.
-      case "$target" in "$clone"/skills/* | "${clone%/better-dev}"/skills/*) return 0 ;; esac
+      # match the normalized clone, its pre-0.7.0 root (after the monorepo move
+      # every old link's target prefix is the root, not better-dev/), AND its
+      # 0.7.0 subdir - a moved clone normalizes UP to the root while every host
+      # link still carries the better-dev/ prefix, and matching only the first two
+      # forms answers "no install here" for the host most in need of the nudge.
+      case "$target" in
+        "$clone"/skills/* | "${clone%/better-dev}"/skills/* | "$clone"/better-dev/skills/*) return 0 ;;
+      esac
     elif [ -f "$entry/.better-dev-skill" ]; then
       return 0
     fi
@@ -206,6 +218,10 @@ hook_nudge() {
   # nudge would buy a second executing copy of all three, running twice per session
   # for good. Relinking skills is idempotent and a duplicate hook is not, so this
   # asymmetry earns its own gate rather than riding link_nudge's posture.
+  # A plugin install is not a supported state any more (D33), but it is NOT this
+  # nudge's business to say so - plugin_nudge below owns that. Everything printed on
+  # this channel drives the "awareness hooks missing, run install.sh" mark, and that
+  # remedy on a plugin host registers a second copy of all three hooks. Stay silent.
   if [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] && [ -f "$clone/hooks/hooks.json" ] \
      && [ "$clone" = "$(normalize_clone "${CLAUDE_PLUGIN_ROOT:-}")" ]; then
     return 0
@@ -229,6 +245,31 @@ hook_nudge() {
   verdict="$("$@" 2>/dev/null)" || return 0
   [ "$verdict" = "would-wire" ] || return 0
   printf ' better-dev: this host is missing awareness hooks the installed clone expects - run %s/install.sh to register them (it writes %s).' "$clone" "$settings"
+}
+
+# --- plugin nudge: is better-dev running from a plugin install at all? ----------
+# D33 settled that as unsupported rather than merely legacy: the plugin cache is
+# version-pinned one directory per version, so bd-link cannot bake a .better-dev/bin
+# symlink that survives an update, and every skill routed through that bridge is
+# already broken on this host. So the remedy is a clone install, never install.sh -
+# which is exactly why this cannot live inside hook_nudge, whose channel drives the
+# "run install.sh" mark. Its own channel, its own mark, its own remedy.
+#
+# Guarded on CLAUDE_PLUGIN_ROOT resolving to something that really is a better-dev
+# checkout (skills/ via normalize_clone, plus the hook declaration only this tool
+# ships), so an unrelated plugin root stays silent. Deliberately NOT gated on
+# host_installed: the pure plugin-only host - no clone install anywhere - is the one
+# most in need of this line, and that is the case host_installed answers no for.
+plugin_nudge() {
+  local clone
+  clone="$(normalize_clone "${CLAUDE_PLUGIN_ROOT:-}")"
+  [ -n "$clone" ] && [ -f "$clone/hooks/hooks.json" ] || return 0
+  # Wording is deliberately about the CHANNEL, not this host's current health: the same guard fires
+  # for a pure plugin host (bridge genuinely unusable) and for one that also links into a git clone
+  # (bridge fine, plugin merely redundant). Asserting "already broken here" would be false every
+  # session for the second, so state what is true of both - the channel is retired - and let the
+  # remedy be the same for both.
+  printf ' better-dev: this session is running better-dev from a plugin install, a channel that is no longer supported (D33) - a version-pinned plugin cache cannot carry the .better-dev/bin scripts bridge, so a host relying on it alone has broken skills. Reinstall from a git clone (see BOOTSTRAP.md); do NOT run install.sh over the top of the plugin, it would register a second copy of every hook.'
 }
 
 # --- reonboard nudge: did a release change the repo surface since /onboard? ---
@@ -380,7 +421,8 @@ emit() {
   rnb="$(reonboard_nudge "$root")"
   lnk="$(link_nudge)"
   hks="$(hook_nudge)"
-  context="${context}${upd}${rnb}${lnk}${hks}"
+  plg="$(plugin_nudge)"
+  context="${context}${upd}${rnb}${lnk}${hks}${plg}"
   escaped=$(escape_for_json "$context")
 
   # A nudge asks a HUMAN to run /update or install.sh, but additionalContext only
@@ -409,6 +451,8 @@ emit() {
   # install.sh writes $HOME/.claude/settings.json - a machine-touching path that
   # keeps its human gate - so the agent cannot stand in for the operator here.
   [ -n "$hks" ] && mark="${mark} - awareness hooks missing, run install.sh"
+  # Its own mark, naming its own remedy. Never "run install.sh" - see plugin_nudge.
+  [ -n "$plg" ] && mark="${mark} - plugin install unsupported, reinstall from a clone"
   welcome="${welcome}${mark}"
 
   # Emit only the field the current host reads. Cursor wants snake_case
@@ -526,6 +570,35 @@ json.dump(d,open(p,'w'))
 PYPL
     out="$(cd "$tmp/proj" && HOME="$tmp/h" CLAUDE_PLUGIN_ROOT="$clone_st" "$SELF")" || fail "errored when the plugin root is the linked clone"
     printf '%s' "$out" | grep -q "missing awareness hooks" && fail "hook nudge fired when the plugin root is the linked clone"
+    # ...but not silent either: a plugin install is not a supported state, and saying
+    # nothing is what let one sit unmigrated indefinitely.
+    printf '%s' "$out" | grep -q "no longer supported" || fail "no migration line on a plugin install"
+    # The migration line must not ride hook_nudge's channel. The operator-visible mark
+    # keys off that channel being non-empty, so anything printed there tells a plugin
+    # host to run install.sh - which registers a SECOND copy of all three hooks, the
+    # one outcome this branch exists to prevent. Its own channel, its own mark.
+    printf '%s' "$out" | jq -r '.systemMessage' | grep -q 'awareness hooks missing' \
+      && fail "plugin install told to run install.sh in the operator-visible line - that advice double-registers every hook"
+    printf '%s' "$out" | jq -r '.systemMessage' | grep -q 'plugin install unsupported' \
+      || fail "no operator-visible migration mark on a plugin install"
+
+    # Moved clone: the host was installed on the pre-flatten layout, so every link
+    # and every wired hook path still points one level down into better-dev/. Both
+    # resolvers used to step DOWN only, so a stale path resolved to nothing and the
+    # two nudges that name the repair went silent on exactly the host that needed
+    # them. Drive it through the hook rather than the functions: what matters is
+    # that the stale host is TOLD, not which helper noticed.
+    mkdir -p "$tmp/stale/.claude/skills"
+    ln -sfn "$clone_st/better-dev/skills/onboard" "$tmp/stale/.claude/skills/onboard"
+    printf '{}' > "$tmp/stale/.claude/settings.json"
+    python3 "$clone_st/scripts/bd-hook-wire" wire "$clone_st/better-dev" "$tmp/stale/.claude/settings.json" >/dev/null 2>&1
+    out="$(cd "$tmp/proj" && HOME="$tmp/stale" CLAUDE_PLUGIN_ROOT= "$SELF")" || fail "errored on a moved clone"
+    printf '%s' "$out" | jq -e . >/dev/null || fail "moved-clone output is not valid JSON"
+    printf '%s' "$out" | grep -q "no link for this host" || fail "link nudge silent on a moved clone"
+    printf '%s' "$out" | grep -q "missing awareness hooks" || fail "hook nudge silent on a moved clone"
+    # -F: $clone_st is a filesystem path, not a pattern. This worktree's own path carries a `+` and
+    # dots, which a BRE would read as metacharacters and match over-permissively.
+    printf '%s' "$out" | grep -qF "$clone_st/install.sh" || fail "moved-clone nudge names no runnable install.sh path"
   fi
 
   # Overrides present -> the note points at them, still valid JSON.
@@ -683,7 +756,7 @@ PYPL
   ln -s "$mono/skills/onboard" "$stalehome/.claude/skills/onboard"   # old-root target, dangling post-move
   out="$(cd "$tmp/proj" && HOME="$stalehome" CLAUDE_PLUGIN_ROOT= "$SELF")"
   printf '%s' "$out" | grep -q "no link for this host" || fail "no link nudge when host links dangle at pre-monorepo paths"
-  printf '%s' "$out" | grep -q "$mono/better-dev/install.sh" || fail "link nudge names the old installer path after the monorepo move"
+  printf '%s' "$out" | grep -qF "$mono/better-dev/install.sh" || fail "link nudge names the old installer path after the monorepo move"
 
   # Update nudge: a copy-fallback plugin root (skills/ but no git) must NOT
   # swallow the nudge - the fallback retries on the git probe and finds the
@@ -861,6 +934,9 @@ if ! bd_root="$(find_bd_root)"; then
   # Same reasoning for the hook set, and more so: hooks are machine-global, so
   # their absence does not depend on this repo being wired at all.
   [ -n "$(hook_nudge)" ] && unwired_mark="${unwired_mark} - awareness hooks missing, run install.sh"
+  # An unwired repo on a plugin host needs this more, not less: /onboard is the next
+  # action and it cannot wire a bridge into a version-pinned cache. Static text only.
+  [ -n "$(plugin_nudge)" ] && unwired_mark="${unwired_mark} - plugin install unsupported, reinstall from a clone"
   printf '{ "systemMessage": "%s%s" }\n' "$WELCOME_UNWIRED" "$unwired_mark"
   exit 0
 fi

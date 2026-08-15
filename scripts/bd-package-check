@@ -340,7 +340,15 @@ for s in scripts/bd-*; do
   [ "$(basename "$s")" = "bd-package-check" ] && continue
   b="$(basename "$s")"
   [ -x "$s" ] || { bad "$b not executable"; continue; }
-  "$s" selftest >/dev/null 2>&1 && ok "$b" || bad "$b selftest FAILED"
+  # Same reason as the hooks loop below: keep the failing run's output so a red selftest names the
+  # assertion that broke, not merely the file. Both loops, or the gap just moves.
+  st_out=""
+  if st_out="$("$s" selftest 2>&1)"; then
+    ok "$b" # prove-new: regression-guard every shipped selftest passes at base and still does; this loop's check and label are unchanged, only the failure OUTPUT was added, so there is no new assertion to come back red
+  else
+    bad "$b selftest FAILED"
+    printf '%s\n' "$st_out" | tail -5 | sed 's/^/      /'
+  fi
 done
 
 echo "== shell parses (bash -n) =="
@@ -361,7 +369,10 @@ echo "== shell parses (bash -n) =="
 # installer) and carries no shebang, and any future helper not named bd-* would otherwise ship
 # unparsed under a label claiming it was checked.
 unparseable=""
-for s in scripts/* hooks/* hosts/* install.sh; do
+# better-dev/hooks/* is in the sweep for the same reason the rest of it is: those are the legacy-path
+# shims a pre-flatten host actually executes, and an unparseable one there is a hook that dies exactly
+# where nothing else can report it - the failure mode the shims exist to end.
+for s in scripts/* hooks/* hosts/* better-dev/hooks/* install.sh; do
   [ -f "$s" ] || continue
   case "$s" in *.json) continue ;; esac
   # Parse each script with the language its shebang declares - bd-atlas is python,
@@ -373,13 +384,22 @@ for s in scripts/* hooks/* hosts/* install.sh; do
     bash -n "$s" 2>/dev/null || unparseable="$unparseable $s"
   fi
 done
-[ -z "$unparseable" ] && ok "every shipped script under scripts/, hooks/, hosts/ and install.sh parses (bash -n, or ast.parse per shebang)" || bad "syntax error in:$unparseable - a selftest cannot see this, it exits before the parse" # prove-new: regression-guard every shipped script parses at base, as it does after any change that did not break one; this catches the later edit that does, which the selftest runner structurally cannot see
+[ -z "$unparseable" ] && ok "every shipped script under scripts/, hooks/, hosts/, better-dev/hooks/ and install.sh parses (bash -n, or ast.parse per shebang)" || bad "syntax error in:$unparseable - a selftest cannot see this, it exits before the parse" # prove-new: regression-guard every shipped script parses at base, as it does after any change that did not break one; this catches the later edit that does, which the selftest runner structurally cannot see
 
 echo "== hook scripts (selftest) =="
 for s in hooks/bd-*; do
   [ -e "$s" ] || continue
   b="$(basename "$s")"
-  [ -x "$s" ] && "$s" selftest >/dev/null 2>&1 && ok "$b" || bad "$b selftest FAILED"
+  # Keep the failing run's output. Discarding it (`>/dev/null 2>&1`) makes a red selftest report only
+  # THAT it failed, never which assertion - a reviewer spent a full pass unable to pin one, because
+  # every selftest here prints its reason and this loop threw it away.
+  st_out=""
+  if [ -x "$s" ] && st_out="$("$s" selftest 2>&1)"; then
+    ok "$b" # prove-new: regression-guard every shipped hook selftest passes at base and still does; this loop's check and label are unchanged, only the failure OUTPUT was added, so there is no new assertion to come back red
+  else
+    bad "$b selftest FAILED"
+    printf '%s\n' "$st_out" | tail -5 | sed 's/^/      /'
+  fi
 done
 
 echo "== manifests (valid JSON) =="
@@ -483,7 +503,7 @@ dash_hits=""
 # sources are not (their comments legitimately carry dashes), so scan only what we wrote. Each `ls` is
 # its own existence guard - absent on a consumer install that did not vendor them.
 vendored_authored="browse/README.md browse/UPSTREAM browse/scripts/check-upstream.sh ios-qa/README.md ios-qa/UPSTREAM ios-qa/scripts/check-upstream.sh"
-for f in $(find skills scripts docs hooks hosts -type f 2>/dev/null; ls install.sh README.md BOOTSTRAP.md $vendored_authored 2>/dev/null); do
+for f in $(find skills scripts docs hooks hosts better-dev -type f 2>/dev/null; ls install.sh README.md BOOTSTRAP.md $vendored_authored 2>/dev/null); do
   LC_ALL=C grep -lq -e "$em" -e "$en" "$f" 2>/dev/null && dash_hits="$dash_hits $f"
 done
 [ -z "$dash_hits" ] && ok "no em/en dashes in shipped text" || bad "em/en dash in:$dash_hits"
@@ -697,6 +717,107 @@ else
   rm -rf "$rt"
 fi
 
+echo "== moved clone (pre-flatten host) =="
+# The flatten deleted <clone>/better-dev/, and a host installed before it holds ABSOLUTE paths into
+# that directory: every skill link, and the three hook commands install.sh wrote into the host's
+# machine-global config. Those hook commands are the load-bearing half - a dead one exits 127, so no
+# hook code runs and no nudge can reach the operator, however correct the nudge is. The legacy-path
+# shims exist for exactly that, and this proves the whole chain end to end on a throwaway HOME:
+# the pre-flatten hook path still executes, what it prints names the repair, and running that repair
+# repoints the links and the hook entries with nothing stale left beside them. Asserting the hook
+# entries through bd-hook-wire's `plan`, never a grep for one hook name - `install.sh --verify`
+# drifted from the WANT table doing precisely that, and plan compares whole entries against it.
+# pwd -P at creation, not the bare mktemp path: install.sh derives its SRC with `pwd -P`, and on macOS
+# /var is a symlink to /private/var, so the two spellings of the same directory would never compare
+# equal and every path assertion below would fail on a healthy repair. Linux CI would not have shown it.
+mc="$(cd "$(mktemp -d)" && pwd -P)"
+mc_hd="$(HOME="$mc" bash -c 'source "$1" && printf %s "$bd_host_skills_dir"' _ hosts/claude 2>/dev/null)"
+mc_settings="$(HOME="$mc" bash -c 'source "$1" && printf %s "$bd_host_hook_settings"' _ hosts/claude 2>/dev/null)"
+# One check, not two: an adapter that yields no paths reports through the same bad below rather than
+# earning a label of its own. A second label here would be one that never RUNS at base, which
+# --prove-new reads as a silent skip and refuses - correctly, since a check that cannot fail at base
+# proves nothing about the diff that added it.
+mc_ok=0
+# The clone under test is a throwaway made of symlinks into $ROOT, NOT $ROOT itself. Two reasons, both
+# load-bearing. It is not a git checkout, so update_nudge stops at its `rev-parse --git-dir` guard
+# instead of running its bounded `git fetch` - a gate must not make a network call, and must never
+# write FETCH_HEAD into the very checkout it is grading. And it puts the clone at a path that is not
+# the repo root, which is what a real install looks like. `cd` is logical, so the shim's `../..`
+# collapses textually before `pwd -P` and still lands on $mc/clone.
+mc_clone="$mc/clone"
+mkdir -p "$mc_clone/better-dev"
+for d in skills scripts hooks hosts docs .claude-plugin; do ln -sfn "$ROOT/$d" "$mc_clone/$d"; done
+ln -sfn "$ROOT/better-dev/hooks" "$mc_clone/better-dev/hooks"
+ln -sfn "$ROOT/install.sh" "$mc_clone/install.sh"
+if [ -n "$mc_hd" ] && [ -n "$mc_settings" ]; then
+  mkdir -p "$mc_hd" "$(dirname "$mc_settings")"
+  # A host wired on the 0.7.0 layout: link target and hook commands both one level down.
+  ln -sfn "$mc_clone/better-dev/skills/onboard" "$mc_hd/onboard"
+  printf '{}' > "$mc_settings"
+  python3 "$ROOT/scripts/bd-hook-wire" wire "$mc_clone/better-dev" "$mc_settings" >/dev/null 2>&1
+  # cd into the throwaway HOME, not the repo: an unwired cwd is the honest case (the operator's own
+  # project), and it keeps this repo's .better-dev out of the hook's walk-up.
+  # Capture the exit status, do not discard it. The criterion is that the legacy path still RUNS -
+  # a shim that printed the right words and exited non-zero would satisfy every other conjunct here,
+  # and a `|| true` would let it through. 127 (the dead-path case) is caught twice over this way.
+  mc_rc=0
+  mc_out="$(cd "$mc" && HOME="$mc" CLAUDE_PLUGIN_ROOT= bash "$mc_clone/better-dev/hooks/bd-session-start" 2>/dev/null)" || mc_rc=$?
+  # The stale-entry assertion above matches the FULL legacy prefix with -F, not the bare substring
+  # `better-dev/hooks/`. The install one-liner this repo ships clones to ~/better-dev, and CI checks
+  # the renamed repo out at .../better-dev/better-dev, so a correctly repaired entry legitimately
+  # contains that substring and the bare form fails a healthy host. Third instance of "the clone path
+  # is not a pattern" on this branch; the other two were grep -q where -qF was meant.
+  # Assert on systemMessage, not additionalContext: install.sh writes the host's machine-global
+  # config, so the repair is the operator's to run and a mark only the agent can see does not deliver
+  # it. Both marks, because the two losses are independent - skills and hooks.
+  mc_msg="$(printf '%s' "$mc_out" | jq -r '.systemMessage' 2>/dev/null || true)"
+  if [ "$mc_rc" = 0 ] \
+     && printf '%s' "$mc_msg" | grep -q 'skill links missing, run install.sh' \
+     && printf '%s' "$mc_msg" | grep -q 'awareness hooks missing, run install.sh' \
+     && HOME="$mc" "$mc_clone/install.sh" --host claude >/dev/null 2>&1 \
+     && [ -e "$mc_hd/onboard/SKILL.md" ] \
+     && [ "$(readlink "$mc_hd/onboard")" = "$mc_clone/skills/onboard" ] \
+     && ! grep -qF "$mc_clone/better-dev/hooks/" "$mc_settings" \
+     && [ "$(python3 "$ROOT/scripts/bd-hook-wire" plan "$mc_clone" "$mc_settings" 2>/dev/null)" = current ]; then
+    mc_ok=1
+  fi
+fi
+[ "$mc_ok" = 1 ] \
+  && ok "moved clone: the pre-flatten hook path still runs and names install.sh, and that run repoints every link and hook entry with no stale entry beside them" \
+  || bad "moved clone: a host wired on the pre-flatten layout is not reached or does not repair - the legacy hook path is dead (nothing can nudge the operator), its output does not name install.sh, the repair left a link or hook entry pointing into the deleted better-dev/ directory, or hosts/claude yields no skills dir"
+rm -rf "$mc"
+
+# /update resolves the clone with its OWN standalone bash - it has to run before it knows where the
+# tool is, so it cannot call normalize_clone. That makes it a second copy of the same three-way
+# resolution, and the copy silently stepped down only: post-flatten it reported "no better-dev clone
+# found" and never reached its link reconcile, on the sanctioned update path. Assert both directions
+# and the string read - following the link with `cd` fails on the dangling one, which is the whole
+# case. Text-level, because the block is prose in a skill, not a shipped script.
+upd="skills/update/SKILL.md"
+if grep -q 'clone="$clone/better-dev"' "$upd" \
+   && grep -q 'clone="${clone%/\*}"' "$upd" \
+   && grep -q 'clone="${t%/skills/onboard}"' "$upd"; then
+  ok "/update's clone resolver normalizes in both directions and reads the link as a string, so a moved clone still resolves"
+else
+  bad "/update's clone resolver does not handle a moved clone: it steps only down (or follows the link with cd, which fails on the dangling link a moved clone leaves), so the sanctioned update path reports no clone found on exactly the install that needs updating"
+fi
+
+# The legacy-plugin decision, landed in one direction everywhere. The failure that matters is a skill
+# DECLINING to wire the guard because it believes a plugin already did - a repo left with no
+# enforcement and a record saying it has some. Assert the write-nothing branches are gone rather than
+# asserting new prose. Each site is pinned by ABSENCE of the old instruction - the /update conjunct
+# needs both halves, because a positive grep for the new sentence stays green if the old one is simply
+# restored beside it. Known limit, stated rather than overclaimed: absence-of-one-sentence does not
+# catch a reworded reintroduction of the same idea, only a verbatim one.
+if ! grep -q 'nothing to do; enforcement is already always-on' skills/guardrails-install/SKILL.md \
+   && ! grep -q 'write nothing' skills/guardrails-install/stacks.md \
+   && ! grep -q 'that channel working as designed' skills/update/SKILL.md \
+   && grep -q 'not a supported install' skills/update/SKILL.md; then
+  ok "a legacy plugin install is settled as unsupported: no branch tells /guardrails-install to skip the wiring, and /update names the migration rather than calling a refused pull normal"
+else
+  bad "the legacy-plugin decision is not landed in all three places - /guardrails-install still declines to wire the guard on the belief a plugin delivered it (leaving a repo unenforced while recording that it is enforced), or /update still describes a plugin checkout as a normal state to leave alone"
+fi
+
 echo "== comms-style block =="
 # The block ships from exactly one file. onboard writes it per repo and BOOTSTRAP offers it globally;
 # two copies of the body would drift, and the drift only shows up on a user machine. Also gate the
@@ -709,7 +830,7 @@ else
   # NOT the git index: an uncommitted second copy is exactly the drift this gate exists to catch, and
   # `git ls-files` cannot see one. raw/ is the gitignored source archive and stays out of scope.
   probe="The reader may have ADHD"
-  homes="$(find skills scripts docs hooks hosts -type f 2>/dev/null; ls install.sh README.md BOOTSTRAP.md 2>/dev/null)"
+  homes="$(find skills scripts docs hooks hosts better-dev -type f 2>/dev/null; ls install.sh README.md BOOTSTRAP.md 2>/dev/null)"
   homes="$(printf '%s\n' "$homes" \
     | while read -r f; do [ -f "$f" ] && grep -lqF "$probe" "$f" 2>/dev/null && printf '%s\n' "$f"; done \
     | grep -v 'scripts/bd-package-check' || true)"
