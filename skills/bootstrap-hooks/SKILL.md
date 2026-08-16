@@ -71,7 +71,13 @@ routine install. `install.sh` registers the two events through `scripts/bd-hook-
 machine-global hook config named by
 `bd_host_hook_settings` in `hosts/<name>`. Adding a host means adding that variable - and only once its
 config path and format are verified on a real machine, never inferred, the same posture as
-`bd_host_dir_policy`. An empty value makes the installer skip and say so.
+`bd_host_dir_policy`. An empty value makes the installer skip and say so. A host that does not
+register hooks by merging entries into a JSON config declares a second variable alongside it,
+`bd_host_hook_wire`: a script basename under `scripts/`, defaulting to `bd-hook-wire` when unset or
+empty, so the wiring *mechanism* is a name the adapter supplies rather than a branch inside
+`install.sh`. `hosts/omp` sets `bd-omp-hook-wire`, which installs a TypeScript module into omp's own
+hooks dir because omp has no hook config to merge into. `porting.md` carries the CLI every such
+script answers to, which is what a third mechanism has to match.
 
 That leaves three cases for this skill: a host whose hook config exists but has no adapter variable
 yet, a machine with no `python3` (the installer says so and skips), and a config the installer refused
@@ -84,6 +90,16 @@ session-level awareness is cross-host today. SubagentStart is a Claude-Code (and
 that expose no subagent-spawn hook get session awareness but not per-worker re-injection until an
 equivalent hook is sourced for them. That's a coverage limit to name, not a failure - the session
 note still lands.
+
+omp earns per-worker re-injection without a subagent-spawn event, because it exposes none: the bridge
+annotates the `task` tool's batch context on the way through, so a dispatched omp worker reads the
+same note the session got. Two things it does not get. `bd-guard`'s `PreToolUse` pair is not wired,
+even though omp's `tool_call` event can veto and the port is therefore possible - that pair enforces
+a per-repo blast-radius policy `/guardrails-install` owns, which is why `bd-hook-wire`'s `WANT` table
+excludes it for every host. And a named omp profile is not covered: the adapter's paths are the
+default `~/.omp/agent`, so an operator running a profile gets skills linked into a dir that profile
+never reads. Both are coverage limits to name, the same posture as hermes and codex declining a hook
+config nobody has verified on a real machine.
 
 ## How this fits
 

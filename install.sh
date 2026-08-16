@@ -11,11 +11,16 @@
 # needs a re-run of ./install.sh too: it links the new one and prunes a link whose skill was removed
 # upstream, and also reclaims a moved clone's stale links.
 #
-# It also registers the SessionStart/SubagentStart awareness hooks in the host's machine-global hook
-# config, for every host whose config file and format are verified (hosts/<name>'s
-# bd_host_hook_settings) - scripts/bd-hook-wire does that merge, from its own table of the awareness
-# hooks hooks/hooks.json declares. A host with no verified config is reported as skipped, and
-# /bootstrap-hooks wires it by hand. Pass --no-hooks to skip it.
+# It also registers the awareness hooks in the host's machine-global hook target, for every host
+# whose target and format are verified (hosts/<name>'s bd_host_hook_settings). Which events those
+# are is the host's business, not this script's: Claude Code names SessionStart and SubagentStart,
+# omp has neither and takes a session_start plus a task tool_call handler instead.
+# The merge is done by the wiring script that host's adapter NAMES in bd_host_hook_wire - default
+# scripts/bd-hook-wire, which merges a JSON hook config from its own table of the awareness hooks
+# hooks/hooks.json declares. A host whose mechanism is not a JSON config names its own script instead
+# (omp's bd-omp-hook-wire installs a TypeScript bridge module), so the installer grows no branch per
+# host. A host with no verified target is reported as skipped, and /bootstrap-hooks wires it by hand.
+# Pass --no-hooks to skip it.
 #
 #   ./install.sh [--host <name>|auto]         # <name> = any adapter file in hosts/; default: auto
 #                                              # (each host whose CLI is on PATH or home dir exists)
@@ -178,11 +183,18 @@ host_apply() {
 }
 
 # ── register the awareness hooks for one host ────────────────────────────────
+# Which script speaks for a host: bd_host_hook_wire is a script BASENAME under scripts/, defaulting to
+# bd-hook-wire's JSON-config merge. Resolved in one place because the install path and --verify must
+# never disagree about which script wires a host.
+hook_wire() {
+  if [ -n "${bd_host_hook_wire:-}" ]; then echo "$bd_host_hook_wire"; else echo "bd-hook-wire"; fi
+}
+
 # Why this lives in the installer and not in a doc step: an agent told "install better-dev" reads
 # BOOTSTRAP and runs this script - it is the only install path there is. If hooks were a separate
 # manual step, that install would end hookless in every repo while BOOTSTRAP claims the tool ships
 # hooks. So the installer the operator ran does the write.
-# Only a host with a VERIFIED hook config carries bd_host_hook_settings; empty means skip and name the
+# Only a host with a VERIFIED hook target carries bd_host_hook_settings; empty means skip and name the
 # gap, the same premise-verify posture as bd_host_dir_policy. arg1: 1 = dry-run (report only).
 host_hooks() {
   dry="$1"
@@ -195,17 +207,31 @@ host_hooks() {
     echo "    hooks: python3 not found - skipped. Wire them by hand with /bootstrap-hooks."
     return 0
   fi
+  # The wiring MECHANISM is the adapter's to name, not a branch here: each such script takes the same
+  # argv and prints the same one status word, so a fifth host with a fifth mechanism (omp's is a
+  # TypeScript module, not JSON) adds a file rather than a case.
+  hookwire="$(hook_wire)"
+  if [ ! -f "$SRC/scripts/$hookwire" ]; then
+    echo "    hooks: this clone has no scripts/$hookwire, the wiring script $bd_host_display names - skipped. /bootstrap-hooks wires them by hand."
+    return 0
+  fi
   hookverb=wire; [ "$dry" = 1 ] && hookverb=plan
   hookout=""
-  if ! hookout="$(python3 "$SRC/scripts/bd-hook-wire" "$hookverb" "$SRC" "$bd_host_hook_settings" 2>/dev/null)"; then
+  # No environment is passed down: a wiring script's whole input is its argv. Both shipped ones read
+  # none, and the copy-mode decision this line once carried belongs to skills alone - the hook target
+  # is one file each script installs its own way, never a symlink to choose about.
+  if ! hookout="$(python3 "$SRC/scripts/$hookwire" "$hookverb" "$SRC" "$bd_host_hook_settings" 2>/dev/null)"; then
     echo "    hooks: could not update $bd_host_hook_settings - skipped. /bootstrap-hooks wires them by hand."
     return 0
   fi
   case "$hookout" in
-    wired)      echo "    hooks: SessionStart + SubagentStart registered in $bd_host_hook_settings" ;;
-    would-wire) echo "    would register SessionStart + SubagentStart hooks in $bd_host_hook_settings" ;;
+    # Host-neutral on purpose: WHICH events these are is the host's own vocabulary, and naming
+    # Claude's here told an omp operator we registered SessionStart and SubagentStart, two events omp
+    # does not have. What is true for every host is that its awareness hooks now reach the model.
+    wired)      echo "    hooks: awareness hooks registered in $bd_host_hook_settings" ;;
+    would-wire) echo "    would register awareness hooks in $bd_host_hook_settings" ;;
     current)    echo "    hooks: already registered in $bd_host_hook_settings" ;;
-    unreadable) echo "    hooks: $bd_host_hook_settings is not readable JSON - left untouched. Fix it and re-run, or use /bootstrap-hooks." ;;
+    unreadable) echo "    hooks: $bd_host_hook_settings is not usable as this host's hook target - left untouched. Fix it and re-run, or use /bootstrap-hooks." ;;
     *)          echo "    hooks: unexpected installer state ('$hookout') - left untouched; /bootstrap-hooks wires them by hand." ;;
   esac
 }
@@ -242,11 +268,29 @@ host_verify() {
   # Hooks are half the install, so verify asserts them too - an install that links every skill and
   # registers no hook is exactly the silent half-install this flag exists to catch.
   if [ -n "${bd_host_hook_settings:-}" ] && [ "$WIRE_HOOKS" = 1 ]; then
-    if grep -q "hooks/bd-session-start" "$bd_host_hook_settings" 2>/dev/null; then
-      echo "  ok $bd_host_display: awareness hooks registered"
-    else
-      echo "  x $bd_host_display: awareness hooks NOT registered in $bd_host_hook_settings - re-run install.sh (or /bootstrap-hooks)"
+    # `plan` is the mechanism-agnostic check: the script that would do the wiring answers whether a
+    # fresh install would still have work to do, so a JSON-config host and a module host are each
+    # asserted against what their own wiring installs, never against a string that happens to be in a
+    # file. A grep can pass over an install the host cannot load, and over a newly added hook.
+    hookwire="$(hook_wire)"
+    if ! command -v python3 >/dev/null 2>&1; then
+      echo "  ? $bd_host_display: awareness hooks UNVERIFIABLE - python3 not found, so scripts/$hookwire cannot answer. /bootstrap-hooks wires them by hand."
       verify_fail=1
+    elif [ ! -f "$SRC/scripts/$hookwire" ]; then
+      echo "  ? $bd_host_display: awareness hooks UNVERIFIABLE - this clone has no scripts/$hookwire, the wiring script $bd_host_display names."
+      verify_fail=1
+    else
+      hookout="$(python3 "$SRC/scripts/$hookwire" plan "$SRC" "$bd_host_hook_settings" 2>/dev/null)" || hookout="(no answer)"
+      case "$hookout" in
+        current)
+          echo "  ok $bd_host_display: awareness hooks registered" ;;
+        would-wire)
+          echo "  x $bd_host_display: awareness hooks NOT registered in $bd_host_hook_settings - re-run ./install.sh --host $h (or /bootstrap-hooks)"
+          verify_fail=1 ;;
+        *)
+          echo "  ? $bd_host_display: awareness hooks UNVERIFIABLE - scripts/$hookwire plan said '$hookout' for $bd_host_hook_settings. /bootstrap-hooks wires them by hand."
+          verify_fail=1 ;;
+      esac
     fi
   fi
 }
@@ -258,7 +302,7 @@ verify_fail=0
 for h in $hosts; do
   adapter="$HOSTS_DIR/$h"
   [ -f "$adapter" ] || { echo "install: no adapter for host '$h'" >&2; continue; }
-  bd_host_cli=""; bd_host_display=""; bd_host_skills_dir=""; bd_host_dir_policy=""; bd_host_hook_settings=""
+  bd_host_cli=""; bd_host_display=""; bd_host_skills_dir=""; bd_host_dir_policy=""; bd_host_hook_settings=""; bd_host_hook_wire=""
   . "$adapter"
   dir="$bd_host_skills_dir"
   # auto installs for a host whose CLI is on PATH OR whose home dir already exists (GUI-managed CLI,
@@ -303,7 +347,8 @@ else
   echo "  fresh session picks up the pull. Re-run ./install.sh after a pull that adds or removes a skill,"
   echo "  so the new one links and orphans prune)."
 fi
-echo "Hooks: the SessionStart/SubagentStart nudge is registered above for every host with a verified"
-echo "  hook config; a host reported as skipped has none yet, and /bootstrap-hooks wires one by hand."
+echo "Hooks: better-dev's awareness hooks are registered above for every host with a verified hook"
+echo "  config, in whatever form that host takes; a host reported as skipped has none yet, and"
+echo "  /bootstrap-hooks wires one by hand."
 echo "In a repo, run  /onboard  once to wire it (creates .better-dev/bin -> this clone's scripts)."
 echo "To remove better-dev later, run  /uninstall  (or scripts/bd-uninstall; dry-run by default)."

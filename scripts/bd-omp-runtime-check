@@ -1,0 +1,255 @@
+#!/usr/bin/env bash
+# bd-omp-runtime-check - prove a REAL omp session receives better-dev's awareness note.
+#
+# Every other check on this install passed while a live omp session received nothing: the bridge was
+# installed as a symlink, and omp's hook discovery skips symlinked modules without a word. Only an
+# actual `omp -p` run observes the thing the install exists to deliver, so this check runs one.
+#
+# It builds a throwaway fixture - a fake clone whose hooks/bd-session-start emits a UNIQUE random
+# token, plus a working dir carrying .better-dev/ - installs the real bridge module into the
+# fixture's own project-scoped .omp/hooks/pre/ through scripts/bd-omp-hook-wire, and asks a real omp
+# session for that token. Both halves are required: the token comes back with .better-dev/ present,
+# and does NOT come back with .better-dev/ moved aside. The positive half alone would pass on a
+# bridge that injects unconditionally.
+#
+#   bd-omp-runtime-check            run both halves (needs omp on PATH and model credentials)
+#   bd-omp-runtime-check selftest   fixture construction, both premise-skip paths, and the hang
+#                                   path, offline
+#
+# A missing premise - no omp binary, no model - is reported and skipped, never failed. A run that
+# HANGS is not a missing premise and never skips: the probe below runs with the operator's GLOBAL
+# omp hooks loaded, so an omp that never returns is this bridge's own time bound failing, which is
+# the one failure this check exists to catch. BD_OMP overrides the binary; BD_OMP_TIMEOUT the
+# per-run bound in seconds; BD_OMP_GRACE the seconds the watchdog waits past that bound before it
+# kills the run. This needs network and a model, so it is a human/loop check, never a package-gate
+# check: the gate runs `selftest` only.
+#
+# Writes nothing outside its own tempdir and installs nothing into the operator's ~/.omp - the
+# bridge goes into the fixture's project-scoped hooks dir, which is what omp loads for that cwd.
+set -euo pipefail
+
+case "$0" in /*) SELF="$0" ;; *) SELF="$PWD/$0" ;; esac
+HERE="$(cd "$(dirname "$SELF")" && pwd -P)"
+ROOT="$(cd "$HERE/.." && pwd -P)"
+WIRE="$HERE/bd-omp-hook-wire"
+MODULE="$ROOT/hooks/omp/bd-awareness.ts"
+
+OMP="${BD_OMP:-omp}"
+TIMEOUT="${BD_OMP_TIMEOUT:-120}"
+# How long the watchdog waits PAST omp's own --max-time before killing the run. Only a run that
+# ignored its own bound ever reaches it, so the grace is short; the selftest lowers it (with the
+# bound) to exercise the kill path in seconds rather than minutes.
+GRACE="${BD_OMP_GRACE:-15}"
+
+# Asked of the fixture session, and of the liveness probe. The sentinels keep both replies short
+# enough to grep and cheap enough to spend.
+ASK="What is the session passphrase? Reply with the passphrase alone, or exactly NOPASS if you were not given one."
+LIVE="BDOMPLIVE"
+LIVE_ASK="Reply with exactly: $LIVE"
+
+# Every path writes inside this one dir and nowhere else, so the trap is the whole cleanup story.
+# It is global because an EXIT trap fires after the function that made the dir has returned, where
+# a `local` name no longer exists.
+TMP=""
+trap '[ -z "$TMP" ] || rm -rf "$TMP"' EXIT INT TERM
+
+die() { printf 'bd-omp-runtime-check: %s\n' "$*" >&2; exit 1; }
+
+token() { printf 'BDOMP%s' "$(od -An -N6 -tx1 /dev/urandom | tr -d ' \n' | tr 'a-f' 'A-F')"; }
+
+# <root> - sets CLONE, FIX, TARGET, TOKEN.
+build_fixture() {
+  local root="$1"
+  CLONE="$root/clone"
+  FIX="$root/fixture"
+  TARGET="$FIX/.omp/hooks/pre/bd-awareness.ts"
+  TOKEN="$(token)"
+  mkdir -p "$CLONE/hooks/omp" "$FIX/.better-dev" "$FIX/.omp/hooks/pre" "$root/probe"
+  # COPIED, never linked: the bridge resolves its clone from its own realpath, so a linked module
+  # would resolve the real clone and run the real hooks instead of this fixture's.
+  cp "$MODULE" "$CLONE/hooks/omp/bd-awareness.ts"
+  # Stand-in for hooks/bd-session-start: the same default output branch the bridge consumes
+  # (top-level systemMessage + additionalContext), gated on .better-dev/ exactly as the real hook
+  # is, carrying a token nothing else on this machine can know.
+  cat >"$CLONE/hooks/bd-session-start" <<EOF
+#!/bin/sh
+[ -d .better-dev ] || exit 0
+printf '%s\n' '{"systemMessage":"better-dev runtime-check fixture","additionalContext":"SESSION PASSPHRASE: $TOKEN . When asked for the session passphrase, answer with it verbatim."}'
+EOF
+  printf '#!/bin/sh\nexit 0\n' >"$CLONE/hooks/bd-graphify-refresh-stale"
+  chmod +x "$CLONE/hooks/bd-session-start" "$CLONE/hooks/bd-graphify-refresh-stale"
+  printf 'runtime-check fixture - no overrides\n' >"$FIX/.better-dev/overrides.md"
+}
+
+wire_fixture() { python3 "$WIRE" wire "$CLONE" "$TARGET"; }
+
+# <cwd> <prompt> <outfile> - sets RC, and HUNG=1 when the watchdog had to kill the run. The two are
+# different faults and the caller has to tell them apart: a fast non-zero is a machine that cannot
+# start omp, while a kill is a run that never returned. Bounded twice over: omp's own --max-time,
+# and this watchdog for a run that wedges before that bound is armed (`timeout` is not on every
+# macOS PATH).
+# --no-tools and --no-skills keep the run cheap and deterministic; neither touches hook discovery.
+omp_run() {
+  local dir="$1" prompt="$2" out="$3" pid waited=0
+  HUNG=0
+  ( cd "$dir" && "$OMP" -p --no-session --no-tools --no-skills --max-time="$TIMEOUT" "$prompt" ) \
+    >"$out" 2>"$out.err" &
+  pid=$!
+  while kill -0 "$pid" 2>/dev/null; do
+    if [ "$waited" -ge "$((TIMEOUT + GRACE))" ]; then
+      HUNG=1
+      kill -TERM "$pid" 2>/dev/null || true
+      sleep 2
+      kill -KILL "$pid" 2>/dev/null || true
+      break
+    fi
+    sleep 1
+    waited=$((waited + 1))
+  done
+  RC=0
+  wait "$pid" 2>/dev/null || RC=$?
+}
+
+reply() { sed -n '1,12p' "$1" | sed 's/^/      /'; }
+
+# Why the last run ended, for a message. The exit status alone cannot say it: a watchdog kill shows
+# up as 143 or 137, which reads exactly like any other non-zero exit.
+why() {
+  if [ "$HUNG" = 1 ]; then printf 'never returned and was killed after %ss' "$((TIMEOUT + GRACE))"
+  else printf 'exited %s' "$RC"; fi
+}
+
+check() {
+  local status rc=0
+  command -v "$OMP" >/dev/null 2>&1 \
+    || { printf 'skip: %s is not on PATH - a real omp binary is this check'"'"'s premise\n' "$OMP"; return 0; }
+  TMP="$(mktemp -d)"
+  build_fixture "$TMP"
+  status="$(wire_fixture || true)"
+  [ "$status" = wired ] || {
+    printf 'FAIL: bd-omp-hook-wire wire reported "%s", not "wired" - there is no install to observe\n' "$status" >&2
+    return 1
+  }
+
+  # Liveness before either assertion: without it a machine with no credentials would read as a
+  # bridge that injects nothing, which is the same word for two very different states.
+  omp_run "$TMP/probe" "$LIVE_ASK" "$TMP/live.out"
+  if [ "$HUNG" = 1 ]; then
+    # NOT a premise skip, and this is the whole point of the distinction. The probe runs in a dir
+    # with no project-scoped bridge but with the operator's GLOBAL ~/.omp/agent/hooks/pre/ loaded,
+    # so an omp that never returns here is a session start that never completes - precisely what the
+    # bridge's own time bound exists to prevent. Reported as "no credentials" it would exit 0 on the
+    # machine whose every omp session our hook has wedged.
+    printf 'FAIL: omp %s - a session that never starts is the failure this check exists to catch, not a missing premise\n' "$(why)" >&2
+    reply "$TMP/live.out.err" >&2
+    return 1
+  fi
+  if [ "$RC" != 0 ] || ! grep -qF "$LIVE" "$TMP/live.out"; then
+    printf 'skip: omp could not complete a run (exit %s) - no model credentials, or no network\n' "$RC"
+    reply "$TMP/live.out.err"
+    return 0
+  fi
+
+  omp_run "$FIX" "$ASK" "$TMP/pos.out"
+  if [ "$RC" != 0 ] || [ "$HUNG" = 1 ]; then
+    printf 'FAIL: the omp run with .better-dev/ present %s\n' "$(why)" >&2
+    reply "$TMP/pos.out.err" >&2
+    rc=1
+  elif ! grep -qF "$TOKEN" "$TMP/pos.out"; then
+    printf 'FAIL: positive half - the session never received token %s, so the bridge injected nothing\n' "$TOKEN" >&2
+    printf '      wired as: %s\n' "$(ls -ld "$TARGET" | sed 's/  */ /g')" >&2
+    reply "$TMP/pos.out" >&2
+    rc=1
+  fi
+
+  # Same fixture, same wiring, .better-dev/ moved aside: a bridge that injects unconditionally is
+  # as broken as one that never injects, and the positive half cannot tell them apart.
+  mv "$FIX/.better-dev" "$FIX/.better-dev-off"
+  omp_run "$FIX" "$ASK" "$TMP/neg.out"
+  if [ "$RC" != 0 ] || [ "$HUNG" = 1 ] || [ ! -s "$TMP/neg.out" ]; then
+    printf 'FAIL: the control run without .better-dev/ did not complete (%s), so its silence proves nothing\n' "$(why)" >&2
+    reply "$TMP/neg.out.err" >&2
+    rc=1
+  elif grep -qF "$TOKEN" "$TMP/neg.out"; then
+    printf 'FAIL: negative half - token %s came back from a fixture with no .better-dev/, so the note is unconditional\n' "$TOKEN" >&2
+    reply "$TMP/neg.out" >&2
+    rc=1
+  fi
+
+  [ $rc = 0 ] || return 1
+  printf 'PASS: a real omp session received the note - positive half: token %s came back with .better-dev/ present; negative half: the same fixture with .better-dev/ moved aside returned no token\n' "$TOKEN"
+}
+
+selftest() {
+  local r=0
+  TMP="$(mktemp -d)"
+  ( set -e
+    build_fixture "$TMP/a"
+    [ -x "$CLONE/hooks/bd-session-start" ]        || { echo "FAIL: fixture session hook not executable"; exit 1; }
+    [ -f "$CLONE/hooks/omp/bd-awareness.ts" ]     || { echo "FAIL: bridge module not in the fake clone"; exit 1; }
+    [ ! -L "$CLONE/hooks/omp/bd-awareness.ts" ]   || { echo "FAIL: bridge module linked - it would resolve the real clone"; exit 1; }
+
+    out="$(cd "$FIX" && "$CLONE/hooks/bd-session-start")"
+    case "$out" in *"$TOKEN"*) ;; *) echo "FAIL: fixture session hook emitted no token"; exit 1 ;; esac
+    case "$out" in *'"additionalContext"'*) ;; *) echo "FAIL: fixture hook is not in the output shape the bridge consumes"; exit 1 ;; esac
+    mv "$FIX/.better-dev" "$FIX/.better-dev-off"
+    [ -z "$(cd "$FIX" && "$CLONE/hooks/bd-session-start")" ] \
+                                                  || { echo "FAIL: fixture hook emitted without .better-dev/"; exit 1; }
+    mv "$FIX/.better-dev-off" "$FIX/.better-dev"
+    ( cd "$FIX" && "$CLONE/hooks/bd-graphify-refresh-stale" ) \
+                                                  || { echo "FAIL: fixture graphify hook is not a clean no-op"; exit 1; }
+
+    s="$(wire_fixture || true)"
+    [ "$s" = wired ]                              || { echo "FAIL: wire reported '$s', not 'wired'"; exit 1; }
+    # What omp loads has to be a REAL file. A symlinked module is the exact defect this check
+    # exists for: omp skips it silently, so the fixture would report a hookless session as normal.
+    { [ -f "$TARGET" ] && [ ! -L "$TARGET" ]; }    || { echo "FAIL: wired target is not a real file - omp will skip it"; exit 1; }
+    grep -q '^// better-dev-omp-hook$' "$TARGET"   || { echo "FAIL: wired target carries no ours-marker"; exit 1; }
+    grep -qF "$CLONE/hooks/omp/bd-awareness.ts" "$TARGET" \
+                                                  || { echo "FAIL: wired target does not reach the fixture's own module"; exit 1; }
+
+    # A token reused across runs could be matched from a cached or resumed reply rather than from
+    # the note this run injected.
+    first="$TOKEN"
+    build_fixture "$TMP/b"
+    [ "$TOKEN" != "$first" ]                      || { echo "FAIL: token is not unique per fixture"; exit 1; }
+
+    # Both premise skips exit 0 and say so: a machine with no omp, or no model, is "not proven
+    # here", never "broken".
+    o="$(BD_OMP="$TMP/no-such-omp" "$SELF" 2>&1)"    || { echo "FAIL: a missing omp binary did not exit 0"; exit 1; }
+    case "$o" in skip:*) ;; *) echo "FAIL: a missing omp binary did not report a skip: $o"; exit 1 ;; esac
+    printf '#!/bin/sh\necho "error: no credentials found" >&2\nexit 1\n' >"$TMP/omp-dead"
+    chmod +x "$TMP/omp-dead"
+    o="$(BD_OMP="$TMP/omp-dead" BD_OMP_TIMEOUT=5 "$SELF" 2>&1)" \
+                                                  || { echo "FAIL: an omp that cannot run did not exit 0"; exit 1; }
+    case "$o" in *"skip: omp could not complete a run"*) ;; *) echo "FAIL: no skip for an omp that cannot run: $o"; exit 1 ;; esac
+    case "$o" in *PASS*) echo "FAIL: an omp that cannot run was reported as a pass"; exit 1 ;; esac
+
+    # A HUNG omp is a failure, not a premise skip, and this is the case that holds the difference.
+    # The probe loads the operator's global omp hooks, so a run that never returns is a session
+    # start our own bridge wedged - the exact failure its time bound exists to prevent. Read as
+    # "no credentials" it exits 0 and the check that the whole install rests on proves nothing.
+    # The bound and the grace are both cut to 1s so the watchdog fires in seconds.
+    printf '#!/bin/sh\nsleep 30\n' >"$TMP/omp-hang"
+    chmod +x "$TMP/omp-hang"
+    if o="$(BD_OMP="$TMP/omp-hang" BD_OMP_TIMEOUT=1 BD_OMP_GRACE=1 "$SELF" 2>&1)"; then
+      echo "FAIL: a hung omp exited 0 - a wedged session was swallowed as a premise skip: $o"; exit 1
+    fi
+    case "$o" in *"FAIL: omp never returned"*) ;;
+      *) echo "FAIL: a hung omp was not reported as a hang: $o"; exit 1 ;;
+    esac
+    case "$o" in *skip:*) echo "FAIL: a hung omp was reported as a premise skip: $o"; exit 1 ;; esac
+  ) && r=0 || r=1
+  [ $r = 0 ] && echo "selftest OK" || { echo "selftest FAILED" >&2; exit 1; }
+}
+
+[ -f "$WIRE" ] || die "no wiring script at $WIRE"
+[ -f "$MODULE" ] || die "no bridge module at $MODULE"
+command -v python3 >/dev/null 2>&1 || die "python3 is required (the wiring script is python3)"
+
+case "${1:-}" in
+  "") check ;;
+  selftest) selftest ;;
+  -h|--help) sed -n '2,28p' "$SELF"; exit 0 ;;
+  *) die "unknown command '$1' (no argument to run the check | selftest)" ;;
+esac
