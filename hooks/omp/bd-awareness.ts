@@ -5,12 +5,11 @@
 // it - so the awareness set cannot be registered the way install.sh registers it for Claude
 // Code. omp loads this module instead, from $HOME/.omp/agent/hooks/pre/bd-awareness.ts.
 //
-// Line 2 above is the ours-marker: it is how install.sh and scripts/bd-omp-hook-wire decide
-// whether the file sitting at that target is ours, through a symlink and for a copy alike.
-//
-// The literal relative path "hooks/bd-session-start" below is also install.sh --verify's
-// assertion for this host: it greps the installed target for that string. Renaming the exec
-// path breaks that assertion - keep the two in step.
+// Line 2 above is the ours-marker: install.sh and scripts/bd-omp-hook-wire look for that exact
+// line to decide whether the file sitting at the target is ours. The wiring script writes a real
+// 3-line stub there, carrying that same line, which re-exports this module from the clone -
+// never a symlink, because omp's hook discovery silently skips symlinked modules. So
+// import.meta.url inside this file is always the clone's own path.
 //
 // omp has no subagent-spawn event, so the worker note rides a tool_call handler on the task
 // tool, prepended to the batch context field.
@@ -59,32 +58,15 @@ interface HookApi {
   sendMessage(message: CustomMessage): void;
 }
 
-// The dir holding omp's own skills/ and hooks/ - $HOME/.omp/agent for the default profile. An
-// installed module sits at <agent-dir>/hooks/pre/bd-awareness.ts, so its own directory's ../..
-// is that dir. Derived from the UNRESOLVED path on purpose: a symlink install resolves into
-// the clone, which is not the agent dir.
-function agentDirFor(self: string, home: string): string {
-  const guess = resolve(dirname(self), "..", "..");
-  if (existsSync(join(guess, "skills", ".better-dev-install"))) return guess;
-  return join(home, ".omp", "agent");
-}
-
-// The clone the module was installed from, or undefined when nothing confirms one.
-function resolveClone(self: string, agentDir: string): string | undefined {
+// The clone this module lives in, or undefined when nothing confirms one. The stub at the target
+// re-exports this file, so import.meta.url is already inside the clone and its realpath is all
+// resolution needs.
+function resolveClone(self: string): string | undefined {
   try {
-    // Symlink install: the module's real path is <clone>/hooks/omp/bd-awareness.ts.
-    const linked = resolve(dirname(realpathSync(self)), "..", "..");
-    if (existsSync(join(linked, SESSION_HOOK))) return linked;
+    const root = resolve(dirname(realpathSync(self)), "..", "..");
+    if (existsSync(join(root, SESSION_HOOK))) return root;
   } catch {
-    // an unreadable module path is the copy case below, not a failure to report
-  }
-  try {
-    // Copy install (Windows, or BD_FORCE_COPY): the symlink is gone, so the marker install.sh
-    // writes beside the skill links is the only thing that still knows the clone.
-    const marked = readFileSync(join(agentDir, "skills", ".better-dev-install"), "utf8").trim();
-    if (marked && existsSync(join(marked, SESSION_HOOK))) return marked;
-  } catch {
-    // no marker: install.sh never ran for this host
+    // an unreadable module path confirms no clone, which is not a failure to report
   }
   return undefined;
 }
@@ -138,8 +120,11 @@ function noteOf(out: Record<string, unknown>): string | undefined {
 // injecting nothing.
 function install(pi: HookApi, self: string, home: string): void {
   try {
-    const agentDir = agentDirFor(self, home);
-    const root = resolveClone(self, agentDir);
+    // The dir holding omp's own skills/ and hooks/. $HOME/.omp/agent is where omp reads them for
+    // the default profile, the only profile install.sh wires; under a named profile omp reads a
+    // different dir, so the link nudge would then name a skills dir that profile never loads.
+    const agentDir = join(home, ".omp", "agent");
+    const root = resolveClone(self);
     if (!root) return;
     // bd-session-start's link and hook nudges answer for the host that invoked them, so tell
     // it which host that is. Empty settings is omp's real answer rather than a missing value:
@@ -324,8 +309,9 @@ function selftest(): void {
     check(!r.threw, `bash tool_call threw: ${String(r.threw)}`);
     check(r.value === undefined, "a non-task tool call was revised");
 
-    // 6. and 7. TOTALITY: a throw here would block every task dispatch on the machine, so an
-    // absent hook and a hook exiting non-zero with garbage both have to come back undefined.
+    // 6. and 7. TOTALITY, the return-undefined half: an absent hook and a hook exiting non-zero
+    // with garbage both come back undefined rather than revising the input. Neither reaches the
+    // handler's catch - spawnSync reports both by return value, never by throwing.
     const six = fixture(tmp, "exit 0");
     f = fake();
     install(f.pi, six.self, six.home);
@@ -339,6 +325,19 @@ function selftest(): void {
     r = called(f.handlers.get("tool_call"), { toolName: "task", input: { context: "CALLER" } }, { cwd: seven.cwd });
     check(!r.threw, `task tool_call threw on a failing bd-subagent-start: ${String(r.threw)}`);
     check(r.value === undefined, "revised the task input from a failing bd-subagent-start");
+
+    // ...and the catch itself. ctx is omp's object, not ours: a cwd that is not a string makes
+    // spawnSync throw ERR_INVALID_ARG_TYPE, and that throw escaping the tool_call handler would
+    // block every task dispatch on the machine.
+    const hostile = { cwd: 42 } as unknown as HookContext;
+    f = fake();
+    install(f.pi, four.self, four.home);
+    r = called(f.handlers.get("tool_call"), { toolName: "task", input: { context: "CALLER" } }, hostile);
+    check(!r.threw, `task tool_call threw on a non-string ctx.cwd: ${String(r.threw)}`);
+    check(r.value === undefined, "revised the task input from a throwing run");
+    r = called(f.handlers.get("session_start"), {}, hostile);
+    check(!r.threw, `session_start threw on a non-string ctx.cwd: ${String(r.threw)}`);
+    check(f.messages.length === 0, "injected something from a throwing run");
 
     // 8. a hung hook is bounded here, because omp bounds nothing itself.
     const eight = fixture(tmp, "sleep 30");
@@ -377,20 +376,6 @@ function selftest(): void {
     }
     check(!threw, `install threw with no clone resolvable: ${String(threw)}`);
     check(f.handlers.size === 0, "registered handlers with no clone resolvable");
-
-    // The copy install, where the symlink is gone and only the marker knows the clone.
-    const copied = fixture(tmp, 'printf \'{"additionalContext":"NOTE-BODY"}\\n\'');
-    const copyAgent = join(copied.home, ".omp", "agent");
-    const copySelf = join(copyAgent, "hooks", "pre", "bd-awareness.ts");
-    mkdirSync(dirname(copySelf), { recursive: true });
-    writeFileSync(copySelf, "");
-    mkdirSync(join(copyAgent, "skills"), { recursive: true });
-    writeFileSync(join(copyAgent, "skills", ".better-dev-install"), `${copied.clone}\n`);
-    f = fake();
-    install(f.pi, copySelf, copied.home);
-    r = called(f.handlers.get("session_start"), {}, { cwd: copied.cwd });
-    check(!r.threw, `copy-install session_start threw: ${String(r.threw)}`);
-    check(f.messages.length === 1 && f.messages[0].content.includes("NOTE-BODY"), "clone not resolved from the install marker");
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }
