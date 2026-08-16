@@ -25,6 +25,17 @@ case "$0" in /*) SELF="$0" ;; *) SELF="$PWD/$0" ;; esac
 WELCOME_WIRED="better-dev ready - practices wired in this repo"
 WELCOME_UNWIRED="better-dev ready - not wired in this repo (run /onboard to wire it)"
 
+# Host-scoped paths. The hosts/ adapters own their own dir names, so each of
+# these names what THIS host uses, defaulting to Claude Code's value - an unset
+# environment behaves exactly as it did before any other host existed. ${HOME:-}
+# because a hook must never error out, not even on a HOME-less environment.
+BD_HOST_SKILLS_DIR="${BD_HOST_SKILLS_DIR:-${HOME:-}/.claude/skills}"
+# Unset takes the default; deliberately EMPTY does not - a host can have a wiring
+# mechanism and no settings file at all, and hook_nudge must still run there.
+BD_HOST_HOOK_SETTINGS="${BD_HOST_HOOK_SETTINGS-${HOME:-}/.claude/settings.json}"
+# A basename under <clone>/scripts/, never a path: the script lives in the clone.
+BD_HOST_HOOK_WIRE="${BD_HOST_HOOK_WIRE:-bd-hook-wire}"
+
 # --- locate a better-dev repo by walking up from the working directory --------
 # We deliberately do NOT read stdin (a hook that blocks on stdin can freeze the
 # session); the current directory is enough to tell whether better-dev is here.
@@ -78,14 +89,14 @@ nudge() {
 marks() { printf '%s%s' "${UPDATE_MARK:+ - $UPDATE_MARK}" "$NUDGE_MARK"; }
 
 # --- shared clone resolution fallback: does an existing host skill symlink under
-# $HOME/.claude/skills point into a better-dev clone? Read the link and take its
+# the host's own skills dir point into a better-dev clone? Read the link and take its
 # target's prefix before /skills/<name>. Covers the clone install path (skills
 # symlinked into a git checkout by install.sh, hooks wired via settings, no
 # plugin - CLAUDE_PLUGIN_ROOT unset) that CLAUDE_PLUGIN_ROOT alone can't see.
 # Callers try their own CLAUDE_PLUGIN_ROOT usability check first and only fall
 # back to this when that check fails.
 resolve_clone_via_symlink() {
-  local hostdir="$HOME/.claude/skills" entry name target clone=""
+  local hostdir="$BD_HOST_SKILLS_DIR" entry name target clone=""
   [ -d "$hostdir" ] || return 1
   for entry in "$hostdir"/*; do
     [ -L "$entry" ] || continue
@@ -162,7 +173,7 @@ update_nudge() {
 
 # --- shared install-channel guard: did install.sh run on this host, or is this a
 # plugin-only install? A host link into the resolved clone (or a copy-install
-# marker file) means the former; nothing under $HOME/.claude/skills means the
+# marker file) means the former; nothing under the host's skills dir means the
 # latter, where skills AND hooks both ride the plugin update. Every nudge whose
 # remedy is install.sh must skip a plugin-only host: the remedy is merely wrong
 # for skills, and actively harmful for hooks - hooks/hooks.json already delivers
@@ -170,7 +181,7 @@ update_nudge() {
 # twice per session. One guard, all callers route through it. Callers pass the
 # clone they resolved; returns 1 (skip) when this host has no install of its own.
 host_installed() {
-  local clone="$1" hostdir="$HOME/.claude/skills" entry target
+  local clone="$1" hostdir="$BD_HOST_SKILLS_DIR" entry target
   [ -d "$hostdir" ] || return 1
   for entry in "$hostdir"/*; do
     [ -e "$entry" ] || [ -L "$entry" ] || continue
@@ -194,11 +205,11 @@ host_installed() {
 # --- link nudge: does the installed clone hold a skill this host never linked? -
 # Covers the gap update_nudge leaves: after a pull, a brand-new skills/<name>/ in
 # the clone has no host link yet, the behind-count is zero, and nothing else
-# would notice. Claude-host-scoped for now ($HOME/.claude/skills); other
-# link-install hosts (codex, hermes) get the same treatment when it bites - the
-# hosts/ adapters own their own dir names.
+# would notice. Scoped to whichever host is running - BD_HOST_SKILLS_DIR names its
+# skills dir and defaults to Claude Code's, so codex and hermes get the same
+# treatment by declaring theirs; the hosts/ adapters own their own dir names.
 link_nudge() {
-  local clone hostdir="$HOME/.claude/skills" name missing n skill msg
+  local clone hostdir="$BD_HOST_SKILLS_DIR" name missing n skill msg
   # Locate the clone: the plugin root if it looks like one, else the fallback above.
   clone="$(normalize_clone "${CLAUDE_PLUGIN_ROOT:-}")"
   [ -n "$clone" ] || clone="$(normalize_clone "$(resolve_clone_via_symlink)")"
@@ -237,11 +248,11 @@ link_nudge() {
 hook_nudge() {
   local clone settings verdict tobin msg
   # Same retry rule as update_nudge and reonboard_nudge: fall back when the plugin
-  # root fails THIS nudge's predicate (no scripts/bd-hook-wire - a pre-0.11.0
+  # root fails THIS nudge's predicate (no scripts/<wiring script> - a pre-0.11.0
   # clone), not only when it lacks skills/.
   clone="$(normalize_clone "${CLAUDE_PLUGIN_ROOT:-}")"
-  [ -n "$clone" ] && [ -f "$clone/scripts/bd-hook-wire" ] || clone="$(normalize_clone "$(resolve_clone_via_symlink)")"
-  [ -n "$clone" ] && [ -f "$clone/scripts/bd-hook-wire" ] || return 0
+  [ -n "$clone" ] && [ -f "$clone/scripts/$BD_HOST_HOOK_WIRE" ] || clone="$(normalize_clone "$(resolve_clone_via_symlink)")"
+  [ -n "$clone" ] && [ -f "$clone/scripts/$BD_HOST_HOOK_WIRE" ] || return 0
   # A plugin-only install has NO settings entries by design - hooks/hooks.json
   # delivers all three through the plugin - so the shared guard keeps this nudge
   # off that host, and off the install.sh run that would double-register them.
@@ -261,8 +272,11 @@ hook_nudge() {
     return 0
   fi
   command -v python3 >/dev/null 2>&1 || return 0
-  settings="$HOME/.claude/settings.json"   # this hook runs under Claude Code; other hosts declare their own
-  [ -f "$settings" ] || return 0
+  settings="$BD_HOST_HOOK_SETTINGS"
+  # Only a NAMED settings path has to exist. A host whose wiring mechanism keeps no
+  # settings file declares an empty one and passes it through as the target, so the
+  # nudge answers for that host instead of going inert on it.
+  [ -z "$settings" ] || [ -f "$settings" ] || return 0
   # `plan` writes nothing and reads one small local JSON file with no network and
   # no children - not the trade the fetch above makes, which bounds a network call
   # that can genuinely hang. So `timeout` is a nice-to-have here, not a premise:
@@ -274,12 +288,12 @@ hook_nudge() {
   # silent. Built through the positional params so the bounded and unbounded forms
   # share one command line (a function's $@ is its own).
   tobin="$(command -v timeout || command -v gtimeout || true)"
-  set -- python3 "$clone/scripts/bd-hook-wire" plan "$clone" "$settings"
+  set -- python3 "$clone/scripts/$BD_HOST_HOOK_WIRE" plan "$clone" "$settings"
   [ -n "$tobin" ] && set -- "$tobin" 1 "$@"
   verdict="$("$@" 2>/dev/null)" || return 0
   [ "$verdict" = "would-wire" ] || return 0
   printf -v msg 'better-dev: this host is missing awareness hooks the installed clone expects - run %s/install.sh to register them (it writes %s).' "$clone" "$settings"
-  # install.sh writes $HOME/.claude/settings.json - a machine-touching path that
+  # install.sh writes the host's settings file - a machine-touching path that
   # keeps its human gate - so the agent cannot stand in for the operator here.
   nudge "$msg" 'awareness hooks missing, run install.sh'
 }
@@ -920,6 +934,95 @@ PYST
   home3="$tmp/home3"; mkdir -p "$home3"
   out="$(cd "$tmp/proj" && HOME="$home3" CLAUDE_PLUGIN_ROOT="$lclone" "$SELF")"
   printf '%s' "$out" | grep -q "no link for this host" && fail "link nudge fired with no host skills dir"
+
+  # BD_HOST_SKILLS_DIR: the link nudge answers for the dir the HOST declared, not
+  # for the one under HOME. The omp-shaped dir is short a skill while the Claude dir
+  # under the same HOME holds both, so a nudge naming b can only have read the
+  # variable - and with the variable unset the same fixture is silent.
+  oclone="$tmp/oclone"
+  mkdir -p "$oclone/skills/a" "$oclone/skills/b"
+  : > "$oclone/skills/a/SKILL.md"; : > "$oclone/skills/b/SKILL.md"
+  ohome="$tmp/ohome"; mkdir -p "$ohome/.claude/skills" "$ohome/.omp/agent/skills"
+  ln -s "$oclone/skills/a" "$ohome/.claude/skills/a"
+  ln -s "$oclone/skills/b" "$ohome/.claude/skills/b"
+  ln -s "$oclone/skills/a" "$ohome/.omp/agent/skills/a"
+  out="$(cd "$tmp/proj" && HOME="$ohome" BD_HOST_SKILLS_DIR="$ohome/.omp/agent/skills" CLAUDE_PLUGIN_ROOT="$oclone" "$SELF")" \
+    || fail "errored with a host-declared skills dir"
+  printf '%s' "$out" | jq -e . >/dev/null || fail "host-declared skills-dir output is not valid JSON"
+  printf '%s' "$out" | grep -q "no link for this host (b)" \
+    || fail "link nudge read HOME instead of BD_HOST_SKILLS_DIR"
+  out="$(cd "$tmp/proj" && HOME="$ohome" CLAUDE_PLUGIN_ROOT="$oclone" "$SELF")" || fail "errored with the default skills dir"
+  printf '%s' "$out" | grep -q "no link for this host" && fail "link nudge fired with the default dir fully linked"
+
+  # The mirror: the declared dir is complete and the Claude dir is short -> silent,
+  # and the same fixture with the variable unset fires, so the read moved rather
+  # than the nudge merely going inert.
+  ohome2="$tmp/ohome2"; mkdir -p "$ohome2/.claude/skills" "$ohome2/.omp/agent/skills"
+  ln -s "$oclone/skills/a" "$ohome2/.claude/skills/a"
+  ln -s "$oclone/skills/a" "$ohome2/.omp/agent/skills/a"
+  ln -s "$oclone/skills/b" "$ohome2/.omp/agent/skills/b"
+  out="$(cd "$tmp/proj" && HOME="$ohome2" BD_HOST_SKILLS_DIR="$ohome2/.omp/agent/skills" CLAUDE_PLUGIN_ROOT="$oclone" "$SELF")" \
+    || fail "errored with a complete host-declared skills dir"
+  printf '%s' "$out" | grep -q "no link for this host" \
+    && fail "link nudge fired for a skill missing only from the Claude dir under HOME"
+  out="$(cd "$tmp/proj" && HOME="$ohome2" CLAUDE_PLUGIN_ROOT="$oclone" "$SELF")" || fail "errored with a short default skills dir"
+  printf '%s' "$out" | grep -q "no link for this host (b)" || fail "link nudge silent on the default dir missing b"
+
+  # Clone resolution follows the declared dir too: with no plugin root and no Claude
+  # dir at all, the link inside the omp-shaped dir is the only thing that can find
+  # the clone, so a nudge at all proves the fallback read the variable.
+  ohome3="$tmp/ohome3"; mkdir -p "$ohome3/.omp/agent/skills"
+  ln -s "$oclone/skills/a" "$ohome3/.omp/agent/skills/a"
+  out="$(cd "$tmp/proj" && HOME="$ohome3" BD_HOST_SKILLS_DIR="$ohome3/.omp/agent/skills" CLAUDE_PLUGIN_ROOT= "$SELF")" \
+    || fail "errored resolving the clone through the declared skills dir"
+  printf '%s' "$out" | grep -q "no link for this host (b)" \
+    || fail "clone resolution ignored BD_HOST_SKILLS_DIR with no plugin root"
+
+  # ...and the install-channel guard asks about the declared dir: one holding no link
+  # into the clone is a host install.sh never ran on, so the nudge whose remedy is
+  # install.sh stays silent there even though the Claude dir under the same HOME does
+  # link into that clone.
+  ohome4="$tmp/ohome4"; mkdir -p "$ohome4/.claude/skills" "$ohome4/.omp/agent/skills/unrelated"
+  ln -s "$oclone/skills/a" "$ohome4/.claude/skills/a"
+  out="$(cd "$tmp/proj" && HOME="$ohome4" BD_HOST_SKILLS_DIR="$ohome4/.omp/agent/skills" CLAUDE_PLUGIN_ROOT="$oclone" "$SELF")" \
+    || fail "errored with a declared dir holding no link into the clone"
+  printf '%s' "$out" | grep -q "no link for this host" \
+    && fail "link nudge fired on a host the installer never ran on - the guard read HOME"
+
+  # BD_HOST_HOOK_WIRE: the verdict routes through the script the host names, not
+  # through bd-hook-wire. The fake clone ships no bd-hook-wire at all, so the unset
+  # run below going silent proves the two firing runs came from the named script.
+  if command -v python3 >/dev/null 2>&1; then
+    wclone="$tmp/wclone"; mkdir -p "$wclone/skills/a" "$wclone/scripts"
+    : > "$wclone/skills/a/SKILL.md"
+    printf '%s\n' 'print("would-wire")' > "$wclone/scripts/bd-stub-would"
+    printf '%s\n' 'print("current")' > "$wclone/scripts/bd-stub-current"
+    whome="$tmp/whome"; mkdir -p "$whome/.claude/skills"
+    ln -s "$wclone/skills/a" "$whome/.claude/skills/a"
+    printf '{}' > "$whome/.claude/settings.json"
+    out="$(cd "$tmp/proj" && HOME="$whome" BD_HOST_HOOK_WIRE=bd-stub-would CLAUDE_PLUGIN_ROOT="$wclone" "$SELF")" \
+      || fail "errored with a host-declared wiring script"
+    printf '%s' "$out" | jq -e . >/dev/null || fail "host-declared wiring-script output is not valid JSON"
+    printf '%s' "$out" | grep -q "missing awareness hooks" \
+      || fail "hook nudge silent on a would-wire verdict from the host's own wiring script"
+    out="$(cd "$tmp/proj" && HOME="$whome" BD_HOST_HOOK_WIRE=bd-stub-current CLAUDE_PLUGIN_ROOT="$wclone" "$SELF")" \
+      || fail "errored with a current verdict from the host's own wiring script"
+    printf '%s' "$out" | grep -q "missing awareness hooks" && fail "hook nudge fired on a current verdict"
+    out="$(cd "$tmp/proj" && HOME="$whome" CLAUDE_PLUGIN_ROOT="$wclone" "$SELF")" || fail "errored with no default wiring script in the clone"
+    printf '%s' "$out" | grep -q "missing awareness hooks" && fail "hook nudge fired with no bd-hook-wire in the clone"
+
+    # A host with a wiring mechanism and no settings file at all: an empty declared
+    # path is a premise the nudge accepts, not one it goes silent on.
+    out="$(cd "$tmp/proj" && HOME="$whome" BD_HOST_HOOK_WIRE=bd-stub-would BD_HOST_HOOK_SETTINGS= CLAUDE_PLUGIN_ROOT="$wclone" "$SELF")" \
+      || fail "errored with an empty declared settings path"
+    printf '%s' "$out" | jq -e . >/dev/null || fail "empty-settings output is not valid JSON"
+    printf '%s' "$out" | grep -q "missing awareness hooks" \
+      || fail "hook nudge silent with an empty BD_HOST_HOOK_SETTINGS"
+    # ...and it planned against the declared path: HOME's settings.json exists here,
+    # so naming it would mean the nudge never read the variable at all.
+    printf '%s' "$out" | grep -qF "$whome/.claude/settings.json" \
+      && fail "hook nudge planned against HOME's settings.json instead of BD_HOST_HOOK_SETTINGS"
+  fi
 
   # Reonboard nudge: a reonboard-flagged release newer than the wired-version
   # stamp names the newest such version and /update. HOME stays isolated (home3
