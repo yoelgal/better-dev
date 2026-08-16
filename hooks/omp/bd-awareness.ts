@@ -50,10 +50,15 @@ interface CustomMessage {
   attribution: string;
 }
 
+interface SwitchEvent {
+  reason?: string;
+}
+
 // Declared here rather than imported from the omp package: the installed module is read from
 // omp's own hooks dir, where nothing resolves but node builtins.
 interface HookApi {
-  on(event: "session_start", handler: (event: unknown, ctx: HookContext) => void): void;
+  on(event: "session_start" | "session_compact", handler: (event: unknown, ctx: HookContext) => void): void;
+  on(event: "session_switch", handler: (event: SwitchEvent | undefined, ctx: HookContext) => void): void;
   on(event: "tool_call", handler: (event: ToolCallEvent, ctx: HookContext) => ToolCallResult | undefined): void;
   sendMessage(message: CustomMessage): void;
 }
@@ -116,7 +121,7 @@ function noteOf(out: Record<string, unknown>): string | undefined {
 
 // TOTALITY. omp's emitToolCall is the one event whose handler errors it does NOT swallow: a
 // throw here blocks the tool call, so a broken better-dev hook would block every task
-// dispatch on the machine. Both handlers therefore catch everything and fall back to
+// dispatch on the machine. Every handler therefore catches everything and falls back to
 // injecting nothing.
 function install(pi: HookApi, self: string, home: string): void {
   try {
@@ -139,10 +144,22 @@ function install(pi: HookApi, self: string, home: string): void {
       BD_HOST_HOOK_WIRE: "bd-omp-hook-wire",
     };
 
-    pi.on("session_start", (_event, ctx) => {
+    // Claude Code's manifest fires bd-session-start on startup|resume|clear|compact - every
+    // transition that leaves the model looking at a context the note is not in. omp splits
+    // those four across three events, so the body all of them need lives here once.
+    //
+    // refresh carries the manifest's OTHER matcher: bd-graphify-refresh-stale is wired to
+    // startup|resume alone, never clear or compact, so a compaction-heavy session does not
+    // re-run a staleness check the manifest never asked for.
+    //
+    // Nothing suppresses a repeat. Every trigger in this set IS a context the note is absent
+    // from, so an earlier injection says nothing about whether it is present now: wall-clock
+    // proximity measures the wrong thing, and guessing wrong means silence at exactly the
+    // compaction this set exists for. A duplicate costs one bounded run and one hidden message.
+    const announce = (ctx: HookContext, refresh: boolean): void => {
       try {
         const out = run(join(root, SESSION_HOOK), ctx?.cwd, env);
-        fire(join(root, GRAPHIFY_HOOK), ctx?.cwd, env);
+        if (refresh) fire(join(root, GRAPHIFY_HOOK), ctx?.cwd, env);
         const parsed = out ? parse(out) : undefined;
         if (!parsed) return;
         const note = noteOf(parsed);
@@ -153,7 +170,25 @@ function install(pi: HookApi, self: string, home: string): void {
       } catch {
         // an awareness nudge is never worth a broken session
       }
+    };
+
+    pi.on("session_start", (_event, ctx) => announce(ctx, true));
+
+    // omp reports resume and clear as one event carrying a reason: "resume" is the manifest's
+    // resume, and "new" is its clear, a context emptied down to nothing. The other two reasons
+    // are NOT in the set - fork() copies the transcript into the new session file and handoff
+    // carries a summary built from it, so the note is already in the context both land in.
+    pi.on("session_switch", (event, ctx) => {
+      const reason = event?.reason;
+      if (reason === "resume") announce(ctx, true);
+      else if (reason === "new") announce(ctx, false);
     });
+
+    // Compaction is the trigger the set exists for: the one that drops the note out of a
+    // session that is otherwise still running. omp emits this AFTER it has rebuilt the context
+    // from the compaction entry - replaceMessages precedes the emit at all three commit sites
+    // in omp 17.3.5 - so the note lands in the rebuilt context, not the discarded one.
+    pi.on("session_compact", (_event, ctx) => announce(ctx, false));
 
     pi.on("tool_call", (event, ctx) => {
       try {
@@ -422,6 +457,84 @@ async function selftest(): Promise<void> {
     setTimeout(tick.resolve, 500);
     await tick.promise;
     check(f.messages.length === 1 && f.messages[0].content.includes("NOTE-BODY"), "note lost with the staleness refresh absent");
+
+    // A tick to let a fire-and-forget child land, the same wait case 10 makes inline. The
+    // cases below need it more than once, so it gets a name here rather than editing case 10.
+    const settle = async (ms: number): Promise<void> => {
+      const done = Promise.withResolvers<void>();
+      setTimeout(done.resolve, ms);
+      await done.promise;
+    };
+
+    // 11. resume and clear, two of the three triggers startup-only was missing. omp reports
+    // both through session_switch: the manifest's resume as reason "resume", and its clear as
+    // reason "new", a context emptied down to nothing.
+    const eleven = fixture(tmp, 'printf \'{"additionalContext":"NOTE-BODY"}\\n\'');
+    f = fake();
+    install(f.pi, eleven.self, eleven.home);
+    check(f.handlers.has("session_switch"), "no session_switch handler registered on a resolvable clone");
+    r = called(f.handlers.get("session_switch"), { type: "session_switch", reason: "resume" }, { cwd: eleven.cwd });
+    check(!r.threw, `session_switch(resume) threw: ${String(r.threw)}`);
+    check(f.messages.length === 1 && f.messages[0].content.includes("NOTE-BODY"), `no note injected on session_switch(resume): ${f.messages.length} messages`);
+    // ...and again on the next trigger. Nothing suppresses a repeat: each of these events is a
+    // context the note is absent from, so a note injected moments ago is not one that is still
+    // there. This second injection IS that decision, made observable.
+    r = called(f.handlers.get("session_switch"), { type: "session_switch", reason: "new" }, { cwd: eleven.cwd });
+    check(!r.threw, `session_switch(new) threw: ${String(r.threw)}`);
+    check(f.messages.length === 2 && f.messages[1].content.includes("NOTE-BODY"), `no note injected on session_switch(new), omp's clear: ${f.messages.length} messages`);
+
+    // ...while the two reasons outside the manifest's set inject nothing. fork() copies the
+    // transcript into the new session file and handoff carries a summary built from it, so the
+    // note is already in the context both of those land in. A reason omp has not shipped yet,
+    // or an event object that is not one at all, is left alone too rather than throwing.
+    for (const reason of ["fork", "handoff", "future-reason", undefined]) {
+      r = called(f.handlers.get("session_switch"), { type: "session_switch", reason }, { cwd: eleven.cwd });
+      check(!r.threw, `session_switch(${String(reason)}) threw: ${String(r.threw)}`);
+    }
+    for (const event of [undefined, 42, null]) {
+      r = called(f.handlers.get("session_switch"), event, { cwd: eleven.cwd });
+      check(!r.threw, `session_switch threw on a ${String(event)} event: ${String(r.threw)}`);
+    }
+    check(f.messages.length === 2, `injected on a session_switch outside the manifest's set: ${f.messages.length} messages`);
+
+    // 12. compaction, the trigger the whole set exists for: it is the one that drops the note
+    // out of a session that is otherwise still running, which is precisely when Claude Code
+    // re-injects. Both fields ride it, the same as any other trigger.
+    const twelve = fixture(tmp, 'printf \'{"additionalContext":"NOTE-BODY","systemMessage":"W"}\\n\'');
+    f = fake();
+    install(f.pi, twelve.self, twelve.home);
+    check(f.handlers.has("session_compact"), "no session_compact handler registered on a resolvable clone");
+    r = called(f.handlers.get("session_compact"), { type: "session_compact", fromExtension: false }, { cwd: twelve.cwd });
+    check(!r.threw, `session_compact threw: ${String(r.threw)}`);
+    const afterCompact = f.messages.filter(m => m.display === false);
+    check(afterCompact.length === 1 && afterCompact[0].content.includes("NOTE-BODY"), `no note injected on session_compact: ${f.messages.length} messages`);
+    check(f.messages.filter(m => m.display === true).length === 1, "welcome not sent as a displayed message on session_compact");
+
+    // 13. the staleness refresh keeps the manifest's NARROWER matcher. hooks.json fires
+    // bd-session-start on four triggers but bd-graphify-refresh-stale on startup|resume only,
+    // so clear and compact must not re-run a staleness check the manifest never asked for -
+    // otherwise a compaction-heavy session runs one per compaction.
+    const thirteen = fixture(tmp, 'printf \'{"additionalContext":"NOTE-BODY"}\\n\'');
+    script(join(thirteen.clone, GRAPHIFY_HOOK), 'printf "x" >> "$PWD/refresh.txt"');
+    const refreshes = (): number => {
+      const marker = join(thirteen.cwd, "refresh.txt");
+      return existsSync(marker) ? readFileSync(marker, "utf8").length : 0;
+    };
+    f = fake();
+    install(f.pi, thirteen.self, thirteen.home);
+    called(f.handlers.get("session_switch"), { type: "session_switch", reason: "new" }, { cwd: thirteen.cwd });
+    called(f.handlers.get("session_compact"), { type: "session_compact" }, { cwd: thirteen.cwd });
+    await settle(500);
+    check(f.messages.length === 2, `the two refresh-less triggers did not both inject: ${f.messages.length} messages`);
+    check(refreshes() === 0, `staleness refresh fired outside startup|resume: ${refreshes()} runs`);
+    // ...and the upper half: resume is in that matcher, so it does fire there. Without this the
+    // case would pass on a bridge that never ran the refresh at all.
+    called(f.handlers.get("session_switch"), { type: "session_switch", reason: "resume" }, { cwd: thirteen.cwd });
+    await settle(500);
+    check(refreshes() === 1, `staleness refresh did not fire on resume: ${refreshes()} runs`);
+    called(f.handlers.get("session_start"), { type: "session_start" }, { cwd: thirteen.cwd });
+    await settle(500);
+    check(refreshes() === 2, `staleness refresh did not fire on startup: ${refreshes()} runs`);
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }
