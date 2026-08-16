@@ -181,6 +181,13 @@ host_apply() {
 }
 
 # ── register the awareness hooks for one host ────────────────────────────────
+# Which script speaks for a host: bd_host_hook_wire is a script BASENAME under scripts/, defaulting to
+# bd-hook-wire's JSON-config merge. Resolved in one place because the install path and --verify must
+# never disagree about which script wires a host.
+hook_wire() {
+  if [ -n "${bd_host_hook_wire:-}" ]; then echo "$bd_host_hook_wire"; else echo "bd-hook-wire"; fi
+}
+
 # Why this lives in the installer and not in a doc step: an agent told "install better-dev" reads
 # BOOTSTRAP and runs this script - it is the only install path there is. If hooks were a separate
 # manual step, that install would end hookless in every repo while BOOTSTRAP claims the tool ships
@@ -198,11 +205,10 @@ host_hooks() {
     echo "    hooks: python3 not found - skipped. Wire them by hand with /bootstrap-hooks."
     return 0
   fi
-  # The wiring MECHANISM is the adapter's to name, not a branch here: bd_host_hook_wire is a script
-  # basename under scripts/, defaulting to bd-hook-wire's JSON-config merge. Each such script takes
-  # the same argv and prints the same one status word, so a fifth host with a fifth mechanism (omp's
-  # is a TypeScript module, not JSON) adds a file rather than a case.
-  hookwire="${bd_host_hook_wire:-}"; [ -n "$hookwire" ] || hookwire="bd-hook-wire"
+  # The wiring MECHANISM is the adapter's to name, not a branch here: each such script takes the same
+  # argv and prints the same one status word, so a fifth host with a fifth mechanism (omp's is a
+  # TypeScript module, not JSON) adds a file rather than a case.
+  hookwire="$(hook_wire)"
   if [ ! -f "$SRC/scripts/$hookwire" ]; then
     echo "    hooks: this clone has no scripts/$hookwire, the wiring script $bd_host_display names - skipped. /bootstrap-hooks wires them by hand."
     return 0
@@ -257,14 +263,29 @@ host_verify() {
   # Hooks are half the install, so verify asserts them too - an install that links every skill and
   # registers no hook is exactly the silent half-install this flag exists to catch.
   if [ -n "${bd_host_hook_settings:-}" ] && [ "$WIRE_HOOKS" = 1 ]; then
-    # One grep covers a module-wired host too, and not by luck: the module installed at that target is
-    # a symlink into hooks/omp/bd-awareness.ts, which carries the literal hooks/bd-session-start path
-    # because it execs it. Renaming that exec path breaks this assertion - keep the two in step.
-    if grep -q "hooks/bd-session-start" "$bd_host_hook_settings" 2>/dev/null; then
-      echo "  ok $bd_host_display: awareness hooks registered"
-    else
-      echo "  x $bd_host_display: awareness hooks NOT registered in $bd_host_hook_settings - re-run install.sh (or /bootstrap-hooks)"
+    # `plan` is the mechanism-agnostic check: the script that would do the wiring answers whether a
+    # fresh install would still have work to do, so a JSON-config host and a module host are each
+    # asserted against what their own wiring installs, never against a string that happens to be in a
+    # file. A grep can pass over an install the host cannot load, and over a newly added hook.
+    hookwire="$(hook_wire)"
+    if ! command -v python3 >/dev/null 2>&1; then
+      echo "  ? $bd_host_display: awareness hooks UNVERIFIABLE - python3 not found, so scripts/$hookwire cannot answer. /bootstrap-hooks wires them by hand."
       verify_fail=1
+    elif [ ! -f "$SRC/scripts/$hookwire" ]; then
+      echo "  ? $bd_host_display: awareness hooks UNVERIFIABLE - this clone has no scripts/$hookwire, the wiring script $bd_host_display names."
+      verify_fail=1
+    else
+      hookout="$(python3 "$SRC/scripts/$hookwire" plan "$SRC" "$bd_host_hook_settings" 2>/dev/null)" || hookout="(no answer)"
+      case "$hookout" in
+        current)
+          echo "  ok $bd_host_display: awareness hooks registered" ;;
+        would-wire)
+          echo "  x $bd_host_display: awareness hooks NOT registered in $bd_host_hook_settings - re-run ./install.sh --host $h (or /bootstrap-hooks)"
+          verify_fail=1 ;;
+        *)
+          echo "  ? $bd_host_display: awareness hooks UNVERIFIABLE - scripts/$hookwire plan said '$hookout' for $bd_host_hook_settings. /bootstrap-hooks wires them by hand."
+          verify_fail=1 ;;
+      esac
     fi
   fi
 }
