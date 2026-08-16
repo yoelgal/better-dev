@@ -1,0 +1,255 @@
+#!/usr/bin/env python3
+"""bd-omp-hook-wire - register better-dev's awareness bridge in omp's own hooks dir.
+
+omp (Oh My Pi) has no machine-global command-hook config: SessionStart, SubagentStart and PreToolUse
+do not exist in it. An omp hook is a TypeScript module dropped at ~/.omp/agent/hooks/pre/*.ts which
+default-exports (pi) => void and subscribes with pi.on(...). So omp's wiring is not a JSON merge like
+bd-hook-wire's - it is installing ONE file at ONE path, and that is the whole difference between the
+two scripts. install.sh reaches this one through the host adapter's `bd_host_hook_wire`; bd-hook-wire
+stays the default for every host that does own a hook config.
+
+  bd-omp-hook-wire wire   <clone-dir> <target-path>   install the bridge module; print a status word
+  bd-omp-hook-wire plan   <clone-dir> <target-path>   same decision, but write nothing
+  bd-omp-hook-wire unwire <clone-dir> <target-path>   remove the module, but only if it is ours
+  bd-omp-hook-wire selftest
+
+The module installed at <target-path> is <clone-dir>/hooks/omp/bd-awareness.ts, symlinked so a
+`git pull` refreshes it, copied instead when BD_FORCE_COPY=1 - the same variable install.sh uses to
+take its Windows path, where a symlink silently freezes into a stale copy.
+
+Status word on stdout, one of: wired | would-wire | current | unwired | unreadable. Never raises at
+the caller, and never writes over anything that is not ours: the target is a path in the operator's
+own hooks dir, so a file there that we did not put there is reported and left byte-identical rather
+than clobbered. `unwire` is bd-uninstall's half - a module left behind after the clone is gone would
+run a hook pointing at a deleted path in every omp session.
+"""
+import os
+import pathlib
+import shutil
+import subprocess
+import sys
+import tempfile
+
+# Where the module lives inside the clone. Also the ours-test for a symlink: only better-dev's
+# installer points a hooks/pre entry at a path in this shape, so a re-run after the clone moves
+# replaces its own stale link and a foreign module is never touched.
+MODULE = "hooks/omp/bd-awareness.ts"
+
+# The module's literal second line, and the only ours-test that survives copy-mode installs, where
+# there is no link target left to read. Slice B's module carries it; keep the two in step.
+MARKER = "// better-dev-omp-hook"
+
+# A regular file at the target is the operator's hook until proven otherwise, so read only enough of
+# it to find the marker line rather than pulling an arbitrary file into memory.
+HEAD = 4096
+
+
+def marked(p):
+    with open(str(p), "rb") as fh:
+        head = fh.read(HEAD)
+    for line in head.decode("utf-8", "replace").splitlines():
+        if line.strip() == MARKER:
+            return True
+    return False
+
+
+def classify(p):
+    """absent | ours | foreign. Raises OSError, which every caller turns into `unreadable`."""
+    if p.is_symlink():
+        # Checked before .exists(), so a dangling ours-link (moved or removed clone) is still ours
+        # and gets replaced, instead of reading as absent and being installed over.
+        target = os.readlink(str(p)).rstrip("/")
+        return "ours" if target.endswith("/" + MODULE) else "foreign"
+    if not p.exists():
+        return "absent"
+    if not p.is_file():
+        return "foreign"
+    return "ours" if marked(p) else "foreign"
+
+
+def installed(p, module, copy):
+    """Is the ours-install at p already the one this run would make?"""
+    if copy:
+        if p.is_symlink() or not p.is_file():
+            return False
+        return p.read_bytes() == module.read_bytes()
+    if not p.is_symlink():
+        return False
+    return os.path.realpath(str(p)) == os.path.realpath(str(module))
+
+
+def install(p, module, copy):
+    # Build beside the target and rename over it: the operator's session may load this dir at any
+    # moment, and a delete-then-create leaves a window with no hook and, on a failed create, none.
+    fd, tmp = tempfile.mkstemp(dir=str(p.parent), prefix=".bd-omp-hook.")
+    os.close(fd)
+    try:
+        if copy:
+            shutil.copyfile(str(module), tmp)
+            os.chmod(tmp, 0o644)
+        else:
+            os.unlink(tmp)
+            os.symlink(str(module), tmp)
+        os.replace(tmp, str(p))
+    except OSError:
+        if os.path.lexists(tmp):
+            os.unlink(tmp)
+        raise
+
+
+def apply(src, target, dry=False, remove=False):
+    p = pathlib.Path(target)
+    module = pathlib.Path(src) / MODULE
+    copy = os.environ.get("BD_FORCE_COPY", "0") == "1"
+
+    try:
+        state = classify(p)
+    except OSError:
+        return "unreadable"
+    if remove:
+        # A foreign file is nothing of ours to remove, which is `current`, not a failure: an
+        # uninstall that reported `unreadable` over the operator's own hook would read as a broken
+        # uninstall when it did exactly the right thing.
+        if state != "ours":
+            return "current"
+        try:
+            p.unlink()
+        except OSError:
+            return "unreadable"
+        return "unwired"
+
+    if state == "foreign":
+        return "unreadable"
+
+    try:
+        # The source is checked before anything is written, because installing a link to a module
+        # that is not there yet would leave a dangling entry in omp's hooks dir - which omp would
+        # then try to load every session.
+        if not module.is_file():
+            return "unreadable"
+        if state == "ours" and installed(p, module, copy):
+            return "current"
+        if dry:
+            return "would-wire"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        install(p, module, copy)
+    except OSError:
+        return "unreadable"
+    return "wired"
+
+
+def selftest():
+    self = os.path.abspath(__file__)
+    fails = []
+
+    def check(cond, what):
+        if not cond:
+            fails.append(what)
+
+    def run(mode, src, target, copy=False):
+        env = dict(os.environ)
+        env.pop("BD_FORCE_COPY", None)
+        if copy:
+            env["BD_FORCE_COPY"] = "1"
+        out = subprocess.run(
+            [sys.executable, self, mode, str(src), str(target)],
+            capture_output=True, text=True, env=env,
+        )
+        return out.stdout.strip()
+
+    def clone(root, name, module=True):
+        c = pathlib.Path(root) / name
+        m = c / MODULE
+        m.parent.mkdir(parents=True, exist_ok=True)
+        if module:
+            m.write_text("export default (pi) => {};\n%s\n" % MARKER)
+        return c, m
+
+    with tempfile.TemporaryDirectory() as d:
+        here, mod = clone(d, "clone")
+        pre = pathlib.Path(d) / "omp" / "agent" / "hooks" / "pre"
+        tgt = pre / "bd-awareness.ts"
+
+        # 1. absent target, source present: installed, and the target reads back the real module
+        check(run("wire", here, tgt) == "wired", "absent target not wired")
+        check(os.path.realpath(str(tgt)) == os.path.realpath(str(mod)), "target does not resolve to the module")
+        check(MARKER in tgt.read_text(), "target does not read back the marker line")
+
+        # 2. idempotent: a second run changes nothing
+        check(run("wire", here, tgt) == "current", "re-run not idempotent")
+
+        # 3. a moved clone replaces our install rather than adding a second one. Two modules in
+        # omp's hooks/pre dir would both load, and the stale one points into a clone that is gone.
+        moved, moved_mod = clone(d, "moved")
+        check(run("wire", moved, tgt) == "wired", "moved clone not rewired")
+        check(os.path.realpath(str(tgt)) == os.path.realpath(str(moved_mod)), "stale clone path survived")
+        left = sorted(x.name for x in pre.iterdir())
+        check(left == ["bd-awareness.ts"], "moved clone left %r in hooks/pre" % left)
+
+        # 4. unwire removes it, and a second unwire is a no-op
+        check(run("unwire", moved, tgt) == "unwired", "unwire did not report removal")
+        check(not os.path.lexists(str(tgt)), "unwire left the target behind")
+        check(run("unwire", moved, tgt) == "current", "second unwire was not a no-op")
+
+        # 5. plan writes nothing
+        fresh = pathlib.Path(d) / "plan" / "bd-awareness.ts"
+        check(run("plan", here, fresh) == "would-wire", "plan did not report would-wire")
+        check(not os.path.lexists(str(fresh)), "plan wrote a file")
+
+        # 6. a foreign file at the target is the operator's own hook: reported, never overwritten,
+        # never removed by unwire either
+        foreign = pathlib.Path(d) / "foreign.ts"
+        body = "export default (pi) => { pi.on('session_start', () => {}); };\n"
+        foreign.write_text(body)
+        check(run("wire", here, foreign) == "unreadable", "foreign file not reported")
+        check(foreign.read_text() == body, "foreign file was modified by wire")
+        check(run("unwire", here, foreign) == "current", "unwire claimed a foreign file")
+        check(foreign.read_text() == body, "foreign file was modified by unwire")
+        check(run("plan", here, foreign) == "unreadable", "plan did not report a foreign file")
+
+        # 7. copy mode: a regular file, not a link, and the marker is what identifies it afterwards
+        cp = pathlib.Path(d) / "copy" / "bd-awareness.ts"
+        check(run("wire", here, cp, copy=True) == "wired", "copy mode not wired")
+        check(not cp.is_symlink(), "copy mode installed a symlink")
+        check(cp.read_bytes() == mod.read_bytes(), "copy mode content does not match the module")
+        check(run("wire", here, cp, copy=True) == "current", "copy mode re-run not idempotent")
+        check(run("unwire", here, cp, copy=True) == "unwired", "copy mode not unwired")
+        check(not os.path.lexists(str(cp)), "copy mode left the file behind")
+
+        # 8. missing source module: nothing is installed, so omp never loads a dangling entry
+        empty, _ = clone(d, "empty", module=False)
+        dangle = pathlib.Path(d) / "dangle" / "bd-awareness.ts"
+        check(run("wire", empty, dangle) == "unreadable", "missing source not reported")
+        check(not os.path.lexists(str(dangle)), "missing source installed a dangling entry")
+        check(run("plan", empty, dangle) == "unreadable", "plan did not report a missing source")
+
+    if fails:
+        for f in fails:
+            print("FAIL: " + f, file=sys.stderr)
+        print("selftest FAILED", file=sys.stderr)
+        return 1
+    print("selftest OK")
+    return 0
+
+
+def main(argv):
+    if not argv or argv[0] in ("-h", "--help"):
+        print(__doc__.strip())
+        return 0
+    cmd = argv[0]
+    if cmd == "selftest":
+        return selftest()
+    if cmd in ("wire", "plan", "unwire"):
+        if len(argv) != 3:
+            print("bd-omp-hook-wire: %s needs <clone-dir> <target-path>" % cmd, file=sys.stderr)
+            return 1
+        print(apply(argv[1].rstrip("/"), argv[2],
+                    dry=(cmd == "plan"), remove=(cmd == "unwire")))
+        return 0
+    print("bd-omp-hook-wire: unknown command '%s' (wire | plan | unwire | selftest)" % cmd,
+          file=sys.stderr)
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
