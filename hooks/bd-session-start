@@ -29,11 +29,18 @@ WELCOME_UNWIRED="better-dev ready - not wired in this repo (run /onboard to wire
 # these names what THIS host uses, defaulting to Claude Code's value - an unset
 # environment behaves exactly as it did before any other host existed. ${HOME:-}
 # because a hook must never error out, not even on a HOME-less environment.
-BD_HOST_SKILLS_DIR="${BD_HOST_SKILLS_DIR:-${HOME:-}/.claude/skills}"
-# Unset takes the default; deliberately EMPTY does not - a host can have a wiring
-# mechanism and no settings file at all, and hook_nudge must still run there.
+#
+# Both PATHS take the default only when UNSET; a host that declares one EMPTY
+# keeps it empty, because empty means "this host has no such thing" and answering
+# with Claude's path would report Claude's state to a non-Claude host. Empty
+# skills dir: the clone-resolution fallback and the install-channel guard find
+# nothing, so every nudge whose remedy is install.sh goes silent. Empty settings:
+# hook_nudge has no target to plan against and goes silent the same way.
+BD_HOST_SKILLS_DIR="${BD_HOST_SKILLS_DIR-${HOME:-}/.claude/skills}"
 BD_HOST_HOOK_SETTINGS="${BD_HOST_HOOK_SETTINGS-${HOME:-}/.claude/settings.json}"
-# A basename under <clone>/scripts/, never a path: the script lives in the clone.
+# The wiring script is the deliberate exception, and takes the default on empty
+# too: it is a basename under <clone>/scripts/, never a path, and no host wires
+# through nothing - so an empty one is a missing value, not a declared absence.
 BD_HOST_HOOK_WIRE="${BD_HOST_HOOK_WIRE:-bd-hook-wire}"
 
 # --- locate a better-dev repo by walking up from the working directory --------
@@ -273,10 +280,10 @@ hook_nudge() {
   fi
   command -v python3 >/dev/null 2>&1 || return 0
   settings="$BD_HOST_HOOK_SETTINGS"
-  # Only a NAMED settings path has to exist. A host whose wiring mechanism keeps no
-  # settings file declares an empty one and passes it through as the target, so the
-  # nudge answers for that host instead of going inert on it.
-  [ -z "$settings" ] || [ -f "$settings" ] || return 0
+  # The wiring target has to exist. It is not always a settings file - omp's is the
+  # hook MODULE that host loads - but every host names one real path, and a host
+  # that names none has nothing for the wiring script to compare against.
+  [ -f "$settings" ] || return 0
   # `plan` writes nothing and reads one small local JSON file with no network and
   # no children - not the trade the fetch above makes, which bounds a network call
   # that can genuinely hang. So `timeout` is a nice-to-have here, not a premise:
@@ -989,39 +996,104 @@ PYST
   printf '%s' "$out" | grep -q "no link for this host" \
     && fail "link nudge fired on a host the installer never ran on - the guard read HOME"
 
+  # ...and an EMPTY declared dir is a declared absence, not a missing value: a host
+  # saying it has no skills dir gets silence, not an answer about Claude's dir under
+  # the same HOME. The control run with the variable unset fires on this very
+  # fixture, so the silence is the declaration's doing and not a linked-up dir.
+  out="$(cd "$tmp/proj" && HOME="$ohome4" CLAUDE_PLUGIN_ROOT="$oclone" "$SELF")" \
+    || fail "errored with the default skills dir short of b"
+  printf '%s' "$out" | grep -q "no link for this host (b)" \
+    || fail "control for the empty declared dir: the default dir is not short of b"
+  out="$(cd "$tmp/proj" && HOME="$ohome4" BD_HOST_SKILLS_DIR= CLAUDE_PLUGIN_ROOT="$oclone" "$SELF")" \
+    || fail "errored with an empty declared skills dir"
+  printf '%s' "$out" | jq -e . >/dev/null || fail "empty-skills-dir output is not valid JSON"
+  printf '%s' "$out" | grep -q "no link for this host" \
+    && fail "link nudge answered for Claude's dir on a host declaring no skills dir"
+
   # BD_HOST_HOOK_WIRE: the verdict routes through the script the host names, not
   # through bd-hook-wire. The fake clone ships no bd-hook-wire at all, so the unset
   # run below going silent proves the two firing runs came from the named script.
+  #
+  # The stub ANSWERS FROM THE TARGET it is handed - would-wire for a regular file,
+  # unreadable for anything else, which is the call both real wiring scripts make -
+  # and records that target for the assertions. A stub printing a constant cannot
+  # see which path reached it, and that blindness is how an empty target shipped:
+  # bd-omp-hook-wire maps empty to Path(".") and answers unreadable forever.
   if command -v python3 >/dev/null 2>&1; then
     wclone="$tmp/wclone"; mkdir -p "$wclone/skills/a" "$wclone/scripts"
     : > "$wclone/skills/a/SKILL.md"
-    printf '%s\n' 'print("would-wire")' > "$wclone/scripts/bd-stub-would"
+    planlog="$tmp/planned-target"
+    printf '%s\n' \
+      'import os, sys' \
+      'target = sys.argv[3] if len(sys.argv) > 3 else ""' \
+      'log = os.environ.get("BD_STUB_TARGET_LOG")' \
+      'if log: open(log, "w").write(target)' \
+      'print("would-wire" if os.path.isfile(target) else "unreadable")' > "$wclone/scripts/bd-stub-plan"
     printf '%s\n' 'print("current")' > "$wclone/scripts/bd-stub-current"
     whome="$tmp/whome"; mkdir -p "$whome/.claude/skills"
     ln -s "$wclone/skills/a" "$whome/.claude/skills/a"
     printf '{}' > "$whome/.claude/settings.json"
-    out="$(cd "$tmp/proj" && HOME="$whome" BD_HOST_HOOK_WIRE=bd-stub-would CLAUDE_PLUGIN_ROOT="$wclone" "$SELF")" \
+    rm -f "$planlog"
+    out="$(cd "$tmp/proj" && HOME="$whome" BD_STUB_TARGET_LOG="$planlog" BD_HOST_HOOK_WIRE=bd-stub-plan CLAUDE_PLUGIN_ROOT="$wclone" "$SELF")" \
       || fail "errored with a host-declared wiring script"
     printf '%s' "$out" | jq -e . >/dev/null || fail "host-declared wiring-script output is not valid JSON"
     printf '%s' "$out" | grep -q "missing awareness hooks" \
       || fail "hook nudge silent on a would-wire verdict from the host's own wiring script"
+    # ...and the target the script was handed is the declared one, read from the
+    # script's own record rather than from the sentence the nudge printed.
+    [ "$(cat "$planlog" 2>/dev/null)" = "$whome/.claude/settings.json" ] \
+      || fail "wiring script planned against '$(cat "$planlog" 2>/dev/null)', not the declared target"
     out="$(cd "$tmp/proj" && HOME="$whome" BD_HOST_HOOK_WIRE=bd-stub-current CLAUDE_PLUGIN_ROOT="$wclone" "$SELF")" \
       || fail "errored with a current verdict from the host's own wiring script"
     printf '%s' "$out" | grep -q "missing awareness hooks" && fail "hook nudge fired on a current verdict"
     out="$(cd "$tmp/proj" && HOME="$whome" CLAUDE_PLUGIN_ROOT="$wclone" "$SELF")" || fail "errored with no default wiring script in the clone"
     printf '%s' "$out" | grep -q "missing awareness hooks" && fail "hook nudge fired with no bd-hook-wire in the clone"
 
-    # A host with a wiring mechanism and no settings file at all: an empty declared
-    # path is a premise the nudge accepts, not one it goes silent on.
-    out="$(cd "$tmp/proj" && HOME="$whome" BD_HOST_HOOK_WIRE=bd-stub-would BD_HOST_HOOK_SETTINGS= CLAUDE_PLUGIN_ROOT="$wclone" "$SELF")" \
-      || fail "errored with an empty declared settings path"
-    printf '%s' "$out" | jq -e . >/dev/null || fail "empty-settings output is not valid JSON"
+    # BD_HOST_HOOK_SETTINGS, the omp shape: the declared target is the hook MODULE
+    # that host loads, not a settings.json, and it is that path which has to reach
+    # the wiring script. HOME's settings.json exists here too, so planning against
+    # it - or against the empty string the bridge used to export - is visible.
+    ohookhome="$tmp/ohookhome"
+    mkdir -p "$ohookhome/.claude" "$ohookhome/.omp/agent/skills" "$ohookhome/.omp/agent/hooks/pre"
+    ln -s "$wclone/skills/a" "$ohookhome/.omp/agent/skills/a"
+    printf '{}' > "$ohookhome/.claude/settings.json"
+    otarget="$ohookhome/.omp/agent/hooks/pre/bd-awareness.ts"
+    printf '// better-dev-omp-hook\n' > "$otarget"
+    rm -f "$planlog"
+    out="$(cd "$tmp/proj" && HOME="$ohookhome" BD_STUB_TARGET_LOG="$planlog" \
+      BD_HOST_SKILLS_DIR="$ohookhome/.omp/agent/skills" BD_HOST_HOOK_SETTINGS="$otarget" \
+      BD_HOST_HOOK_WIRE=bd-stub-plan CLAUDE_PLUGIN_ROOT="$wclone" "$SELF")" \
+      || fail "errored with a hook-module target"
+    printf '%s' "$out" | jq -e . >/dev/null || fail "hook-module-target output is not valid JSON"
     printf '%s' "$out" | grep -q "missing awareness hooks" \
-      || fail "hook nudge silent with an empty BD_HOST_HOOK_SETTINGS"
-    # ...and it planned against the declared path: HOME's settings.json exists here,
-    # so naming it would mean the nudge never read the variable at all.
-    printf '%s' "$out" | grep -qF "$whome/.claude/settings.json" \
-      && fail "hook nudge planned against HOME's settings.json instead of BD_HOST_HOOK_SETTINGS"
+      || fail "hook nudge silent on a hook module at the declared target"
+    [ "$(cat "$planlog" 2>/dev/null)" = "$otarget" ] \
+      || fail "wiring script planned against '$(cat "$planlog" 2>/dev/null)', not the declared hook module"
+
+    # ...and the same target through the REAL bd-omp-hook-wire, because the pair that
+    # broke was bridge -> this nudge -> that script, and a stub cannot answer for it:
+    # a freshly wired module is current and silent, and the stale one an install.sh
+    # re-run repairs is would-wire and fires. Its own HOME, so the only clone the
+    # skills dir can resolve to is this one - the fake clone above has no such script.
+    if [ -f "$clone_st/scripts/bd-omp-hook-wire" ]; then
+      rthome="$tmp/rthome"; mkdir -p "$rthome/.omp/agent/skills" "$rthome/.omp/agent/hooks/pre"
+      ln -sfn "$clone_st/skills/onboard" "$rthome/.omp/agent/skills/onboard"
+      rtarget="$rthome/.omp/agent/hooks/pre/bd-awareness.ts"
+      python3 "$clone_st/scripts/bd-omp-hook-wire" wire "$clone_st" "$rtarget" >/dev/null 2>&1 \
+        || fail "could not wire the omp hook target"
+      out="$(cd "$tmp/proj" && HOME="$rthome" BD_HOST_SKILLS_DIR="$rthome/.omp/agent/skills" \
+        BD_HOST_HOOK_SETTINGS="$rtarget" BD_HOST_HOOK_WIRE=bd-omp-hook-wire CLAUDE_PLUGIN_ROOT= "$SELF")" \
+        || fail "errored planning through the real bd-omp-hook-wire"
+      printf '%s' "$out" | jq -e . >/dev/null || fail "real-bd-omp-hook-wire output is not valid JSON"
+      printf '%s' "$out" | grep -q "missing awareness hooks" \
+        && fail "hook nudge fired on a freshly wired omp hook module"
+      printf '// better-dev omp awareness hook\n// better-dev-omp-hook\nexport { default } from "/gone/hooks/omp/bd-awareness.ts";\n' > "$rtarget"
+      out="$(cd "$tmp/proj" && HOME="$rthome" BD_HOST_SKILLS_DIR="$rthome/.omp/agent/skills" \
+        BD_HOST_HOOK_SETTINGS="$rtarget" BD_HOST_HOOK_WIRE=bd-omp-hook-wire CLAUDE_PLUGIN_ROOT= "$SELF")" \
+        || fail "errored with a stale omp hook module"
+      printf '%s' "$out" | grep -q "missing awareness hooks" \
+        || fail "hook nudge silent on a stale omp hook module - the real script never saw the target"
+    fi
   fi
 
   # Reonboard nudge: a reonboard-flagged release newer than the wired-version

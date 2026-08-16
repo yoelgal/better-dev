@@ -127,12 +127,15 @@ function install(pi: HookApi, self: string, home: string): void {
     const root = resolveClone(self);
     if (!root) return;
     // bd-session-start's link and hook nudges answer for the host that invoked them, so tell
-    // it which host that is. Empty settings is omp's real answer rather than a missing value:
-    // there is no JSON hook config here for a wired set to be compared against.
+    // it which host that is. The hook target is not a JSON hook config here - omp has none -
+    // but the module path omp loads the bridge from, the same target hosts/omp declares and
+    // install.sh writes, so the hook nudge plans against the file omp actually reads. An empty
+    // value is NOT omp's answer: bd-omp-hook-wire maps it to Path(".") and answers unreadable,
+    // which silences the nudge on every state including the stale one it exists for.
     const env: ChildEnv = {
       ...process.env,
       BD_HOST_SKILLS_DIR: join(agentDir, "skills"),
-      BD_HOST_HOOK_SETTINGS: "",
+      BD_HOST_HOOK_SETTINGS: join(agentDir, "hooks", "pre", "bd-awareness.ts"),
       BD_HOST_HOOK_WIRE: "bd-omp-hook-wire",
     };
 
@@ -215,15 +218,17 @@ interface Fixture {
 let fixtureSeq = 0;
 
 // A clone carrying the module and fake hooks, plus a working dir with a .better-dev/ scaffold.
-// The session hook always exists: it is what clone resolution confirms a clone by.
-function fixture(tmp: string, session: string, subagent?: string): Fixture {
+// The session hook always exists: it is what clone resolution confirms a clone by. The staleness
+// refresh exists unless a case asks for it to be absent - a missing one is the input fire()'s
+// 'error' listener is there for, so a case has to be able to produce it.
+function fixture(tmp: string, session: string, subagent?: string, graphify = true): Fixture {
   const dir = join(tmp, `f${++fixtureSeq}`);
   const clone = join(dir, "clone");
   const self = join(clone, "hooks", "omp", "bd-awareness.ts");
   mkdirSync(dirname(self), { recursive: true });
   writeFileSync(self, "");
   script(join(clone, SESSION_HOOK), session);
-  script(join(clone, GRAPHIFY_HOOK), "exit 0");
+  if (graphify) script(join(clone, GRAPHIFY_HOOK), "exit 0");
   if (subagent !== undefined) script(join(clone, SUBAGENT_HOOK), subagent);
   const cwd = join(dir, "proj");
   mkdirSync(join(cwd, ".better-dev"), { recursive: true });
@@ -240,7 +245,7 @@ function called(fn: unknown, event: unknown, ctx: HookContext): { value?: unknow
   }
 }
 
-function selftest(): void {
+async function selftest(): Promise<void> {
   const bad: string[] = [];
   const check = (ok: unknown, why: string) => {
     if (!ok) bad.push(why);
@@ -269,7 +274,12 @@ function selftest(): void {
     check(hidden[0]?.attribution === "user", "hidden message has the wrong attribution");
     check(shown.length === 1 && shown[0].content.includes("W"), "welcome not sent as a displayed message");
     const recorded = existsSync(join(one.cwd, "env.txt")) ? readFileSync(join(one.cwd, "env.txt"), "utf8").trim() : "";
-    check(recorded === `${join(one.home, ".omp", "agent", "skills")}||bd-omp-hook-wire`, `host-scoping env not passed to the child: ${recorded}`);
+    // The hook target is the one value bd-session-start cannot supply for itself: it names the
+    // module omp loads, hosts/omp declares and install.sh writes, and hook_nudge hands it
+    // straight to bd-omp-hook-wire. An empty one plans against Path(".") -> unreadable, so the
+    // nudge never fires; assert the real path rather than merely that something was passed.
+    const target = join(one.home, ".omp", "agent", "hooks", "pre", "bd-awareness.ts");
+    check(recorded === `${join(one.home, ".omp", "agent", "skills")}|${target}|bd-omp-hook-wire`, `host-scoping env not passed to the child: ${recorded}`);
 
     // 2. the nested shape Claude Code's branch emits is read too.
     const two = fixture(tmp, 'printf \'{"hookSpecificOutput":{"additionalContext":"NOTE-BODY"}}\\n\'');
@@ -326,6 +336,25 @@ function selftest(): void {
     check(!r.threw, `task tool_call threw on a failing bd-subagent-start: ${String(r.threw)}`);
     check(r.value === undefined, "revised the task input from a failing bd-subagent-start");
 
+    // ...and the exit status alone decides it. Case 7 pairs its non-zero exit with garbage, so
+    // parse() rejects that body whatever the status was; only a WELL-FORMED note behind a
+    // non-zero exit puts the status check under test. A hook that prints its note and then
+    // trips set -e is a hook that did not finish, and its half-built note is not honoured.
+    const sevenB = fixture(tmp, "exit 0", 'printf \'{"hookSpecificOutput":{"additionalContext":"WORKER-NOTE"}}\\n\'\nexit 1');
+    f = fake();
+    install(f.pi, sevenB.self, sevenB.home);
+    r = called(f.handlers.get("tool_call"), { toolName: "task", input: { context: "CALLER" } }, { cwd: sevenB.cwd });
+    check(!r.threw, `task tool_call threw on a non-zero bd-subagent-start with a valid note: ${String(r.threw)}`);
+    check(r.value === undefined, "honoured a note from a bd-subagent-start that exited non-zero");
+
+    // ...the same on the session side, where the note would reach the model instead.
+    const sevenC = fixture(tmp, 'printf \'{"additionalContext":"NOTE-BODY","systemMessage":"W"}\\n\'\nexit 1');
+    f = fake();
+    install(f.pi, sevenC.self, sevenC.home);
+    r = called(f.handlers.get("session_start"), {}, { cwd: sevenC.cwd });
+    check(!r.threw, `session_start threw on a non-zero hook with a valid note: ${String(r.threw)}`);
+    check(f.messages.length === 0, "injected a note from a session hook that exited non-zero");
+
     // ...and the catch itself. ctx is omp's object, not ours: a cwd that is not a string makes
     // spawnSync throw ERR_INVALID_ARG_TYPE, and that throw escaping the tool_call handler would
     // block every task dispatch on the machine.
@@ -376,6 +405,23 @@ function selftest(): void {
     }
     check(!threw, `install threw with no clone resolvable: ${String(threw)}`);
     check(f.handlers.size === 0, "registered handlers with no clone resolvable");
+
+    // 10. TOTALITY, the asynchronous half: an absent staleness refresh. spawn() reports a
+    // missing binary by emitting 'error' on a LATER tick, when fire()'s try/catch has already
+    // returned, so nothing in this module's synchronous path can catch it - an unhandled 'error'
+    // event terminates the process, taking the session with it. The note still has to arrive,
+    // and this process still has to be alive one tick later to check that it did: the await
+    // below IS the assertion, because a dead process runs nothing after it.
+    const ten = fixture(tmp, 'printf \'{"additionalContext":"NOTE-BODY"}\\n\'', undefined, false);
+    check(!existsSync(join(ten.clone, GRAPHIFY_HOOK)), "the graphify-less fixture still ships a staleness refresh");
+    f = fake();
+    install(f.pi, ten.self, ten.home);
+    r = called(f.handlers.get("session_start"), {}, { cwd: ten.cwd });
+    check(!r.threw, `session_start threw with the staleness refresh absent: ${String(r.threw)}`);
+    const tick = Promise.withResolvers<void>();
+    setTimeout(tick.resolve, 500);
+    await tick.promise;
+    check(f.messages.length === 1 && f.messages[0].content.includes("NOTE-BODY"), "note lost with the staleness refresh absent");
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }
@@ -387,4 +433,4 @@ function selftest(): void {
   console.log("selftest OK");
 }
 
-if (import.meta.main) selftest();
+if (import.meta.main) await selftest();
