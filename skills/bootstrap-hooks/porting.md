@@ -9,9 +9,14 @@ Registering a hook is a different problem per host, and there are two shapes of 
 machine-global JSON config of hook entries, so wiring is a merge: `scripts/bd-hook-wire` reads the
 file named by `bd_host_hook_settings`, adds the entries its `WANT` table declares, and leaves the rest
 of the operator's file alone. omp keeps no hook config at all - its hooks are TypeScript modules it
-loads out of a directory - so wiring is an install: `scripts/bd-omp-hook-wire` puts the bridge module
-at `$HOME/.omp/agent/hooks/pre/bd-awareness.ts`, by symlink normally and by copy under
-`BD_FORCE_COPY=1` or on Windows, the same split `install.sh` already uses for skills.
+loads out of a directory - so wiring is an install: `scripts/bd-omp-hook-wire` writes a real
+three-line stub at `$HOME/.omp/agent/hooks/pre/bd-awareness.ts` whose body re-exports the bridge,
+`export { default } from "<clone>/hooks/omp/bd-awareness.ts"`. A stub and not a symlink, because
+omp's hook discovery silently skips a symlinked module - it never loads, with no warning and no log
+line to say so - while a byte-identical real file at the same path loads normally. Re-exporting is
+what buys back what the symlink was for: the logic stays in the clone, so a `git pull` refreshes it
+without a re-install, and `import.meta.url` inside the module still resolves into the clone, which
+is where the bridge looks for the shell hooks it runs.
 
 `install.sh` picks between them by name rather than by branch: `bd_host_hook_wire` in `hosts/<name>`
 is a script basename under `scripts/` and defaults to `bd-hook-wire`, so a host with a third
@@ -27,12 +32,13 @@ a caller that will get it wrong. `plan` writes nothing, which is what makes the 
 every session start. The target path is always argv and never computed inside the script, so the same
 script answers for a fixture in a test and for the operator's real home.
 
-Two rules keep a new mechanism honest. It needs an ours-test that survives both install modes: for
-omp that is the module's literal second line, `// better-dev-omp-hook`, which reads the same through
-a symlink and inside a copy, where checking a symlink target would only answer for one of them. And
-an unusable target is reported, never clobbered - a foreign file already sitting at the target path
-comes back `unreadable` and stays byte-identical, because that path belongs to the operator and a
-wiring step that overwrites it has done more damage than the missing hook was worth.
+Two rules keep a new mechanism honest. It needs an ours-test that reads the installed artifact
+rather than the path that produced it: for omp that is the module's literal second line,
+`// better-dev-omp-hook`, which answers the same for a stub this version wrote and for a symlink an
+older one left behind, so an upgrade reclaims its own target instead of refusing it. And an unusable
+target is reported, never clobbered - a foreign file already sitting at the target path comes back
+`unreadable` and stays byte-identical, because that path belongs to the operator and a wiring step
+that overwrites it has done more damage than the missing hook was worth.
 
 ## Output shapes differ by event and host
 
