@@ -215,16 +215,19 @@ host_hooks() {
   fi
   hookverb=wire; [ "$dry" = 1 ] && hookverb=plan
   hookout=""
-  # Pass the copy-mode decision down, do not let the child re-derive it: IS_WINDOWS is already 1 for a
-  # real Windows shell as well as for BD_FORCE_COPY=1, and a module-installing script reads that env to
-  # choose symlink-or-copy. Without this the skills copy on Windows while the module symlinks and rots.
-  if ! hookout="$(BD_FORCE_COPY="$IS_WINDOWS" python3 "$SRC/scripts/$hookwire" "$hookverb" "$SRC" "$bd_host_hook_settings" 2>/dev/null)"; then
+  # No environment is passed down: a wiring script's whole input is its argv. Both shipped ones read
+  # none, and the copy-mode decision this line once carried belongs to skills alone - the hook target
+  # is one file each script installs its own way, never a symlink to choose about.
+  if ! hookout="$(python3 "$SRC/scripts/$hookwire" "$hookverb" "$SRC" "$bd_host_hook_settings" 2>/dev/null)"; then
     echo "    hooks: could not update $bd_host_hook_settings - skipped. /bootstrap-hooks wires them by hand."
     return 0
   fi
   case "$hookout" in
-    wired)      echo "    hooks: SessionStart + SubagentStart registered in $bd_host_hook_settings" ;;
-    would-wire) echo "    would register SessionStart + SubagentStart hooks in $bd_host_hook_settings" ;;
+    # Host-neutral on purpose: WHICH events these are is the host's own vocabulary, and naming
+    # Claude's here told an omp operator we registered SessionStart and SubagentStart, two events omp
+    # does not have. What is true for every host is that its awareness hooks now reach the model.
+    wired)      echo "    hooks: awareness hooks registered in $bd_host_hook_settings" ;;
+    would-wire) echo "    would register awareness hooks in $bd_host_hook_settings" ;;
     current)    echo "    hooks: already registered in $bd_host_hook_settings" ;;
     unreadable) echo "    hooks: $bd_host_hook_settings is not usable as this host's hook target - left untouched. Fix it and re-run, or use /bootstrap-hooks." ;;
     *)          echo "    hooks: unexpected installer state ('$hookout') - left untouched; /bootstrap-hooks wires them by hand." ;;
@@ -342,7 +345,8 @@ else
   echo "  fresh session picks up the pull. Re-run ./install.sh after a pull that adds or removes a skill,"
   echo "  so the new one links and orphans prune)."
 fi
-echo "Hooks: the SessionStart/SubagentStart nudge is registered above for every host with a verified"
-echo "  hook config; a host reported as skipped has none yet, and /bootstrap-hooks wires one by hand."
+echo "Hooks: better-dev's awareness hooks are registered above for every host with a verified hook"
+echo "  config, in whatever form that host takes; a host reported as skipped has none yet, and"
+echo "  /bootstrap-hooks wires one by hand."
 echo "In a repo, run  /onboard  once to wire it (creates .better-dev/bin -> this clone's scripts)."
 echo "To remove better-dev later, run  /uninstall  (or scripts/bd-uninstall; dry-run by default)."

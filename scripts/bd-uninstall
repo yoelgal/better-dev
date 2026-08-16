@@ -108,8 +108,21 @@ do_global() {
       if [ "$yes" = 1 ]; then
         [ "$(python3 "$SRC/scripts/$hookwire" unwire "$SRC" "$bd_host_hook_settings" 2>/dev/null)" = unwired ] \
           && removed="$removed awareness-hooks"
-      elif grep -q "hooks/bd-session-start" "$bd_host_hook_settings" 2>/dev/null; then
-        removed="$removed awareness-hooks"
+      else
+        # The preview has to answer the same question the apply answers, and only the wiring script
+        # can: a grep for one host's string reads "nothing of ours" on a host whose mechanism writes
+        # a different file entirely, and --yes then removes it anyway. That is what the omp stub did
+        # here - its three lines name hooks/omp/bd-awareness.ts and never hooks/bd-session-start - so
+        # the operator consented to a preview that omitted the file it went on to delete.
+        # So the preview runs the REAL unwire against a throwaway COPY of the target: same script,
+        # same bytes, and both wiring scripts' ours-test reads the CONTENT rather than the path, so
+        # the copy answers exactly what the original would. Nothing of the operator's is opened for
+        # writing, which is the whole promise of a dry run.
+        pv="$(mktemp -d)"; pvt="$pv/$(basename "$bd_host_hook_settings")"
+        cp "$bd_host_hook_settings" "$pvt" 2>/dev/null \
+          && [ "$(python3 "$SRC/scripts/$hookwire" unwire "$SRC" "$pvt" 2>/dev/null)" = unwired ] \
+          && removed="$removed awareness-hooks"
+        rm -rf "$pv"
       fi
     fi
     # 5. Install marker.
@@ -191,6 +204,33 @@ selftest() {
     [ ! -e "$sk/packaging" ]              || { echo "FAIL: ours link survived --yes"; exit 1; }
     [ ! -f "$sk/.better-dev-install" ]    || { echo "FAIL: marker survived --yes"; exit 1; }
     [ -f "$sk/review/SKILL.md" ]          || { echo "FAIL: foreign skill was removed"; exit 1; }
+
+    # The preview is the report the operator consents to, so for EVERY host whose hooks the
+    # installer wires it has to name the awareness hooks that --yes then removes. This loops the
+    # adapter registry rather than naming a host, because the defect it guards is mechanism-shaped:
+    # omp's target is a TypeScript module at a path of its own, carrying none of Claude's strings,
+    # and the grep this preview used to run reported "nothing of ours" and deleted it anyway.
+    # Skipped without python3, which is what wiring (and so unwiring) needs on either host.
+    if command -v python3 >/dev/null 2>&1; then
+      for a in "$HOSTS_DIR"/*; do
+        [ -f "$a" ] || continue
+        hn="$(basename "$a")"; hh="$d/home-$hn"; mkdir -p "$hh"
+        # Ask the adapter for its own target instead of restating it here: a second copy of the path
+        # would keep passing after the adapter moved it.
+        tgt="$(HOME="$hh" sh -c '. "$1"; printf "%s" "${bd_host_hook_settings:-}"' _ "$a")"
+        [ -n "$tgt" ] || continue
+        HOME="$hh" "$SRC/install.sh" --host "$hn" >/dev/null
+        [ -f "$tgt" ]                     || { echo "FAIL: install --host $hn wrote no hook target at $tgt"; exit 1; }
+        pre="$(HOME="$hh" "$SELF" global --host "$hn")"
+        case "$pre" in *awareness-hooks*) ;;
+          *) echo "FAIL: the $hn dry-run did not name the awareness hooks it would remove: $pre"; exit 1 ;;
+        esac
+        app="$(HOME="$hh" "$SELF" global --host "$hn" --yes)"
+        case "$app" in *awareness-hooks*) ;;
+          *) echo "FAIL: the $hn preview promised to remove awareness hooks and --yes did not: $app"; exit 1 ;;
+        esac
+      done
+    fi
 
     # repo: bridge goes, data stays without --purge-data.
     repo="$d/repo"; mkdir -p "$repo/.better-dev/ledger"

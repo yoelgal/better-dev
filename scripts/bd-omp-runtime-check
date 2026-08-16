@@ -13,11 +13,16 @@
 # bridge that injects unconditionally.
 #
 #   bd-omp-runtime-check            run both halves (needs omp on PATH and model credentials)
-#   bd-omp-runtime-check selftest   fixture construction + both premise-skip paths, offline
+#   bd-omp-runtime-check selftest   fixture construction, both premise-skip paths, and the hang
+#                                   path, offline
 #
-# A missing premise - no omp binary, no model - is reported and skipped, never failed. BD_OMP
-# overrides the binary; BD_OMP_TIMEOUT the per-run bound in seconds. This needs network and a model,
-# so it is a human/loop check, never a package-gate check: the gate runs `selftest` only.
+# A missing premise - no omp binary, no model - is reported and skipped, never failed. A run that
+# HANGS is not a missing premise and never skips: the probe below runs with the operator's GLOBAL
+# omp hooks loaded, so an omp that never returns is this bridge's own time bound failing, which is
+# the one failure this check exists to catch. BD_OMP overrides the binary; BD_OMP_TIMEOUT the
+# per-run bound in seconds; BD_OMP_GRACE the seconds the watchdog waits past that bound before it
+# kills the run. This needs network and a model, so it is a human/loop check, never a package-gate
+# check: the gate runs `selftest` only.
 #
 # Writes nothing outside its own tempdir and installs nothing into the operator's ~/.omp - the
 # bridge goes into the fixture's project-scoped hooks dir, which is what omp loads for that cwd.
@@ -31,6 +36,10 @@ MODULE="$ROOT/hooks/omp/bd-awareness.ts"
 
 OMP="${BD_OMP:-omp}"
 TIMEOUT="${BD_OMP_TIMEOUT:-120}"
+# How long the watchdog waits PAST omp's own --max-time before killing the run. Only a run that
+# ignored its own bound ever reaches it, so the grace is short; the selftest lowers it (with the
+# bound) to exercise the kill path in seconds rather than minutes.
+GRACE="${BD_OMP_GRACE:-15}"
 
 # Asked of the fixture session, and of the liveness probe. The sentinels keep both replies short
 # enough to grep and cheap enough to spend.
@@ -74,16 +83,21 @@ EOF
 
 wire_fixture() { python3 "$WIRE" wire "$CLONE" "$TARGET"; }
 
-# <cwd> <prompt> <outfile> - sets RC. Bounded twice over: omp's own --max-time, and a watchdog for
-# a run that wedges before that bound is armed (`timeout` is not on every macOS PATH).
+# <cwd> <prompt> <outfile> - sets RC, and HUNG=1 when the watchdog had to kill the run. The two are
+# different faults and the caller has to tell them apart: a fast non-zero is a machine that cannot
+# start omp, while a kill is a run that never returned. Bounded twice over: omp's own --max-time,
+# and this watchdog for a run that wedges before that bound is armed (`timeout` is not on every
+# macOS PATH).
 # --no-tools and --no-skills keep the run cheap and deterministic; neither touches hook discovery.
 omp_run() {
   local dir="$1" prompt="$2" out="$3" pid waited=0
+  HUNG=0
   ( cd "$dir" && "$OMP" -p --no-session --no-tools --no-skills --max-time="$TIMEOUT" "$prompt" ) \
     >"$out" 2>"$out.err" &
   pid=$!
   while kill -0 "$pid" 2>/dev/null; do
-    if [ "$waited" -ge "$((TIMEOUT + 15))" ]; then
+    if [ "$waited" -ge "$((TIMEOUT + GRACE))" ]; then
+      HUNG=1
       kill -TERM "$pid" 2>/dev/null || true
       sleep 2
       kill -KILL "$pid" 2>/dev/null || true
@@ -97,6 +111,13 @@ omp_run() {
 }
 
 reply() { sed -n '1,12p' "$1" | sed 's/^/      /'; }
+
+# Why the last run ended, for a message. The exit status alone cannot say it: a watchdog kill shows
+# up as 143 or 137, which reads exactly like any other non-zero exit.
+why() {
+  if [ "$HUNG" = 1 ]; then printf 'never returned and was killed after %ss' "$((TIMEOUT + GRACE))"
+  else printf 'exited %s' "$RC"; fi
+}
 
 check() {
   local status rc=0
@@ -113,6 +134,16 @@ check() {
   # Liveness before either assertion: without it a machine with no credentials would read as a
   # bridge that injects nothing, which is the same word for two very different states.
   omp_run "$TMP/probe" "$LIVE_ASK" "$TMP/live.out"
+  if [ "$HUNG" = 1 ]; then
+    # NOT a premise skip, and this is the whole point of the distinction. The probe runs in a dir
+    # with no project-scoped bridge but with the operator's GLOBAL ~/.omp/agent/hooks/pre/ loaded,
+    # so an omp that never returns here is a session start that never completes - precisely what the
+    # bridge's own time bound exists to prevent. Reported as "no credentials" it would exit 0 on the
+    # machine whose every omp session our hook has wedged.
+    printf 'FAIL: omp %s - a session that never starts is the failure this check exists to catch, not a missing premise\n' "$(why)" >&2
+    reply "$TMP/live.out.err" >&2
+    return 1
+  fi
   if [ "$RC" != 0 ] || ! grep -qF "$LIVE" "$TMP/live.out"; then
     printf 'skip: omp could not complete a run (exit %s) - no model credentials, or no network\n' "$RC"
     reply "$TMP/live.out.err"
@@ -120,8 +151,8 @@ check() {
   fi
 
   omp_run "$FIX" "$ASK" "$TMP/pos.out"
-  if [ "$RC" != 0 ]; then
-    printf 'FAIL: the omp run with .better-dev/ present exited %s\n' "$RC" >&2
+  if [ "$RC" != 0 ] || [ "$HUNG" = 1 ]; then
+    printf 'FAIL: the omp run with .better-dev/ present %s\n' "$(why)" >&2
     reply "$TMP/pos.out.err" >&2
     rc=1
   elif ! grep -qF "$TOKEN" "$TMP/pos.out"; then
@@ -135,8 +166,8 @@ check() {
   # as broken as one that never injects, and the positive half cannot tell them apart.
   mv "$FIX/.better-dev" "$FIX/.better-dev-off"
   omp_run "$FIX" "$ASK" "$TMP/neg.out"
-  if [ "$RC" != 0 ] || [ ! -s "$TMP/neg.out" ]; then
-    printf 'FAIL: the control run without .better-dev/ did not complete (exit %s), so its silence proves nothing\n' "$RC" >&2
+  if [ "$RC" != 0 ] || [ "$HUNG" = 1 ] || [ ! -s "$TMP/neg.out" ]; then
+    printf 'FAIL: the control run without .better-dev/ did not complete (%s), so its silence proves nothing\n' "$(why)" >&2
     reply "$TMP/neg.out.err" >&2
     rc=1
   elif grep -qF "$TOKEN" "$TMP/neg.out"; then
@@ -193,6 +224,21 @@ selftest() {
                                                   || { echo "FAIL: an omp that cannot run did not exit 0"; exit 1; }
     case "$o" in *"skip: omp could not complete a run"*) ;; *) echo "FAIL: no skip for an omp that cannot run: $o"; exit 1 ;; esac
     case "$o" in *PASS*) echo "FAIL: an omp that cannot run was reported as a pass"; exit 1 ;; esac
+
+    # A HUNG omp is a failure, not a premise skip, and this is the case that holds the difference.
+    # The probe loads the operator's global omp hooks, so a run that never returns is a session
+    # start our own bridge wedged - the exact failure its time bound exists to prevent. Read as
+    # "no credentials" it exits 0 and the check that the whole install rests on proves nothing.
+    # The bound and the grace are both cut to 1s so the watchdog fires in seconds.
+    printf '#!/bin/sh\nsleep 30\n' >"$TMP/omp-hang"
+    chmod +x "$TMP/omp-hang"
+    if o="$(BD_OMP="$TMP/omp-hang" BD_OMP_TIMEOUT=1 BD_OMP_GRACE=1 "$SELF" 2>&1)"; then
+      echo "FAIL: a hung omp exited 0 - a wedged session was swallowed as a premise skip: $o"; exit 1
+    fi
+    case "$o" in *"FAIL: omp never returned"*) ;;
+      *) echo "FAIL: a hung omp was not reported as a hang: $o"; exit 1 ;;
+    esac
+    case "$o" in *skip:*) echo "FAIL: a hung omp was reported as a premise skip: $o"; exit 1 ;; esac
   ) && r=0 || r=1
   [ $r = 0 ] && echo "selftest OK" || { echo "selftest FAILED" >&2; exit 1; }
 }
@@ -204,6 +250,6 @@ command -v python3 >/dev/null 2>&1 || die "python3 is required (the wiring scrip
 case "${1:-}" in
   "") check ;;
   selftest) selftest ;;
-  -h|--help) sed -n '2,23p' "$SELF"; exit 0 ;;
+  -h|--help) sed -n '2,28p' "$SELF"; exit 0 ;;
   *) die "unknown command '$1' (no argument to run the check | selftest)" ;;
 esac

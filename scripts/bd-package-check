@@ -373,10 +373,11 @@ unchecked_ts=""
 # better-dev/hooks/* is in the sweep for the same reason the rest of it is: those are the legacy-path
 # shims a pre-flatten host actually executes, and an unparseable one there is a hook that dies exactly
 # where nothing else can report it - the failure mode the shims exist to end.
-# hooks/omp/* is named explicitly: the glob above is `hooks/*`, which yields the DIRECTORY, and the
-# `-f` guard below then drops it - so every file in it shipped unparsed under a label claiming the
-# whole of hooks/ was checked.
-for s in scripts/* hooks/* hooks/omp/* hosts/* better-dev/hooks/* install.sh; do
+# hooks/*/* is swept alongside hooks/*: the glob `hooks/*` yields a host DIRECTORY (hooks/omp today),
+# and the `-f` guard below then drops it - so every file inside it shipped unparsed under a label
+# claiming the whole of hooks/ was checked. The pattern names the SHAPE, not the one host that has
+# it today, so the next hooks/<host>/ dir is swept the day it lands rather than reintroducing this.
+for s in scripts/* hooks/* hooks/*/* hosts/* better-dev/hooks/* install.sh; do
   [ -f "$s" ] || continue
   case "$s" in *.json) continue ;; esac
   # TypeScript is not shell: `bash -n` rejects a type annotation as a syntax error that is not one.
@@ -403,18 +404,35 @@ for s in scripts/* hooks/* hooks/omp/* hosts/* better-dev/hooks/* install.sh; do
   fi
 done
 [ -z "$unchecked_ts" ] || printf '  \033[33m•\033[0m bun is not on PATH, so these shipped TypeScript files were NOT parsed:%s\n' "$unchecked_ts"
-[ -z "$unparseable" ] && ok "every shipped script under scripts/, hooks/ (hooks/omp/*.ts through bun), hosts/, better-dev/hooks/ and install.sh parses (bash -n, ast.parse, or bun build per shebang and extension)" || bad "syntax error in:$unparseable - a selftest cannot see this, it exits before the parse" # prove-new: regression-guard every shipped script parses at base, as it does after any change that did not break one; this catches the later edit that does, which the selftest runner structurally cannot see
+[ -z "$unparseable" ] && ok "every shipped script under scripts/, hooks/ (including hooks/<host>/*.ts through bun), hosts/, better-dev/hooks/ and install.sh parses (bash -n, ast.parse, or bun build per shebang and extension)" || bad "syntax error in:$unparseable - a selftest cannot see this, it exits before the parse" # prove-new: regression-guard every shipped script parses at base, as it does after any change that did not break one; this catches the later edit that does, which the selftest runner structurally cannot see
 
 echo "== hook scripts (selftest) =="
-for s in hooks/bd-*; do
-  [ -e "$s" ] || continue
-  b="$(basename "$s")"
+# hooks/*/bd-* alongside hooks/bd-*, for the reason the parse sweep above takes hooks/*/*: a host's
+# own hooks live one level down, `hooks/bd-*` never matches them, and the omp bridge - whose 200-line
+# selftest is the only proof of note delivery, the worker note, the totality guard and the time bound
+# - was therefore parse-checked and never RUN by this gate. The shape, not the host that has it today.
+for s in hooks/bd-* hooks/*/bd-*; do
+  [ -f "$s" ] || continue
+  # Path under hooks/, not basename: two hosts may ship the same hook name, and a bare basename would
+  # print one label for both.
+  b="${s#hooks/}"
+  # HOW to run it is per-file. A .ts hook carries no shebang and is not executable; bun is the
+  # runtime omp itself loads it with, so bun is the runtime its selftest has to run under. A machine
+  # without bun is told the selftest did NOT run - never counted as passed, the same posture the
+  # parse sweep takes with unchecked_ts.
+  runner=""
+  case "$s" in
+    *.ts)
+      command -v bun >/dev/null 2>&1 || {
+        printf '  \033[33m•\033[0m bun is not on PATH, so %s selftest was NOT run\n' "$b"; continue; }
+      runner=bun ;;
+  esac
   # Keep the failing run's output. Discarding it (`>/dev/null 2>&1`) makes a red selftest report only
   # THAT it failed, never which assertion - a reviewer spent a full pass unable to pin one, because
   # every selftest here prints its reason and this loop threw it away.
   st_out=""
-  if [ -x "$s" ] && st_out="$("$s" selftest 2>&1)"; then
-    ok "$b" # prove-new: regression-guard every shipped hook selftest passes at base and still does; this loop's check and label are unchanged, only the failure OUTPUT was added, so there is no new assertion to come back red
+  if { [ -n "$runner" ] || [ -x "$s" ]; } && st_out="$($runner "$s" selftest 2>&1)"; then
+    ok "$b" # prove-new: the check and its label are unchanged - what changed is the loop's REACH, and hooks/omp/bd-awareness.ts is a genuinely new assertion here: it was never run by this gate before, and it comes back red when the bridge breaks (mutation-proven)
   else
     bad "$b selftest FAILED"
     printf '%s\n' "$st_out" | tail -5 | sed 's/^/      /'
