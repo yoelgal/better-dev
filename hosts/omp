@@ -1,0 +1,24 @@
+# hosts/omp - better-dev adapter for omp (Oh My Pi).
+#
+# Same depth-1 layout as every host: install.sh links each skill at <skills-dir>/<name>, discovered by
+# its SKILL.md. Sourced by install.sh, which reads these variables. Adding a host = drop a sibling file
+# like this. Named coverage limit: an omp PROFILE (`omp --profile <name>`) relocates BOTH dirs below to
+# ~/.omp/profiles/<name>/agent/, which this static adapter does not cover - every other adapter is a
+# single static path too, so a profiled install is /bootstrap-hooks' by-hand case, not this file's.
+bd_host_name="omp"
+bd_host_display="Oh My Pi (omp)"
+bd_host_cli="omp"                              # PATH probe for --host auto
+bd_host_skills_dir="$HOME/.omp/agent/skills"   # native global skills dir
+bd_host_dir_policy="create"                 # verified on a real machine (omp 17.3.4): a skill placed at
+                                            # <skills-dir>/<name>/SKILL.md was read back through skill://
+# Empty BY DECISION, not for want of a verified path. omp keeps ONE user-scope context file, and its
+# native provider (priority 100) outranks the claude provider (80) through which omp already reads
+# ~/.claude/CLAUDE.md - so writing ~/.omp/agent/AGENTS.md would silently shadow the operator's entire
+# CLAUDE.md. Declining names the gap instead of shipping that shadowing - same posture as hermes'.
+bd_host_global_entry=""
+bd_host_hook_wire="bd-omp-hook-wire"        # this host's wiring script under scripts/ (default: bd-hook-wire)
+# NOT a JSON hook config like Claude Code's settings.json: omp has no command-hook config at all -
+# SessionStart, SubagentStart and PreToolUse have zero occurrences in the shipped bundle. omp hooks are
+# TypeScript modules under ~/.omp/agent/hooks/pre/, so this is the module PATH bd-omp-hook-wire
+# installs the bridge to, and unwire's inverse deletes.
+bd_host_hook_settings="$HOME/.omp/agent/hooks/pre/bd-awareness.ts"
