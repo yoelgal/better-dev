@@ -1190,3 +1190,39 @@ Over half of `bd-package-check`'s checks assert that a phrase exists in skill pr
 anything works, and adding a check now needs its own documented protocol - a gate that needs rules
 about how to extend it has outgrown its job. Cutting those is a reduction of the repo's own CI safety
 net, so it waits on the operator naming the checks rather than riding a general mandate.
+
+## D36 - better-dev runs on trunk; the staged model stays fully supported (operator ruling, 2026-08-15)
+
+`main` is now this repo's integration branch and its release branch. `feat/*` branches off it and
+merges back into it; a release is a version commit and a tag on that branch. `staging` is retired,
+archived as `archive/staging-2026-08-15` and restorable from that pushed tag.
+
+This reverses the branch discipline the `better-dev-extraction` groundwork carved (`feat/*` off
+`staging`, promoted to `main`) and replaces the recorded `integration branch = staging` override. It
+is a ruling, not a derivation: the operator asked for the release ceremony to go away, and a staged
+model keeps it by construction - someone still has to decide when to promote, and that decision *is*
+the ceremony.
+
+**The library is not changing with it.** The operator was explicit: *"the goal is not to retire
+anything, but it's more we wanna be flexible. So I think the default is clearly moving to trunk. But
+if a developer still wants to use the whole staging approach, then there definitely still needs to be
+a way for them to trigger a release and a promotion."* So `/release-promotion` drives four paths
+(trunk or staged, crossed with whether a release tool is wired), every staged gate is intact, and
+`staging` stays the example integration branch throughout `skills/`. An audit of all 34 files
+mentioning it found **zero** that needed rewriting for the library's sake - only this repo's own
+config did, which is the evidence that the staged path was never conditional on this repo using it.
+
+**What it costs, recorded so nobody rediscovers it.** `main` is the distribution channel: users
+install by cloning the default branch and update by pulling it. Under `staging` there was a buffer
+where work accumulated before users could see it; there is not one now, so a merge is live on the
+next `git pull` and a red gate reaches people rather than sitting behind a promote. `main`'s
+protection is `strict: true`, so every PR must be up to date with `main` before it merges - a
+day-to-day cost the staged model did not have.
+
+**Ordering that mattered.** The migration ran *after* the 0.13.0 release, not before. `origin/main`
+was four commits behind and still carried the pre-flatten layout (`better-dev/` subdir, no root
+`skills/`), so retiring `staging` first would have made a pre-D32 tree the trunk that every user
+clones. `bd-migrate-branch-model` deliberately never merges for you, so nothing would have caught it.
+
+The historical record is annotated, not rewritten: `docs/DECISIONS.md`, `docs/PLAN.md` and
+`docs/TRAPS.md` describe decisions that were really made about `staging`, and they still say so.
