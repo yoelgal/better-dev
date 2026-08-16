@@ -369,12 +369,30 @@ echo "== shell parses (bash -n) =="
 # installer) and carries no shebang, and any future helper not named bd-* would otherwise ship
 # unparsed under a label claiming it was checked.
 unparseable=""
+unchecked_ts=""
 # better-dev/hooks/* is in the sweep for the same reason the rest of it is: those are the legacy-path
 # shims a pre-flatten host actually executes, and an unparseable one there is a hook that dies exactly
 # where nothing else can report it - the failure mode the shims exist to end.
-for s in scripts/* hooks/* hosts/* better-dev/hooks/* install.sh; do
+# hooks/omp/* is named explicitly: the glob above is `hooks/*`, which yields the DIRECTORY, and the
+# `-f` guard below then drops it - so every file in it shipped unparsed under a label claiming the
+# whole of hooks/ was checked.
+for s in scripts/* hooks/* hooks/omp/* hosts/* better-dev/hooks/* install.sh; do
   [ -f "$s" ] || continue
   case "$s" in *.json) continue ;; esac
+  # TypeScript is not shell: `bash -n` rejects a type annotation as a syntax error that is not one.
+  # `bun build --no-bundle` transpiles a single file without resolving its imports and writes nothing,
+  # which is exactly a parse check. bun is the host's own runtime for these files, not a new build
+  # dependency of this repo - so a machine without it is named as unchecked, never failed and never
+  # counted as passed.
+  case "$s" in
+    *.ts)
+      if command -v bun >/dev/null 2>&1; then
+        bun build --no-bundle "$s" >/dev/null 2>&1 || unparseable="$unparseable $s"
+      else
+        unchecked_ts="$unchecked_ts $s"
+      fi
+      continue ;;
+  esac
   # Parse each script with the language its shebang declares - bd-hook-wire is python,
   # and `bash -n` on python rejects the first class statement, not a real defect.
   # ast.parse, not py_compile: a parse check must not write __pycache__ into the tree.
@@ -384,7 +402,8 @@ for s in scripts/* hooks/* hosts/* better-dev/hooks/* install.sh; do
     bash -n "$s" 2>/dev/null || unparseable="$unparseable $s"
   fi
 done
-[ -z "$unparseable" ] && ok "every shipped script under scripts/, hooks/, hosts/, better-dev/hooks/ and install.sh parses (bash -n, or ast.parse per shebang)" || bad "syntax error in:$unparseable - a selftest cannot see this, it exits before the parse" # prove-new: regression-guard every shipped script parses at base, as it does after any change that did not break one; this catches the later edit that does, which the selftest runner structurally cannot see
+[ -z "$unchecked_ts" ] || printf '  \033[33m•\033[0m bun is not on PATH, so these shipped TypeScript files were NOT parsed:%s\n' "$unchecked_ts"
+[ -z "$unparseable" ] && ok "every shipped script under scripts/, hooks/ (hooks/omp/*.ts through bun), hosts/, better-dev/hooks/ and install.sh parses (bash -n, ast.parse, or bun build per shebang and extension)" || bad "syntax error in:$unparseable - a selftest cannot see this, it exits before the parse" # prove-new: regression-guard every shipped script parses at base, as it does after any change that did not break one; this catches the later edit that does, which the selftest runner structurally cannot see
 
 echo "== hook scripts (selftest) =="
 for s in hooks/bd-*; do
@@ -857,6 +876,48 @@ for a in hosts/*; do
     /nonexistent/*) ok "hosts/$h: global entry under HOME" ;;
     *) bad "hosts/$h: bd_host_global_entry not under HOME ($ge)" ;;
   esac
+  # Same assertion, the adapter's other machine-touching path. bd_host_hook_settings is where
+  # install.sh registers this host's awareness hooks; a value outside HOME writes hook config into
+  # somebody else's tree on every install, and empty is the declining answer codex and hermes give.
+  hs="$(HOME=/nonexistent bash -c 'source "$1" && printf %s "${bd_host_hook_settings:-}"' _ "$a" 2>/dev/null)"
+  case "$hs" in
+    "") ok "hosts/$h: declines hook wiring (no verified machine-global hook config)" ;; # prove-new: regression-guard codex and hermes already decline at base; the branch exists so a declining adapter reads as decided rather than as unexamined
+    /nonexistent/*) ok "hosts/$h: hook settings under HOME" ;; # prove-new: regression-guard hosts/claude's hook settings already sit under HOME at base, as every adapter's must; this catches the later adapter that points install.sh's hook registration outside the operator's own config
+    *) bad "hosts/$h: bd_host_hook_settings not under HOME ($hs) - installing this host would register hooks outside the operator's own config" ;;
+  esac
+  # Which wiring script install.sh runs for this host. install.sh interpolates the value straight into
+  # "$SRC/scripts/$value", so it has to be a bare basename: a slash or a .. walks out of scripts/.
+  # And a name that resolves to nothing is worse than no name at all - the installer reports a skipped
+  # hook step forever while the adapter claims the host is supported.
+  hw="$(HOME=/nonexistent bash -c 'source "$1" && printf %s "${bd_host_hook_wire:-}"' _ "$a" 2>/dev/null)"
+  case "$hw" in
+    "") ok "hosts/$h: takes the default hook wiring script" ;; # prove-new: regression-guard no adapter overrides the wiring script at base, so every one takes the default; this catches the later adapter that names a path where a basename belongs
+    */*|*..*) bad "hosts/$h: bd_host_hook_wire is a path, not a basename ($hw) - install.sh interpolates it into \$SRC/scripts/, so this escapes the scripts dir" ;;
+    *)
+      if [ -x "scripts/$hw" ]; then
+        ok "hosts/$h: wires hooks through scripts/$hw" # prove-new: regression-guard no adapter names a wiring script at base, so none can be missing yet; this catches the later adapter naming a script that does not ship, whose hook step then skips on every install while the host reads as supported
+      else
+        bad "hosts/$h: bd_host_hook_wire names scripts/$hw, which is missing or not executable - installing this host skips hook wiring forever while reporting the host supported"
+      fi ;;
+  esac
+done
+
+# The five status words ARE the caller-facing contract of a wiring script: install.sh and
+# hooks/bd-session-start branch on the printed word, never on an exit code. A second wiring script
+# that renames one reports success in a vocabulary no caller reads. Grep-level is enough - each
+# script's own selftest proves the behavior, this only holds the words still.
+for w in scripts/bd-*hook-wire; do
+  [ -f "$w" ] || continue
+  wb="$(basename "$w")"
+  missing=""
+  for word in wired would-wire current unwired unreadable; do
+    grep -qF -- "$word" "$w" || missing="$missing $word"
+  done
+  if [ -z "$missing" ]; then
+    ok "$wb speaks the whole wiring status vocabulary" # prove-new: regression-guard bd-hook-wire carries all five words at base, being the only wiring script there; this catches the second wiring script that renames one, leaving each caller able to read only one of them
+  else
+    bad "$wb never mentions:$missing - the wiring status vocabulary has drifted, so a caller branching on one script's words is silently blind to the other's"
+  fi
 done
 
 # A machine carrying the global block styles every transcript on it, trap transcripts included. Trap
