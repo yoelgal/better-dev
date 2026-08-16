@@ -11,8 +11,10 @@
 # needs a re-run of ./install.sh too: it links the new one and prunes a link whose skill was removed
 # upstream, and also reclaims a moved clone's stale links.
 #
-# It also registers the SessionStart/SubagentStart awareness hooks in the host's machine-global hook
-# target, for every host whose target and format are verified (hosts/<name>'s bd_host_hook_settings).
+# It also registers the awareness hooks in the host's machine-global hook target, for every host
+# whose target and format are verified (hosts/<name>'s bd_host_hook_settings). Which events those
+# are is the host's business, not this script's: Claude Code names SessionStart and SubagentStart,
+# omp has neither and takes a session_start plus a task tool_call handler instead.
 # The merge is done by the wiring script that host's adapter NAMES in bd_host_hook_wire - default
 # scripts/bd-hook-wire, which merges a JSON hook config from its own table of the awareness hooks
 # hooks/hooks.json declares. A host whose mechanism is not a JSON config names its own script instead

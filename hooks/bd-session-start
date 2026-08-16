@@ -250,8 +250,10 @@ link_nudge() {
 # entries against its WANT table, the same table the installer writes from), so
 # ask it rather than re-deriving the answer here and drifting from WANT the way
 # --verify already has. Silent on every missing premise: a pre-0.11.0 clone has no
-# bd-hook-wire, a host may have no python3, and the settings file may be absent or
-# unreadable - none of those is this hook's business to report.
+# bd-hook-wire, a host may have no python3, and the target may be unreadable or not a
+# regular file - none of those is this hook's business to report. An ABSENT target is
+# not a missing premise but the answer itself: it is what a hookless install looks
+# like, and both wiring scripts plan from nothing.
 hook_nudge() {
   local clone settings verdict tobin msg
   # Same retry rule as update_nudge and reonboard_nudge: fall back when the plugin
@@ -280,18 +282,32 @@ hook_nudge() {
   fi
   command -v python3 >/dev/null 2>&1 || return 0
   settings="$BD_HOST_HOOK_SETTINGS"
-  # The wiring target has to exist. It is not always a settings file - omp's is the
-  # hook MODULE that host loads - but every host names one real path, and a host
-  # that names none has nothing for the wiring script to compare against.
-  [ -f "$settings" ] || return 0
+  # The host has to NAME a target: empty is a declared absence (codex and hermes say
+  # so), and there is nothing for the wiring script to compare against.
+  [ -n "$settings" ] || return 0
+  # An ABSENT target is a state to REPORT, not one to skip. It is the whole of a
+  # hookless install on omp - there the target is the bridge module itself, so an
+  # operator who never ran the installer has no file there at all - and it is what a
+  # Claude host looks like on a machine with no settings.json yet. Both wiring scripts
+  # plan from nothing (bd-hook-wire reads a missing config as {}, bd-omp-hook-wire
+  # answers would-wire for an absent module), and install.sh, the remedy this nudge
+  # names, is what creates the file. Requiring -f here made the nudge depend on
+  # whether an unrelated file happened to exist: the same hookless host was told when
+  # its config was present and empty, and told nothing when it was absent. The
+  # install-channel guard above is what keeps this ours to report - it answers no
+  # unless this host links into the resolved clone.
+  #
+  # What still has to be skipped is a target that exists as something OTHER than a
+  # regular file: a directory, or a FIFO, whose read can block forever.
+  [ ! -e "$settings" ] || [ -f "$settings" ] || return 0
   # `plan` writes nothing and reads one small local JSON file with no network and
   # no children - not the trade the fetch above makes, which bounds a network call
   # that can genuinely hang. So `timeout` is a nice-to-have here, not a premise:
   # requiring it would make the whole nudge inert on stock macOS, which ships
   # neither timeout nor gtimeout. Use one when the host has it, at 1s - the two
   # bounds are serial, and 2s + 1s keeps the worst case inside the hook's 5s
-  # budget where 2s + 2s did not. `-f` above already excludes the one local read
-  # that can block forever (a FIFO). Any non-zero exit or unexpected word stays
+  # budget where 2s + 2s did not. The predicate above already excludes the one local
+  # read that can block forever (a FIFO). Any non-zero exit or unexpected word stays
   # silent. Built through the positional params so the bounded and unbounded forms
   # share one command line (a function's $@ is its own).
   tobin="$(command -v timeout || command -v gtimeout || true)"
@@ -651,9 +667,34 @@ PYST
     printf '%s' "$out" | jq -r '.systemMessage' | grep -q 'awareness hooks missing, run install.sh' \
       || fail "no hook nudge in an unwired repo"
 
+    # An ABSENT target on a host that IS installed here: nothing is registered, which
+    # is precisely the state this nudge exists for, and install.sh - the remedy it
+    # names - is what creates the file. This case used to assert the opposite, and that
+    # silence made the nudge depend on whether an unrelated file happened to exist:
+    # the same hookless host was told when its config was present and empty (the case
+    # above) and told nothing when it was absent. On omp, where the target IS the
+    # bridge module, the absent case is the WHOLE of a hookless install.
+    # The inversion is deliberate and was the operator's call, not a side effect of
+    # host-parameterizing this file: it changes what an existing Claude Code user sees
+    # on one state (skills linked, no settings.json at all), and the contract's user
+    # story 6 covered only omp. Approved 2026-08-16, recorded in the work-item's
+    # approvals.log.
     rm -f "$tmp/h/.claude/settings.json"
     out="$(cd "$tmp/proj" && HOME="$tmp/h" CLAUDE_PLUGIN_ROOT= "$SELF")" || fail "errored with no settings file"
-    printf '%s' "$out" | grep -q "missing awareness hooks" && fail "hook nudge fired with no settings file"
+    printf '%s' "$out" | jq -e . >/dev/null || fail "absent-target output is not valid JSON"
+    printf '%s' "$out" | grep -q "missing awareness hooks" \
+      || fail "hook nudge silent with no settings file - a host linking into the clone with no hook config at all is a hookless install, not a missing premise"
+    printf '%s' "$out" | jq -r '.systemMessage' | grep -q 'awareness hooks missing, run install.sh' \
+      || fail "absent-target hook nudge never reached the operator-visible welcome"
+    # ...while a host with no install of its OWN stays silent on the same absence: the
+    # channel is not ours to advise there. This one holds through clone resolution
+    # before the install-channel guard is even reached, so it is a regression guard on
+    # the blast radius of relaxing the predicate above, not a proof of that guard - the
+    # plugin-only cases above are what pin the guard itself.
+    mkdir -p "$tmp/nh/.claude/skills/someone-elses"
+    out="$(cd "$tmp/proj" && HOME="$tmp/nh" CLAUDE_PLUGIN_ROOT= "$SELF")" || fail "errored on a host with no install of its own"
+    printf '%s' "$out" | grep -q "missing awareness hooks" \
+      && fail "hook nudge fired on a host that never installed better-dev - an absent target is only ours to report where we are installed"
 
     # The plugin root IS the clone the host links into: the plugin already delivers
     # the hooks, so nudging here would buy a second executing copy of all three.
@@ -1049,6 +1090,31 @@ PYST
     out="$(cd "$tmp/proj" && HOME="$whome" CLAUDE_PLUGIN_ROOT="$wclone" "$SELF")" || fail "errored with no default wiring script in the clone"
     printf '%s' "$out" | grep -q "missing awareness hooks" && fail "hook nudge fired with no bd-hook-wire in the clone"
 
+    # Two targets the nudge must not hand to a wiring script AT ALL, observed the only
+    # way that can come back red: the stub records every target it is given, so an
+    # absent record is the assertion. A silent OUTCOME proves nothing here - both
+    # shipped scripts happen to answer unreadable for either input, so the outcome
+    # stays silent even with the predicate gone, and it is the ASKING that has to stop.
+    # An empty declared target is a host saying it has no such thing (codex, hermes),
+    # never an absent file to plan wiring for; and a target that exists as something
+    # other than a regular file is the read that can block forever - a bound the nudge
+    # cannot count on, since stock macOS ships neither timeout nor gtimeout.
+    rm -f "$planlog"
+    out="$(cd "$tmp/proj" && HOME="$whome" BD_STUB_TARGET_LOG="$planlog" BD_HOST_HOOK_SETTINGS= \
+      BD_HOST_HOOK_WIRE=bd-stub-plan CLAUDE_PLUGIN_ROOT="$wclone" "$SELF")" \
+      || fail "errored with a host declaring no hook target"
+    [ ! -f "$planlog" ] \
+      || fail "wiring script was handed '$(cat "$planlog" 2>/dev/null)' by a host declaring NO hook target - empty is a declared absence, not an absent file"
+    if mkfifo "$tmp/fifo-target" 2>/dev/null; then
+      rm -f "$planlog"
+      out="$(cd "$tmp/proj" && HOME="$whome" BD_STUB_TARGET_LOG="$planlog" BD_HOST_HOOK_SETTINGS="$tmp/fifo-target" \
+        BD_HOST_HOOK_WIRE=bd-stub-plan CLAUDE_PLUGIN_ROOT="$wclone" "$SELF")" \
+        || fail "errored with a FIFO at the declared target"
+      [ ! -f "$planlog" ] \
+        || fail "wiring script was handed a FIFO at the declared target - a read on one can block forever, and the nudge carries no bound of its own"
+      rm -f "$tmp/fifo-target"
+    fi
+
     # BD_HOST_HOOK_SETTINGS, the omp shape: the declared target is the hook MODULE
     # that host loads, not a settings.json, and it is that path which has to reach
     # the wiring script. HOME's settings.json exists here too, so planning against
@@ -1093,6 +1159,21 @@ PYST
         || fail "errored with a stale omp hook module"
       printf '%s' "$out" | grep -q "missing awareness hooks" \
         || fail "hook nudge silent on a stale omp hook module - the real script never saw the target"
+      # ...and the target ABSENT, which is the omp user who never ran the installer:
+      # there the target IS the bridge module, so a hookless install has no file there
+      # at all, and while the nudge required one to exist that state - the only one an
+      # omp operator reaches before installing - was the one it could never report.
+      # The real script answers would-wire from nothing (its own selftest case 6), so
+      # what this pins is the nudge ASKING it rather than skipping first.
+      rm -f "$rtarget"
+      out="$(cd "$tmp/proj" && HOME="$rthome" BD_HOST_SKILLS_DIR="$rthome/.omp/agent/skills" \
+        BD_HOST_HOOK_SETTINGS="$rtarget" BD_HOST_HOOK_WIRE=bd-omp-hook-wire CLAUDE_PLUGIN_ROOT= "$SELF")" \
+        || fail "errored with no omp hook module at the declared target"
+      printf '%s' "$out" | jq -e . >/dev/null || fail "absent-omp-module output is not valid JSON"
+      printf '%s' "$out" | grep -q "missing awareness hooks" \
+        || fail "hook nudge silent with no omp hook module at the declared target - on omp that absence IS a hookless install"
+      printf '%s' "$out" | jq -r '.systemMessage' | grep -q 'awareness hooks missing, run install.sh' \
+        || fail "absent omp hook module never reached the operator-visible welcome"
     fi
   fi
 

@@ -432,7 +432,7 @@ for s in hooks/bd-* hooks/*/bd-*; do
   # every selftest here prints its reason and this loop threw it away.
   st_out=""
   if { [ -n "$runner" ] || [ -x "$s" ]; } && st_out="$($runner "$s" selftest 2>&1)"; then
-    ok "$b" # prove-new: the check and its label are unchanged - what changed is the loop's REACH, and hooks/omp/bd-awareness.ts is a genuinely new assertion here: it was never run by this gate before, and it comes back red when the bridge breaks (mutation-proven)
+    ok "$b selftest passes" # prove-new: regression-guard every shipped hook selftest passes at base and still does; what this pass changed is the loop's REACH, and hooks/omp/bd-awareness.ts is a genuinely new assertion here - never run by this gate before, and red when the bridge breaks (mutation-proven)
   else
     bad "$b selftest FAILED"
     printf '%s\n' "$st_out" | tail -5 | sed 's/^/      /'
@@ -918,6 +918,69 @@ for a in hosts/*; do
         bad "hosts/$h: bd_host_hook_wire names scripts/$hw, which is missing or not executable - installing this host skips hook wiring forever while reporting the host supported"
       fi ;;
   esac
+done
+
+echo "== host bridges (exported paths vs adapter) =="
+# A host whose hook mechanism is a MODULE rather than a config ships a bridge under hooks/<host>/,
+# and that bridge is what hands the awareness hooks their host-scoped env: BD_HOST_SKILLS_DIR and
+# BD_HOST_HOOK_SETTINGS. Both values are the ADAPTER's - install.sh writes the target from
+# bd_host_hook_settings - and a bridge that restates them in its own literals is a second copy
+# nothing compares. Its own selftest cannot: it builds the expected value from the same literals as
+# the code under test. So rename the target in hosts/<host> and every selftest and --verify stays
+# green while the installer writes one path and the bridge exports another, which is the permanently
+# silent hook nudge this branch already had to fix once.
+#
+# Compare the two SOURCES here, where every adapter is already sourced under a scratch HOME. RUN the
+# bridge for its side: it resolves its clone from its own module path and then EXECUTES
+# <clone>/hooks/bd-session-start, so a two-line recorder standing in for that hook reports the env
+# the bridge really hands a child. Grepping the bridge for the literal would be a third copy of it,
+# which is the defect, not the fix. Keyed on shape - a *.ts hook module beside hosts/<host> - so the
+# next host with a bridge is covered without naming it.
+for a in hosts/*; do
+  [ -f "$a" ] || continue
+  h="$(basename "$a")"
+  for br in "hooks/$h"/*.ts; do
+    [ -f "$br" ] || continue
+    bb="${br#hooks/}"
+    # Same posture as the parse sweep and the hook-selftest loop: bun is the runtime the host itself
+    # loads these modules with, so a machine without it is told the comparison did NOT run.
+    command -v bun >/dev/null 2>&1 || {
+      printf '  \033[33m•\033[0m bun is not on PATH, so %s exported paths were NOT compared with hosts/%s\n' "$bb" "$h"; continue; }
+    bd="$(cd "$(mktemp -d)" && pwd -P)"
+    mkdir -p "$bd/home" "$bd/proj" "$bd/clone/hooks/$h"
+    cp "$br" "$bd/clone/hooks/$h/"
+    printf '#!/usr/bin/env bash\nprintf "%%s\\n%%s\\n" "${BD_HOST_SKILLS_DIR-}" "${BD_HOST_HOOK_SETTINGS-}" > "$BD_BRIDGE_ENV"\nprintf "{}\\n"\n' \
+      > "$bd/clone/hooks/bd-session-start"
+    chmod +x "$bd/clone/hooks/bd-session-start"
+    # The bridge registers handlers on the host's hook api and only builds the env when one fires,
+    # so the driver plays the host: a recording api, then the session_start handler. A bridge that
+    # registers nothing records nothing and reports below as a mismatch, never as a pass.
+    printf '%s\n' \
+      'import { readFileSync } from "node:fs";' \
+      'const [bridge, cwd] = process.argv.slice(2);' \
+      'const mod = await import(bridge);' \
+      'const handlers = new Map();' \
+      'mod.default({ on: (e, f) => handlers.set(e, f), sendMessage: () => {} });' \
+      'const h = handlers.get("session_start");' \
+      'if (!h) { console.error("bridge registered no session_start handler"); process.exit(1); }' \
+      'h({}, { cwd });' \
+      'process.stdout.write(readFileSync(process.env.BD_BRIDGE_ENV, "utf8"));' > "$bd/drv.mjs"
+    got="$(cd "$bd" && HOME="$bd/home" BD_BRIDGE_ENV="$bd/env.txt" \
+      bun "$bd/drv.mjs" "$bd/clone/hooks/$h/$(basename "$br")" "$bd/proj" 2>/dev/null)"
+    want_sk="$(HOME="$bd/home" bash -c 'source "$1" && printf %s "${bd_host_skills_dir-}"' _ "$a" 2>/dev/null)"
+    want_hs="$(HOME="$bd/home" bash -c 'source "$1" && printf %s "${bd_host_hook_settings-}"' _ "$a" 2>/dev/null)"
+    got_sk="$(printf '%s\n' "$got" | sed -n 1p)"
+    got_hs="$(printf '%s\n' "$got" | sed -n 2p)"
+    berrs=""
+    [ "$got_sk" = "$want_sk" ] || berrs="$berrs skills-dir(exports '$got_sk', hosts/$h declares '$want_sk')"
+    [ "$got_hs" = "$want_hs" ] || berrs="$berrs hook-target(exports '$got_hs', hosts/$h declares '$want_hs')"
+    if [ -z "$berrs" ]; then
+      ok "$bb exports the skills dir and hook target hosts/$h declares" # prove-new: regression-guard no host bridge exists at base, so this cannot come back red there; it holds today (mutation-proven - renaming hosts/omp's target reddens it and nothing else does) and catches the later adapter edit that moves a path the bridge restates
+    else
+      bad "$bb and hosts/$h disagree:$berrs - install.sh writes the adapter's path while the bridge tells the awareness hooks another, so the hook nudge plans against a file nothing maintains"
+    fi
+    rm -rf "$bd"
+  done
 done
 
 # The five status words ARE the caller-facing contract of a wiring script: install.sh and
