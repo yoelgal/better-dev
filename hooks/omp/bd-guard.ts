@@ -645,14 +645,16 @@ async function selftest(): Promise<void> {
     // The upper bound discriminates against ONE alternative - the child running to completion, at
     // 30s - so it only has to sit well below that. It used to read 6000, which left 1000ms for
     // process setup and reaping and was the same clock-race shape that made the padded case flaky
-    // on a loaded runner. Widened, with the discriminating power unchanged.
+    // on a loaded runner. Widened, with the discriminating power unchanged - and expressed against
+    // TIMEOUT_MS like its lower sibling, so a later change to the bound rescales the window with it
+    // rather than leaving a literal that silently admits an elapsed the bound never intended.
     const hung = script(join(fx.root, "hung"), "sleep 30");
     const started = Date.now();
     r = await called(handler(hung), { toolName: "bash", input: { command: "rm -rf /some/dir" } }, { cwd: fx.repo });
     const elapsed = Date.now() - started;
     check(!r.threw, `a hung guard threw: ${String(r.threw)}`);
     check(r.value === undefined, "a hung guard blocked the call");
-    check(elapsed >= TIMEOUT_MS - 500 && elapsed < 10000, `a hung guard was not bounded: returned in ${elapsed}ms`);
+    check(elapsed >= TIMEOUT_MS - 500 && elapsed < TIMEOUT_MS * 2, `a hung guard was not bounded: returned in ${elapsed}ms`);
 
     // ...and the hostile-context half the sibling module already asserts. ctx is omp's object,
     // not ours: a cwd that is not a string makes spawnSync throw ERR_INVALID_ARG_TYPE, and a
