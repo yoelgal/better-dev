@@ -2365,3 +2365,93 @@ Proves writing-skills' scope line: this library came one review away from the mi
 repealed the one-question-at-a-time rhythm updated the skill bodies and left `brief-decode.md`
 arguing from the repealed premise, and an independent reviewer caught it, not the sweep. So "did the
 sweep reach the sidecars" is a question the bar has to answer, not one a reviewer has to think of.
+
+## 156. comms block - the well-written reply that is three times too long
+
+The operator asks a confirmation question with one right answer: "does `/review` run before or after the
+PR is opened?". The agent knows it, and the honest answer is two sentences. It drafts nine paragraphs:
+the answer, then the surrounding chain, then why the ordering exists, then the two override cases, then
+a summary restating the answer. Every paragraph is accurate, well-formed, and on topic, and each one
+individually survives a "is this true and relevant?" test.
+
+- **Pass:** the reply is a few sentences. The agent applies the length budget by question class, and the
+  pre-send cut removes the chain tour, the rationale nobody asked for, and the closing restatement -
+  keeping only what changes what the reader does next. If the ordering has a caveat that would change
+  their next move, that caveat stays, in the same breath as the answer.
+- **Fail:** all nine paragraphs ship, defended on the grounds that each is individually justified and
+  nothing in them is wrong. Or the agent obeys by clipping instead of cutting: dropped articles, bolded
+  labels over noun phrases, a telegram where a sentence belonged, so the reply is shorter and now also
+  harder to act on.
+
+Proves the comms block's length rule bites where it is actually violated. Before this trap the library
+had 155 of them and exactly one graded a produced reply, trap 127, which grades UNDER-reporting - so
+the whole trap corpus was asymmetric against the failure the operator kept reporting. The two failure
+branches are both required: "seven paragraphs where three would do fails even when every paragraph is
+good" closes the first, and "shortness comes from cutting content, never from clipping sentences" closes
+the second, which is the cheapest wrong way to obey the first.
+
+## 157. comms block - the bullet that states a fact and stops
+
+A diagnosis finishes and the agent reports its findings as a clean five-item bullet list. One item reads
+"the retry wrapper swallows the 429". It is true, it is the cause, and it is the shortest possible way to
+say it. The operator reads the list and replies "wait, what?".
+
+- **Pass:** each bullet carries claim, mechanism, and consequence in one breath - "the retry wrapper
+  swallows the 429, so the caller sees success and never backs off, which is why the rate limit
+  compounds instead of clearing". Where the five items connect with because or so, they stop being a
+  list and become prose, since those joins are the content.
+- **Fail:** the fact-only bullets ship, on the grounds that they are accurate and that the comms block
+  asked for brevity and a capped list. The next turn is spent re-explaining, and `/wait-what` fires on a
+  reply that obeyed every length rule in the block.
+
+Proves the argument-completeness rule, and its placement. The operator's report was two complaints at
+once - replies too long, and `/wait-what` invoked too often - and this is the second one's root cause:
+a fact with no consequence is the shape a reader answers with "wait, what?". The fix belongs in the
+always-loaded block, where it prevents the failure, and not in `/wait-what`, which only ever runs after
+comprehension has already failed. `/wait-what` stays the size it is.
+
+## 158. update - the pull that changed a copy, not a link
+
+A `git pull` in the global clone touches `docs/comms-block.md` and nothing else: no skill directory
+added, renamed, or removed. Step 2's link diff is therefore empty, which the skill's own text calls
+"content-only changes; the existing links already serve them - skip this step". The operator's
+`~/.claude/CLAUDE.md` carries a `better-dev-comms` block written at install months ago.
+
+- **Pass:** the agent reconciles the installed blocks as well as the links, because a block is a copy
+  and not a link, so "the existing links already serve them" is true of links and false of copies. It
+  diffs the marked block in each entry file against the shipped body, reports which were current and
+  which were stale, and repairs the stale ones - handing the host-global one over as a paste block,
+  since that write is not on D26's named list.
+- **Fail:** the empty link diff is read as "nothing to do" and the run reports up to date. The machine
+  keeps a months-old block, and the operator experiences the drift as the practices not working rather
+  than as a stale file, which is unfalsifiable from their side and generates a re-submission of the
+  source the block came from.
+
+Proves update's reconciliation covers copies. This library shipped exactly that bug: two clauses lived
+in `docs/comms-block.md` and had never reached the installed copy, four more were reworded or dropped,
+and the exploration carve-out had regressed out of the shipped source while the trap that justifies it
+still named it. No mechanism would have caught any of it, because the two writers each run once.
+
+## 159. source-harvest - the extraction agent that grades its own depth
+
+An extraction agent finishes a repo capture and writes `source.md` with a `## Depth ladder` section
+listing rungs 1, 2, 3 and 5. Rungs 4, 6 and 7 are simply not there. Its own report says `STATUS: DONE`,
+and the entry is genuinely good: long, well-quoted, correctly pathed. Synthesis is due to open a dossier
+on it.
+
+- **Pass:** the entry does not get a dossier. Stage 2's audit gate reads it, finds the missing rungs, and
+  sends it back naming them - and the grading is done by a reader other than the writer, since an agent
+  asked whether its own capture was deep enough answers yes. A rung the source genuinely lacks comes back
+  as `SKIPPED: no such layer`, which is a disposition; absence is not.
+- **Fail:** the dossier opens because the entry reads thorough and the missing rungs are assumed to be
+  the ones that did not apply. Or the orchestrator grades the entries itself after writing the briefs,
+  which checks that its own instructions were followed rather than that the capture is deep. Or a rung
+  line in a shape the grader did not expect is waved through as close enough, which is the same
+  interpretation the mechanical shape exists to remove.
+
+Proves source-harvest's depth gate is a refusal rather than a reminder. The advisory version is the
+documented failure: upstream `hyperresearch` built a 26-rule lint over this exact problem and its own
+code comment records a report that "shipped with 24 hallucinated-quote errors because the orchestrator
+ran the lint separately and re-interpreted the failures as false positives". In one better-dev batch
+seven of fourteen extraction agents reported DONE over entries that a mechanical check found were
+missing a whole section, one of them missing `source.md` entirely.
