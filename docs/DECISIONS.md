@@ -1226,3 +1226,36 @@ clones. `bd-migrate-branch-model` deliberately never merges for you, so nothing 
 
 The historical record is annotated, not rewritten: `docs/DECISIONS.md`, `docs/PLAN.md` and
 `docs/TRAPS.md` describe decisions that were really made about `staging`, and they still say so.
+
+## D37 - enforcement reaches omp through the bridge that already runs the awareness hooks (2026-08-17)
+
+`bd-guard check-bash` and `check-edit` were registered as Claude Code `PreToolUse` entries only, so every
+destructive command and out-of-boundary edit in an omp session ran unchecked and an onboarded repo could
+only record `safety-enforcement: prose` - the fallback reserved for a host with **no** pre-execution hook.
+omp has one: a `tool_call` handler may return `{block, reason}`, and `ctx.ui.confirm` is a real prompt.
+
+**A second module in the clone, not a second installed hook.** The guard is its own module under
+`hooks/omp/`, and the awareness bridge omp already loads calls it. Nothing about the install changes: one
+stub, one target path, no wiring-script, `--verify` or uninstall edit, and no migration for a stub already
+on a machine. Its every path is total, because omp's runner converts a handler that throws or outruns its
+bound into a block itself - a non-total guard would deny every guarded tool call on the machine. The
+rejected alternative was a second install target so enforcement could be removed without losing
+awareness; it grows five surfaces to buy what `bd-guard off` already gives.
+
+**The bridge translates; the policy stays in `bd-guard`.** It maps the script's existing Claude-shaped
+envelope onto omp's result type and adds no branch to the script and no pattern of its own, so widening
+the denylist is still one `bd-mem remember`.
+
+**An ask with no UI blocks.** Fail-open is the posture for *errors*; an ask is a decision, and a headless
+run has nobody to escalate to, so allowing it would self-approve the one class the policy escalates.
+
+**A URI-scheme write target is not judged as a path.** omp dispatches its internal devices as writes to
+`xd://<device>`, so reading that scheme as a filesystem path would deny every device call in every
+session; a device's real paths are judged under the device's own tool name instead.
+
+**Three named coverage limits ship with it, rather than being papered over.** The `eval` tool is
+unjudged, because `bd-guard`'s pattern set is shell-shaped and matching python or JS source against it
+would be fake coverage that also mis-asks on ordinary prose. A `hub` start op is unjudged, because it
+launches a process outside the bash tool and its command never reaches `check-bash`. A hashline move
+destination is unjudged, because it is not among the paths omp derives for its own approval gate, and
+judging exactly that surface is the point - not a second, wider parser to keep in step.

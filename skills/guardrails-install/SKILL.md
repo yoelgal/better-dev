@@ -540,6 +540,10 @@ a hook config for a host whose convention was never verified:
 - **A host with no pre-execution hook** - the policy stands as prose and the loop's escalation
   discipline carries it alone. A named coverage limit, not a failure.
 
+On omp the pair rides the machine-global install rather than a per-repo settings write, so
+`safety-enforcement` reads `hook` there once the installer has run and the paste block above stays Claude
+Code's.
+
 Record which, so downstream skills know what kind of gate they have:
 
 ```bash

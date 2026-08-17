@@ -102,23 +102,42 @@ de-duplicating is why the scripts branch to emit exactly one, rather than emitti
 ## Porting the enforcement hooks
 
 The awareness hooks inject a note; the enforcement pair (`bd-guard check-bash`, `bd-guard check-edit`)
-vetoes or asks before a tool runs, so a host earns them only if it exposes a pre-tool-execution hook
-that can return a deny/ask decision. If it does: register `check-bash` on the Bash-equivalent tool and
-`check-edit` on the edit/write tools, then confirm the host's decision envelope - `bd-guard` emits
-Claude Code's nested `hookSpecificOutput.{permissionDecision, permissionDecisionReason}` shape, and a
-host that reads a different field ignores the decision without an error (the same silent-failure trap
-as the `SubagentStart` shape above). Add the host's envelope as a branch in the script's `emit_decision`
-and prove both decisions land: pipe one destructive fixture through `check-bash` and one out-of-boundary
-edit through `check-edit`, and confirm the host asks and denies rather than proceeding.
+vetoes or asks before a tool runs, so a host earns them only if it exposes a pre-tool-execution hook that
+can return a deny/ask decision. Claude Code's is `PreToolUse`: `check-bash` on the Bash-equivalent tool,
+`check-edit` on the edit/write tools. omp's is a `tool_call` handler, which earns the pair too - it returns
+`{block: true, reason}` to refuse the call, and `ctx.hasUI` with `ctx.ui.confirm(title, message)` gives the
+ask somewhere to land.
 
-Unlike the awareness hooks above, these two read the tool call on stdin - that is how they see the
-command or the file path to judge. So the host must pipe the tool-input JSON to the hook; a host that
-registers them without feeding stdin stalls every tool call to the hook timeout (the `INPUT="$(cat)"`
-read blocks with nothing to read). Confirm the host pipes tool input before registering them, and keep
-the timeout short (the `hooks.json` entries set one) so a misconfigured host fails to a bounded delay
-rather than a hang.
+Whether a host needs its own branch in `bd-guard`'s `emit_decision` is the same distinction `## Output
+shapes` above draws: a host that parses the decision off the hook's stdout needs one, a host whose bridge
+parses needs none, because the bridge is ours. So `bd-guard` gained no omp case - omp's enforcement bridge
+translates Claude's `hookSpecificOutput.{permissionDecision, permissionDecisionReason}` shape unchanged.
 
-A host with no pre-execution hook gets prose policy: record it
+Three translations, none of them a free choice. A `deny` becomes a blocked call carrying the reason. An
+`ask` with a UI becomes a confirm, and a declined confirm blocks, because a refused prompt read as
+approval is worse than no gate at all. An `ask` with no UI blocks too: a headless session has nobody to
+escalate to, so allowing it would silently self-approve the one class the policy escalates.
+
+omp inverts the failure direction, and that is what makes this the dangerous hook to port: the `tool_call`
+gotcha above holds with its consequence turned up. The runner converts a handler that throws or outruns its
+bound into a block itself, so a broken guard denies every bash, write and edit on the machine rather than
+failing open the way `bd-guard`'s check-* subcommands do. Hence a guard bound well inside the runner's, and
+every path total.
+
+Where the tools are not named `Bash`/`Edit`/`Write`, feed `check-bash` the command string and `check-edit`
+the paths the host already derives for its own approval gate, never a re-parse of its patch language - one
+parser, judging what the host itself gates on. A target carrying a URI scheme is not a filesystem path: a
+host that dispatches internal devices through its write tool (omp writes to `xd://<device>`) denies every
+device call if the boundary check reads the scheme as a path, so pass those through and cover the device's
+real paths under its own tool name.
+
+Unlike the awareness hooks above, these two read the tool call on stdin - that is how they see the command
+or the path to judge. So the host must pipe the tool-input JSON in; one that registers them without
+feeding stdin stalls every tool call to the hook timeout (`INPUT="$(cat)"` blocks with nothing to read).
+Confirm that before registering them, and keep the timeout short (the `hooks.json` entries set one) so a
+misconfigured host costs a bounded delay rather than a hang.
+
+A host with genuinely no pre-execution hook gets prose policy: record it
 (`.better-dev/bin/bd-mem remember "safety-enforcement: prose"`) and say so - a named coverage limit,
 not a failure. The loop's escalation discipline carries the same policy alone there.
 
