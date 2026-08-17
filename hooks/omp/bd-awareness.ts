@@ -1,4 +1,6 @@
-// better-dev awareness bridge for omp: the tool's bash awareness hooks, in omp's hook API.
+// better-dev's omp bridge: the tool's bash awareness hooks AND its enforcement pair, in omp's
+// hook API. Awareness lives here; the enforcement half is ./bd-guard.ts, which this file
+// registers so both arrive with one installed stub.
 // better-dev-omp-hook
 //
 // omp has no command-hook config - SessionStart, SubagentStart and PreToolUse do not exist in
@@ -13,12 +15,17 @@
 //
 // omp has no subagent-spawn event, so the worker note rides a tool_call handler on the task
 // tool, prepended to the batch context field.
+//
+// The enforcement pair is a sibling module rather than a second install target: install.sh
+// writes one stub, and install(), below, calls installGuard() on the same pi. See bd-guard.ts
+// for why that is one wiring target's worth of surface instead of six.
 
 import { spawn, spawnSync } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { installGuard, type GuardContext, type GuardDecision } from "./bd-guard.ts";
 
 const SESSION_HOOK = "hooks/bd-session-start";
 const SUBAGENT_HOOK = "hooks/bd-subagent-start";
@@ -60,6 +67,11 @@ interface HookApi {
   on(event: "session_start" | "session_compact", handler: (event: unknown, ctx: HookContext) => void): void;
   on(event: "session_switch", handler: (event: SwitchEvent | undefined, ctx: HookContext) => void): void;
   on(event: "tool_call", handler: (event: ToolCallEvent, ctx: HookContext) => ToolCallResult | undefined): void;
+  // The enforcement half registers a SECOND tool_call handler on this same pi: its handler
+  // answers a promise and may refuse the call outright, a shape the sync overload above cannot
+  // express. omp keeps a handler's result only when truthy and short-circuits on the first
+  // block, so the guard's undefined never clobbers the revision the sync handler returns.
+  on(event: "tool_call", handler: (event: ToolCallEvent, ctx: GuardContext) => Promise<GuardDecision | undefined>): void;
   sendMessage(message: CustomMessage): void;
 }
 
@@ -204,6 +216,11 @@ function install(pi: HookApi, self: string, home: string): void {
         return undefined;
       }
     });
+
+    // Enforcement registers LAST, on the same resolved clone: the awareness note is the
+    // behavior this bridge already ships, so nothing above it may be lost to a failure while
+    // adding the guard. installGuard catches its own, so it cannot reach the catch below.
+    installGuard(pi, root);
   } catch {
     // a bridge that cannot resolve its own clone registers nothing
   }
@@ -220,21 +237,27 @@ export default function bdAwareness(pi: HookApi): void {
 interface Fake {
   pi: HookApi;
   handlers: Map<string, (event: unknown, ctx: HookContext) => unknown>;
+  events: string[];
   messages: CustomMessage[];
 }
 
 function fake(): Fake {
   const handlers = new Map<string, (event: unknown, ctx: HookContext) => unknown>();
+  const events: string[] = [];
   const messages: CustomMessage[] = [];
   const pi = {
     on(event: string, handler: (event: unknown, ctx: HookContext) => unknown) {
-      handlers.set(event, handler);
+      events.push(event);
+      // First registration wins. The bridge registers TWO tool_call handlers now - awareness's
+      // below, and the guard's from installGuard (./bd-guard.ts) - and omp keeps both. This
+      // fixture drives the awareness one; bd-guard.ts's own selftest drives the guard's.
+      if (!handlers.has(event)) handlers.set(event, handler);
     },
     sendMessage(message: CustomMessage) {
       messages.push(message);
     },
   } as unknown as HookApi;
-  return { pi, handlers, messages };
+  return { pi, handlers, events, messages };
 }
 
 function script(path: string, body: string): void {
@@ -337,6 +360,9 @@ async function selftest(): Promise<void> {
     f = fake();
     install(f.pi, four.self, four.home);
     check(f.handlers.has("tool_call"), "no tool_call handler registered on a resolvable clone");
+    // ...and enforcement rides the same install: the guard's handler is registered alongside
+    // this one, which is the whole reason the pair needs no second install target.
+    check(f.events.filter(e => e === "tool_call").length === 2, `expected awareness and guard tool_call handlers, got ${f.events.filter(e => e === "tool_call").length}`);
     const tasks: unknown[] = [];
     r = called(f.handlers.get("tool_call"), { toolName: "task", input: { context: "CALLER", tasks } }, { cwd: four.cwd });
     check(!r.threw, `task tool_call threw: ${String(r.threw)}`);
