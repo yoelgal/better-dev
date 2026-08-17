@@ -172,8 +172,8 @@ was a requirement the tool never claimed.
 **Do not bill the operator's deliberation against the hook's own bound.** If the hook is time-bounded
 and its refusal can prompt, a slow human answer silently spends the budget the later paths needed, and
 the batch proceeds unjudged - which looks like an approval and is not one. omp's runner pauses a
-handler's budget across a UI dialog for exactly this reason; copy that. A bound that runs out while
-checks are still unjudged is not silence either: refuse, and name how many went unjudged.
+handler's budget across a UI dialog for exactly this reason; copy that. What the bound running out
+must NOT do is refuse: that was built and measured, and the paragraph above carries the result.
 
 Unlike the awareness hooks above, these two read the tool call on stdin - that is how they see the command
 or the path to judge. So the host must pipe the tool-input JSON in; one that registers them without
