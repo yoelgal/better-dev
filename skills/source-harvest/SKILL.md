@@ -165,10 +165,11 @@ wrote it, and an extraction line without one means the band decision never reach
 dispatch call. The extraction brief that works:
 
 - A `## Depth ladder` section in `source.md`, all seven rungs, each line in the pinned shape above:
-  the rung number, then `CAPTURED` with what was read, or `SKIPPED: <reason>` from the closed list.
-  Say so in the brief and paste the two-line example into it, because stage 2 refuses an entry whose
-  rungs are not dispositioned, and a gate that checks a shape the brief never asked for reads as an
-  arbitrary rejection to the worker that has to fix it.
+  the rung number, then `CAPTURED` with what was read, or `SKIPPED:` and one of exactly these five
+  reasons - no such layer, commodity content, paywalled, out of assigned scope, or unrecoverable with
+  the routes tried named. Spell those five into the brief and paste the two-line example into it. The
+  worker never loads this file, so a closed list it cannot see is a list it will invent around: an
+  off-list reason like "not applicable" is a line stage 2 then refuses, for a defect the brief caused.
 - Read the ACTUAL files, never summarize from memory of the repo's name.
 - Complete inventory (every skill/prompt, one line each), then per relevant item: what
   it does, its best instructions QUOTED VERBATIM with file paths, and one line

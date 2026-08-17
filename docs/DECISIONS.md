@@ -1393,7 +1393,8 @@ artifact-and-typing model as its subject. "HITL" appears zero times in this file
 though the typing was captured verbatim in the first ingest and re-named in two more. Three ingests,
 zero dispositions. Carried to its own work-item rather than folded here (master plan H3).
 
-**Landed:** `docs/comms-block.md` (24/24 lines), `hooks/bd-subagent-start` plus its selftest,
+**Landed:** `docs/comms-block.md` (23 of 24 lines, so one line of headroom and no more),
+`hooks/bd-subagent-start` plus its selftest,
 `skills/update/SKILL.md` step 2, `skills/source-harvest/SKILL.md` (ladder plus stage-2 audit gate),
 `skills/source-harvest/extraction-recipes.md` (single-browser batch reader after measuring 19 pages in
 82s against 4 in 10 minutes, silent-video keyframe recipe, fxtwitter fallback), traps 156 to 159.

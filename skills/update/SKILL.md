@@ -89,32 +89,37 @@ written at install. Nothing else reconciles them - the two writers (`BOOTSTRAP.m
 operator experiences it as the practices not working rather than as a stale file. Compare the marked
 block against the shipped body wherever one is installed:
 
-Guard it on the clone first, because step 1 reports a failed resolve to stderr without exiting: with
-`$clone` empty, `diff` cannot open the shipped body, exits 2, and an exit-code test that only
-distinguishes zero from non-zero prints `STALE` for every entry file it finds.
+The whole check sits inside one `if` on the clone, because step 1 reports a failed resolve to stderr
+without exiting: with `$clone` empty, `diff` cannot open the shipped body, exits 2, and an exit-code
+test that only distinguishes zero from non-zero prints `STALE` for every entry file it finds. Scope is
+the guard rather than an early return, which would end an interactive or persistent shell instead of
+skipping a step.
 
 ```bash
-[ -f "$clone/docs/comms-block.md" ] || { echo "clone unresolved - skipping the block check"; return 2>/dev/null || exit 0; }
-found=0
-# Global entry files come from the host adapters, never a hardcoded path: hosts/claude names
-# ~/.claude/CLAUDE.md, hosts/codex names ~/.codex/AGENTS.md, and hermes and omp name "" to decline.
-# Read every adapter rather than detecting the host - a machine may run more than one, and inlining
-# one host's answer would report "clean" on every other.
-globals=$(for a in "$clone"/hosts/*; do
-  ( . "$a" >/dev/null 2>&1; printf '%s\n' "${bd_host_global_entry:-}" )
-done | grep . | sort -u)
-for entry in $globals ./CLAUDE.md ./CLAUDE.local.md ./AGENTS.md; do
-  [ -f "$entry" ] || continue
-  grep -q 'BEGIN better-dev-comms' "$entry" || continue
-  found=$((found + 1))
-  if diff <(sed -n '/BEGIN better-dev-comms/,/END better-dev-comms/p' "$entry" | sed '1d;$d') \
-          "$clone/docs/comms-block.md" >/dev/null; then
-    echo "current: $entry"
-  else
-    echo "STALE: $entry"
-  fi
-done
-[ "$found" -gt 0 ] || echo "no better-dev-comms block installed anywhere"
+if [ ! -f "$clone/docs/comms-block.md" ]; then
+  echo "clone unresolved - skipping the block check"
+else
+  found=0
+  # Global entry files come from the host adapters, never a hardcoded path: hosts/claude names
+  # ~/.claude/CLAUDE.md, hosts/codex names ~/.codex/AGENTS.md, and hermes and omp name "" to decline.
+  # Read every adapter rather than detecting the host - a machine may run more than one, and inlining
+  # one host's answer would report "clean" on every other.
+  globals=$(for a in "$clone"/hosts/*; do
+    ( . "$a" >/dev/null 2>&1; printf '%s\n' "${bd_host_global_entry:-}" )
+  done | grep . | sort -u)
+  for entry in $globals ./CLAUDE.md ./CLAUDE.local.md ./AGENTS.md; do
+    [ -f "$entry" ] || continue
+    grep -q 'BEGIN better-dev-comms' "$entry" || continue
+    found=$((found + 1))
+    if diff <(sed -n '/BEGIN better-dev-comms/,/END better-dev-comms/p' "$entry" | sed '1d;$d') \
+            "$clone/docs/comms-block.md" >/dev/null; then
+      echo "current: $entry"
+    else
+      echo "STALE: $entry"
+    fi
+  done
+  [ "$found" -gt 0 ] || echo "no better-dev-comms block installed anywhere"
+fi
 ```
 
 An adapter that names no global entry file is declining one, not missing it: `grep .` drops the empty
