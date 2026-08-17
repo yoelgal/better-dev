@@ -43,7 +43,14 @@ emit_allow() { printf '{}\n'; }
 # the wrong envelope fails silently (see bootstrap-hooks/porting.md).
 emit_decision() { # emit_decision ask|deny <message>
   local msg
-  msg="$(printf '%s' "$2" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+  # C0 control characters FIRST, then the two JSON metacharacters. A message embeds a model-chosen
+  # path, so a path holding a newline or a tab used to emit a raw control character inside a JSON
+  # string. That is invalid JSON: a real refusal then reaches the host as an answer it cannot parse,
+  # and any reader treating a parse failure as "no decision" performs the write - an
+  # attacker-triggerable bypass on every host, reachable by naming the file. Mapping C0 to a space
+  # cannot produce invalid JSON and costs a reader nothing: the path is still named in the reason.
+  # tr runs before sed because sed works line by line, so an embedded newline would survive it.
+  msg="$(printf '%s' "$2" | tr '\000-\037' ' ' | sed 's/\\/\\\\/g; s/"/\\"/g')"
   printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"%s","permissionDecisionReason":"%s"}}\n' "$1" "$msg"
 }
 
@@ -441,6 +448,23 @@ selftest() {
   out="$(cd "$repo" && jedit "$repo/.env.production" | "$SELF" check-edit)"
   printf '%s' "$out" | grep -q '"permissionDecision":"ask"' || fail "prose-form denylist did not enforce .env*"
   printf '%s' "$out" | grep -q '\.env\*' || fail "prose-form denylist ask does not name the glob"
+
+  # A decision whose reason embeds a model-chosen path is still VALID JSON when that path carries a
+  # control character. This is the bypass shape, not a formatting nicety: the host serializes the
+  # tool input correctly, so a newline arrives here as a real newline in $path, and an unescaped one
+  # inside the reason made the whole envelope unparseable - a refusal the reader then sees as no
+  # decision at all, and performs the write. Asserted through a parser, because grep cannot tell
+  # valid JSON from a string that merely looks close. Last case in the run: it leaves a boundary set.
+  if command -v python3 >/dev/null 2>&1; then
+    ( cd "$repo" && "$SELF" scope "$repo/src" --ttl 0 ) >/dev/null
+    for ctl in 'x\ny' 'x\ty' 'x\ry'; do
+      out="$(cd "$repo" && jedit "$repo/$ctl" | "$SELF" check-edit)"
+      printf '%s' "$out" | grep -q '"permissionDecision":"deny"' \
+        || fail "a path carrying a control character escaped the boundary deny: $out"
+      printf '%s' "$out" | python3 -c 'import sys,json; json.load(sys.stdin)' 2>/dev/null \
+        || fail "the decision envelope for a control-character path is not valid JSON: $out"
+    done
+  fi
 
   rm -rf "$d"
   echo "bd-guard selftest: ok"

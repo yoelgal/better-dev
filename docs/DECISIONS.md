@@ -1240,11 +1240,24 @@ stub, one target path, no wiring-script, `--verify` or uninstall edit, and no mi
 on a machine. Its every path is total, because omp's runner converts a handler that throws or outruns its
 bound into a block itself - a non-total guard would deny every guarded tool call on the machine. The
 rejected alternative was a second install target so enforcement could be removed without losing
-awareness; it grows five surfaces to buy what `bd-guard off` already gives.
+awareness; it grows five surfaces to buy an on-off switch nobody asked for, and `bd-guard off` is not
+that switch - it lifts the scope boundary and leaves the destructive-command and denylist asks armed.
 
 **The bridge translates; the policy stays in `bd-guard`.** It maps the script's existing Claude-shaped
-envelope onto omp's result type and adds no branch to the script and no pattern of its own, so widening
-the denylist is still one `bd-mem remember`.
+envelope onto omp's result type and adds no pattern and no denylist of its own, so widening the recorded
+policy is still one `bd-mem remember`. The review round found the envelope's *encoding* broken rather
+than its shape, and that is the one change the script did earn: `emit_decision` escaped only backslash
+and double quote while embedding a model-chosen path in the reason, so a path carrying a newline emitted
+invalid JSON, a real refusal reached the reader as no decision at all, and allow-by-default performed the
+write. Reachable by naming the file, on every host, Claude Code included. Fixed at the producer (C0 maps
+to a space) and refused at the consumer: silence still allows, but an answer that arrived and could not
+be decoded now blocks. That split is the point - fail-open is for *not hearing*, never for *not
+understanding*.
+
+**What the guard judges is what will actually run.** omp's `bash` input carries an `env` map, so a
+command of `$X` with `env: {X: <destructive>}` reaches the shell fully formed while a bare-`command`
+submission sees nothing. The bridge therefore hands `check-bash` the shell spelling of the call,
+`VAR=value command`. A faithful rendering of the same invocation, not a fabricated one.
 
 **An ask with no UI blocks.** Fail-open is the posture for *errors*; an ask is a decision, and a headless
 run has nobody to escalate to, so allowing it would self-approve the one class the policy escalates.
@@ -1253,9 +1266,16 @@ run has nobody to escalate to, so allowing it would self-approve the one class t
 `xd://<device>`, so reading that scheme as a filesystem path would deny every device call in every
 session; a device's real paths are judged under the device's own tool name instead.
 
-**Three named coverage limits ship with it, rather than being papered over.** The `eval` tool is
-unjudged, because `bd-guard`'s pattern set is shell-shaped and matching python or JS source against it
-would be fake coverage that also mis-asks on ordinary prose. A `hub` start op is unjudged, because it
-launches a process outside the bash tool and its command never reaches `check-bash`. A hashline move
-destination is unjudged, because it is not among the paths omp derives for its own approval gate, and
-judging exactly that surface is the point - not a second, wider parser to keep in step.
+**Its coverage limits are named rather than papered over.** The `eval` tool is unjudged, because
+`bd-guard`'s pattern set is shell-shaped and matching python or JS source against it would be fake
+coverage that also mis-asks on ordinary prose. A `hub` start op is unjudged, because it launches a
+process outside the bash tool and its command never reaches `check-bash`. A hashline move destination is
+unjudged, because it is not among the paths omp derives for its own approval gate, and judging exactly
+that surface is the point - not a second, wider parser to keep in step. A target behind a URI scheme is
+unjudged, and the cost is real rather than zero: a scoped session can still put bytes outside its
+boundary through `local://`, `memory://`, `artifact://` or `ssh://`. Narrowing the rule to `xd:` alone
+was considered and rejected, because it would deny a `local://` handoff - a working orchestration path.
+A selector path (`db.sqlite:table:key`, `archive.zip:member`) is forwarded verbatim, so it satisfies the
+boundary prefix check while no denylist glob can match it. And `bash` is spawned from `PATH`, so whoever
+can write your `PATH` or the clone's `scripts/` disarms the guard - accepted, identical to what
+`hooks.json` already ships, and an attacker with that write owns the session anyway.

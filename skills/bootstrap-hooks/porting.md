@@ -131,6 +131,25 @@ host that dispatches internal devices through its write tool (omp writes to `xd:
 device call if the boundary check reads the scheme as a path, so pass those through and cover the device's
 real paths under its own tool name.
 
+Three traps a porter hits after the wiring works, all found by review rather than by testing, and all
+about the *reader* of a decision rather than the decision itself. **Escape the envelope for control
+characters, not just quotes.** A decision reason embeds a model-chosen path, so a path carrying a
+newline emits a raw control character inside a JSON string; the envelope is then invalid, and any
+reader that treats a parse failure as no-decision performs the write. An attacker picks the filename.
+**Split silence from an answer you cannot read.** Fail-open belongs to *not hearing* the guard - a
+missing script, a non-zero exit, a bound that expired. An answer that arrived and would not decode is
+the opposite case and must refuse, or the two failures share one bucket and the safe one legitimizes
+the unsafe one. **And judge what will actually run, not the field that looks like the command.** Where
+the host's exec tool carries an environment map beside the command string, a command of `$X` with the
+payload in `env` reaches the shell fully formed while a bare-`command` submission sees nothing: feed
+the check the shell spelling of the whole call.
+
+One more that only bites a host whose refusal can prompt: if the hook has its own time bound, the
+operator's deliberation must not be billed against it. omp's runner pauses a handler's budget across
+a UI dialog for exactly this reason, and a bridge that does not copy that behavior lets a slow answer
+silently spend the budget every later path needed - the batch then proceeds unjudged, which looks
+like an approval and is not one.
+
 Unlike the awareness hooks above, these two read the tool call on stdin - that is how they see the command
 or the path to judge. So the host must pipe the tool-input JSON in; one that registers them without
 feeding stdin stalls every tool call to the hook timeout (`INPUT="$(cat)"` blocks with nothing to read).

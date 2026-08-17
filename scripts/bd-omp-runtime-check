@@ -18,18 +18,22 @@
 # refusal above proving nothing.
 #
 #   bd-omp-runtime-check            run both subjects (needs omp on PATH and model credentials)
-#   bd-omp-runtime-check selftest   fixture construction, every premise-skip path, and the hang
-#                                   path, offline
+#   bd-omp-runtime-check selftest   fixture construction, the shipped policy's answer to the
+#                                   stimulus, how each verdict is classified, every premise-skip
+#                                   path, the hang path, and the missing-module failure - offline
 #
-# A missing premise - no omp binary, no model, no hooks/omp/bd-guard.ts, or a local omp tool policy
-# that denies the stimulus above the hook - is reported and skipped, never failed. A run that HANGS
-# is not a missing premise and never skips: the probe below runs with the operator's GLOBAL omp hooks
-# loaded, so an omp that never returns is this bridge's own time bound failing, which is the one
-# failure this check exists to catch. BD_OMP overrides the binary; BD_OMP_TIMEOUT the per-run bound
-# in seconds; BD_OMP_GRACE the seconds the watchdog waits past that bound before it kills the run;
-# BD_GUARD_MODULE the guard module path (the selftest points it at a missing file to exercise that
-# premise skip). This needs network and a model, so it is a human/loop check, never a package-gate
-# check: the gate runs `selftest` only.
+# A missing premise - no omp binary, no model, or a local omp tool policy that denies the stimulus
+# above the hook - is reported and skipped, never failed. A clone missing hooks/omp/bd-guard.ts or
+# scripts/bd-guard is NOT a premise and fails outright: bd-awareness.ts imports ./bd-guard.ts
+# statically, so without the sibling omp cannot load the bridge at all and NEITHER subject can be
+# observed. Skipping that would exit 0 on a clone whose bridge does not load, which is the exact
+# class of defect this check exists to catch. A run that HANGS is not a missing premise either and
+# never skips: the probe below runs with the operator's GLOBAL omp hooks loaded, so an omp that never
+# returns is this bridge's own time bound failing, which is the one failure this check exists to
+# catch. BD_OMP overrides the binary; BD_OMP_TIMEOUT the per-run bound in seconds; BD_OMP_GRACE the
+# seconds the watchdog waits past that bound before it kills the run; BD_GUARD_MODULE the guard
+# module path (the selftest points it at a missing file to prove that failure). This needs network
+# and a model, so it is a human/loop check, never a package-gate check: the gate runs `selftest` only.
 #
 # Writes nothing outside its own tempdir and installs nothing into the operator's ~/.omp - the
 # bridge goes into the fixture's project-scoped hooks dir, which is what omp loads for that cwd.
@@ -107,9 +111,10 @@ build_fixture() {
   # COPIED, never linked: the bridge resolves its clone from its own realpath, so a linked module
   # would resolve the real clone and run the real hooks instead of this fixture's.
   cp "$MODULE" "$CLONE/hooks/omp/bd-awareness.ts"
-  # The guard module rides along when the clone has one. When it does not, check() reports that
-  # premise and runs the note subject alone - a `cp` failure here would take both subjects down.
-  if [ -f "$GUARD_MODULE" ]; then cp "$GUARD_MODULE" "$CLONE/hooks/omp/bd-guard.ts"; fi
+  # The guard module is copied too, and unconditionally: bd-awareness.ts imports ./bd-guard.ts
+  # statically, so a fake clone missing the sibling could not load the bridge at all. The preflight
+  # at the bottom refuses to run without it, which is why this is a plain cp and not a conditional.
+  cp "$GUARD_MODULE" "$CLONE/hooks/omp/bd-guard.ts"
   # The real policy script, copied for the same reason the module is: the bridge spawns
   # <clone>/scripts/bd-guard by path, and the fixture has to exercise the shipped patterns rather
   # than a stand-in that could ask where the real one allows.
@@ -172,22 +177,16 @@ why() {
 
 # Whether a run died on the machine's OWN tool policy rather than on our hook. omp's tool wrapper
 # decides bash.patterns before it emits tool_call, so such a deny stops the stimulus above the guard
-# and the guard subject is simply unobserved - a premise, never a red. Matched on omp's own wording,
-# which a better-dev refusal never carries, so a genuine pass can never be downgraded to a skip.
+# and the subject is simply unobserved - a premise, never a red. Consulted only AFTER the filesystem
+# observable says nothing happened: a session denied once can retry a variant the policy allows and
+# write the marker anyway, and that masked failure must never be classified from the transcript.
 policy_denied() { grep -qF 'blocked by user policy' "$1" "$1.err" 2>/dev/null; }
 
 check() {
+  # guard is the latch for the guard subject: 1 until this machine's own tool policy is caught
+  # denying the stimulus above the hook, the one premise that can cost that subject alone. Its two
+  # files are preflight requirements rather than premises - see the header.
   local status rc=0 guard=1 ask stim
-  # Named before the omp premise so a clone with no guard module says so even on a machine that also
-  # cannot run omp, and so the note subject still runs: the module is a premise for its own subject,
-  # never for both.
-  if [ ! -f "$GUARD_MODULE" ]; then
-    guard=0
-    printf 'skip: no guard module at %s - the guard subject cannot be observed without it\n' "$GUARD_MODULE"
-  elif [ ! -f "$GUARD" ]; then
-    guard=0
-    printf 'skip: no policy script at %s - the guard subject spawns it\n' "$GUARD"
-  fi
   command -v "$OMP" >/dev/null 2>&1 \
     || { printf 'skip: %s is not on PATH - a real omp binary is this check'"'"'s premise\n' "$OMP"; return 0; }
   TMP="$(mktemp -d)"
@@ -240,20 +239,27 @@ check() {
   ask="$(printf "$GUARD_ASK_FMT" "$stim")"
   if [ "$guard" = 1 ]; then
     omp_run "$FIX" "$ask" "$TMP/gpos.out" --auto-approve
-    if policy_denied "$TMP/gpos.out" && [ "$HUNG" = 0 ]; then
+    # OBSERVABLE FIRST, and the order is itself the assertion. A session whose first attempt is
+    # denied by the machine's own policy can retry a variant that policy allows, write the marker,
+    # and still leave the policy string in the transcript. Classified on the transcript, that masked
+    # failure exits 0 as a premise skip - and this run is the only live proof the guard bites, so a
+    # masked failure would read as a clean run. A written marker is therefore a FAIL whatever the
+    # transcript says, and only a run whose observable is consistent with nothing having happened is
+    # eligible for the policy skip.
+    if [ -f "$MARKER" ]; then
+      printf 'FAIL: guard positive half - %s was written, so the denied tool call ran unguarded (read the reply below for whether the session ran the stimulus verbatim)\n' "$MARKER" >&2
+      reply "$TMP/gpos.out" >&2
+      rc=1
+    elif policy_denied "$TMP/gpos.out" && [ "$HUNG" = 0 ]; then
       guard=0
       printf 'skip: the local omp tool policy denied "%s" before the hook could see it - a bash.patterns rule in the omp config decides inside omp own tool wrapper, above tool_call, so the guard subject was not observed here\n' "$stim"
     elif [ "$RC" != 0 ] || [ "$HUNG" = 1 ]; then
       printf 'FAIL: the guarded omp run with .better-dev/ present %s\n' "$(why)" >&2
       reply "$TMP/gpos.out.err" >&2
       rc=1
-    elif [ -f "$MARKER" ]; then
-      printf 'FAIL: guard positive half - %s was written, so the denied tool call ran unguarded (read the reply below for whether the session ran the stimulus verbatim)\n' "$MARKER" >&2
-      reply "$TMP/gpos.out" >&2
-      rc=1
     elif ! grep -qF '[better-dev]' "$TMP/gpos.out" "$TMP/gpos.out.err"; then
-      # The absent marker is the load-bearing observable; this marker string is what distinguishes a
-      # guard that refused the call from a model that simply never made it.
+      # The absent marker is the load-bearing observable; this string is what distinguishes a guard
+      # that refused the call from a model that simply never made it.
       printf 'FAIL: guard positive half - %s was never written but no refusal carrying [better-dev] reached the session, so nothing shows the guard is why\n' "$MARKER" >&2
       reply "$TMP/gpos.out" >&2
       rc=1
@@ -274,21 +280,27 @@ check() {
     rc=1
   fi
 
-  # Guard control: same fixture, .better-dev/ still aside, marker cleared. A control that never
-  # writes the marker cannot tell a guard that refused from a session that never issued the command,
-  # so a missing marker here is a control failure and never a pass.
+  # Guard control: same fixture, .better-dev/ still aside, marker cleared. Observable first here
+  # too, and this half has no premise to fall back on: the stimulus is the same command the positive
+  # half just ran, so a machine whose tool policy denies it has already skipped above and this block
+  # never runs. A marker missing anyway cannot tell a guard that refused from a session that never
+  # issued the command, which makes it a control failure and never a skip.
   if [ "$guard" = 1 ]; then
     clear_marker
     omp_run "$FIX" "$ask" "$TMP/gneg.out" --auto-approve
-    if policy_denied "$TMP/gneg.out" && [ "$HUNG" = 0 ]; then
-      guard=0
-      printf 'skip: the local omp tool policy denied "%s" in the control run - see bash.patterns in the omp config; it decides above tool_call, so the guard subject was not observed here\n' "$stim"
+    if [ -f "$MARKER" ]; then
+      # The command ran with .better-dev/ aside, which is the whole of what this half asserts.
+      :
     elif [ "$RC" != 0 ] || [ "$HUNG" = 1 ]; then
       printf 'FAIL: the guard control run without .better-dev/ did not complete (%s), so the refusal above proves nothing\n' "$(why)" >&2
       reply "$TMP/gneg.out.err" >&2
       rc=1
-    elif [ ! -f "$MARKER" ]; then
-      printf 'FAIL: guard control - %s was not written with .better-dev/ moved aside, so nothing shows the command would otherwise have run\n' "$MARKER" >&2
+    elif grep -qF '[better-dev]' "$TMP/gneg.out" "$TMP/gneg.out.err"; then
+      printf 'FAIL: guard control - %s was not written and the run carries a [better-dev] refusal, so the guard decided in a fixture with no .better-dev/ and the repo gate leaked\n' "$MARKER" >&2
+      reply "$TMP/gneg.out" >&2
+      rc=1
+    else
+      printf 'FAIL: guard control - %s was not written with .better-dev/ moved aside, so nothing shows the command would otherwise have run (read the reply below, then bash.patterns in the omp config)\n' "$MARKER" >&2
       reply "$TMP/gneg.out" >&2
       rc=1
     fi
@@ -317,10 +329,8 @@ selftest() {
     : >"$MARKER"
     clear_marker
     [ ! -e "$MARKER" ]                            || { echo "FAIL: clear_marker leaves the observable behind - the control half needs it gone"; exit 1; }
-    if [ -f "$GUARD_MODULE" ]; then
-      [ -f "$CLONE/hooks/omp/bd-guard.ts" ]       || { echo "FAIL: guard module not in the fake clone"; exit 1; }
-      [ ! -L "$CLONE/hooks/omp/bd-guard.ts" ]     || { echo "FAIL: guard module linked - it would resolve the real clone"; exit 1; }
-    fi
+    [ -f "$CLONE/hooks/omp/bd-guard.ts" ]         || { echo "FAIL: guard module not in the fake clone"; exit 1; }
+    [ ! -L "$CLONE/hooks/omp/bd-guard.ts" ]       || { echo "FAIL: guard module linked - it would resolve the real clone"; exit 1; }
 
     out="$(cd "$FIX" && "$CLONE/hooks/bd-session-start")"
     case "$out" in *"$TOKEN"*) ;; *) echo "FAIL: fixture session hook emitted no token"; exit 1 ;; esac
@@ -404,31 +414,87 @@ selftest() {
       *) echo "FAIL: a hung omp was not reported as a hang: $o"; exit 1 ;;
     esac
     # Matched against the OMP premise skips by name, not against any line starting "skip:": the
-    # guard subject reports its own missing-module premise on the same run, and a hang assertion
-    # that trips on that line would fail for the one reason it is not about.
+    # guard subject can report its own tool-policy premise on the same run, and a hang assertion
+    # that tripped on that line would fail for the one reason it is not about.
     case "$o" in *"skip: omp"*|*"is not on PATH"*)
       echo "FAIL: a hung omp was reported as a missing omp premise: $o"; exit 1 ;;
     esac
 
-    # A guard module the clone does not have yet is a premise, not a failure - and the run has to
-    # NAME it, or a subject that never ran reads exactly like a subject that passed.
-    o="$(BD_GUARD_MODULE="$TMP/no-such-guard.ts" BD_OMP="$TMP/no-such-omp" "$SELF" 2>&1)" \
-                                                  || { echo "FAIL: a missing guard module did not exit 0"; exit 1; }
-    case "$o" in *"skip: no guard module at $TMP/no-such-guard.ts"*) ;;
-      *) echo "FAIL: a missing guard module did not name its premise: $o"; exit 1 ;;
+    # A clone missing the guard module is a hard failure, not a premise: bd-awareness.ts imports
+    # ./bd-guard.ts statically, so the bridge cannot load and the NOTE subject would fail too. No
+    # BD_OMP override here on purpose - the preflight has to be what stops the run, not an unrelated
+    # early return that would pass this assertion without ever reaching the module.
+    if o="$(BD_GUARD_MODULE="$TMP/no-such-guard.ts" "$SELF" 2>&1)"; then
+      echo "FAIL: a clone with no guard module exited 0: $o"; exit 1
+    fi
+    case "$o" in *"no guard module at $TMP/no-such-guard.ts"*) ;;
+      *) echo "FAIL: a missing guard module did not name itself: $o"; exit 1 ;;
     esac
-    case "$o" in *FAIL*) echo "FAIL: a missing guard module was reported as a failure: $o"; exit 1 ;; esac
+    case "$o" in *skip:*) echo "FAIL: a missing guard module was reported as a premise skip: $o"; exit 1 ;; esac
+
+    # The ORDER of the guard verdict, end to end, with a fake omp so it needs no model. Both cases
+    # below leave the same policy string in the transcript and differ only in the filesystem
+    # observable, which is exactly what has to decide the verdict. This fake writes the marker only
+    # where .better-dev/ is present, so one run drives the masked-failure shape in both halves: the
+    # positive half must FAIL on the written marker, the control half must FAIL on the missing one,
+    # and neither may skip. The note halves fail in both runs (a fake omp cannot know the fixture
+    # token), so these assertions read the guard lines rather than the exit status.
+    cat >"$TMP/omp-masked" <<'EOS'
+#!/bin/sh
+case "$*" in
+  *"printf marker"*)
+    printf 'Tool "bash" is blocked by user policy.\n'
+    [ -d .better-dev ] && : >"$PWD/marker.txt"
+    ;;
+  *) printf 'BDOMPLIVE\n' ;;
+esac
+exit 0
+EOS
+    chmod +x "$TMP/omp-masked"
+    o="$(BD_OMP="$TMP/omp-masked" BD_OMP_TIMEOUT=5 "$SELF" 2>&1 || true)"
+    case "$o" in *"FAIL: guard positive half - "*"was written"*) ;;
+      *) echo "FAIL: a written marker plus a policy string was not a positive-half failure: $o"; exit 1 ;;
+    esac
+    case "$o" in *"FAIL: guard control"*) ;;
+      *) echo "FAIL: a missing marker plus a policy string was not a control failure: $o"; exit 1 ;;
+    esac
+    case "$o" in *"skip: the local omp tool policy"*)
+      echo "FAIL: the transcript decided before the observable - a masked failure read as a premise skip: $o"; exit 1 ;;
+    esac
+
+    # The same policy string with NOTHING written is the real premise, and it still has to skip.
+    cat >"$TMP/omp-policy" <<'EOS'
+#!/bin/sh
+case "$*" in
+  *"printf marker"*) printf 'Tool "bash" is blocked by user policy.\n' ;;
+  *) printf 'BDOMPLIVE\n' ;;
+esac
+exit 0
+EOS
+    chmod +x "$TMP/omp-policy"
+    o="$(BD_OMP="$TMP/omp-policy" BD_OMP_TIMEOUT=5 "$SELF" 2>&1 || true)"
+    case "$o" in *"skip: the local omp tool policy"*) ;;
+      *) echo "FAIL: a policy deny with nothing written did not report the premise skip: $o"; exit 1 ;;
+    esac
+    case "$o" in *"FAIL: guard positive half"*|*"FAIL: guard control"*)
+      echo "FAIL: a policy deny with nothing written was reported as a guard failure: $o"; exit 1 ;;
+    esac
   ) && r=0 || r=1
   [ $r = 0 ] && echo "selftest OK" || { echo "selftest FAILED" >&2; exit 1; }
 }
 
 [ -f "$WIRE" ] || die "no wiring script at $WIRE"
 [ -f "$MODULE" ] || die "no bridge module at $MODULE"
+# Not a premise skip: bd-awareness.ts imports ./bd-guard.ts statically, so a clone without the
+# sibling cannot load the bridge at all and neither subject can be observed. Exiting 0 on that would
+# be the same silence the symlinked-module defect taught this check to refuse.
+[ -f "$GUARD_MODULE" ] || die "no guard module at $GUARD_MODULE - hooks/omp/bd-awareness.ts imports it, so omp cannot load the bridge without it"
+[ -f "$GUARD" ] || die "no policy script at $GUARD - the guard subject spawns it from the fake clone"
 command -v python3 >/dev/null 2>&1 || die "python3 is required (the wiring script is python3)"
 
 case "${1:-}" in
   "") check ;;
   selftest) selftest ;;
-  -h|--help) sed -n '2,35p' "$SELF"; exit 0 ;;
+  -h|--help) sed -n '2,39p' "$SELF"; exit 0 ;;
   *) die "unknown command '$1' (no argument to run the check | selftest)" ;;
 esac

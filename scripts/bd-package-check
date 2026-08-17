@@ -945,7 +945,16 @@ for a in hosts/*; do
   # export and never claimed to be a bridge, so driving it as one fails by construction and says
   # nothing about the adapter.
   br="hooks/$h/$(basename "$(bash -c 'source "$1" && printf %s "${bd_host_hook_settings-}"' _ "$a" 2>/dev/null)")"
-  if [ -f "$br" ]; then
+  # A host HAS a module bridge when hooks/<host>/ holds any .ts. Given one, a declared basename that
+  # resolves to no file is precisely the drift this check exists for - the installer would write a
+  # path nothing maintains - so it reports RED. Gating the whole block on `[ -f "$br" ]` alone made
+  # the check VANISH under exactly its own named mutation (rename the declared target and there was
+  # no ok, no bad, not even the not-compared note), which is worse than the check it replaced.
+  mods=""
+  for cand in "hooks/$h"/*.ts; do [ -f "$cand" ] && mods="$mods $cand"; done
+  if [ -n "$mods" ] && [ ! -f "$br" ]; then
+    bad "hosts/$h declares a hook target whose module is absent from hooks/$h/ (looked for '$br', found:$mods) - install.sh would write that path while no module maintains it, so the hook nudge plans against a file nothing exports" # prove-new: regression-guard at base hosts/omp declares bd-awareness.ts and that module is present, so this branch cannot fire there; it is the red-capability the same pass removed by gating on [ -f "$br" ], and it fires on the rename mutation the ok line's own claim rests on (mutation-proven)
+  elif [ -f "$br" ]; then
     bb="${br#hooks/}"
     # Same posture as the parse sweep and the hook-selftest loop: bun is the runtime the host itself
     # loads these modules with, so a machine without it is told the comparison did NOT run.
@@ -983,7 +992,7 @@ for a in hosts/*; do
     [ "$got_sk" = "$want_sk" ] || berrs="$berrs skills-dir(exports '$got_sk', hosts/$h declares '$want_sk')"
     [ "$got_hs" = "$want_hs" ] || berrs="$berrs hook-target(exports '$got_hs', hosts/$h declares '$want_hs')"
     if [ -z "$berrs" ]; then
-      ok "$bb exports the skills dir and hook target hosts/$h declares" # prove-new: regression-guard no host bridge exists at base, so this cannot come back red there; it holds today (mutation-proven - renaming hosts/omp's target reddens it and nothing else does) and catches the later adapter edit that moves a path the bridge restates
+      ok "$bb exports the skills dir and hook target hosts/$h declares" # prove-new: regression-guard no host bridge exists at base, so this cannot come back red there; it holds today and catches the later adapter edit that moves a path the bridge restates. Mutation-proven in two directions, which is why the sibling `bad` above exists: editing the path the bridge exports reddens THIS line, while renaming the target hosts/omp declares reddens the missing-module branch instead - before that branch was added the rename made the whole comparison vanish
     else
       bad "$bb and hosts/$h disagree:$berrs - install.sh writes the adapter's path while the bridge tells the awareness hooks another, so the hook nudge plans against a file nothing maintains"
     fi
