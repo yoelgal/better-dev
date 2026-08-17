@@ -280,17 +280,25 @@ check() {
     rc=1
   fi
 
-  # Guard control: same fixture, .better-dev/ still aside, marker cleared. Observable first here
-  # too, and this half has no premise to fall back on: the stimulus is the same command the positive
-  # half just ran, so a machine whose tool policy denies it has already skipped above and this block
-  # never runs. A marker missing anyway cannot tell a guard that refused from a session that never
-  # issued the command, which makes it a control failure and never a skip.
+  # Guard control: same fixture, .better-dev/ still aside, marker cleared. Observable first here too,
+  # but PAIRED with liveness: a run that wrote the marker and then wedged has not shown the command
+  # runs cleanly, and a bare marker test would report that wedge as success while making the liveness
+  # test below it unreachable. The tool-policy premise sits behind the observable rather than being
+  # absent: the two halves are separate model turns from the same ask, so the command the model
+  # actually wrote can differ between them and omp's bash.patterns matches what was written - a
+  # denial can land on this run alone, which the positive half's latch cannot have caught (it only
+  # latches when that half was denied AND its marker was absent). A marker missing for any other
+  # reason cannot tell a guard that refused from a session that never issued the command, which makes
+  # it a control failure.
   if [ "$guard" = 1 ]; then
     clear_marker
     omp_run "$FIX" "$ask" "$TMP/gneg.out" --auto-approve
-    if [ -f "$MARKER" ]; then
+    if [ -f "$MARKER" ] && [ "$HUNG" = 0 ]; then
       # The command ran with .better-dev/ aside, which is the whole of what this half asserts.
       :
+    elif [ ! -f "$MARKER" ] && policy_denied "$TMP/gneg.out" && [ "$HUNG" = 0 ]; then
+      guard=0
+      printf 'skip: the local omp tool policy denied "%s" in the control run, so the guard subject was not observed here - the halves are separate model turns, so a bash.patterns rule in the omp config can match the command this turn wrote and not the one the positive turn wrote\n' "$stim"
     elif [ "$RC" != 0 ] || [ "$HUNG" = 1 ]; then
       printf 'FAIL: the guard control run without .better-dev/ did not complete (%s), so the refusal above proves nothing\n' "$(why)" >&2
       reply "$TMP/gneg.out.err" >&2
@@ -432,13 +440,14 @@ selftest() {
     esac
     case "$o" in *skip:*) echo "FAIL: a missing guard module was reported as a premise skip: $o"; exit 1 ;; esac
 
-    # The ORDER of the guard verdict, end to end, with a fake omp so it needs no model. Both cases
-    # below leave the same policy string in the transcript and differ only in the filesystem
-    # observable, which is exactly what has to decide the verdict. This fake writes the marker only
-    # where .better-dev/ is present, so one run drives the masked-failure shape in both halves: the
-    # positive half must FAIL on the written marker, the control half must FAIL on the missing one,
-    # and neither may skip. The note halves fail in both runs (a fake omp cannot know the fixture
-    # token), so these assertions read the guard lines rather than the exit status.
+    # The ORDER of the guard verdict, end to end, with fake omps so none of it needs a model. Each
+    # case leaves a policy string in a guard transcript; what differs is the filesystem observable,
+    # which is what has to decide the verdict. The note halves fail in all of them (a fake omp cannot
+    # know the fixture token), so the assertions read the guard lines, not the exit status. The two
+    # skip messages are matched by their own wording, since which half skipped is the whole point.
+    #
+    # Case 1, the masked failure: the marker IS written and the policy string is there too. The
+    # positive half must FAIL on the observable and never explain it away with the transcript.
     cat >"$TMP/omp-masked" <<'EOS'
 #!/bin/sh
 case "$*" in
@@ -455,14 +464,16 @@ EOS
     case "$o" in *"FAIL: guard positive half - "*"was written"*) ;;
       *) echo "FAIL: a written marker plus a policy string was not a positive-half failure: $o"; exit 1 ;;
     esac
-    case "$o" in *"FAIL: guard control"*) ;;
-      *) echo "FAIL: a missing marker plus a policy string was not a control failure: $o"; exit 1 ;;
-    esac
-    case "$o" in *"skip: the local omp tool policy"*)
+    case "$o" in *"before the hook could see it"*)
       echo "FAIL: the transcript decided before the observable - a masked failure read as a premise skip: $o"; exit 1 ;;
     esac
+    # This fake writes nothing in the control run, so that half is legitimately the premise below.
+    case "$o" in *"in the control run"*) ;;
+      *) echo "FAIL: the control half did not reach its own tool-policy premise: $o"; exit 1 ;;
+    esac
 
-    # The same policy string with NOTHING written is the real premise, and it still has to skip.
+    # Case 2: the same policy string with NOTHING written is the real premise at the positive half,
+    # and it still has to skip - which is also what keeps case 1 from passing on a dead skip path.
     cat >"$TMP/omp-policy" <<'EOS'
 #!/bin/sh
 case "$*" in
@@ -473,11 +484,54 @@ exit 0
 EOS
     chmod +x "$TMP/omp-policy"
     o="$(BD_OMP="$TMP/omp-policy" BD_OMP_TIMEOUT=5 "$SELF" 2>&1 || true)"
-    case "$o" in *"skip: the local omp tool policy"*) ;;
+    case "$o" in *"before the hook could see it"*) ;;
       *) echo "FAIL: a policy deny with nothing written did not report the premise skip: $o"; exit 1 ;;
     esac
     case "$o" in *"FAIL: guard positive half"*|*"FAIL: guard control"*)
       echo "FAIL: a policy deny with nothing written was reported as a guard failure: $o"; exit 1 ;;
+    esac
+
+    # Case 3: the denial lands on the CONTROL run alone while the positive half is healthy. The two
+    # halves are separate model turns, so this is reachable and the positive latch cannot have caught
+    # it; it has to skip rather than report a control failure on a premise.
+    cat >"$TMP/omp-control-policy" <<'EOS'
+#!/bin/sh
+case "$*" in
+  *"printf marker"*)
+    if [ -d .better-dev ]; then printf 'REFUSED [better-dev] Obfuscated shell construct refused\n'
+    else printf 'Tool "bash" is blocked by user policy.\n'; fi
+    ;;
+  *) printf 'BDOMPLIVE\n' ;;
+esac
+exit 0
+EOS
+    chmod +x "$TMP/omp-control-policy"
+    o="$(BD_OMP="$TMP/omp-control-policy" BD_OMP_TIMEOUT=5 "$SELF" 2>&1 || true)"
+    case "$o" in *"in the control run"*) ;;
+      *) echo "FAIL: a control-only policy deny did not report the control premise: $o"; exit 1 ;;
+    esac
+    case "$o" in *"FAIL: guard control"*)
+      echo "FAIL: a control-only policy deny was reported as a control failure: $o"; exit 1 ;;
+    esac
+    case "$o" in *"FAIL: guard positive half"*)
+      echo "FAIL: a refused positive half was reported as a failure: $o"; exit 1 ;;
+    esac
+
+    # Case 4: the marker IS written and the run then WEDGES. A bare observable test would call that
+    # success and leave the liveness test below it unreachable, so the control pairs the two. The
+    # bound and the grace are cut to 1s so the watchdog fires in seconds.
+    cat >"$TMP/omp-wedged" <<'EOS'
+#!/bin/sh
+case "$*" in
+  *"printf marker"*) : >"$PWD/marker.txt"; sleep 30 ;;
+  *) printf 'BDOMPLIVE\n' ;;
+esac
+exit 0
+EOS
+    chmod +x "$TMP/omp-wedged"
+    o="$(BD_OMP="$TMP/omp-wedged" BD_OMP_TIMEOUT=1 BD_OMP_GRACE=1 "$SELF" 2>&1 || true)"
+    case "$o" in *"FAIL: the guard control run without .better-dev/ did not complete"*) ;;
+      *) echo "FAIL: a control run that wrote the marker and then wedged was not a failure: $o"; exit 1 ;;
     esac
   ) && r=0 || r=1
   [ $r = 0 ] && echo "selftest OK" || { echo "selftest FAILED" >&2; exit 1; }

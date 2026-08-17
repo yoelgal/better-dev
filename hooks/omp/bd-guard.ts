@@ -108,28 +108,26 @@ function str(value: unknown): string | undefined {
 // its own approval gate, so the guard judges exactly what omp gates on and never parses the
 // hashline patch language. Every other tool spawns nothing.
 //
-// Named coverage limits, deliberate: eval (python and JS source, and bd-guard's pattern set is
-// shell-shaped, so matching it would be fake coverage), hub with op "start", and a hashline
-// MV destination (not one of the paths omp derives).
+// Named coverage limits, deliberate. eval (python and JS source, and bd-guard's pattern set is
+// shell-shaped, so matching it would be fake coverage), hub with op "start", a hashline MV
+// destination (not one of the paths omp derives), and bash's env map.
+//
+// env is the one that was TRIED and reverted, so it stays named rather than re-attempted: omp's
+// bash input carries an env map, and `$X` with env {X: "rm -rf /"} does reach the shell fully
+// formed. But submitting the spelling `VAR=value command` was measured worse than not submitting
+// it, both ways round. Splicing any prefix - correctly escaped included - perturbs bd-guard's
+// quote-stripping lexer and can re-pair quotes with the command, so an `eval "$P" # '` that denies
+// on its own ALLOWS once a prefix is spliced in; and judging values on their own turns ordinary
+// prose into a deny (`MSG=fix the eval path git commit -m "$MSG"`), an unpromptable false refusal
+// on a commit message. bd-guard's own header says it stops accidents, not attacks - a plain `sed`
+// already defeats it - so judging env was serving a requirement the tool does not claim. The
+// command string is submitted unchanged, byte-identical to what Claude Code judges.
 function plan(event: GuardToolCallEvent | undefined): Check[] {
   const input = event?.input ?? {};
   switch (event?.toolName) {
     case "bash": {
       const command = str(input.command);
-      if (!command) return [];
-      // omp's bash input carries an env map, and a command of `$X` with env {X: "rm -rf /"}
-      // reaches the shell fully formed while the bare command string reads as harmless. So what
-      // gets submitted is the shell spelling of what will actually run, `VAR=value command`: a
-      // faithful rendering of this same call, never a fabricated one. A key that is not a shell
-      // name, or a value that is not a string, is not something omp will export.
-      const env = input.env;
-      const exported = env && typeof env === "object" && !Array.isArray(env)
-        ? Object.entries(env as Record<string, unknown>)
-            .filter(([name, value]) => typeof value === "string" && /^[A-Za-z_][A-Za-z0-9_]*$/.test(name))
-            .map(([name, value]) => `${name}=${String(value)}`)
-        : [];
-      const spelled = exported.length > 0 ? `${exported.join(" ")} ${command}` : command;
-      return [{ sub: "check-bash", stdin: JSON.stringify({ tool_input: { command: spelled } }) }];
+      return command ? [{ sub: "check-bash", stdin: JSON.stringify({ tool_input: { command } }) }] : [];
     }
     case "write": {
       const target = str(input.path);
@@ -149,10 +147,15 @@ function plan(event: GuardToolCallEvent | undefined): Check[] {
   }
 }
 
-// Raw stdout of a clean run, or undefined for SILENCE: no script, a non-zero exit, no output at
+// The guard's decision line, or undefined for SILENCE: no script, a non-zero exit, no output at
 // all, or the budget already gone. Silence allows, which is bd-guard's own documented check-*
 // posture. The tool input travels as JSON on stdin, never as argv, so no model text reaches a
 // shell.
+//
+// The decision is the LAST non-empty line, not the whole stream. bd-guard emits one line and
+// cannot prepend to it, but the spawn is `bash <guard> <sub>` and non-interactive bash sources
+// $BASH_ENV: a shim there that prints anything would otherwise make every guarded call on the
+// machine an undecodable refusal, which is a worse failure than the silent allow it replaced.
 function consult(guard: string, check: Check, cwd: string | undefined, deadline: number): string | undefined {
   const budget = deadline - Date.now();
   if (budget <= 0) return undefined;
@@ -163,8 +166,10 @@ function consult(guard: string, check: Check, cwd: string | undefined, deadline:
     encoding: "utf8",
     stdio: ["pipe", "pipe", "ignore"],
   });
-  if (res.status !== 0 || typeof res.stdout !== "string" || res.stdout.trim().length === 0) return undefined;
-  return res.stdout;
+  const out = typeof res.stdout === "string" ? res.stdout.trim() : "";
+  if (res.status !== 0 || out.length === 0) return undefined;
+  const lines = out.split("\n");
+  return lines[lines.length - 1].trim();
 }
 
 // bd-guard's decision envelope is Claude Code's PreToolUse shape. undefined means the answer
@@ -198,8 +203,22 @@ export function installGuard(pi: GuardHookApi, root: string, guard: string = joi
         const checks = plan(event);
         if (checks.length === 0) return undefined;
         let deadline = Date.now() + TIMEOUT_MS;
-        for (const check of checks) {
-          const raw = consult(guard, check, ctx?.cwd, deadline);
+        for (let i = 0; i < checks.length; i += 1) {
+          // A budget that ran out with paths STILL UNJUDGED is not silence either: at roughly
+          // 60ms a spawn, a padded batch of ~70 in-boundary paths with the real target last
+          // would spend the bound and walk the tail through unchecked. Allowing on the strength
+          // of the paths that did answer is the same mistake as reading a garbled refusal as an
+          // allow. A budget spent with nothing left to judge is fine, and stays an allow.
+          if (Date.now() >= deadline) {
+            const unjudged = checks.length - i;
+            return {
+              block: true,
+              reason: `[better-dev] the guard's ${TIMEOUT_MS}ms budget ran out with ${unjudged} of ${checks.length}`
+                + " paths still unjudged, so this call is refused rather than allowed on the strength of the"
+                + " paths that did answer. Split the batch into smaller edits.",
+            };
+          }
+          const raw = consult(guard, checks[i], ctx?.cwd, deadline);
           // Silence does not stop the call, and does not stop the remaining paths from being
           // judged: a flaky spawn on one path must not carry the next one across the boundary.
           if (raw === undefined) continue;
@@ -436,20 +455,6 @@ async function selftest(): Promise<void> {
     check(clean.calls.length === 0, `confirm was called ${clean.calls.length} times on a safe rm`);
     check(fx.spawns() === 1, `expected one guard spawn for a safe rm, got ${fx.spawns()}`);
 
-    // ...and what gets judged is the command omp will actually run. omp's bash input carries an
-    // env map, so `$X` with env {X: "<destructive>"} reaches the shell fully formed while the
-    // bare command reads as harmless. The submitted spelling is VAR=value command, so the same
-    // call draws the same ask it would have written inline.
-    const smuggled = operator(fx.repo, false);
-    r = await called(
-      handler(fx.wrapper),
-      { toolName: "bash", input: { command: "$X", env: { X: "rm -rf /some/dir" } } },
-      smuggled.ctx,
-    );
-    check(!r.threw, `a bash call carrying a destructive env value threw: ${String(r.threw)}`);
-    check(r.value?.block === true, "a destructive command smuggled through the env map was allowed");
-    check(smuggled.calls.length === 1, `expected one confirm for an env-smuggled command, got ${smuggled.calls.length}`);
-
     // 5. the edit surfaces are judged against the boundary: write's own path field, inside and
     // outside.
     r = await called(handler(fx.wrapper), { toolName: "write", input: { path: fx.outside } }, { cwd: fx.repo });
@@ -562,6 +567,44 @@ async function selftest(): Promise<void> {
     r = await called(handler(allowed), { toolName: "write", input: { path: fx.outside } }, { cwd: fx.repo });
     check(!r.threw, `an allowing guard threw: ${String(r.threw)}`);
     check(r.value === undefined, "the {} of an allow was refused");
+
+    // ...and stray bytes ahead of the decision are not a garbled answer. The spawn is
+    // `bash <guard> <sub>`, and non-interactive bash sources $BASH_ENV, so a shim there that
+    // prints would otherwise turn every guarded call on the machine into a refusal. The decision
+    // is the last line, and it is still read.
+    const noisy = script(join(fx.root, "noisy"), "printf 'sourced something\\n'\nprintf '{\"hookSpecificOutput\":{\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"[better-dev] noisy deny\"}}\\n'\nexit 0");
+    r = await called(handler(noisy), { toolName: "write", input: { path: fx.outside } }, { cwd: fx.repo });
+    check(!r.threw, `a guard preceded by stray output threw: ${String(r.threw)}`);
+    check(r.value?.block === true, "the decision was lost behind stray bytes on stdout");
+    check(r.value?.reason?.includes("noisy deny") === true, `the decision line was not the one decoded: ${String(r.value?.reason)}`);
+
+    // ...and the encoding path end to end, across BOTH programs: fx.wrapper execs the real
+    // scripts/bd-guard, so this case spans the producer's escape and this bridge's decode. A path
+    // carrying a control character used to make a real boundary DENY arrive as invalid JSON.
+    // Asserting the REASON is the whole point: `block === true` is vacuous here, since the same
+    // input blocks either way - as an undecodable refusal before the escape, as a boundary deny
+    // after it - and only the reason tells those two apart.
+    r = await called(handler(fx.wrapper), { toolName: "write", input: { path: join(fx.repo, "x\ny") } }, { cwd: fx.repo });
+    check(!r.threw, `a write to a path carrying a control character threw: ${String(r.threw)}`);
+    check(r.value?.block === true, "a write outside the boundary named with a control character was allowed");
+    check(
+      r.value?.reason?.includes("outside the scope boundary") === true,
+      `a real boundary deny did not survive the encoding round trip: ${String(r.value?.reason)}`,
+    );
+
+    // ...and a budget that runs out with paths STILL UNJUDGED refuses. A batch padded with
+    // in-boundary paths and the real target last would otherwise walk its tail through unchecked
+    // once the shared bound is spent. The cost of this case is the bound, not the path count: the
+    // loop stops the moment the budget is gone.
+    const padded = Array.from({ length: 400 }, (_unused, n) => join(fx.inside, `pad${n}.ts`));
+    const paddedStarted = Date.now();
+    r = await called(handler(fx.wrapper), { toolName: "edit", input: { paths: padded } }, { cwd: fx.repo });
+    const paddedElapsed = Date.now() - paddedStarted;
+    check(!r.threw, `a padded batch threw: ${String(r.threw)}`);
+    check(paddedElapsed >= TIMEOUT_MS, `the padded batch did not reach the bound, so the case proves nothing: ${paddedElapsed}ms`);
+    check(r.value?.block === true, "a batch whose budget ran out mid-way was allowed on the paths that did answer");
+    check(r.value?.reason?.includes("still unjudged") === true, `the refusal does not name the unjudged tail: ${String(r.value?.reason)}`);
+    check(fx.spawns() < padded.length, `the batch was not cut short by the bound: ${fx.spawns()} spawns`);
 
     // ...and a hung guard is bounded here, because the runner's own bound expiring IS a block.
     // The lower bound is the load-bearing half: without it a handler that spawned nothing at all

@@ -1254,10 +1254,26 @@ to a space) and refused at the consumer: silence still allows, but an answer tha
 be decoded now blocks. That split is the point - fail-open is for *not hearing*, never for *not
 understanding*.
 
-**What the guard judges is what will actually run.** omp's `bash` input carries an `env` map, so a
-command of `$X` with `env: {X: <destructive>}` reaches the shell fully formed while a bare-`command`
-submission sees nothing. The bridge therefore hands `check-bash` the shell spelling of the call,
-`VAR=value command`. A faithful rendering of the same invocation, not a fabricated one.
+**The command is submitted as written, and `env` is a named limit - tried, measured, reverted.** omp's
+`bash` input carries an `env` map, so `$X` with `env: {X: <destructive>}` does reach the shell fully
+formed while a bare-`command` submission sees nothing. Submitting the shell spelling `VAR=value
+command` looked like the faithful fix and was worse in both directions: any prefix perturbs
+`bd-guard`'s quote lexer, so a command that denies on its own is ALLOWED once spliced - even with the
+value correctly escaped - while ordinary prose in a value lands on the live side and draws an
+unpromptable deny on an everyday commit message. Judging values separately fails the other way: a
+value containing the word `eval` is refused. So the rendering is gone, `command` goes over as written,
+behaviour on that string is byte-identical to Claude Code's, and `env` joins the named limits.
+`bd-guard` stops accidents, not attacks - a plain `sed` already defeats it - so this was a requirement
+the tool never claimed. Recorded as tried-and-reverted in the code, so it is not re-attempted.
+
+**Two more producer defects surfaced with it, both pre-existing and both live on Claude Code.** A lone
+surrogate in a path or command was decoded, failed to re-encode on stdout, and the swallowed error left
+an EMPTY value - so `rm -rf /important # \ud800` was allowed where the same command asks, the surrogate
+sitting in a shell comment and changing nothing about what runs. And every byte-level `tr`, `sed` and
+`grep` in the deny path ran under the ambient locale, where an illegal byte sequence ABORTS the
+utility; with `set -euo pipefail` and a fail-open `ERR` trap, that abort is an allow. Both fixed in the
+script: the extractor pins its own streams and passes surrogates through, and the script pins `LC_ALL=C`
+for everything except that parse, which needs UTF-8 to accept a non-ASCII path at all.
 
 **An ask with no UI blocks.** Fail-open is the posture for *errors*; an ask is a decision, and a headless
 run has nobody to escalate to, so allowing it would self-approve the one class the policy escalates.

@@ -131,24 +131,44 @@ host that dispatches internal devices through its write tool (omp writes to `xd:
 device call if the boundary check reads the scheme as a path, so pass those through and cover the device's
 real paths under its own tool name.
 
-Three traps a porter hits after the wiring works, all found by review rather than by testing, and all
-about the *reader* of a decision rather than the decision itself. **Escape the envelope for control
-characters, not just quotes.** A decision reason embeds a model-chosen path, so a path carrying a
-newline emits a raw control character inside a JSON string; the envelope is then invalid, and any
-reader that treats a parse failure as no-decision performs the write. An attacker picks the filename.
-**Split silence from an answer you cannot read.** Fail-open belongs to *not hearing* the guard - a
-missing script, a non-zero exit, a bound that expired. An answer that arrived and would not decode is
-the opposite case and must refuse, or the two failures share one bucket and the safe one legitimizes
-the unsafe one. **And judge what will actually run, not the field that looks like the command.** Where
-the host's exec tool carries an environment map beside the command string, a command of `$X` with the
-payload in `env` reaches the shell fully formed while a bare-`command` submission sees nothing: feed
-the check the shell spelling of the whole call.
+Four traps a porter hits after the wiring works. None showed up in testing; two rounds of review found
+them, and three are about the *reader* of a decision rather than the decision itself.
 
-One more that only bites a host whose refusal can prompt: if the hook has its own time bound, the
-operator's deliberation must not be billed against it. omp's runner pauses a handler's budget across
-a UI dialog for exactly this reason, and a bridge that does not copy that behavior lets a slow answer
-silently spend the budget every later path needed - the batch then proceeds unjudged, which looks
-like an approval and is not one.
+**Make the decision survive a hostile filename.** The reason embeds a model-chosen path, so escaping
+only quotes is not enough: a newline emits a raw control character inside a JSON string, the envelope
+is invalid, and any reader that treats a parse failure as no-decision performs the write. The
+attacker picks the filename. Escape losslessly where the format has a spelling (`\n`, `\r`, `\t`) so
+the operator still reads the real path, and say so when anything else had to be replaced. Watch the
+*input* side of the same problem: better-dev's own extractor decoded a lone surrogate happily and
+then failed to re-encode it, the error was swallowed, and an empty value meant nothing to judge - so
+a destructive command with a surrogate in a trailing shell comment was allowed where the same command
+asks. And pin the locale (`LC_ALL=C`) around every byte-level `tr`, `sed` and `grep` on that string:
+under a UTF-8 locale they abort on an illegal byte sequence, and with `set -e` plus a fail-open trap
+an abort IS an allow.
+
+**Split silence from an answer you cannot read.** Fail-open belongs to *not hearing* the guard - a
+missing script, a non-zero exit, a bound that expired with nothing left to ask. An answer that arrived
+and would not decode is the opposite case and must refuse, or the two share one bucket and the safe
+failure legitimizes the unsafe one. Note which readers have that inversion: better-dev's omp bridge
+does, and Claude Code's own hook machinery is a second reader of the same envelope with unchanged
+behavior, so a future producer change would block loudly on one host and degrade quietly on the other.
+
+**Do not splice structured fields into a string a shell-shaped matcher will re-lex.** This one is a
+recorded failure, not advice: where the exec tool carries an environment map beside the command, a
+command of `$X` with the payload in `env` does reach the shell fully formed, and submitting the
+spelling `VAR=value command` looked like the faithful fix. Measured, it was worse in both directions -
+any prefix perturbs the quote lexer, so a command that denies on its own is allowed once spliced (even
+with the value correctly escaped), while ordinary prose in a value lands on the live side and draws an
+unpromptable deny on an everyday commit message. Judging the values separately fails too: an
+ordinary value containing the word `eval` is refused. Leave the extra field unjudged and name it a
+coverage limit. `bd-guard` stops accidents, not attacks - a plain `sed` already defeats it - so this
+was a requirement the tool never claimed.
+
+**Do not bill the operator's deliberation against the hook's own bound.** If the hook is time-bounded
+and its refusal can prompt, a slow human answer silently spends the budget the later paths needed, and
+the batch proceeds unjudged - which looks like an approval and is not one. omp's runner pauses a
+handler's budget across a UI dialog for exactly this reason; copy that. A bound that runs out while
+checks are still unjudged is not silence either: refuse, and name how many went unjudged.
 
 Unlike the awareness hooks above, these two read the tool call on stdin - that is how they see the command
 or the path to judge. So the host must pipe the tool-input JSON in; one that registers them without
