@@ -1249,10 +1249,22 @@ policy is still one `bd-mem remember`. The review round found the envelope's *en
 than its shape, and that is the one change the script did earn: `emit_decision` escaped only backslash
 and double quote while embedding a model-chosen path in the reason, so a path carrying a newline emitted
 invalid JSON, a real refusal reached the reader as no decision at all, and allow-by-default performed the
-write. Reachable by naming the file, on every host, Claude Code included. Fixed at the producer (C0 maps
-to a space) and refused at the consumer: silence still allows, but an answer that arrived and could not
-be decoded now blocks. That split is the point - fail-open is for *not hearing*, never for *not
-understanding*.
+write. Reachable by naming the file, on every host, Claude Code included. Fixed at the PRODUCER, which
+is also where it fixes Claude Code: the reason is escaped losslessly, the script pins `LC_ALL=C` so a
+byte-level `tr`/`sed`/`grep` cannot abort into the fail-open trap, and the extractor passes surrogates
+through instead of returning empty.
+
+**The consumer stays a pure translator, and that is a reversal worth recording.** A second review round
+had the bridge refuse on an answer it could not decode - silence allows, garble blocks. Round 3 measured
+it: a `$BASH_ENV` or PATH shim printing without a trailing newline, or from an EXIT trap, made every
+bash, write, edit and ast_edit call block in every session on the machine, in every repo including
+un-onboarded ones, with `bd-guard off` unable to lift it. A consumer that invents refusal semantics its
+producer never had turns each producer hiccup into a machine-wide outage. The same reasoning retired a
+second invented refusal, a batch that exhausted the hook's bound with paths still unjudged, which
+refused an ordinary multi-file edit at around 45 paths under normal parallel load on paths already
+judged clean. Anything unclear ALLOWS, as `bd-guard`'s charter always said; the encoder is where the
+effort goes. Three hardening rounds each opened the next hole, which is the recorded signal to question
+the defended default rather than defend it again.
 
 **The command is submitted as written, and `env` is a named limit - tried, measured, reverted.** omp's
 `bash` input carries an `env` map, so `$X` with `env: {X: <destructive>}` does reach the shell fully

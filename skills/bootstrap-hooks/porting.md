@@ -146,12 +146,17 @@ asks. And pin the locale (`LC_ALL=C`) around every byte-level `tr`, `sed` and `g
 under a UTF-8 locale they abort on an illegal byte sequence, and with `set -e` plus a fail-open trap
 an abort IS an allow.
 
-**Split silence from an answer you cannot read.** Fail-open belongs to *not hearing* the guard - a
-missing script, a non-zero exit, a bound that expired with nothing left to ask. An answer that arrived
-and would not decode is the opposite case and must refuse, or the two share one bucket and the safe
-failure legitimizes the unsafe one. Note which readers have that inversion: better-dev's omp bridge
-does, and Claude Code's own hook machinery is a second reader of the same envelope with unchanged
-behavior, so a future producer change would block loudly on one host and degrade quietly on the other.
+**Fix a mis-encoding at the encoder, and keep the bridge a pure translator.** The tempting move when a
+refusal arrives garbled is to make the reader refuse on it - silence allows, an answer you cannot
+decode blocks. That was built here and measured: a `$BASH_ENV` or PATH shim that prints without a
+trailing newline, or from an EXIT trap, then made EVERY guarded call block in every session on the
+machine, in every repo including un-onboarded ones, with no lever to lift it. A guard that invents
+refusal semantics its producer never had converts every producer hiccup into a machine-wide outage,
+and it is the wrong layer besides: the encoding bug was in `emit_decision`, where fixing it also
+fixed Claude Code. So anything unclear ALLOWS, and the encoder is where you spend the effort. The
+same reasoning retired a second invented refusal - a batch that exhausted the hook's time bound with
+paths still unjudged - which refused an ordinary multi-file edit at around 45 paths under normal
+parallel load, on paths the guard had already judged clean. A large batch is not a wedged guard.
 
 **Do not splice structured fields into a string a shell-shaped matcher will re-lex.** This one is a
 recorded failure, not advice: where the exec tool carries an environment map beside the command, a
