@@ -1307,3 +1307,92 @@ A selector path (`db.sqlite:table:key`, `archive.zip:member`) is forwarded verba
 boundary prefix check while no denylist glob can match it. And `bash` is spawned from `PATH`, so whoever
 can write your `PATH` or the clone's `scripts/` disarms the guard - accepted, identical to what
 `hooks.json` already ships, and an attacker with that write owns the session anyway.
+
+## D38 - links-batch harvest rulings: the block gains a device that acts on a reply (2026-08-17)
+
+32 submitted sources, 18 archive entries. Full plan at
+`raw/synthesis/2026-08-17-master-plan.md`, frontier read at `raw/synthesis/2026-08-17-frontier-read.md`.
+
+The operator re-submitted sources this archive already held, with two complaints: replies "too long and
+verbose and not pragmatic", and `/wait-what` invoked "too often". Neither was a capture failure. The
+26-row rule-by-rule diff against upstream grades our comms block STRONGER on two rows and narrower on
+one, so the rules were not the problem: **nothing applied them at the moment they would bind.** Four
+independent absences, and one regression.
+
+Of 155 traps, exactly one graded a produced reply (127), and it grades UNDER-reporting. The trap corpus
+was asymmetric against the failure being reported.
+
+**What was wrong, with receipts.**
+
+- No device acted on a drafted reply. Every mechanism the library shipped acted on the *block*: one
+  writer per destination, a 24-line cap, a single-home gate, a duplicate-copy trap, an authoring size
+  trap.
+- The installed copy had drifted from the shipped body. Two clauses in `docs/comms-block.md` had never
+  reached `~/.claude/CLAUDE.md`; four installed clauses were reworded or dropped. Nothing reconciles
+  them: the two writers (`BOOTSTRAP.md` globally, `/onboard` per repo) each run once, and
+  `skills/update/SKILL.md` step 2 explicitly skipped content-only changes.
+- `hooks/bd-subagent-start` carried no output shaping at all, so every fan-out report the operator reads
+  was unstyled by construction. SessionStart context never reaches a subagent, which is why the gap was
+  invisible.
+- The exploration carve-out written to answer upstream `ayghri/i-have-adhd` issue #42 had **regressed
+  out** of `docs/comms-block.md` while trap 127 still called it "the whole reason the carve-out line
+  exists" and a work-item contract still pinned it.
+
+**Rulings.** Full text in the master plan; the load-bearing ones:
+
+1. The block gains the length budget, argument completeness, the connected-reasoning clause and a
+   pre-send cut list, and pays for them by compressing existing rules and rewrapping wider - **the
+   24-line cap stands** and is still CI-gated. Raising it was put to the operator, not taken.
+2. Argument completeness lands in the block, never in `/wait-what`. A fact stated without its
+   consequence is the shape a reader answers with "wait, what?", so the fix belongs where it prevents
+   the failure. `/wait-what` is untouched and stays its size: growing a corrective against volume fails
+   the rule it teaches.
+3. `prose` and `i-have-adhd` genuinely conflict on form. Resolved by axis rather than by picking a
+   winner: lists for parallel enumerable facts, prose where items join with because, so, or but.
+   Neither source adopted whole.
+4. Brevity rules ship with their cheapest wrong obedience named. Shortness comes from cutting content,
+   never from clipping sentences.
+5. Dispatched workers get two shaping rules inline, asserted by the hook's own selftest. A pointer
+   would not be followed by a worker that never loads the file.
+6. `/update` reconciles copies as well as links. The host-global write stays operator-run per D26.
+
+**The harvest skill's own defect, and its fix.** The operator also reported that harvest passes "gloss
+over some things". The depth ladder was enforced by prose, and this batch measured the result: seven of
+fourteen extraction agents reported `DONE` over entries a mechanical check found incomplete, one missing
+`source.md` entirely. The fix is a **refusal at a stage boundary**, not a lint - no new `bd-*` script,
+per D35. Stage 2 will not open a dossier on an entry whose rungs are not dispositioned, and the grading
+is done by a reader other than the writer.
+
+The advisory alternative is a documented failure, not a hypothesis. Upstream `hyperresearch` built a
+26-rule lint over exactly this problem; its own code comment records a report that "shipped with 24
+hallucinated-quote errors because the orchestrator ran the lint separately and re-interpreted the
+failures as false positives - folding the rules in here removes that seam." Only 2 of its 26 rules bind,
+and they bind by being imported into the one command that produces the ship verdict.
+
+Three further ladder rulings: the disposition shape is pinned (`CAPTURED` or `SKIPPED: <closed-list
+reason>`), because the check produced false failures until it accepted the heading shapes agents
+actually use; each rung now names the specific miss it suffers rather than only its category, since "go
+deep" is an adjective; and a source's own evidence is read rather than its caption, because two sources
+this batch had evidence that undercut their framing.
+
+**Wayfinder, answered.** Neither obvious explanation holds: every rejection carries a recorded reason
+and all seven ruled-on landings are faithful, one stronger than its source. The gap is **scope** - D18
+harvested grilling, D23 harvested the handoff seam, and no batch ever took wayfinder's
+artifact-and-typing model as its subject. "HITL" appears zero times in this file's 1,309 prior lines,
+though the typing was captured verbatim in the first ingest and re-named in two more. Three ingests,
+zero dispositions. Carried to its own work-item rather than folded here (master plan H3).
+
+**Landed:** `docs/comms-block.md` (24/24 lines), `hooks/bd-subagent-start` plus its selftest,
+`skills/update/SKILL.md` step 2, `skills/source-harvest/SKILL.md` (ladder plus stage-2 audit gate),
+`skills/source-harvest/extraction-recipes.md` (single-browser batch reader after measuring 19 pages in
+82s against 4 in 10 minutes, silent-video keyframe recipe, fxtwitter fallback), traps 156 to 159.
+
+**Rejected, so it is not re-litigated:** paraphrase distillation (training-time, no prompt-level
+analogue); the `/effort` ladder as written (maps effort to job categories not judgment bands, and
+`codex -e high` is not a documented flag); the smart-zone and dumb-zone vocabulary (undefined in its
+source, and "handoff" is taken); "map once, not grep forever" as a claim (the replies falsify it for
+active repos); taste-encoded design skills as a better-dev default (kept as a composed host capability).
+
+**One lesson about this file.** The `groundwork` fog test shipped through a diff with no ruling and was
+re-proposed three weeks later as a fresh finding. A landing recorded only in a diff is invisible to the
+next harvest, which is why these rulings are numbered. Recorded as `harvest landing record`.
