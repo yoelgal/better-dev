@@ -1,28 +1,33 @@
 #!/usr/bin/env bash
-# bd-omp-runtime-check - prove a REAL omp session receives better-dev's awareness note.
+# bd-omp-runtime-check - prove a REAL omp session gets what better-dev's omp bridge installs: the
+# awareness note, and the guard that refuses a destructive tool call.
 #
 # Every other check on this install passed while a live omp session received nothing: the bridge was
 # installed as a symlink, and omp's hook discovery skips symlinked modules without a word. Only an
-# actual `omp -p` run observes the thing the install exists to deliver, so this check runs one.
+# actual `omp -p` run observes what the install exists to deliver, so this check runs one.
 #
-# It builds a throwaway fixture - a fake clone whose hooks/bd-session-start emits a UNIQUE random
-# token, plus a working dir carrying .better-dev/ - installs the real bridge module into the
-# fixture's own project-scoped .omp/hooks/pre/ through scripts/bd-omp-hook-wire, and asks a real omp
-# session for that token. Both halves are required: the token comes back with .better-dev/ present,
-# and does NOT come back with .better-dev/ moved aside. The positive half alone would pass on a
-# bridge that injects unconditionally.
+# It builds one throwaway fixture - a fake clone whose hooks/bd-session-start emits a UNIQUE random
+# token and whose scripts/ carries the real bd-guard, plus a working dir holding .better-dev/ and a
+# victim directory with a file in it - installs the real bridge module into the fixture's own
+# project-scoped .omp/hooks/pre/ through scripts/bd-omp-hook-wire, and asks real omp sessions for
+# two things. NOTE subject: the token. GUARD subject: `rm -rf <fixture>/victim`, run with the bash
+# tool. Each subject needs both halves: with .better-dev/ present the token comes back and the
+# victim survives the refusal; with .better-dev/ moved aside the token does not come back and the
+# victim is deleted. A positive half alone would pass on a bridge that fires unconditionally, and a
+# control that fails to delete would leave the survival above proving nothing.
 #
-#   bd-omp-runtime-check            run both halves (needs omp on PATH and model credentials)
-#   bd-omp-runtime-check selftest   fixture construction, both premise-skip paths, and the hang
+#   bd-omp-runtime-check            run both subjects (needs omp on PATH and model credentials)
+#   bd-omp-runtime-check selftest   fixture construction, every premise-skip path, and the hang
 #                                   path, offline
 #
-# A missing premise - no omp binary, no model - is reported and skipped, never failed. A run that
-# HANGS is not a missing premise and never skips: the probe below runs with the operator's GLOBAL
-# omp hooks loaded, so an omp that never returns is this bridge's own time bound failing, which is
-# the one failure this check exists to catch. BD_OMP overrides the binary; BD_OMP_TIMEOUT the
-# per-run bound in seconds; BD_OMP_GRACE the seconds the watchdog waits past that bound before it
-# kills the run. This needs network and a model, so it is a human/loop check, never a package-gate
-# check: the gate runs `selftest` only.
+# A missing premise - no omp binary, no model, no hooks/omp/bd-guard.ts - is reported and skipped,
+# never failed. A run that HANGS is not a missing premise and never skips: the probe below runs with
+# the operator's GLOBAL omp hooks loaded, so an omp that never returns is this bridge's own time
+# bound failing, which is the one failure this check exists to catch. BD_OMP overrides the binary;
+# BD_OMP_TIMEOUT the per-run bound in seconds; BD_OMP_GRACE the seconds the watchdog waits past that
+# bound before it kills the run; BD_GUARD_MODULE the guard module path (the selftest points it at a
+# missing file to exercise that premise skip). This needs network and a model, so it is a human/loop
+# check, never a package-gate check: the gate runs `selftest` only.
 #
 # Writes nothing outside its own tempdir and installs nothing into the operator's ~/.omp - the
 # bridge goes into the fixture's project-scoped hooks dir, which is what omp loads for that cwd.
@@ -33,6 +38,11 @@ HERE="$(cd "$(dirname "$SELF")" && pwd -P)"
 ROOT="$(cd "$HERE/.." && pwd -P)"
 WIRE="$HERE/bd-omp-hook-wire"
 MODULE="$ROOT/hooks/omp/bd-awareness.ts"
+# The guard subject's two moving parts: the bridge module that translates a decision, and the policy
+# script it spawns. The module path is overridable so the selftest can exercise its premise skip
+# without disturbing the clone.
+GUARD_MODULE="${BD_GUARD_MODULE:-$ROOT/hooks/omp/bd-guard.ts}"
+GUARD="$ROOT/scripts/bd-guard"
 
 OMP="${BD_OMP:-omp}"
 TIMEOUT="${BD_OMP_TIMEOUT:-120}"
@@ -47,6 +57,12 @@ ASK="What is the session passphrase? Reply with the passphrase alone, or exactly
 LIVE="BDOMPLIVE"
 LIVE_ASK="Reply with exactly: $LIVE"
 
+# Asked of the fixture session for the guard subject. The absolute victim path is pinned in the
+# prompt because a model left to pick its own target makes the observable non-deterministic, and a
+# relative path would resolve against whatever cwd the session chooses.
+RM_ASK_FMT='Use the bash tool to run exactly this command, with no changes and no other commands: rm -rf %s
+Then reply on one line: DELETED if the command ran, or REFUSED followed by the exact refusal text if the tool call was blocked.'
+
 # Every path writes inside this one dir and nowhere else, so the trap is the whole cleanup story.
 # It is global because an EXIT trap fires after the function that made the dir has returned, where
 # a `local` name no longer exists.
@@ -57,17 +73,35 @@ die() { printf 'bd-omp-runtime-check: %s\n' "$*" >&2; exit 1; }
 
 token() { printf 'BDOMP%s' "$(od -An -N6 -tx1 /dev/urandom | tr -d ' \n' | tr 'a-f' 'A-F')"; }
 
-# <root> - sets CLONE, FIX, TARGET, TOKEN.
+# The guard subject's target, rebuilt between its two halves. A directory with a file in it, named
+# nothing on bd-guard's safe-rm allowlist (node_modules, dist, build, coverage ...), so the shipped
+# patterns see a real recursive delete rather than a build clean they pass silently.
+make_victim() {
+  rm -rf "$VICTIM"
+  mkdir -p "$VICTIM"
+  printf 'runtime-check victim - deleting this dir is the tool call the guard must refuse\n' >"$VICTIM/keepme.txt"
+}
+
+# <root> - sets CLONE, FIX, TARGET, VICTIM, TOKEN.
 build_fixture() {
   local root="$1"
   CLONE="$root/clone"
   FIX="$root/fixture"
   TARGET="$FIX/.omp/hooks/pre/bd-awareness.ts"
+  VICTIM="$FIX/victim"
   TOKEN="$(token)"
-  mkdir -p "$CLONE/hooks/omp" "$FIX/.better-dev" "$FIX/.omp/hooks/pre" "$root/probe"
+  mkdir -p "$CLONE/hooks/omp" "$CLONE/scripts" "$FIX/.better-dev" "$FIX/.omp/hooks/pre" "$root/probe"
   # COPIED, never linked: the bridge resolves its clone from its own realpath, so a linked module
   # would resolve the real clone and run the real hooks instead of this fixture's.
   cp "$MODULE" "$CLONE/hooks/omp/bd-awareness.ts"
+  # The guard module rides along when the clone has one. When it does not, check() reports that
+  # premise and runs the note subject alone - a `cp` failure here would take both subjects down.
+  if [ -f "$GUARD_MODULE" ]; then cp "$GUARD_MODULE" "$CLONE/hooks/omp/bd-guard.ts"; fi
+  # The real policy script, copied for the same reason the module is: the bridge spawns
+  # <clone>/scripts/bd-guard by path, and the fixture has to exercise the shipped patterns rather
+  # than a stand-in that could ask where the real one allows.
+  cp "$GUARD" "$CLONE/scripts/bd-guard"
+  chmod +x "$CLONE/scripts/bd-guard"
   # Stand-in for hooks/bd-session-start: the same default output branch the bridge consumes
   # (top-level systemMessage + additionalContext), gated on .better-dev/ exactly as the real hook
   # is, carrying a token nothing else on this machine can know.
@@ -79,20 +113,24 @@ EOF
   printf '#!/bin/sh\nexit 0\n' >"$CLONE/hooks/bd-graphify-refresh-stale"
   chmod +x "$CLONE/hooks/bd-session-start" "$CLONE/hooks/bd-graphify-refresh-stale"
   printf 'runtime-check fixture - no overrides\n' >"$FIX/.better-dev/overrides.md"
+  make_victim
 }
 
 wire_fixture() { python3 "$WIRE" wire "$CLONE" "$TARGET"; }
 
-# <cwd> <prompt> <outfile> - sets RC, and HUNG=1 when the watchdog had to kill the run. The two are
-# different faults and the caller has to tell them apart: a fast non-zero is a machine that cannot
-# start omp, while a kill is a run that never returned. Bounded twice over: omp's own --max-time,
-# and this watchdog for a run that wedges before that bound is armed (`timeout` is not on every
-# macOS PATH).
-# --no-tools and --no-skills keep the run cheap and deterministic; neither touches hook discovery.
+# <cwd> <prompt> <outfile> [omp flag...] - sets RC, and HUNG=1 when the watchdog had to kill the
+# run. The two are different faults and the caller has to tell them apart: a fast non-zero is a
+# machine that cannot start omp, while a kill is a run that never returned. Bounded twice over:
+# omp's own --max-time, and this watchdog for a run that wedges before that bound is armed
+# (`timeout` is not on every macOS PATH).
+# --no-skills keeps every run cheap and touches neither hook discovery nor the tool set. --no-tools
+# is passed per call instead of here: the note subject wants no tools, and the guard subject needs
+# them, because a guard with nothing to guard observes nothing.
 omp_run() {
   local dir="$1" prompt="$2" out="$3" pid waited=0
+  shift 3
   HUNG=0
-  ( cd "$dir" && "$OMP" -p --no-session --no-tools --no-skills --max-time="$TIMEOUT" "$prompt" ) \
+  ( cd "$dir" && "$OMP" -p --no-session --no-skills "$@" --max-time="$TIMEOUT" "$prompt" ) \
     >"$out" 2>"$out.err" &
   pid=$!
   while kill -0 "$pid" 2>/dev/null; do
@@ -120,7 +158,17 @@ why() {
 }
 
 check() {
-  local status rc=0
+  local status rc=0 guard=1 ask
+  # Named before the omp premise so a clone with no guard module says so even on a machine that also
+  # cannot run omp, and so the note subject still runs: the module is a premise for its own subject,
+  # never for both.
+  if [ ! -f "$GUARD_MODULE" ]; then
+    guard=0
+    printf 'skip: no guard module at %s - the guard subject cannot be observed without it\n' "$GUARD_MODULE"
+  elif [ ! -f "$GUARD" ]; then
+    guard=0
+    printf 'skip: no policy script at %s - the guard subject spawns it\n' "$GUARD"
+  fi
   command -v "$OMP" >/dev/null 2>&1 \
     || { printf 'skip: %s is not on PATH - a real omp binary is this check'"'"'s premise\n' "$OMP"; return 0; }
   TMP="$(mktemp -d)"
@@ -133,7 +181,7 @@ check() {
 
   # Liveness before either assertion: without it a machine with no credentials would read as a
   # bridge that injects nothing, which is the same word for two very different states.
-  omp_run "$TMP/probe" "$LIVE_ASK" "$TMP/live.out"
+  omp_run "$TMP/probe" "$LIVE_ASK" "$TMP/live.out" --no-tools
   if [ "$HUNG" = 1 ]; then
     # NOT a premise skip, and this is the whole point of the distinction. The probe runs in a dir
     # with no project-scoped bridge but with the operator's GLOBAL ~/.omp/agent/hooks/pre/ loaded,
@@ -150,7 +198,7 @@ check() {
     return 0
   fi
 
-  omp_run "$FIX" "$ASK" "$TMP/pos.out"
+  omp_run "$FIX" "$ASK" "$TMP/pos.out" --no-tools
   if [ "$RC" != 0 ] || [ "$HUNG" = 1 ]; then
     printf 'FAIL: the omp run with .better-dev/ present %s\n' "$(why)" >&2
     reply "$TMP/pos.out.err" >&2
@@ -162,10 +210,36 @@ check() {
     rc=1
   fi
 
+  # Guard subject, positive: the same fixture, WITH tools, asked for one destructive command. The
+  # whole observable is a tool call that does not happen, so --no-tools would make it unobservable.
+  # --auto-approve takes omp's OWN approval gate out of the experiment: a print-mode session has
+  # nobody to answer that prompt, so without it the command would not run for a reason that has
+  # nothing to do with better-dev, and the control half below could never delete anything. It does
+  # not disarm hooks - a tool_call handler's block is not an approval prompt.
+  ask="$(printf "$RM_ASK_FMT" "$VICTIM")"
+  if [ "$guard" = 1 ]; then
+    omp_run "$FIX" "$ask" "$TMP/gpos.out" --auto-approve
+    if [ "$RC" != 0 ] || [ "$HUNG" = 1 ]; then
+      printf 'FAIL: the guarded omp run with .better-dev/ present %s\n' "$(why)" >&2
+      reply "$TMP/gpos.out.err" >&2
+      rc=1
+    elif [ ! -d "$VICTIM" ]; then
+      printf 'FAIL: guard positive half - the session deleted %s, so the destructive tool call ran unguarded\n' "$VICTIM" >&2
+      reply "$TMP/gpos.out" >&2
+      rc=1
+    elif ! grep -qF '[better-dev]' "$TMP/gpos.out" "$TMP/gpos.out.err"; then
+      # The surviving dir is the load-bearing observable; the marker is what distinguishes a guard
+      # that refused the call from a model that simply never made it.
+      printf 'FAIL: guard positive half - %s survived but no refusal carrying [better-dev] reached the session, so nothing shows the guard is why\n' "$VICTIM" >&2
+      reply "$TMP/gpos.out" >&2
+      rc=1
+    fi
+  fi
+
   # Same fixture, same wiring, .better-dev/ moved aside: a bridge that injects unconditionally is
   # as broken as one that never injects, and the positive half cannot tell them apart.
   mv "$FIX/.better-dev" "$FIX/.better-dev-off"
-  omp_run "$FIX" "$ASK" "$TMP/neg.out"
+  omp_run "$FIX" "$ASK" "$TMP/neg.out" --no-tools
   if [ "$RC" != 0 ] || [ "$HUNG" = 1 ] || [ ! -s "$TMP/neg.out" ]; then
     printf 'FAIL: the control run without .better-dev/ did not complete (%s), so its silence proves nothing\n' "$(why)" >&2
     reply "$TMP/neg.out.err" >&2
@@ -176,8 +250,28 @@ check() {
     rc=1
   fi
 
+  # Guard control: same fixture, .better-dev/ still aside, victim rebuilt. A control that leaves the
+  # victim standing cannot tell a guard that refused from a session that never issued the command,
+  # so an undeleted victim here is a control failure and never a pass.
+  if [ "$guard" = 1 ]; then
+    make_victim
+    omp_run "$FIX" "$ask" "$TMP/gneg.out" --auto-approve
+    if [ "$RC" != 0 ] || [ "$HUNG" = 1 ]; then
+      printf 'FAIL: the guard control run without .better-dev/ did not complete (%s), so the survival above proves nothing\n' "$(why)" >&2
+      reply "$TMP/gneg.out.err" >&2
+      rc=1
+    elif [ -d "$VICTIM" ]; then
+      printf 'FAIL: guard control - %s still exists with .better-dev/ moved aside, so nothing shows the command would otherwise have run\n' "$VICTIM" >&2
+      reply "$TMP/gneg.out" >&2
+      rc=1
+    fi
+  fi
+
   [ $rc = 0 ] || return 1
   printf 'PASS: a real omp session received the note - positive half: token %s came back with .better-dev/ present; negative half: the same fixture with .better-dev/ moved aside returned no token\n' "$TOKEN"
+  if [ "$guard" = 1 ]; then
+    printf 'PASS: a real omp session was refused the destructive command - positive half: rm -rf %s was blocked and the dir survived; control half: the same run with .better-dev/ moved aside deleted it\n' "$VICTIM"
+  fi
 }
 
 selftest() {
@@ -188,6 +282,18 @@ selftest() {
     [ -x "$CLONE/hooks/bd-session-start" ]        || { echo "FAIL: fixture session hook not executable"; exit 1; }
     [ -f "$CLONE/hooks/omp/bd-awareness.ts" ]     || { echo "FAIL: bridge module not in the fake clone"; exit 1; }
     [ ! -L "$CLONE/hooks/omp/bd-awareness.ts" ]   || { echo "FAIL: bridge module linked - it would resolve the real clone"; exit 1; }
+    cmp -s "$GUARD" "$CLONE/scripts/bd-guard" \
+                                                  || { echo "FAIL: the fake clone's bd-guard is not the real policy script"; exit 1; }
+    [ -x "$CLONE/scripts/bd-guard" ]              || { echo "FAIL: the fake clone's bd-guard is not executable"; exit 1; }
+    [ ! -L "$CLONE/scripts/bd-guard" ]            || { echo "FAIL: bd-guard linked - the bridge spawns <clone>/scripts/bd-guard by path"; exit 1; }
+    { [ -d "$VICTIM" ] && [ -f "$VICTIM/keepme.txt" ]; } \
+                                                  || { echo "FAIL: the victim dir holds no file for the destructive command to delete"; exit 1; }
+    make_victim
+    [ -f "$VICTIM/keepme.txt" ]                   || { echo "FAIL: make_victim does not rebuild over an existing victim - the control half needs it to"; exit 1; }
+    if [ -f "$GUARD_MODULE" ]; then
+      [ -f "$CLONE/hooks/omp/bd-guard.ts" ]       || { echo "FAIL: guard module not in the fake clone"; exit 1; }
+      [ ! -L "$CLONE/hooks/omp/bd-guard.ts" ]     || { echo "FAIL: guard module linked - it would resolve the real clone"; exit 1; }
+    fi
 
     out="$(cd "$FIX" && "$CLONE/hooks/bd-session-start")"
     case "$out" in *"$TOKEN"*) ;; *) echo "FAIL: fixture session hook emitted no token"; exit 1 ;; esac
@@ -198,6 +304,23 @@ selftest() {
     mv "$FIX/.better-dev-off" "$FIX/.better-dev"
     ( cd "$FIX" && "$CLONE/hooks/bd-graphify-refresh-stale" ) \
                                                   || { echo "FAIL: fixture graphify hook is not a clean no-op"; exit 1; }
+
+    # The fixture's own victim path has to trip the shipped policy, and stop tripping it without
+    # .better-dev/ - both offline. A victim named `build` or `dist` lands on bd-guard's safe-rm
+    # allowlist, and then the live guard half would watch a deletion the policy never meant to stop.
+    d="$(cd "$FIX" && printf '{"tool_input":{"command":"rm -rf %s"}}' "$VICTIM" | bash "$CLONE/scripts/bd-guard" check-bash)"
+    case "$d" in *'"permissionDecision":"ask"'*) ;;
+      *) echo "FAIL: bd-guard does not stop 'rm -rf $VICTIM': $d"; exit 1 ;;
+    esac
+    case "$d" in *'[better-dev]'*) ;;
+      *) echo "FAIL: the decision the live half greps for carries no [better-dev] marker: $d"; exit 1 ;;
+    esac
+    mv "$FIX/.better-dev" "$FIX/.better-dev-off"
+    d="$(cd "$FIX" && printf '{"tool_input":{"command":"rm -rf %s"}}' "$VICTIM" | bash "$CLONE/scripts/bd-guard" check-bash)"
+    case "$d" in '{}') ;;
+      *) echo "FAIL: bd-guard still decides with .better-dev/ moved aside, so the guard control could never delete: $d"; exit 1 ;;
+    esac
+    mv "$FIX/.better-dev-off" "$FIX/.better-dev"
 
     s="$(wire_fixture || true)"
     [ "$s" = wired ]                              || { echo "FAIL: wire reported '$s', not 'wired'"; exit 1; }
@@ -238,7 +361,21 @@ selftest() {
     case "$o" in *"FAIL: omp never returned"*) ;;
       *) echo "FAIL: a hung omp was not reported as a hang: $o"; exit 1 ;;
     esac
-    case "$o" in *skip:*) echo "FAIL: a hung omp was reported as a premise skip: $o"; exit 1 ;; esac
+    # Matched against the OMP premise skips by name, not against any line starting "skip:": the
+    # guard subject reports its own missing-module premise on the same run, and a hang assertion
+    # that trips on that line would fail for the one reason it is not about.
+    case "$o" in *"skip: omp"*|*"is not on PATH"*)
+      echo "FAIL: a hung omp was reported as a missing omp premise: $o"; exit 1 ;;
+    esac
+
+    # A guard module the clone does not have yet is a premise, not a failure - and the run has to
+    # NAME it, or a subject that never ran reads exactly like a subject that passed.
+    o="$(BD_GUARD_MODULE="$TMP/no-such-guard.ts" BD_OMP="$TMP/no-such-omp" "$SELF" 2>&1)" \
+                                                  || { echo "FAIL: a missing guard module did not exit 0"; exit 1; }
+    case "$o" in *"skip: no guard module at $TMP/no-such-guard.ts"*) ;;
+      *) echo "FAIL: a missing guard module did not name its premise: $o"; exit 1 ;;
+    esac
+    case "$o" in *FAIL*) echo "FAIL: a missing guard module was reported as a failure: $o"; exit 1 ;; esac
   ) && r=0 || r=1
   [ $r = 0 ] && echo "selftest OK" || { echo "selftest FAILED" >&2; exit 1; }
 }
@@ -250,6 +387,6 @@ command -v python3 >/dev/null 2>&1 || die "python3 is required (the wiring scrip
 case "${1:-}" in
   "") check ;;
   selftest) selftest ;;
-  -h|--help) sed -n '2,28p' "$SELF"; exit 0 ;;
+  -h|--help) sed -n '2,33p' "$SELF"; exit 0 ;;
   *) die "unknown command '$1' (no argument to run the check | selftest)" ;;
 esac
