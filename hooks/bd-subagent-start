@@ -13,6 +13,14 @@
 #
 # This note is intentionally short and NOT the onboarding body: a focused worker
 # should do its briefed task, not re-run repo onboarding.
+#
+# One shaping clause rides along, and it is not decoration. A dispatched worker's
+# report is read by a human at least as often as the parent's own turns are, and
+# nothing else reaches it: the comms block lands in the host's entry file, which
+# SessionStart context (and therefore that block) never reaches a subagent. Without
+# this line every fan-out report in the library is unstyled by construction, which is
+# a distribution gap rather than a style preference. Keep it to the two rules that
+# bind hardest on a report; the full block stays in docs/comms-block.md.
 
 set -euo pipefail
 
@@ -42,7 +50,7 @@ emit() {
   local root="$1" note context escaped
   note=""
   [ -s "$root/.better-dev/overrides.md" ] && note=" Honor .better-dev/overrides.md before any built-in default."
-  context="You're a worker dispatched in a better-dev repo. The project's practices still apply to your task - see /orchestrating-agents for how dispatch and file handoffs work.${note} Do the specific task you were briefed with; no need to re-run onboarding. Hit friction - a dead-end tool call, a broken doc link, a flaky command? Log it in one line and keep going: .better-dev/bin/bd-mem papercut add \"<what happened>\"."
+  context="You're a worker dispatched in a better-dev repo. The project's practices still apply to your task - see /orchestrating-agents for how dispatch and file handoffs work.${note} Do the specific task you were briefed with; no need to re-run onboarding. Report the outcome first, at the length the finding deserves, and cut anything that does not change what the reader does next. Hit friction - a dead-end tool call, a broken doc link, a flaky command? Log it in one line and keep going: .better-dev/bin/bd-mem papercut add \"<what happened>\"."
   escaped=$(escape_for_json "$context")
 
   # Codex reads a nested hookSpecificOutput too, but also surfaces a top-level
@@ -67,6 +75,7 @@ if [ "${1:-}" = "selftest" ]; then
   printf '%s' "$out" | jq -e '.hookSpecificOutput.hookEventName == "SubagentStart"' >/dev/null || fail "wrong hookEventName"
   printf '%s' "$out" | grep -q "orchestrating-agents" || fail "missing dispatch pointer"
   printf '%s' "$out" | grep -q "papercut add" || fail "missing papercut nudge"
+  printf '%s' "$out" | grep -q "Report the outcome first" || fail "missing report-shaping clause (a dispatched worker gets no comms block any other way)"
 
   out="$(cd "$tmp/proj" && PLUGIN_DATA=x "$SELF")"; printf '%s' "$out" | jq -e '.systemMessage' >/dev/null || fail "Codex systemMessage missing"
 
