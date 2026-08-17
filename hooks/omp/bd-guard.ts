@@ -342,6 +342,8 @@ interface Fixture {
   inside: string;
   outside: string;
   wrapper: string;
+  // The wrapper's tally file, so a case needing a fake guard of its own can still be counted.
+  log: string;
   spawns(): number;
   clear(): void;
 }
@@ -385,6 +387,7 @@ function fixture(): Fixture {
     inside,
     outside: join(repo, "outside.ts"),
     wrapper,
+    log,
     spawns: () => (existsSync(log) ? readFileSync(log, "utf8").split("\n").filter(line => line.length > 0).length : 0),
     clear: () => writeFileSync(log, ""),
   };
@@ -616,9 +619,19 @@ async function selftest(): Promise<void> {
     // judged 75 paths clean, with no prompt and no override, and it fired in un-onboarded repos
     // too. A batch that outruns the budget runs its tail unguarded, which is the coverage limit
     // this bridge accepts rather than becoming the thing that stops ordinary work.
-    const padded = Array.from({ length: 100 }, (_unused, n) => join(fx.inside, `pad${n}.ts`));
+    //
+    // Exhaustion is guaranteed by CONSTRUCTION, not by racing the clock. The fake sleeps a known
+    // 200ms per call and allows, so 30 paths cost 6s of wall time against the 5s bound on any
+    // machine, and a slower machine only makes the premise more true. Padding real bd-guard spawns
+    // instead made this case flaky by construction: it passed on one CI run and failed on the next
+    // over identical code, because 100 spawns finished in 4003ms on a runner faster than the
+    // author's laptop. The premise check below is what caught that, and it stays: without it a fast
+    // machine would judge the whole batch inside the bound and the case would report that an
+    // exhausted budget allows while never having exhausted anything.
+    const slow = script(join(fx.root, "slow"), `printf 'x\\n' >> "${fx.log}"\nsleep 0.2\nprintf '{}\\n'`);
+    const padded = Array.from({ length: 30 }, (_unused, n) => join(fx.inside, `pad${n}.ts`));
     const paddedStarted = Date.now();
-    r = await called(handler(fx.wrapper), { toolName: "edit", input: { paths: padded } }, { cwd: fx.repo });
+    r = await called(handler(slow), { toolName: "edit", input: { paths: padded } }, { cwd: fx.repo });
     const paddedElapsed = Date.now() - paddedStarted;
     check(!r.threw, `a padded batch threw: ${String(r.threw)}`);
     check(paddedElapsed >= TIMEOUT_MS, `the padded batch did not reach the bound, so the case proves nothing: ${paddedElapsed}ms`);
@@ -628,13 +641,18 @@ async function selftest(): Promise<void> {
     // ...and a hung guard is bounded here, because the runner's own bound expiring IS a block.
     // The lower bound is the load-bearing half: without it a handler that spawned nothing at all
     // would return instantly and pass having run no guard.
+    //
+    // The upper bound discriminates against ONE alternative - the child running to completion, at
+    // 30s - so it only has to sit well below that. It used to read 6000, which left 1000ms for
+    // process setup and reaping and was the same clock-race shape that made the padded case flaky
+    // on a loaded runner. Widened, with the discriminating power unchanged.
     const hung = script(join(fx.root, "hung"), "sleep 30");
     const started = Date.now();
     r = await called(handler(hung), { toolName: "bash", input: { command: "rm -rf /some/dir" } }, { cwd: fx.repo });
     const elapsed = Date.now() - started;
     check(!r.threw, `a hung guard threw: ${String(r.threw)}`);
     check(r.value === undefined, "a hung guard blocked the call");
-    check(elapsed >= TIMEOUT_MS - 500 && elapsed < 6000, `a hung guard was not bounded: returned in ${elapsed}ms`);
+    check(elapsed >= TIMEOUT_MS - 500 && elapsed < 10000, `a hung guard was not bounded: returned in ${elapsed}ms`);
 
     // ...and the hostile-context half the sibling module already asserts. ctx is omp's object,
     // not ours: a cwd that is not a string makes spawnSync throw ERR_INVALID_ARG_TYPE, and a
