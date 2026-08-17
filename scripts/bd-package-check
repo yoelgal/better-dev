@@ -939,8 +939,22 @@ echo "== host bridges (exported paths vs adapter) =="
 for a in hosts/*; do
   [ -f "$a" ] || continue
   h="$(basename "$a")"
-  for br in "hooks/$h"/*.ts; do
-    [ -f "$br" ] || continue
+  # The bridge is the module the adapter DECLARES, never every .ts sitting beside it: install.sh
+  # writes bd_host_hook_settings, so that is the one file whose exported env has to agree with it.
+  # A sibling the bridge COMPOSES - the enforcement half, hooks/omp/bd-guard.ts - has no default
+  # export and never claimed to be a bridge, so driving it as one fails by construction and says
+  # nothing about the adapter.
+  br="hooks/$h/$(basename "$(bash -c 'source "$1" && printf %s "${bd_host_hook_settings-}"' _ "$a" 2>/dev/null)")"
+  # A host HAS a module bridge when hooks/<host>/ holds any .ts. Given one, a declared basename that
+  # resolves to no file is precisely the drift this check exists for - the installer would write a
+  # path nothing maintains - so it reports RED. Gating the whole block on `[ -f "$br" ]` alone made
+  # the check VANISH under exactly its own named mutation (rename the declared target and there was
+  # no ok, no bad, not even the not-compared note), which is worse than the check it replaced.
+  mods=""
+  for cand in "hooks/$h"/*.ts; do [ -f "$cand" ] && mods="$mods $cand"; done
+  if [ -n "$mods" ] && [ ! -f "$br" ]; then
+    bad "hosts/$h declares a hook target whose module is absent from hooks/$h/ (looked for '$br', found:$mods) - install.sh would write that path while no module maintains it, so the hook nudge plans against a file nothing exports" # prove-new: regression-guard at base hosts/omp declares bd-awareness.ts and that module is present, so this branch cannot fire there; it is the red-capability the same pass removed by gating on [ -f "$br" ], and it fires on the rename mutation the ok line's own claim rests on (mutation-proven)
+  elif [ -f "$br" ]; then
     bb="${br#hooks/}"
     # Same posture as the parse sweep and the hook-selftest loop: bun is the runtime the host itself
     # loads these modules with, so a machine without it is told the comparison did NOT run.
@@ -948,7 +962,10 @@ for a in hosts/*; do
       printf '  \033[33m•\033[0m bun is not on PATH, so %s exported paths were NOT compared with hosts/%s\n' "$bb" "$h"; continue; }
     bd="$(cd "$(mktemp -d)" && pwd -P)"
     mkdir -p "$bd/home" "$bd/proj" "$bd/clone/hooks/$h"
-    cp "$br" "$bd/clone/hooks/$h/"
+    # The whole host dir, not the bridge alone: a bridge may import a sibling module from it, and a
+    # one-file copy leaves that import unresolvable - which reads as a bridge exporting nothing
+    # rather than as a fixture that never loaded it.
+    cp "hooks/$h"/*.ts "$bd/clone/hooks/$h/"
     printf '#!/usr/bin/env bash\nprintf "%%s\\n%%s\\n" "${BD_HOST_SKILLS_DIR-}" "${BD_HOST_HOOK_SETTINGS-}" > "$BD_BRIDGE_ENV"\nprintf "{}\\n"\n' \
       > "$bd/clone/hooks/bd-session-start"
     chmod +x "$bd/clone/hooks/bd-session-start"
@@ -975,12 +992,12 @@ for a in hosts/*; do
     [ "$got_sk" = "$want_sk" ] || berrs="$berrs skills-dir(exports '$got_sk', hosts/$h declares '$want_sk')"
     [ "$got_hs" = "$want_hs" ] || berrs="$berrs hook-target(exports '$got_hs', hosts/$h declares '$want_hs')"
     if [ -z "$berrs" ]; then
-      ok "$bb exports the skills dir and hook target hosts/$h declares" # prove-new: regression-guard no host bridge exists at base, so this cannot come back red there; it holds today (mutation-proven - renaming hosts/omp's target reddens it and nothing else does) and catches the later adapter edit that moves a path the bridge restates
+      ok "$bb exports the skills dir and hook target hosts/$h declares" # prove-new: regression-guard no host bridge exists at base, so this cannot come back red there; it holds today and catches the later adapter edit that moves a path the bridge restates. Mutation-proven in two directions, which is why the sibling `bad` above exists: editing the path the bridge exports reddens THIS line, while renaming the target hosts/omp declares reddens the missing-module branch instead - before that branch was added the rename made the whole comparison vanish
     else
       bad "$bb and hosts/$h disagree:$berrs - install.sh writes the adapter's path while the bridge tells the awareness hooks another, so the hook nudge plans against a file nothing maintains"
     fi
     rm -rf "$bd"
-  done
+  fi
 done
 
 # The five status words ARE the caller-facing contract of a wiring script: install.sh and

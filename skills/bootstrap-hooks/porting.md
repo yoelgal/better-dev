@@ -102,23 +102,86 @@ de-duplicating is why the scripts branch to emit exactly one, rather than emitti
 ## Porting the enforcement hooks
 
 The awareness hooks inject a note; the enforcement pair (`bd-guard check-bash`, `bd-guard check-edit`)
-vetoes or asks before a tool runs, so a host earns them only if it exposes a pre-tool-execution hook
-that can return a deny/ask decision. If it does: register `check-bash` on the Bash-equivalent tool and
-`check-edit` on the edit/write tools, then confirm the host's decision envelope - `bd-guard` emits
-Claude Code's nested `hookSpecificOutput.{permissionDecision, permissionDecisionReason}` shape, and a
-host that reads a different field ignores the decision without an error (the same silent-failure trap
-as the `SubagentStart` shape above). Add the host's envelope as a branch in the script's `emit_decision`
-and prove both decisions land: pipe one destructive fixture through `check-bash` and one out-of-boundary
-edit through `check-edit`, and confirm the host asks and denies rather than proceeding.
+vetoes or asks before a tool runs, so a host earns them only if it exposes a pre-tool-execution hook that
+can return a deny/ask decision. Claude Code's is `PreToolUse`: `check-bash` on the Bash-equivalent tool,
+`check-edit` on the edit/write tools. omp's is a `tool_call` handler, which earns the pair too - it returns
+`{block: true, reason}` to refuse the call, and `ctx.hasUI` with `ctx.ui.confirm(title, message)` gives the
+ask somewhere to land.
 
-Unlike the awareness hooks above, these two read the tool call on stdin - that is how they see the
-command or the file path to judge. So the host must pipe the tool-input JSON to the hook; a host that
-registers them without feeding stdin stalls every tool call to the hook timeout (the `INPUT="$(cat)"`
-read blocks with nothing to read). Confirm the host pipes tool input before registering them, and keep
-the timeout short (the `hooks.json` entries set one) so a misconfigured host fails to a bounded delay
-rather than a hang.
+Whether a host needs its own branch in `bd-guard`'s `emit_decision` is the same distinction `## Output
+shapes` above draws: a host that parses the decision off the hook's stdout needs one, a host whose bridge
+parses needs none, because the bridge is ours. So `bd-guard` gained no omp case - omp's enforcement bridge
+translates Claude's `hookSpecificOutput.{permissionDecision, permissionDecisionReason}` shape unchanged.
 
-A host with no pre-execution hook gets prose policy: record it
+Three translations, none of them a free choice. A `deny` becomes a blocked call carrying the reason. An
+`ask` with a UI becomes a confirm, and a declined confirm blocks, because a refused prompt read as
+approval is worse than no gate at all. An `ask` with no UI blocks too: a headless session has nobody to
+escalate to, so allowing it would silently self-approve the one class the policy escalates.
+
+omp inverts the failure direction, and that is what makes this the dangerous hook to port: the `tool_call`
+gotcha above holds with its consequence turned up. The runner converts a handler that throws or outruns its
+bound into a block itself, so a broken guard denies every bash, write and edit on the machine rather than
+failing open the way `bd-guard`'s check-* subcommands do. Hence a guard bound well inside the runner's, and
+every path total.
+
+Where the tools are not named `Bash`/`Edit`/`Write`, feed `check-bash` the command string and `check-edit`
+the paths the host already derives for its own approval gate, never a re-parse of its patch language - one
+parser, judging what the host itself gates on. A target carrying a URI scheme is not a filesystem path: a
+host that dispatches internal devices through its write tool (omp writes to `xd://<device>`) denies every
+device call if the boundary check reads the scheme as a path, so pass those through and cover the device's
+real paths under its own tool name.
+
+Four traps a porter hits after the wiring works. None showed up in testing; two rounds of review found
+them, and three are about the *reader* of a decision rather than the decision itself.
+
+**Make the decision survive a hostile filename.** The reason embeds a model-chosen path, so escaping
+only quotes is not enough: a newline emits a raw control character inside a JSON string, the envelope
+is invalid, and any reader that treats a parse failure as no-decision performs the write. The
+attacker picks the filename. Escape losslessly where the format has a spelling (`\n`, `\r`, `\t`) so
+the operator still reads the real path, and say so when anything else had to be replaced. Watch the
+*input* side of the same problem: better-dev's own extractor decoded a lone surrogate happily and
+then failed to re-encode it, the error was swallowed, and an empty value meant nothing to judge - so
+a destructive command with a surrogate in a trailing shell comment was allowed where the same command
+asks. And pin the locale (`LC_ALL=C`) around every byte-level `tr`, `sed` and `grep` on that string:
+under a UTF-8 locale they abort on an illegal byte sequence, and with `set -e` plus a fail-open trap
+an abort IS an allow.
+
+**Fix a mis-encoding at the encoder, and keep the bridge a pure translator.** The tempting move when a
+refusal arrives garbled is to make the reader refuse on it - silence allows, an answer you cannot
+decode blocks. That was built here and measured: a `$BASH_ENV` or PATH shim that prints without a
+trailing newline, or from an EXIT trap, then made EVERY guarded call block in every session on the
+machine, in every repo including un-onboarded ones, with no lever to lift it. A guard that invents
+refusal semantics its producer never had converts every producer hiccup into a machine-wide outage,
+and it is the wrong layer besides: the encoding bug was in `emit_decision`, where fixing it also
+fixed Claude Code. So anything unclear ALLOWS, and the encoder is where you spend the effort. The
+same reasoning retired a second invented refusal - a batch that exhausted the hook's time bound with
+paths still unjudged - which refused an ordinary multi-file edit at around 45 paths under normal
+parallel load, on paths the guard had already judged clean. A large batch is not a wedged guard.
+
+**Do not splice structured fields into a string a shell-shaped matcher will re-lex.** This one is a
+recorded failure, not advice: where the exec tool carries an environment map beside the command, a
+command of `$X` with the payload in `env` does reach the shell fully formed, and submitting the
+spelling `VAR=value command` looked like the faithful fix. Measured, it was worse in both directions -
+any prefix perturbs the quote lexer, so a command that denies on its own is allowed once spliced (even
+with the value correctly escaped), while ordinary prose in a value lands on the live side and draws an
+unpromptable deny on an everyday commit message. Judging the values separately fails too: an
+ordinary value containing the word `eval` is refused. Leave the extra field unjudged and name it a
+coverage limit. `bd-guard` stops accidents, not attacks - a plain `sed` already defeats it - so this
+was a requirement the tool never claimed.
+
+**Do not bill the operator's deliberation against the hook's own bound.** If the hook is time-bounded
+and its refusal can prompt, a slow human answer silently spends the budget the later paths needed, and
+the batch proceeds unjudged - which looks like an approval and is not one. omp's runner pauses a
+handler's budget across a UI dialog for exactly this reason; copy that. What the bound running out
+must NOT do is refuse: that was built and measured, and the paragraph above carries the result.
+
+Unlike the awareness hooks above, these two read the tool call on stdin - that is how they see the command
+or the path to judge. So the host must pipe the tool-input JSON in; one that registers them without
+feeding stdin stalls every tool call to the hook timeout (`INPUT="$(cat)"` blocks with nothing to read).
+Confirm that before registering them, and keep the timeout short (the `hooks.json` entries set one) so a
+misconfigured host costs a bounded delay rather than a hang.
+
+A host with genuinely no pre-execution hook gets prose policy: record it
 (`.better-dev/bin/bd-mem remember "safety-enforcement: prose"`) and say so - a named coverage limit,
 not a failure. The loop's escalation discipline carries the same policy alone there.
 

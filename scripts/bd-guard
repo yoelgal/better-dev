@@ -34,6 +34,16 @@
 # script structure is better-dev's own.
 set -euo pipefail
 
+# Every pattern here matches BYTES in a model-chosen string, so the locale is not cosmetic: under a
+# UTF-8 locale `tr` and `sed` ABORT on an illegal byte sequence, and under `set -euo pipefail` plus
+# the ERR trap below that abort turns a refusal into an allow. A model only has to name a file with
+# one invalid byte. C also pins [:upper:], [:lower:] and [a-zA-Z] to the bytes the code names rather
+# than the ambient locale's idea of them, which is the convention bd-gfx already records.
+#
+# The one place that must NOT inherit it is the JSON parse: an ASCII codec would refuse a non-ASCII
+# path outright, so extract_field pins python3's own streams to UTF-8 explicitly instead.
+export LC_ALL=C
+
 case "$0" in /*) SELF="$0" ;; *) SELF="$PWD/$0" ;; esac
 die() { printf 'bd-guard: %s\n' "$*" >&2; exit 1; }
 
@@ -42,8 +52,27 @@ emit_allow() { printf '{}\n'; }
 # Claude Code's PreToolUse decision envelope. Another host's shape goes here as a new branch -
 # the wrong envelope fails silently (see bootstrap-hooks/porting.md).
 emit_decision() { # emit_decision ask|deny <message>
-  local msg
-  msg="$(printf '%s' "$2" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+  local msg raw
+  # The reason embeds a model-chosen path, so it can carry anything a filename can. Unescaped, a
+  # newline or a tab emits a raw control character inside a JSON string: that is invalid JSON, a real
+  # refusal reaches the host as an answer it cannot parse, and any reader treating a parse failure as
+  # "no decision" performs the write. An attacker-triggerable bypass on every host, reachable by
+  # naming the file.
+  #
+  # The three that have a JSON spelling are escaped LOSSLESSLY, because the operator answering a
+  # prompt has to read the real path - the same form hooks/bd-session-start already uses. Anything
+  # else in C0 has no spelling here and is mapped to a space, with the reason SAYING SO: the mapping
+  # is not injective (a tab and a space render alike), and telling a reader the wrong filename
+  # silently is worse than telling them a substitution happened. That sweep also kills ESC (0x1B),
+  # so no ANSI escape reaches the prompt. LC_ALL=C pins tr to the bytes named rather than the
+  # ambient locale's idea of them, and it runs before sed because sed is line-based, so an embedded
+  # newline would survive it - the parameter expansions handle those three first for the same reason.
+  raw="$2"
+  msg="${raw//\\/\\\\}"; msg="${msg//\"/\\\"}"
+  msg="${msg//$'\n'/\\n}"; msg="${msg//$'\r'/\\r}"; msg="${msg//$'\t'/\\t}"
+  raw="$msg"
+  msg="$(printf '%s' "$msg" | tr '\001-\037' ' ')"
+  [ "$msg" = "$raw" ] || msg="$msg (control characters in this path were replaced for display)"
   printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"%s","permissionDecisionReason":"%s"}}\n' "$1" "$msg"
 }
 
@@ -71,10 +100,19 @@ bd_dir() {
 # (it handles escaped quotes like "echo \"hi\" && rm -rf src"); the grep/sed path only stops at the
 # first bare " and would truncate such a value, so it is the FALLBACK, used only when python3 is
 # absent. Empty on failure - the caller allows (fail open).
+#
+# surrogatepass is load-bearing, not tidiness. A host serializes a lone surrogate as \ud800, Python's
+# decoder accepts it, and print() then raised UnicodeEncodeError encoding stdout - which 2>/dev/null
+# swallowed, leaving an EMPTY value, which every caller reads as nothing to judge and allows. So
+# `rm -rf /important # \ud800` was allowed where `rm -rf /important` asks, and `eval "$P" # \ud800`
+# was allowed where the same command denies: the surrogate sits in a shell comment, so it changes
+# nothing about what runs and everything about what the guard sees. Reproduced on both check
+# subcommands before this line existed. The grep/sed fallback never had the defect - it reads the
+# escape as six literal characters and matches the rest.
 extract_field() {
   local v
   if command -v python3 >/dev/null 2>&1; then
-    v="$(printf '%s' "$INPUT" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("tool_input",{}).get(sys.argv[1],""))' "$1" 2>/dev/null || true)"
+    v="$(printf '%s' "$INPUT" | python3 -c 'import sys,json; sys.stdin.reconfigure(encoding="utf-8", errors="surrogatepass"); sys.stdout.reconfigure(encoding="utf-8", errors="surrogatepass"); print(json.load(sys.stdin).get("tool_input",{}).get(sys.argv[1],""))' "$1" 2>/dev/null || true)"
   else
     v="$(printf '%s' "$INPUT" | grep -o "\"$1\"[[:space:]]*:[[:space:]]*\"[^\"]*\"" | head -1 | sed 's/.*:[[:space:]]*"//;s/"$//' || true)"
   fi
@@ -441,6 +479,42 @@ selftest() {
   out="$(cd "$repo" && jedit "$repo/.env.production" | "$SELF" check-edit)"
   printf '%s' "$out" | grep -q '"permissionDecision":"ask"' || fail "prose-form denylist did not enforce .env*"
   printf '%s' "$out" | grep -q '\.env\*' || fail "prose-form denylist ask does not name the glob"
+
+  # A decision whose reason embeds a model-chosen path is still VALID JSON when that path carries a
+  # control character. This is the bypass shape, not a formatting nicety: the host serializes the
+  # tool input correctly, so a newline arrives here as a real newline in $path, and an unescaped one
+  # inside the reason made the whole envelope unparseable - a refusal the reader then sees as no
+  # decision at all, and performs the write. Asserted through a parser, because grep cannot tell
+  # valid JSON from a string that merely looks close. Last case in the run: it leaves a boundary set.
+  if command -v python3 >/dev/null 2>&1; then
+    ( cd "$repo" && "$SELF" scope "$repo/src" --ttl 0 ) >/dev/null
+    for ctl in 'x\ny' 'x\ty' 'x\ry'; do
+      out="$(cd "$repo" && jedit "$repo/$ctl" | "$SELF" check-edit)"
+      printf '%s' "$out" | grep -q '"permissionDecision":"deny"' \
+        || fail "a path carrying a control character escaped the boundary deny: $out"
+      printf '%s' "$out" | python3 -c 'import sys,json; json.load(sys.stdin)' 2>/dev/null \
+        || fail "the decision envelope for a control-character path is not valid JSON: $out"
+      # Lossless, not collapsed: the operator answering a prompt has to read the real path, so the
+      # decoded reason carries the character itself rather than a space standing in for it.
+      printf '%s' "$out" | python3 -c '
+import sys, json
+r = json.load(sys.stdin)["hookSpecificOutput"]["permissionDecisionReason"]
+sys.exit(0 if any(c in r for c in "\n\r\t") and "replaced for display" not in r else 1)' 2>/dev/null \
+        || fail "the reason lost the control character instead of escaping it: $out"
+    done
+
+    # A LONE SURROGATE is the other half of the same bypass, and it hides in the producer rather
+    # than the envelope: python3 decodes \ud800 happily and then failed to ENCODE it on stdout, the
+    # error was swallowed, the extracted value came back empty, and empty means nothing to judge.
+    # So a destructive command with a surrogate in a trailing shell COMMENT - which changes nothing
+    # about what the shell runs - was allowed where the same command asks or denies.
+    out="$(cd "$repo" && jbash 'rm -rf /important # \ud800' | "$SELF" check-bash)"
+    printf '%s' "$out" | grep -q '"permissionDecision":"ask"' \
+      || fail "a lone surrogate in a trailing comment hid a recursive delete from check-bash: $out"
+    out="$(cd "$repo" && jbash 'eval \"$P\" # \ud800' | "$SELF" check-bash)"
+    printf '%s' "$out" | grep -q '"permissionDecision":"deny"' \
+      || fail "a lone surrogate in a trailing comment hid an obfuscated-shell construct: $out"
+  fi
 
   rm -rf "$d"
   echo "bd-guard selftest: ok"

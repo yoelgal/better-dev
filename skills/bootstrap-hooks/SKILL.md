@@ -93,13 +93,12 @@ note still lands.
 
 omp earns per-worker re-injection without a subagent-spawn event, because it exposes none: the bridge
 annotates the `task` tool's batch context on the way through, so a dispatched omp worker reads the
-same note the session got. Two things it does not get. `bd-guard`'s `PreToolUse` pair is not wired,
-even though omp's `tool_call` event can veto and the port is therefore possible - that pair enforces
-a per-repo blast-radius policy `/guardrails-install` owns, which is why `bd-hook-wire`'s `WANT` table
-excludes it for every host. And a named omp profile is not covered: the adapter's paths are the
-default `~/.omp/agent`, so an operator running a profile gets skills linked into a dir that profile
-never reads. Both are coverage limits to name, the same posture as hermes and codex declining a hook
-config nobody has verified on a real machine.
+same note the session got. It earns `bd-guard`'s pair too, for the same reason - one `tool_call`
+handler can refuse a call outright, so the enforcement half rides the same bridge rather than the
+`PreToolUse` config omp does not have (`porting.md`, and D37). What omp does not get is a named
+profile: the adapter's paths are the default `~/.omp/agent`, so an operator running a profile gets
+skills linked into a dir that profile never reads. That is a coverage limit to name, the same posture
+as hermes and codex declining a hook config nobody has verified on a real machine.
 
 ## How this fits
 

@@ -29,9 +29,13 @@ shippable before a release.
   back to a copy where symlinks aren't available. It's idempotent. Updating is a `git pull` in the
   clone. It registers the SessionStart/SubagentStart awareness hooks too, through `scripts/bd-hook-wire`,
   into each host's verified machine-global hook config (`bd_host_hook_settings` in `hosts/<name>`). It
-  deliberately omits the `bd-guard` PreToolUse entries: those enforce a *repo's* blast-radius policy and
-  belong to `/guardrails-install`, not to a machine-global install. A host with no verified hook config
-  (`codex`, `hermes`) still declines by design and says so; that is a named gap, not a silent one.
+  omits the `bd-guard` PreToolUse entries from a host's hook CONFIG: those enforce a *repo's*
+  blast-radius policy and belong to `/guardrails-install`, not to a machine-global config write.
+  A host whose hooks are modules is the exception that proves the rule rather than breaking it - omp
+  has no such config to write, so its bridge carries both halves and the enforcement one arrives with
+  the install (D37), still reading the same per-repo recorded policy at check time.
+  A host with no verified hook config (`codex`, `hermes`) still declines by design and says so; that
+  is a named gap, not a silent one.
 
 better-dev used to also ship as a Claude Code plugin, added through a self-hosted marketplace manifest
 at the monorepo root. Both are deleted (D32): the marketplace existed only because the monorepo

@@ -1226,3 +1226,84 @@ clones. `bd-migrate-branch-model` deliberately never merges for you, so nothing 
 
 The historical record is annotated, not rewritten: `docs/DECISIONS.md`, `docs/PLAN.md` and
 `docs/TRAPS.md` describe decisions that were really made about `staging`, and they still say so.
+
+## D37 - enforcement reaches omp through the bridge that already runs the awareness hooks (2026-08-17)
+
+`bd-guard check-bash` and `check-edit` were registered as Claude Code `PreToolUse` entries only, so every
+destructive command and out-of-boundary edit in an omp session ran unchecked and an onboarded repo could
+only record `safety-enforcement: prose` - the fallback reserved for a host with **no** pre-execution hook.
+omp has one: a `tool_call` handler may return `{block, reason}`, and `ctx.ui.confirm` is a real prompt.
+
+**A second module in the clone, not a second installed hook.** The guard is its own module under
+`hooks/omp/`, and the awareness bridge omp already loads calls it. Nothing about the install changes: one
+stub, one target path, no wiring-script, `--verify` or uninstall edit, and no migration for a stub already
+on a machine. Its every path is total, because omp's runner converts a handler that throws or outruns its
+bound into a block itself - a non-total guard would deny every guarded tool call on the machine. The
+rejected alternative was a second install target so enforcement could be removed without losing
+awareness; it grows five surfaces to buy an on-off switch nobody asked for, and `bd-guard off` is not
+that switch - it lifts the scope boundary and leaves the destructive-command and denylist asks armed.
+
+**The bridge translates; the policy stays in `bd-guard`.** It maps the script's existing Claude-shaped
+envelope onto omp's result type and adds no pattern and no denylist of its own, so widening the recorded
+policy is still one `bd-mem remember`. The review round found the envelope's *encoding* broken rather
+than its shape, and that is the one change the script did earn: `emit_decision` escaped only backslash
+and double quote while embedding a model-chosen path in the reason, so a path carrying a newline emitted
+invalid JSON, a real refusal reached the reader as no decision at all, and allow-by-default performed the
+write. Reachable by naming the file, on every host, Claude Code included. Fixed at the PRODUCER, which
+is also where it fixes Claude Code: the reason is escaped losslessly, the script pins `LC_ALL=C` so a
+byte-level `tr`/`sed`/`grep` cannot abort into the fail-open trap, and the extractor passes surrogates
+through instead of returning empty.
+
+**The consumer stays a pure translator, and that is a reversal worth recording.** A second review round
+had the bridge refuse on an answer it could not decode - silence allows, garble blocks. Round 3 measured
+it: a `$BASH_ENV` or PATH shim printing without a trailing newline, or from an EXIT trap, made every
+bash, write, edit and ast_edit call block in every session on the machine, in every repo including
+un-onboarded ones, with `bd-guard off` unable to lift it. A consumer that invents refusal semantics its
+producer never had turns each producer hiccup into a machine-wide outage. The same reasoning retired a
+second invented refusal, a batch that exhausted the hook's bound with paths still unjudged, which
+refused an ordinary multi-file edit at around 45 paths under normal parallel load on paths already
+judged clean. Anything unclear ALLOWS, as `bd-guard`'s charter always said; the encoder is where the
+effort goes. Three hardening rounds each opened the next hole, which is the recorded signal to question
+the defended default rather than defend it again.
+
+**The command is submitted as written, and `env` is a named limit - tried, measured, reverted.** omp's
+`bash` input carries an `env` map, so `$X` with `env: {X: <destructive>}` does reach the shell fully
+formed while a bare-`command` submission sees nothing. Submitting the shell spelling `VAR=value
+command` looked like the faithful fix and was worse in both directions: any prefix perturbs
+`bd-guard`'s quote lexer, so a command that denies on its own is ALLOWED once spliced - even with the
+value correctly escaped - while ordinary prose in a value lands on the live side and draws an
+unpromptable deny on an everyday commit message. Judging values separately fails the other way: a
+value containing the word `eval` is refused. So the rendering is gone, `command` goes over as written,
+behaviour on that string is byte-identical to Claude Code's, and `env` joins the named limits.
+`bd-guard` stops accidents, not attacks - a plain `sed` already defeats it - so this was a requirement
+the tool never claimed. Recorded as tried-and-reverted in the code, so it is not re-attempted.
+
+**Two more producer defects surfaced with it, both pre-existing and both live on Claude Code.** A lone
+surrogate in a path or command was decoded, failed to re-encode on stdout, and the swallowed error left
+an EMPTY value - so `rm -rf /important # \ud800` was allowed where the same command asks, the surrogate
+sitting in a shell comment and changing nothing about what runs. And every byte-level `tr`, `sed` and
+`grep` in the deny path ran under the ambient locale, where an illegal byte sequence ABORTS the
+utility; with `set -euo pipefail` and a fail-open `ERR` trap, that abort is an allow. Both fixed in the
+script: the extractor pins its own streams and passes surrogates through, and the script pins `LC_ALL=C`
+for everything except that parse, which needs UTF-8 to accept a non-ASCII path at all.
+
+**An ask with no UI blocks.** Fail-open is the posture for *errors*; an ask is a decision, and a headless
+run has nobody to escalate to, so allowing it would self-approve the one class the policy escalates.
+
+**A URI-scheme write target is not judged as a path.** omp dispatches its internal devices as writes to
+`xd://<device>`, so reading that scheme as a filesystem path would deny every device call in every
+session; a device's real paths are judged under the device's own tool name instead.
+
+**Its coverage limits are named rather than papered over.** The `eval` tool is unjudged, because
+`bd-guard`'s pattern set is shell-shaped and matching python or JS source against it would be fake
+coverage that also mis-asks on ordinary prose. A `hub` start op is unjudged, because it launches a
+process outside the bash tool and its command never reaches `check-bash`. A hashline move destination is
+unjudged, because it is not among the paths omp derives for its own approval gate, and judging exactly
+that surface is the point - not a second, wider parser to keep in step. A target behind a URI scheme is
+unjudged, and the cost is real rather than zero: a scoped session can still put bytes outside its
+boundary through `local://`, `memory://`, `artifact://` or `ssh://`. Narrowing the rule to `xd:` alone
+was considered and rejected, because it would deny a `local://` handoff - a working orchestration path.
+A selector path (`db.sqlite:table:key`, `archive.zip:member`) is forwarded verbatim, so it satisfies the
+boundary prefix check while no denylist glob can match it. And `bash` is spawned from `PATH`, so whoever
+can write your `PATH` or the clone's `scripts/` disarms the guard - accepted, identical to what
+`hooks.json` already ships, and an attacker with that write owns the session anyway.
