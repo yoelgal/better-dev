@@ -2449,9 +2449,9 @@ on it.
   line in a shape the grader did not expect is waved through as close enough, which is the same
   interpretation the mechanical shape exists to remove.
 
-Proves source-harvest's depth gate is a refusal rather than a reminder. The advisory version is the
-documented failure: upstream `hyperresearch` built a 26-rule lint over this exact problem and its own
-code comment records a report that "shipped with 24 hallucinated-quote errors because the orchestrator
-ran the lint separately and re-interpreted the failures as false positives". In one better-dev batch
-seven of fourteen extraction agents reported DONE over entries that a mechanical check found were
-missing a whole section, one of them missing `source.md` entirely.
+Proves source-harvest's depth gate is a refusal rather than a reminder. The advisory version is a
+documented failure and not a hypothesis: the upstream receipt is quoted at the decision point in
+`skills/source-harvest/SKILL.md`, where a lint that the agent ran on itself had its failures
+re-interpreted as false positives. better-dev reproduced the same shape in one batch, where seven of
+fourteen extraction agents reported DONE over entries a mechanical check found incomplete, one of them
+missing `source.md` entirely.

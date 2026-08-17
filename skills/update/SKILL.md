@@ -89,22 +89,60 @@ written at install. Nothing else reconciles them - the two writers (`BOOTSTRAP.m
 operator experiences it as the practices not working rather than as a stale file. Compare the marked
 block against the shipped body wherever one is installed:
 
+Guard it on the clone first, because step 1 reports a failed resolve to stderr without exiting: with
+`$clone` empty, `diff` cannot open the shipped body, exits 2, and an exit-code test that only
+distinguishes zero from non-zero prints `STALE` for every entry file it finds.
+
 ```bash
-for entry in "$HOME/.claude/CLAUDE.md" ./CLAUDE.md ./CLAUDE.local.md ./AGENTS.md; do
+[ -f "$clone/docs/comms-block.md" ] || { echo "clone unresolved - skipping the block check"; return 2>/dev/null || exit 0; }
+found=0
+# Global entry files come from the host adapters, never a hardcoded path: hosts/claude names
+# ~/.claude/CLAUDE.md, hosts/codex names ~/.codex/AGENTS.md, and hermes and omp name "" to decline.
+# Read every adapter rather than detecting the host - a machine may run more than one, and inlining
+# one host's answer would report "clean" on every other.
+globals=$(for a in "$clone"/hosts/*; do
+  ( . "$a" >/dev/null 2>&1; printf '%s\n' "${bd_host_global_entry:-}" )
+done | grep . | sort -u)
+for entry in $globals ./CLAUDE.md ./CLAUDE.local.md ./AGENTS.md; do
   [ -f "$entry" ] || continue
   grep -q 'BEGIN better-dev-comms' "$entry" || continue
-  diff <(sed -n '/BEGIN better-dev-comms/,/END better-dev-comms/p' "$entry" \
-          | sed '1d;$d') "$clone/docs/comms-block.md" >/dev/null \
-    && echo "current: $entry" || echo "STALE: $entry"
+  found=$((found + 1))
+  if diff <(sed -n '/BEGIN better-dev-comms/,/END better-dev-comms/p' "$entry" | sed '1d;$d') \
+          "$clone/docs/comms-block.md" >/dev/null; then
+    echo "current: $entry"
+  else
+    echo "STALE: $entry"
+  fi
 done
+[ "$found" -gt 0 ] || echo "no better-dev-comms block installed anywhere"
 ```
 
-A `STALE` line is repaired in place, one command per entry file, which is idempotent and marker-aware:
+An adapter that names no global entry file is declining one, not missing it: `grep .` drops the empty
+answers, so those hosts contribute nothing to the list and the per-repo files are still checked.
+
+Three readings, and the third is the one silence would hide. `current` everywhere means nothing is
+owed. Any `STALE` line is drift, handled below. `no better-dev-comms block installed anywhere` means
+the block was never installed on this machine, which is `/onboard` or `BOOTSTRAP.md` territory rather
+than drift - say which, because an empty loop reads as clean and that is exactly the failure this step
+exists to close.
+
+A `STALE` per-repo entry file is repaired in place, one command each, idempotent and marker-aware:
 `"$clone"/scripts/bd-block "$entry" better-dev-comms < "$clone"/docs/comms-block.md`. Report which
 entry files were current and which were refreshed; a silent refresh reads the same as no drift and
-teaches nobody that the copy had rotted. The host-global entry file is operator-owned, so where the
-repo's settings policy keeps agent writes out of it, hand the operator that one line rather than
-running it.
+teaches nobody that the copy had rotted.
+
+**The host-global entry file is operator-run, always.** It is a machine-global write and D26 does not
+name it, so it is handed over as a paste block rather than executed here - and that holds whatever the
+repo's settings policy says, because D26 authorizes specific named commands and never an open class.
+Print the one line and let the operator run it:
+
+```
+<clone>/scripts/bd-block <entry_global> better-dev-comms < <clone>/docs/comms-block.md
+```
+
+A refresh of that file rewrites the whole marked block, so it also removes anything the operator's copy
+carried that the shipped body no longer does. Say that when handing the line over, because the
+difference between a stale rule and a deliberately local one is the operator's to know.
 
 ## 3. Read the release ledger
 

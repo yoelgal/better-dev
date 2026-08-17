@@ -93,8 +93,10 @@ passes itself, every time: seven agents in one batch reported DONE over entries 
 whole section. So the check belongs to a reader, and it belongs at the stage boundary rather
 than in a pass anyone runs separately. Stage 2 will not open a dossier on an entry whose
 rungs are not dispositioned; it sends the entry back and names the rung. That refusal is the
-gate, and the cheap independent grader `/orchestrating-agents` licenses is the right worker
-for it, since the check is deterministic and needs independence rather than capability.
+gate. Dispatch it at the cheap band: what a grader buys here is independence, not capability, and the
+check is deterministic, so a cheap worker reading one artifact against one pinned shape settles it
+below the tier that wrote the entry. `/orchestrating-agents` owns that exception to
+verify-at-or-above-the-tier and is worth reading before the dispatch if this is the run's first one.
 
 Resist the advisory version, which is the shape that feels like a gate and is not. Upstream
 of this rule, `hyperresearch` shipped a 26-rule lint over exactly this problem and its own
@@ -151,8 +153,8 @@ about the capture.
 Repos: shallow-clone to scratch, then one extraction agent per repo writing `source.md`
 + `extraction.md` into the archive. Enter `/orchestrating-agents` before this harvest's
 first dispatch - invoke it where the host has a skill mechanism, read its SKILL.md where
-it doesn't - and dispatch every fan-out in this skill (stage 1 extraction, stage 2
-dossiers and critic, stage 3 matrix workers) by its mechanics: bands resolved through the
+it doesn't - and dispatch every fan-out in this skill (stage 1 extraction, the stage 2 audit gate,
+stage 2 dossiers and critic, stage 3 matrix workers) by its mechanics: bands resolved through the
 recorded tier-map into each dispatch's model parameter, its brief shape, its report
 trailer. The mentions of tiers in this file are routing, not a working summary - a
 harvest that dispatches from them alone improvises the mechanics, and every worker
@@ -162,6 +164,11 @@ batch manifest: each extraction line names the tier band and model of the agent 
 wrote it, and an extraction line without one means the band decision never reached the
 dispatch call. The extraction brief that works:
 
+- A `## Depth ladder` section in `source.md`, all seven rungs, each line in the pinned shape above:
+  the rung number, then `CAPTURED` with what was read, or `SKIPPED: <reason>` from the closed list.
+  Say so in the brief and paste the two-line example into it, because stage 2 refuses an entry whose
+  rungs are not dispositioned, and a gate that checks a shape the brief never asked for reads as an
+  arbitrary rejection to the worker that has to fix it.
 - Read the ACTUAL files, never summarize from memory of the repo's name.
 - Complete inventory (every skill/prompt, one line each), then per relevant item: what
   it does, its best instructions QUOTED VERBATIM with file paths, and one line

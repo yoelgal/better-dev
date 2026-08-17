@@ -1343,6 +1343,17 @@ was asymmetric against the failure being reported.
 1. The block gains the length budget, argument completeness, the connected-reasoning clause and a
    pre-send cut list, and pays for them by compressing existing rules and rewrapping wider - **the
    24-line cap stands** and is still CI-gated. Raising it was put to the operator, not taken.
+   Corrected after review: the first attempt at this compression **deleted** a rule rather than
+   compressing it (the wins-and-errors receipt, "what now works and the command that shows it"), and
+   an earlier draft of this entry recorded the trade as costing no rule. It did. The clause is
+   restored and the block sits at 23 of 24 lines. Two things make that worth recording rather than
+   quietly fixing: it was the only rule requiring a reported win to carry the command that proves it,
+   so it was a COMPLETENESS device deleted in the same edit that added three brevity devices, against
+   an operator complaint that is half about needing re-explanation; and ruling 6 ships the mechanism
+   that would have propagated the deletion to the operator's machine on the next `/update`. A
+   line-capped always-loaded block plus a propagation path means a compression error is a deletion
+   with a delivery mechanism, so a clause-by-clause diff of the base against the head is mandatory on
+   any edit to this file.
 2. Argument completeness lands in the block, never in `/wait-what`. A fact stated without its
    consequence is the shape a reader answers with "wait, what?", so the fix belongs where it prevents
    the failure. `/wait-what` is untouched and stays its size: growing a corrective against volume fails
@@ -1364,10 +1375,10 @@ per D35. Stage 2 will not open a dossier on an entry whose rungs are not disposi
 is done by a reader other than the writer.
 
 The advisory alternative is a documented failure, not a hypothesis. Upstream `hyperresearch` built a
-26-rule lint over exactly this problem; its own code comment records a report that "shipped with 24
-hallucinated-quote errors because the orchestrator ran the lint separately and re-interpreted the
-failures as false positives - folding the rules in here removes that seam." Only 2 of its 26 rules bind,
-and they bind by being imported into the one command that produces the ship verdict.
+26-rule lint over exactly this problem and only 2 of its 26 rules bind, by being imported into the one
+command that produces the ship verdict; the code comment explaining why is quoted at the decision point
+in `skills/source-harvest/SKILL.md`, which is that quote's one home. The capture is at
+`raw/sources/2026-08-17-repo-jordan-gibbs-hyperresearch/`.
 
 Three further ladder rulings: the disposition shape is pinned (`CAPTURED` or `SKIPPED: <closed-list
 reason>`), because the check produced false failures until it accepted the heading shapes agents
