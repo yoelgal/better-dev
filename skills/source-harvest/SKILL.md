@@ -70,38 +70,83 @@ one hop deep by default, ask before crawling further.
 
 ### The depth ladder - what "extracted" means
 
-Every source has layers, and the gold is usually NOT on the surface one. An item may
-only be marked extracted in the manifest when every rung has either been read or is
-named in source.md as skipped WITH the reason ("commodity content", "paywalled", "no
-such layer") - an unnamed skipped rung is the shallow-ingest bug, not a judgment call.
-The rungs:
+Every source has layers, and the gold is usually NOT on the surface one. "Go deep" is an
+adjective, so the ladder is written as seven rungs with the specific miss each one suffers.
+Hunt the miss, not the category.
 
-1. **Canonical text** - post body, README, article text.
-2. **Media** - every image transcribed, every video/audio whisper-transcribed. A
-   diagram or screen-recording is routinely the payload the text only advertises.
-3. **Conversation** - self-replies, the author's answers to users (these often carry
-   the canonical usage or intended flow stated nowhere else), and the sharpest
-   critical replies - a good objection is harvestable material in its own right.
-4. **Linked payloads** - the one-hop promotions above, read from their actual bytes
-   (fetch the PDF, clone the repo) - identifying a paper from prior knowledge is not
-   capture. source.md records which pages/files were read and marks memory-only
-   claims as such until verified.
-5. **Author's rationale** - the WHY layer: changelogs, ADRs, release videos/posts,
-   design notes, anything explaining what changed, what it replaced, and what failure
-   drove it. Rationale routinely outvalues the artifact itself; hunt for it
-   explicitly - a repo announcement post usually links a video or writeup that IS
-   this rung.
-6. **Reception** - user friction where the source's users live: repo issues and
-   discussions, quote-posts, reply complaints. Someone else's users hitting a seam
-   our skills also have is a finding.
-7. **Negative space** - what the source deliberately lacks (no security story, no
-   a11y, no failure handling). Captured, it becomes confidence we are ahead or a
-   named rejection; uncaptured, it gets re-litigated next harvest.
+**The disposition line, shape pinned.** Each rung gets one line in a `## Depth ladder`
+section of source.md, opening with the rung number and then one of two words:
 
-The FEEDS summary in source.md names which rung the best content lives on. A
-re-submitted source with a new version, or whose prior ingest stopped at rung 1-2 (a
-name-map or README-level pass), gets a fresh deep ingest - a prior shallow entry is
-itself a finding to upgrade, not a dupe to skip.
+```
+3. Conversation - CAPTURED. 83 issues and every comment via `gh api`; sharpest three quoted.
+4. Linked payloads - SKIPPED: no such layer. No links in the post; the only hop is the repo,
+   which the sibling entry clones.
+```
+
+`CAPTURED` names what was read. `SKIPPED` carries a reason from a closed list: no such
+layer, commodity content, paywalled, out of assigned scope, or unrecoverable with the routes
+tried named. Anything else, including a rung that is simply absent, is the shallow-ingest bug
+rather than a judgment call.
+
+**Who checks it, and why not the writer.** An extraction agent grades its own depth and
+passes itself, every time: seven agents in one batch reported DONE over entries missing a
+whole section. So the check belongs to a reader, and it belongs at the stage boundary rather
+than in a pass anyone runs separately. Stage 2 will not open a dossier on an entry whose
+rungs are not dispositioned; it sends the entry back and names the rung. That refusal is the
+gate, and the cheap independent grader `/orchestrating-agents` licenses is the right worker
+for it, since the check is deterministic and needs independence rather than capability.
+
+Resist the advisory version, which is the shape that feels like a gate and is not. Upstream
+of this rule, `hyperresearch` shipped a 26-rule lint over exactly this problem and its own
+code comment records what happened: a report "shipped with 24 hallucinated-quote errors
+because the orchestrator ran the lint separately and re-interpreted the failures as false
+positives - folding the rules in here removes that seam." An agent that runs its own check
+argues with the result. The verdict has to be produced by the step that cannot proceed
+without it.
+
+The rungs, each with the miss it suffers:
+
+1. **Canonical text** - post body, README, article text. The miss: a truncated note-tweet.
+   The syndication API cuts at roughly 280 characters, so a numbered list arrives with item
+   0 and nothing else. The rendered page or `api.fxtwitter.com` carries the rest.
+2. **Media** - every image transcribed, every video whisper-transcribed. Two misses. A
+   silent transcript is not "no media content": a screen recording returns a few bytes of
+   whisper output while carrying the whole payload, so extract keyframes and read them. And
+   a screenshot of a file is not the file - find and fetch the original, because a card image
+   crops mid-rule and the install command that names the real URL is often composed in
+   JavaScript rather than written in the copy.
+3. **Conversation** - self-replies, the author's answers to users (routinely the canonical
+   usage, stated nowhere else), and the sharpest critical replies. The miss: reading the top
+   page only. Replies clipped at "Show more" and subthreads folded behind "Show replies" are
+   absent from that DOM, and a login wall can cut the pane to a fraction. Give a truncated
+   reply its own fetch, and where the layer stays gated say how much of it you got.
+4. **Linked payloads** - one-hop promotions read from their actual bytes. The miss:
+   identifying a paper or repo from prior knowledge instead of fetching it. Record which
+   files were read and mark memory-only claims until verified.
+5. **Author's rationale** - the WHY layer: changelogs, ADRs, release posts, design notes,
+   non-goals, the commit that reversed something. The miss: not looking, because the artifact
+   is right there. Rationale routinely outvalues it, and a version's own account of what
+   broke last time is the most reusable thing a source has.
+6. **Reception** - friction where the source's users live: issues, discussions, quote-posts,
+   reply complaints. The miss: treating it as colour. Someone else's users hitting a seam our
+   skills also have is a finding, and a reader's objection is often the operator's question
+   asked by a stranger.
+7. **Negative space** - what the source deliberately lacks (no security story, no a11y, no
+   failure handling, no eval). Captured, it becomes confidence we are ahead or a named
+   rejection; uncaptured, it gets re-litigated next harvest.
+
+Read the source's own evidence rather than its caption. Where a source offers a before/after
+or a benchmark, open it: in one batch the author's panels demonstrated two of his rules and
+quietly failed to show the one being sold, and a README chart turned out to be captioned as a
+projection with validation pending. A number reported without its own disclaimer read is a
+claim, not a receipt.
+
+The FEEDS summary in source.md names which rung the best content lives on. A re-submitted
+source with a new version, or whose prior ingest stopped at rung 1-2 (a name-map or
+README-level pass), gets a fresh deep ingest - a prior shallow entry is itself a finding to
+upgrade, not a dupe to skip. An operator re-submitting a source this archive already holds is
+evidence of an orphan, so treat the re-submission as a signal about the LANDING rather than
+about the capture.
 
 Repos: shallow-clone to scratch, then one extraction agent per repo writing `source.md`
 + `extraction.md` into the archive. Enter `/orchestrating-agents` before this harvest's
@@ -138,6 +183,17 @@ Model economy for this stage: small repos get a cheap model, large or user-flagg
 extraction. Images the main agent transcribes itself - subagents cannot see them.
 
 ## Stage 2 - synthesis (the expensive judgment, spent once)
+
+This stage opens with an audit gate over stage 1's output, and it runs before the two reads
+below. Every entry in the batch is read by someone other than its writer, and an entry whose
+`## Depth ladder` is missing a rung, or carries one with neither `CAPTURED` nor a
+`SKIPPED: <reason>` from the closed list, does not get a dossier: it goes back with the rung
+named. Report the batch in units of entries and rungs, never in units of agents, so a partial
+sweep cannot present as total. Two ways this gate goes soft, both worth refusing: grading the
+entries yourself after writing the briefs (you are then checking your own instructions were
+followed, not that the capture is deep), and accepting a rung line whose shape differs from
+the pinned one because the meaning is obvious - the shape is pinned so the check is
+mechanical, and a grader that interprets is a grader that passes things.
 
 When the dump closes, ground the synthesis in two reads before any dossier launches.
 First the constitution read: the library's PLAN/DECISIONS or equivalent and its core
