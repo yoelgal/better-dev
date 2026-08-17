@@ -81,6 +81,31 @@ it). Resolve the installer, never assume its path: `ls "$clone/install.sh"` - a 
 tool (0.7.0 moved it to `<repo>/better-dev/install.sh`) leaves the normalized `$clone` from step 1
 pointing at the right one, but a stale hand-typed path will not be. Empty output means content-only changes; the existing links already serve them - skip this step.
 
+Content-only is the right verdict for skill links and the wrong one for the always-loaded blocks this
+library installs into a host's own entry file, because those are copies rather than links: a pull that
+edits `docs/comms-block.md` changes nothing on a machine whose `CLAUDE.md` still carries the copy
+written at install. Nothing else reconciles them - the two writers (`BOOTSTRAP.md` globally,
+`/onboard` per repo) each run once - so a block installed months ago silently drifts, and the
+operator experiences it as the practices not working rather than as a stale file. Compare the marked
+block against the shipped body wherever one is installed:
+
+```bash
+for entry in "$HOME/.claude/CLAUDE.md" ./CLAUDE.md ./CLAUDE.local.md ./AGENTS.md; do
+  [ -f "$entry" ] || continue
+  grep -q 'BEGIN better-dev-comms' "$entry" || continue
+  diff <(sed -n '/BEGIN better-dev-comms/,/END better-dev-comms/p' "$entry" \
+          | sed '1d;$d') "$clone/docs/comms-block.md" >/dev/null \
+    && echo "current: $entry" || echo "STALE: $entry"
+done
+```
+
+A `STALE` line is repaired in place, one command per entry file, which is idempotent and marker-aware:
+`"$clone"/scripts/bd-block "$entry" better-dev-comms < "$clone"/docs/comms-block.md`. Report which
+entry files were current and which were refreshed; a silent refresh reads the same as no drift and
+teaches nobody that the copy had rotted. The host-global entry file is operator-owned, so where the
+repo's settings policy keeps agent writes out of it, hand the operator that one line rather than
+running it.
+
 ## 3. Read the release ledger
 
 `docs/RELEASES.md` in the clone holds one line per release, newest first:
