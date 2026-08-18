@@ -133,7 +133,13 @@ Then each pass:
 
 1. **Verify.** Run the check. Exit 0 counts only when it's unambiguous - a half-passing run, or output
    you'd have to interpret, is red, not a rounded-up pass. On a clean green, clean the diff on this first
-   green (read "Clean on the first green"), then `DONE`.
+   green (read "Clean on the first green"), then `DONE`. The contract's check is usually narrower than the
+   repo's own gate, so that first green also runs the recorded verify once
+   (`.better-dev/bin/bd-mem recall "verify"`): a green criterion over a suite this work-item reddened
+   somewhere else is a regression the loop triages and fixes, not a `DONE` for CI to discover after the
+   loop has already claimed proof. That one wider run is also what arms the contract's
+   green-test-goes-red tripwire, which nothing else in the loop executes. A recorded `verify: none` is
+   named as the gap it is, never filled by re-running the narrow check.
 2. **Pick** one step toward the contract - the next slice, the next failing item. Just one - and a
    failing item is triaged first, since only a genuine defect earns a fix pass (read "Triage the red").
    When implementing reaches a branch the contract doesn't define - a failure the spec named without

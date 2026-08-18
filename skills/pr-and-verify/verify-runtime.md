@@ -43,6 +43,11 @@ this tree's app, and `"seed-reset"` where the flow needs data - a recorded `seed
 named gap `/plan-grill` can plan a work-item for, never a silent skip. Both are recorded once by
 `/guardrails-install`; re-discovering them per worktree is the re-detection those keys exist to end.
 
+A criterion carrying a timing, size, or rate threshold is observed as a distribution, not a number: report
+the machine and the repetition count beside the measurement, against the baseline the criterion already
+cites (`/plan-grill`'s pre-seal requires one). A single run on the machine that just built the branch is
+noise wearing a verdict.
+
 Through the real interface: if a user clicks a button, click the button, don't curl the API underneath it.
 The diff's own tests count as the author's claim, never as a surface to observe - on a mixed src+tests
 change, drive the src's surface and leave the test files out of the observation. Operator feedback that
@@ -78,6 +83,10 @@ test overfits the golden path and the skipped branch is exactly where the bug li
 Settle each criterion at one of four:
 
 - **PASS** - driven on its surface, observed doing the right thing, and it survived at least one probe.
+  What counts as right is the criterion, never the diff: where the surface shows something the criterion is
+  silent on, source the expectation outside the change - the base revision's behavior, a committed test,
+  the product copy, the operator - before calling it correct or calling it a defect, because a screen that
+  matches the code you just wrote is a tautology rather than an observation.
 - **FAIL** - it did the wrong thing, threw, or a probe broke it.
 - **BLOCKED** - something outside the change stopped the check from running (a missing credential, an
   environment that won't stand up). Name what blocked it.

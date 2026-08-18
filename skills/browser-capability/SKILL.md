@@ -102,6 +102,13 @@ browser. A visual criterion asks for one thing more: the screenshot is the artif
 is proven by the capture plus a pass over what it shows - a guideline / contrast / anti-slop audit
 (`web-design-guidelines` if wired, else sourced via `/tool-sourcing`). A PNG nobody audited is not a pass.
 
+Where the repo already runs a screenshot-comparison harness (step 2's first rung), its diff is a second
+channel rather than a substitute for that audit: the tool answers whether the render changed, never whether
+it is right. Its blessing flag (`--update-snapshots` or the equivalent) rewrites the stored reference to
+whatever the code renders now, so a reference image is a committed assertion on the same footing as a
+test's expected value - it moves only after the diff image has been looked at and the intended change
+named, never to turn a red comparison green.
+
 If the browser check can't run yet (no dev server, no deploy URL, missing credentials for an authenticated
 page), that's a `NEEDS_INPUT` or `BLOCKED` state to surface, not a criterion to quietly drop. A done-criterion
 the loop can't exercise isn't done.
