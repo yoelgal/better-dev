@@ -446,6 +446,7 @@ itself - a tool you name wins over a row:
 | "wire monitoring", "can I see prod errors?", "does anything page me?" | `/observability-install` | fills the recorded `obs-*` gaps |
 | "review this PR", "review my colleague's PR" | `/review` | inbound path: host mechanics + this repo's recorded policy |
 | "what's in flight?", "where did we leave off?" | `.better-dev/bin/bd-mem ledger status` | one line per work-item with its state |
+| "these are all done", "clean up the ledger" | `.better-dev/bin/bd-mem ledger reap` | previews the in-flight rows whose PR is already in the integration branch; `--apply` settles them |
 | "hand this off", "pick up X's work" | `/worktree-branching` (handoff) | the bundle rides the branch; consent re-pins on pickup |
 | "make it look good", "design the page" | `/design-brief` | -> `/plan-grill` or the loop |
 | "is this safe", a security pass on a risky diff | `/security-pass` | composed by `/review` automatically |

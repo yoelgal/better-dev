@@ -481,7 +481,7 @@ reonboard_nudge() {
 }
 
 emit() {
-  local root="$1" note lessons n inflight bdm rows cnt oldest papercut_nudge papercuts parked fpnote fpcur fprec context escaped welcome custom
+  local root="$1" note lessons n inflight reapable bdm rows cnt oldest papercut_nudge papercuts parked fpnote fpcur fprec context escaped welcome custom
   # Per-repo welcome wording: a "better-dev welcome: <text>" line in overrides.md
   # replaces the default (same knob style as "better-dev auto-update:"). Only the
   # wired message is overridable - an unwired repo has no overrides to read.
@@ -523,6 +523,18 @@ emit() {
       cnt="$(printf '%s\n' "$rows" | wc -l | tr -d ' ')"
       oldest="$(printf '%s\n' "$rows" | head -n1 | awk -F'\t' '{print $1 ", " $3}')"
       inflight=" $cnt work-item(s) in flight (oldest: $oldest) - .better-dev/bin/bd-mem ledger status lists them; resume one with: .better-dev/bin/bd-mem ledger resume <slug>."
+      # How many of those are already dead: a row whose PR is in the integration branch is
+      # finished work that no session ever settled, and "resume one" is the wrong instruction for
+      # it - 12 rows once sat open for up to 13 days with every PR merged, because the count alone
+      # invited a resume nobody wanted and named no way to close them. `reap` is a preview, so
+      # reading it here writes nothing; only the operator's --apply does. The awk consumes the
+      # whole stream rather than exiting on a match - reap prints one row per item and an
+      # early-exiting consumer would hand it a closed pipe.
+      reapable="$(BETTER_DEV_DIR="$root/.better-dev" "$bdm" ledger reap 2>/dev/null | awk -F'\t' '$1 == "reap"' | wc -l | tr -d ' ' || true)"
+      case "$reapable" in
+        '' | 0 | *[!0-9]*) ;;
+        *) inflight="$inflight $reapable of them are already landed (their PR is in the integration branch) and just never settled - close them in one pass: .better-dev/bin/bd-mem ledger reap to read the evidence, then ledger reap --apply." ;;
+      esac
     fi
   fi
   # Papercut nudge: static write-nudge, emitted for every wired repo - an agent cannot log to a
@@ -895,6 +907,19 @@ PYST
   printf '%s' "$out" | jq -e . >/dev/null || fail "in-flight output not valid JSON"
   printf '%s' "$out" | grep -q "1 work-item(s) in flight (oldest: stale-item, 0d)" || fail "missing in-flight clause"
   printf '%s' "$out" | grep -q "ledger status" || fail "in-flight clause must name ledger status"
+  # ...and when a row's PR is already in the integration branch, the clause says how many and names
+  # the verb that closes them. Without this the count alone reads as "resume one", which is the wrong
+  # instruction for finished work and is why rows sat open for weeks. $tmp/proj is not a git repo, so
+  # reap has no history to read and stays silent - make it one, with a squash-shaped subject.
+  printf 'PR #7 -> DONE: merged\n' | BETTER_DEV_DIR="$tmp/proj/.better-dev" "$tmp/proj/.better-dev/bin/bd-mem" ledger put stale-item pr.md - >/dev/null
+  ( cd "$tmp/proj" && git init -q -b main . && git config user.email a@b.c && git config user.name t \
+      && : > landed && git add landed && git commit -qm "feat: the work (#7)" ) >/dev/null 2>&1
+  out="$(cd "$tmp/proj" && CLAUDE_PLUGIN_ROOT=x "$SELF")" || fail "errored with a reapable row"
+  printf '%s' "$out" | grep -q "1 of them are already landed" || fail "in-flight clause did not count the reapable row"
+  printf '%s' "$out" | grep -q "ledger reap --apply" || fail "reap clause must name the verb that closes them"
+  # Reading it is a preview: the hook must never settle anything on the operator's behalf.
+  BETTER_DEV_DIR="$tmp/proj/.better-dev" "$tmp/proj/.better-dev/bin/bd-mem" ledger status | grep -q "^stale-item	in-flight	" \
+    || fail "the session-start reap read settled a row - it must only ever preview"
   printf 'DONE\n' >> "$tmp/proj/.better-dev/ledger/stale-item/progress.md"
   out="$(cd "$tmp/proj" && CLAUDE_PLUGIN_ROOT=x "$SELF")" || fail "errored after terminal state"
   printf '%s' "$out" | grep -q "in flight" && fail "in-flight clause after terminal state"
