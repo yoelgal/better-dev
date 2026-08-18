@@ -5,9 +5,11 @@ description: Use when the better-dev tool itself needs updating - "update better
 
 # /update - bring the tool and this repo current
 
-One verb, five steps, in order. The tool lives in one global clone every repo shares; this repo
-carries only its wiring. /update pulls the clone, reconciles what the pull changed, and tops up
-this repo when a release changed the repo surface.
+One verb, six steps, in order. The tool lives in one global clone every repo shares; this repo
+carries only its wiring. /update pulls the clone, reconciles what the pull changed, tops up this repo
+when a release changed the repo surface, and sweeps this repo's own stale records - it is the repo's
+one recurring upkeep pass, which is why the ledger sweep lives here rather than waiting for someone
+to remember it.
 
 Two preconditions, checked first:
 
@@ -101,7 +103,7 @@ the repo - which is exactly what a `reonboard` flag marks. A pull-only release t
 stamp behind the manifest on purpose, and nothing is owed. Answering "what version is better-dev
 here" by diffing the two numbers reports a top-up that no flag asked for; read the flags between
 the stamp and the manifest instead, and where none are pending, say so rather than prescribing a
-run. Step 5 still re-stamps on any run that gets there, so a synced number is a side effect of
+run. Step 6 still re-stamps on any run that gets there, so a synced number is a side effect of
 updating, never the reason to. This is the general shape any "am I up to date" check needs: two
 sources of truth, each moved by a different human act - a maintainer's release, this skill's own
 top-up - read both, and let the newer one govern rather than trusting either alone.
@@ -130,11 +132,47 @@ is actionable rather than a pointer to go hunting. Ask them together in one pass
 pending, take a no as a no, and apply only what they accept. The offer is a question about this
 machine, so it stands whether or not the reonboard top-up above had anything to fill.
 
-The `wired-version` stamp in step 5 is what closes an offer, which is why stamping last matters here
+The `wired-version` stamp in step 6 is what closes an offer, which is why stamping last matters here
 too: an offer declined this run is not re-asked next run, and an offer never reached because the run
 stopped early is still pending when the operator comes back.
 
-## 5. Stamp the wired version
+## 5. Sweep this repo's stale ledger rows
+
+Every run, pending flags or not. A work-item's terminal state is written by the session that finishes
+it, so a session that ends at the merge - or crashes, or hands off - never writes one, and the row
+reads `in-flight` forever while its branch and worktree are long gone. Nobody notices on their own:
+this is the repo's only recurring upkeep verb, so it is the only place the sweep will actually
+happen. One repo had 12 such rows open for up to 13 days with every one of their PRs merged.
+
+```bash
+.better-dev/bin/bd-mem ledger reap          # preview: one row per item, with its evidence
+.better-dev/bin/bd-mem ledger reap --apply  # settle the ones it could prove
+```
+
+**Show the preview's `reap` lines, then apply, in the same pass.** The preview output *is* the
+evidence (`landed as PR #78 (568a5f6 in main)`), so putting it in front of the operator costs one
+line and needs no round trip; applying without showing it settles records nobody read. A run that
+offers nothing says nothing - `/update` runs in every repo, and a clean ledger has no news.
+
+Reap proves each row from this repo's own history and refuses everything else: the row's own `pr.md`
+must name a PR, a commit ending `(#N)` must be in the integration branch, and a branch it recorded
+must carry nothing that branch lacks - a branch still ahead is a live lane and is kept even though
+its PR landed. So it cannot settle a judgment call, only a fact. Anything needing a human - an
+unstarted item, an epic whose item a later decision cancelled, a lane abandoned on purpose - has no
+mechanical proof and is left exactly as it was.
+
+Two properties that make this safe to run unattended, both worth stating when reporting it:
+
+- **Reversible.** `settle` appends, and `ledger status` reads the last line's terminal token - so
+  appending any ordinary progress line after it puts the row back to `in-flight`. Nothing is deleted.
+- **Not gated on the pull.** This step reads *this repo's* records, never the clone's, so run it even
+  when step 1 reported a refused or offline pull and stopped. A repo whose ledger is stale should not
+  stay stale because a remote was unreachable.
+
+No `.better-dev/bin/bd-mem` (a repo wired before the bridge) means skip the step silently - there is
+nothing to run and nothing to report.
+
+## 6. Stamp the wired version
 
 After the top-up - or directly, when only the pull and install tiers applied - write the clone's
 current manifest version to this repo's stamp:

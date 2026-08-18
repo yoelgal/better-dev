@@ -1056,6 +1056,19 @@ printf '%s' "$offer_step" | grep -q 'offer' \
   && ok "update's top-up step acts on pending offer flags" \
   || bad "skills/update step 4 never acts on the offer flag - pending offers are collected and dropped"
 
+# The ledger sweep only works if it is unconditional and if it actually applies. /update is the one
+# verb an operator re-runs in an already-wired repo, so a sweep gated behind a pending flag would
+# never fire in the common case (a pull-only release), and a sweep that only previews leaves the rows
+# exactly as stale as before while reporting that it looked. Both regressions read like a working step.
+sweep_step="$(awk '/^## 5\. Sweep this repo/{f=1} f&&/^## 6\./{exit} f{print}' skills/update/SKILL.md 2>/dev/null)"
+if printf '%s' "$sweep_step" | grep -q 'ledger reap --apply' \
+   && printf '%s' "$sweep_step" | grep -qi 'every run' \
+   && printf '%s' "$sweep_step" | grep -q 'not gated on the pull'; then
+  ok "update sweeps stale ledger rows every run, applies rather than only previewing, and is not gated on the pull"
+else
+  bad "skills/update step 5 no longer sweeps the ledger unconditionally - a pull-only run (the common case) then leaves settled work reading in-flight forever, which is the failure /update was given this step to end"
+fi
+
 # End to end in a throwaway HOME: the adapter's path, the shipped body, and bd-block together put the
 # block where a session will actually read it. Hermetic - never touches the operator's real HOME.
 if [ -f "$CB" ]; then
