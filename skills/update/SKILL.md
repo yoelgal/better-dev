@@ -23,7 +23,10 @@ Two preconditions, checked first:
 setopt no_nomatch 2>/dev/null || true
 clone="${CLAUDE_PLUGIN_ROOT:-}"
 if [ -z "$clone" ]; then   # fall back to reading a host skill symlink back to the clone
-  for s in "$HOME"/.*/skills/onboard "$HOME"/.config/*/skills/onboard; do
+  # Both depths: a host's skills dir sits one level under $HOME (.claude, .codex, .hermes) or two
+  # (.omp/agent/skills, and the XDG shape .config/<host>/skills). The `.[!.]*` head skips `.` and
+  # `..`, which the two-level pattern would otherwise turn into a wildcard over $HOME's siblings.
+  for s in "$HOME"/.[!.]*/skills/onboard "$HOME"/.[!.]*/*/skills/onboard; do
     [ -L "$s" ] || continue
     t="$(readlink "$s")"; clone="${t%/skills/onboard}"   # strip, never cd: a moved clone's link is DANGLING, and cd into it fails
     [ "$clone" != "$t" ] && break
@@ -53,6 +56,14 @@ probe is not a `.git` dir check: a subdir of a checkout has none of its own. The
 string rather than followed with `cd` for the same reason - the third case's link is **dangling**, so
 `cd` into it fails and the whole resolution silently reports no clone found on exactly the install
 that most needs updating.
+
+The search itself has to span both depths a host adapter may declare, because `hosts/*` is only
+readable once the clone is found and finding the clone is what this loop is for - a glob is the only
+resolver that works before the adapters are reachable. What the loop does NOT need is depth
+awareness in the strip: `clone="${t%/skills/onboard}"` cuts the suffix off the link's TARGET, which
+is always `<clone>/skills/onboard` no matter how deep under `$HOME` the link that carried it sat. So
+a new host nesting its skills dir three levels down needs a wider glob and nothing else, and the
+package gate asserts the glob covers every declared dir rather than trusting that it does.
 
 Where the host gates machine-touching commands, hand the pull to the operator paste-ready
 (`git -C <clone> pull --ff-only`). `--ff-only` never clobbers local edits: a refused pull means

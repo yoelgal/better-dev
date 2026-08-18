@@ -876,6 +876,51 @@ else
   bad "/update's clone resolver does not handle a moved clone: it steps only down (or follows the link with cd, which fails on the dangling link a moved clone leaves), so the sanctioned update path reports no clone found on exactly the install that needs updating"
 fi
 
+# --- the declared-vs-hardcoded class, closed mechanically. hosts/<h> DECLARES bd_host_skills_dir;
+# the resolver globs in /update and /onboard have to FIND that dir before the clone (and therefore
+# hosts/*) is readable at all, so they cannot consult the declaration and instead carry a glob shape
+# that can silently contradict it. It did: omp declares $HOME/.omp/agent/skills - two levels - while
+# every resolver globbed one, so /update resolved nothing on an omp-only machine and resolved through
+# some other host's link by luck on a mixed one. Both sides are DERIVED here, never restated: the
+# dirs come from sourcing each adapter, the patterns come from grepping the skill files, and the
+# match is a real glob against a fixture HOME holding every declared dir. Per FILE, not pooled - one
+# site broadened while a sibling stays one-level is the exact half-fix this has to catch. A future
+# host nesting three levels down fails here rather than shipping.
+hr_home="$(mktemp -d)"
+hr_dirs=""
+for hr_a in hosts/*; do
+  [ -f "$hr_a" ] || continue
+  hr_d="$(HOME="$hr_home" bash -c 'source "$1" && printf %s "${bd_host_skills_dir-}"' _ "$hr_a" 2>/dev/null)"
+  [ -n "$hr_d" ] || continue
+  mkdir -p "$hr_d"
+  hr_dirs="$hr_dirs $hr_d"
+done
+hr_errs=""
+[ -n "$hr_dirs" ] || hr_errs=" no-adapter-declared-a-skills-dir"
+for hr_f in skills/update/SKILL.md skills/onboard/SKILL.md; do
+  # Every "$HOME"-rooted host-skills-dir glob the file runs, reduced to its dir (drop the leaf the
+  # site looks for - onboard/ for the clone link, .better-dev-install for the marker).
+  hr_pats="$(grep -ho '"\$HOME"/[^ ;"]*/skills/[^ ;"]*' "$hr_f" 2>/dev/null | sed 's:/skills/[^/]*$:/skills:' | sort -u)"
+  if [ -z "$hr_pats" ]; then hr_errs="$hr_errs ${hr_f%/SKILL.md}:no-host-skills-glob-left"; continue; fi
+  hr_reached=""
+  while IFS= read -r hr_pat; do
+    [ -n "$hr_pat" ] || continue
+    hr_reached="$hr_reached $(compgen -G "$hr_home${hr_pat#'"$HOME"'}" 2>/dev/null | tr '\n' ' ')"
+  done <<<"$hr_pats"
+  for hr_d in $hr_dirs; do
+    case " $hr_reached " in
+      *" $hr_d "*) ;;
+      *) hr_errs="$hr_errs ${hr_f%/SKILL.md}:unreachable(${hr_d#"$hr_home"/})" ;;
+    esac
+  done
+done
+rm -rf "$hr_home"
+if [ -z "$hr_errs" ]; then
+  ok "every host adapter's declared skills dir is reachable by the resolver globs each of /update and /onboard actually runs"
+else
+  bad "a declared host skills dir is unreachable by a resolver glob, so that host cannot resolve its own clone:$hr_errs"
+fi
+
 # The legacy-plugin decision, landed in one direction everywhere. The failure that matters is a skill
 # DECLINING to wire the guard because it believes a plugin already did - a repo left with no
 # enforcement and a record saying it has some. Assert the write-nothing branches are gone rather than

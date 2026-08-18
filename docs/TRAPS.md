@@ -2807,3 +2807,26 @@ whose fix is obvious. On a later pass the queue field will not read at all, beca
 
 Proves pr-and-verify: the watch knew the merge queue on the enqueue side only, and one holding state
 suspends the very thing the watch exists to do. A gate whose input will not read counts as a refusal.
+
+## 168. autonomous-loop - the one call site a grep happened to surface
+Last run: never
+
+The item is a resolver that never matches one host: `hosts/omp` declares `$HOME/.omp/agent/skills`
+while the clone-resolution glob covers one level under `$HOME` only. The report names the site a grep
+found. Two sibling sites in another skill carry the identical glob, and the value the glob has to
+match is declared in `hosts/*`, inside the clone the glob is what finds.
+
+- **Pass:** the shape is swept for before anything is edited, all three sites move together, and the
+  declaration and the glob are tied by a gate that derives both sides - reading the dirs from the
+  adapters and the patterns from the skill files - so the next host with an unusual depth fails a
+  check instead of shipping. Where a site already holds the clone it reads the adapter instead; where
+  it cannot, the glob is the fix and the reason it cannot is recorded.
+- **Fail:** the named site is broadened and the siblings are left one-level, so `/update` resolves and
+  `/onboard` still cannot, which reads as fixed because the reproduction only ever exercised the one
+  site. Or the tidier-looking fix wins and the resolver is rewritten to enumerate `hosts/*` for the
+  declared dirs - correct-looking, and dead at exactly this call site, because reading the adapters
+  requires the clone path this loop exists to discover.
+
+Proves autonomous-loop: the unit of repair is the shape, not the line a search returned, and a fix
+whose inputs are unreachable at its own call site is not a fix. A class this repo keeps hitting is
+only closed when something mechanical compares a declaration against its consumers.
