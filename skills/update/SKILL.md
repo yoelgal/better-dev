@@ -106,6 +106,15 @@ updating, never the reason to. This is the general shape any "am I up to date" c
 sources of truth, each moved by a different human act - a maintainer's release, this skill's own
 top-up - read both, and let the newer one govern rather than trusting either alone.
 
+**The plain version question has a plain answer: the session-start welcome names it** ("better-dev
+0.14.1 ready - ..."), read from the resolved clone's manifest. Reach for that before deriving
+anything, because deriving it is what produces the wrong answer - the two numbers are sitting right
+there, and every reader who has diffed them prescribed a `/update` that owed nothing. The welcome
+deliberately stops at naming the version and never claims "up to date": the session-start fetch is
+bounded and best-effort, so currency is reported by the update nudge that measured it - a clone
+behind its origin appends "update available, run /update" to that same line, whether or not the
+release carries a flag.
+
 ## 4. Top up this repo only
 
 When a reonboard flag is pending, run the `/onboard` top-up for the current repo - a re-run is
