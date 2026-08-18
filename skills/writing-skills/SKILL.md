@@ -112,6 +112,20 @@ Never put `version`, `license`, or prose in frontmatter.
   it is delegated to the executor's priors. Walk what the draft never says (output shape, scope boundary,
   the failure path, who approves) and make each omission deliberate: fill it, or leave it open on purpose
   knowing which way the priors default.
+- Walk step one against the state that summons the skill. Name what a finished run leaves fixed, removed,
+  or reported broken; then read the first operative step and list what it must find intact to finish. The
+  same thing in both lists means the mechanism's reach stops at exactly the machines that need it:
+  `/update` reconciles a stale install and step one resolves the clone by globbing `$HOME` for a host
+  skills dir, so a wrong glob strands the machine whose fix `/update` was carrying, and the silence reads
+  like an install with nothing to pull. Grade it by putting the target in its worst *recorded* failure
+  state - `docs/TRAPS.md`, a papercut, a ledger receipt, never an imagined one - and running step one
+  against it for real. The remedy is rarely self-sufficiency, which usually cannot be built: name at that
+  step the route whose inputs come from outside the target - a structural handle that already carries the
+  answer (`bd-uninstall` reads its own `$0` through the `.better-dev/bin` symlink instead of guessing a
+  host layout), an operator-supplied value, or the one-paste front door that assumes nothing is installed.
+  Where no such route exists, say so at that step and name the manual escape, so a stranded machine reads
+  a documented exit instead of silence. Where the lists share nothing - a planner, a reviewer, a map - add
+  nothing: a robustness clause over an empty intersection is padding that pays its read cost every run.
 - When a skill pins an output shape - a report trailer, a verdict block, a table - show the shape once
   as a filled example, never only a prose description of it. An executor reproduces a shown format; a
   described one drifts into a new shape per run. One example earns its lines; a gallery doesn't.
