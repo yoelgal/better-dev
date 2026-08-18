@@ -133,7 +133,13 @@ Then each pass:
 
 1. **Verify.** Run the check. Exit 0 counts only when it's unambiguous - a half-passing run, or output
    you'd have to interpret, is red, not a rounded-up pass. On a clean green, clean the diff on this first
-   green (read "Clean on the first green"), then `DONE`.
+   green (read "Clean on the first green"), then `DONE`. The contract's check is usually narrower than the
+   repo's own gate, so that first green also runs the recorded verify once
+   (`.better-dev/bin/bd-mem recall "verify"`): a green criterion over a suite this work-item reddened
+   somewhere else is a regression the loop triages and fixes, not a `DONE` for CI to discover after the
+   loop has already claimed proof. That one wider run is also what arms the contract's
+   green-test-goes-red tripwire, which nothing else in the loop executes. A recorded `verify: none` is
+   named as the gap it is, never filled by re-running the narrow check.
 2. **Pick** one step toward the contract - the next slice, the next failing item. Just one - and a
    failing item is triaged first, since only a genuine defect earns a fix pass (read "Triage the red").
    When implementing reaches a branch the contract doesn't define - a failure the spec named without
@@ -365,7 +371,11 @@ The loop's own green is not the acceptance verdict - the two stay separate so th
 its own check. Acceptance has two parts the loop doesn't self-grade: a fresh reviewer that distrusts the
 report and reads the diff, not the claims (`/review`), and runtime observation - the change driven to
 where it executes and watched past its happy path (`/pr-and-verify`). Exit 0 is the working signal,
-runtime observation is the acceptance; a passing command is not yet a driven flow. Findings of every
+runtime observation is the acceptance; a passing command is not yet a driven flow. A green suite is
+evidence only where its tests can still go red for the right reason, and the loop's own negative
+control covers only the tests it authored this pass: where a done-criterion rests on a test that
+arrived before this work-item, enter `/test-audit` to settle whether that test defends the criterion
+it is credited with, and a `MISSED` row leaves the criterion unproven rather than met. Findings of every
 severity, Minor included, go back as a fix pass, then re-review; the fix pass answers every finding per the
 accept-or-rebut table `/review`'s reception owns - `ACCEPTED` with the fix or `REBUTTED` in one line, and
 a finding answered with silence re-blocks at re-review. A re-review round reporting zero findings with no
@@ -457,4 +467,7 @@ that earned it. Keep the WHAT filter: capture signature, root cause, and fix, ne
 pass's receipt as `prior lesson applied: <key> (confidence <c>, from <date>)`, so the operator can audit
 what the store contributed. The same law fires earlier too - a root cause a
 stuck-check named before a restart, the infra recovery recorded under "Triage the red" - so a lesson
-lands where it's learned, not only at the finish. When you revise this skill, follow `/writing-skills`.
+lands where it's learned, not only at the finish. When this settle also ends the session, run
+`/session-review` once afterwards: the item's lesson is written here, and the session's friction, its
+trap-worthy gaps, and any instruction that misled the run are recorded there instead of dying with
+the transcript. When you revise this skill, follow `/writing-skills`.

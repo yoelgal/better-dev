@@ -107,4 +107,8 @@ Orientation is an input to other practices, not a phase of its own:
 - `/diagnose` - the callers and dependents that seat the root cause at the correct seam.
 - `/review` - the blast radius of the diff: who the changed or removed symbols reach.
 
+Structure is half an orientation. When the real question is what the project is *for* - which
+invariants hold, what it refuses to be - no map answers it, and `/vision` recovers that from the
+repo's own history instead.
+
 It adds to whatever search and tooling you already have, and never replaces them.

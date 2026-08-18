@@ -195,7 +195,9 @@ The negative-lesson filter binds here as everywhere: never a transient "X is bro
 and used during the run is cited in the receipt as
 `prior lesson applied: <key> (confidence <c>, from <date>)` so the operator can audit what the store
 contributed. Each skill inlines only its own one-line close-out at its exit point; this section is the
-full form it points to.
+full form it points to. `/session-review` is the trigger this section otherwise lacks: it fires at a
+session's terminal moment and enters here for these two tests before routing what the run learned to
+a keyed lesson, a papercut, or a trap.
 
 ## Composability & overrides
 

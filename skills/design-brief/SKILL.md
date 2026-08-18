@@ -42,6 +42,11 @@ default-template pull is mode collapse, and asking for the distribution is what 
 candidate with one concrete noun; two candidates sharing a label, or one label that fits them all, is a
 rework signal, not a style note.
 
+When candidate directions stop separating on description alone, stop describing them: enter
+`/prototype` to render them on a real surface with real data and real density, one zoom level per
+round. A direction judged on a blank page always reads fine, and the label check above only catches
+the candidates that were already too close to write down differently.
+
 When the read is blank, or an existing render reads as generic, don't reason from an empty page:
 source a specific admired reference - a real product this brief's audience would call premium - and
 diff against it. Adopt its layout, structure, and information hierarchy; re-skin them in this
@@ -62,6 +67,10 @@ There are two honest states. Pick one and be plain about which:
   vibe with a name. Build it on the project's own stack, and say plainly in a comment what is borrowed
   inspiration versus real material.
 
+Either state leaves the component-level picks open - a toast, a command palette, a combobox, a
+virtualized list - and those are a dependency decision rather than a direction one: enter
+`/pick-ui-library` when the design calls for one and the repo has not already solved it.
+
 Either way, record the choice so the next feature inherits it instead of reinventing it: the token set
 and the named direction go into `.better-dev/overrides.md` (via `.better-dev/bin/bd-mem
 persist-override "<line>"`). This is the frozen shared interface `/groundwork` pins for a UI product - a
@@ -70,7 +79,12 @@ design decided per-feature is two worktrees styling the same button differently.
 The recorded token set names one token source in the repo - CSS custom properties, a Tailwind theme, a
 tokens module - and that file is the visual contract. The loop inherits one deviation criterion from
 it: every color, spacing, and radius value in the diff resolves to the token source, and a raw hex or
-magic pixel value outside it is a finding, greppable, not a taste call. The override line points at
+magic pixel value outside it is a finding, greppable, not a taste call - as is an icon or a font
+imported from outside the pinned set, greppable at the import. Two tiers, one of them referenced:
+values may be named (`--gray-400`), but a component reaches only the role that points at one, and a
+role is never borrowed because its value happens to be right today - a separator used as text color
+holds until borders lighten, and then the text goes with them. Themes resolve through one mechanism,
+not a media query setting some roles and a class setting others. The override line points at
 the token source; the contract lives in code, where it cannot drift from what ships.
 
 A token set is pinned when the token source defines a value for each slot: the font or fonts and the
@@ -96,6 +110,17 @@ its own design skill. Name-check what is wired at runtime and use it. If nothing
 `/tool-sourcing` - discover, vet, try, adopt - and record the choice so it stays swappable, exactly as
 `/browser-capability` sources a browser tool. Never hardcode a stack, framework, or aesthetic here; this
 skill ships the practice, not a taste.
+
+The capability to look for is graded, and which grade is wired decides how much of the audit the host
+carries. A candidate that states a value per property - a duration, a stroke width, a ratio - names an
+owner per domain so one defect is reported once rather than by every rule that can see it, and states
+the condition under which a project overrides each value, can be handed the numeric layer this skill
+pins slots for and deliberately never fills. One that offers principles and a mood settles a register
+and nothing else, so its criteria stay yours to write. Grade it by opening it and looking for those
+three, never by its author's standing: a value whose only warrant is reputation has nothing that can
+notice when it goes stale. Two such skills installed together will disagree on a value for the same
+element class with nothing to arbitrate, so adoption records which one owns which domain in
+`.better-dev/overrides.md`; a conflict found mid-audit is otherwise settled by whichever loaded last.
 
 ## 4. Hand plan-grill checkable visual done-criteria
 
@@ -124,11 +149,15 @@ not advice:
   ornament entirely beats degrading it.
 - **Motion is budgeted by trigger frequency, and bounded.** An action fired dozens-plus times a
   day - a keyboard shortcut, a palette toggle, list navigation - gets no entrance or exit animation
-  at all; an occasional surface - a modal, drawer, toast - gets one transition within the direction
+  at all, and shortening one does not buy it back: the cost is paid per trigger, so a few hundred
+  milliseconds on an action fired a few hundred times a day is minutes out of a user's day, every
+  day. An occasional surface - a modal, drawer, toast - gets one transition within the direction
   card's duration ceiling; only a rare or first-run moment may spend on delight. The criterion names
   the trigger's frequency class. An entrance or exit that starts slow instead of fast, motion that
   keeps playing with no state left to signal, and movement that ignores the user's reduced-motion
   preference (movement drops; comprehension-aiding fades stay) are flagged items, not style notes.
+  Motion is never the only feedback channel: an animated state change also lands a static cue in
+  color, icon, or label, which is what keeps it legible once the movement is dropped.
 
 ## 5. Tell-bans - seed list plus per-project additions
 
@@ -160,10 +189,3 @@ like for this product, specific enough that a worker could aim at it.
 Some things never change silently without an explicit decision: route slugs, primary nav labels, form
 field names and their order, the brand wordmark, existing legal or consent copy. Changing one of those
 is a contract question for `/plan-grill`, not a styling choice.
-
----
-
-This skill settles direction and criteria and hands them off - to `/groundwork` as foundation tokens,
-to `/plan-grill` as the design read and the visual done-criteria, to `/autonomous-loop` and
-`/browser-capability` as the audit the loop runs. Ponytail throughout: it sets what to prove, not how to
-paint.

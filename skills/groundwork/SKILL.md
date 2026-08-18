@@ -12,9 +12,14 @@ land it first, and **carve the rest into disjoint work-items** that N worktrees 
 without stepping on each other.
 
 This is the step above `/plan-grill`. `/plan-grill` grills one feature into a done-contract; groundwork
-sits over it - it shapes the whole idea, builds the substrate, then hands each carved work-item down to
-`/plan-grill` (feature) or `/diagnose` (fix). It runs after `/onboard` has wired the tool and the
+sits over it - it shapes the whole idea, builds the substrate, then hands each carved work-item down
+to the front-end its type names (step 4's table). It runs after `/onboard` has wired the tool and the
 branching base, and before any single feature is grilled.
+Groundwork settles intent forward for something that does not exist yet; where the project already
+exists and its intent was never written down, `/vision` recovers it backward from the repo's own
+history. Where a vision is already recorded, read it before shaping
+(`.better-dev/bin/bd-mem recall "vision"`) - its acceptance policy is a premise this pass inherits
+rather than re-derives.
 
 Read `.better-dev/overrides.md` first (`.better-dev/bin/bd-mem read overrides`). A project's own stack,
 architecture conventions, or a house way of slicing work wins over any default below.
@@ -82,8 +87,8 @@ module/interface/seam/depth vocabulary for the boundaries you'll draw in step 2;
 the glossary and any hard-to-reverse decision as it crystallizes. A clear gap one of them would fill is
 a `/tool-sourcing` candidate - never a blocker.
 
-Otherwise run a lean built-in grill, reusing `/plan-grill`'s discipline - including its
-brief-decode step when the epic arrives as somebody else's words: questions batched by settled
+Otherwise run a lean built-in grill, reusing `/plan-grill`'s discipline - entering
+`/brief-to-problem` first where the epic arrives as somebody else's words: questions batched by settled
 prerequisites into small rounds, each carrying the answer you'd pick and why, exploring the
 codebase before spending the user's attention, and confirming each decision as it locks. The lean
 grill stays human-in-the-loop - a grill that answers its own questions inside groundwork has
@@ -131,6 +136,11 @@ this?* Yes → it's foundation, settle it now. No → leave it; the loops discov
 shared `User` type two features both import is foundation; the internals of one feature's cache are not.
 Designing past the collision line is the waterfall this skill exists to avoid - the loops are better at
 the rest than a design done before any code exists.
+
+A foundation piece can sit inside the collision line and still have several viable shapes - two schema
+shapes, two boundary splits, two auth models - that argue to a draw on paper. Enter `/prototype` and
+settle it against a throwaway artifact before the shape is frozen: a frozen interface is the most
+expensive thing in this skill to get wrong, because every work-item in the wave imports it.
 
 **Freeze the shared surface.** The types, schema, and cross-area interfaces that features import are the
 fan-out's real contract: once the foundation merges, they hold still under a running wave. Name them in the
@@ -192,19 +202,41 @@ the carve is most likely to miss and most expensive to discover - a wrong carve 
 When two candidate items both want the same file, that shared thing is usually a signal it belonged in
 the foundation - push it down into step 2 rather than letting both items edit it. What can't be pushed
 down gets **sequenced**: the dependent item runs in a later wave, off staging, once the item it depends
-on has merged. The output is a list of named work-items, each with its owned areas, its base, and
-whether it's a feature (`/plan-grill`) or a fix (`/diagnose`). A product epic's list also carries a
-distribution work-item - where this ships to real users, by when, shown to how many - tracked like any
-other item. Deferring it is legitimate only as an explicit tracked deferral, never a silent omission: a
-plan whose every item is build and none is reach is a build plan wearing a product plan's name. For the
-fuller method - the file-ownership
-map, the contention check across many items, the three ways to resolve a collision, and ordering items
-into waves - read `carving.md`.
+on has merged. The output is a list of work-items, each with its title, its owned areas, its base,
+and its **type**. The type fixes the front-end, and with it who answers the work-item's open
+questions:
+
+| Type | Front-end | Who answers its open questions |
+|---|---|---|
+| feature | `/plan-grill` | the user, by construction (plan-grill's must-ask guard) |
+| fix | `/diagnose` | the evidence, then the user on a one-way door |
+| chore | `/plan-grill`'s contract-lite path | nobody - the end-state is the spec |
+| unblock | none; it is worked, not grilled | the human where the agent cannot act, otherwise the agent |
+
+The human-in-the-loop axis is a property of the type, read off the row above, and never a field a
+session writes: a per-work-item marker an agent authors saying who is watching reads as permission to
+run unattended, and the unattended signal stays the operator-set turn or wall-clock ceiling
+`/autonomous-loop` requires.
+
+An `unblock` earns its row by clearing a decision's blocker rather than by delivering any part of the
+epic; one that ships user-visible behavior was mis-typed and is a feature. Write it as the same
+four-field `NEEDS_INPUT` handoff step 1 parks a blocked question with, settle it when the work is
+done, and record the facts the work-items downstream of it need - where the credential landed, the
+new URL, the row count. It usually produces no diff, so it takes no branch and no worktree, which is
+why `/worktree-branching`'s prefix table has no `unblock` row.
+
+A product epic's list also carries a distribution work-item - where this ships to real users, by
+when, shown to how many - tracked like any other work-item. Deferring it is legitimate only as an
+explicit tracked deferral, never a silent omission: a plan whose every work-item is build and none is
+reach is a build plan wearing a product plan's name. For the fuller method - the file-ownership map,
+the contention check across many work-items, the three ways to resolve a collision, and ordering
+work-items into waves - read `carving.md`.
 
 ## 5. Hand off, and record the groundwork
 
-Each carved work-item now goes down its own front-end - `/plan-grill` for a feature, `/diagnose` for a
-fix - and then to `/autonomous-loop`. It does not arrive as if it were standalone: the front-end runs in
+Each carved work-item now goes down the front-end its type names in step 4's table, and then to
+`/autonomous-loop`; an `unblock` goes down neither, and settles when the facts it was carved to
+return are recorded. A work-item does not arrive as if it were standalone: the front-end runs in
 a fresh session where this discussion no longer exists, so the epic's ledger record is the context
 transfer - the receiving front-end loads it and enters the epic's settled decisions as settled
 (plan-grill's carved-item entry rule). Groundwork's job ends at the handoff; it doesn't grill each
@@ -214,7 +246,7 @@ carve's edge is reached: hand off, don't build.
 Present the carve before recording it, in **two separate turns, in this order**:
 
 1. **Render the table, and stop.** One message whose content is the numbered work-item list - a row
-   per item carrying its owns, depends-on, base, wave, and front-end - and no question. End the turn
+   per work-item in `carving.md`'s row shape, leading with the title - and no question. End the turn
    there. The table is the deliverable of this step; a turn that renders it has done its job.
 2. **Then ask, in the next turn.** Three things: is the granularity right (too coarse / too fine);
    does each dependency edge gate the item it blocks and nothing else; should any items merge or
@@ -240,28 +272,73 @@ If the carve is large or the dependency edges are what the user has to judge, dr
 tabulate it - a wave-by-wave diagram of items and the edges between them, per `wait-what`'s `visuals.md`. The table
 is what they approve; the picture is what makes a wrong edge visible.
 
-Record the groundwork as the project's map so it survives a compaction and the fan-out stays
-coordinated. Write the foundation contract (its substrate spec from step 2) and the parallel work-item
-list into the ledger under the epic's name. Write it strong enough that an engineer who never saw the
-discussion would rebuild the same substrate from it - the third condition of the ready-to-fan-out gate:
+Record the groundwork so it survives a compaction and the fan-out stays coordinated. Write it to the
+ledger under the epic's name, strong enough that an engineer who never saw the discussion would
+rebuild the same substrate from it - the third condition of the ready-to-fan-out gate. Six sections,
+in this order; a seventh heading is content that belonged in one of the six, filed where the next
+session will not look for it:
+
+```markdown
+## Differentiating idea
+<the bet everything else orbits, from step 1, in one or two lines>
+
+## Foundation contract
+<the substrate spec from step 2: the named do-not-modify frozen surface, the cross-cutting policy>
+
+## Notes
+<the domain; the skills every session on this epic should consult; the epic's standing preferences
+and any epic-wide settled decision that is not substrate; the contribution-guide census line>
+
+## Work-items
+| Work-item | Owns | Depends-on | Base | Type | Wave |
+|---|---|---|---|---|---|
+| Wayfinder artifact typing (`wayfinder-artifact-typing`) | `skills/groundwork/` | the ledger record shape | staging | feature | 1 |
+
+## Not yet specified
+<one line per fog signpost: in scope, and not yet statable>
+
+## Out of scope
+<one line per ruled-out work-item: the gist, and why it is out of scope>
+```
 
 ```bash
-.better-dev/bin/bd-mem ledger put "<epic>" groundwork.md -   # stdin: foundation contract + carved work-item list
+.better-dev/bin/bd-mem ledger put "<epic>" groundwork.md -   # stdin: the six sections above
 ```
 
 `bd-mem` resolves the primary checkout's ledger, so the record is visible from every worktree. Each
 work-item still gets its own contract when its front-end runs; this record is the higher-level plan that
 ties them together.
 
+**The record is the plan, and it holds no state.** Its `## Work-items` rows say what each work-item
+is. A work-item's state keeps one canonical home, `.better-dev/bin/bd-mem ledger status`, which
+derives it from disk each time it is read; a state column authored into the record is a snapshot, and
+it is wrong from the first merge onward. When the two disagree about which work-items exist, the
+record is authoritative about the plan and `ledger status` about what happened to it, and the
+disagreement is itself the finding to report.
+
 **Re-entered on an epic that already has a record, groundwork reports before it reshapes.** Read the
 record back (`.better-dev/bin/bd-mem ledger read "<epic>" groundwork.md`) alongside
-`.better-dev/bin/bd-mem ledger status`, and open with one line per carved work-item and its state -
-before anything else. Then exactly one of three moves: graduate a fog signpost the finished wave has
-made statable into a new carved item, through the carve gate asked again for the new items only; close
-a signpost or item that now sits past the epic's differentiating idea, recorded in the record's
-out-of-scope section with its one-line why; or state that the list is complete and name the next wave's
-base. A second run that reports the epic already finished while unstarted waves sit in the record is
-the failure this clause prevents.
+`.better-dev/bin/bd-mem ledger status`, and open with one line per carved work-item - before anything
+else. Lead with the title and let the slug ride inside it, because a column of bare slugs is decoded
+where titles read at a glance:
+
+> Wayfinder artifact typing (`wayfinder-artifact-typing`) - in-flight, 2d, feat/wayfinder-artifact-typing
+
+Then exactly one of three moves: graduate a fog signpost the finished wave has made statable into a
+new carved work-item, through the carve gate asked again for the new work-items only; rule a signpost
+or work-item that now sits past the epic's differentiating idea out-of-scope, recorded in the
+record's `## Out of scope` section with its one-line why; or state that the list is complete and name
+the next wave's base. A second run that reports the epic already finished while `ledger status` shows
+unstarted work-items is the failure this clause prevents.
+
+Two of those moves run on different axes, and only one of them reverses. Graduating is a sharpness
+move: a signpost becomes a work-item once the wave makes it statable, and it can go back. Ruling
+something out-of-scope is a scope move and it is one-way - it returns only by redrawing the epic's
+differentiating idea with the user, as a fresh epic rather than a resumption of this one. Scope, not
+sharpness, decides which: what you cannot yet phrase is fog, and what sits past the differentiating
+idea is out-of-scope however sharply you can phrase it. Quietly re-graduating an out-of-scope line is
+how an epic's scope grows with nobody approving the growth, and the carve gate never sees it because
+no new work-item was carved.
 
 ## Composability
 

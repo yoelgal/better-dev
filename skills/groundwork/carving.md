@@ -95,12 +95,13 @@ check in step 3 still runs across batches.
 
 ## Approve before it lands
 
-The carve above is a draft until the user confirms it. Render the work-item list - owns, depends-on,
-base, wave - as a table in a turn that asks nothing, then ask the three questions from groundwork
-step 5 in the next turn: is the granularity right (too coarse / too fine), does each dependency edge
-gate only the item it blocks, should anything merge or split. The two-turn order is groundwork step
-5's, and it is what stops the table collapsing into the question prompt - read it there before
-running this gate. Iterate until approved; only the approved list goes to the ledger.
+The carve above is a draft until the user confirms it. Render the work-item list, one row per
+work-item in the Output shape below, as a table in a turn that asks nothing, then ask the three
+questions from groundwork step 5 in the next turn: is the granularity right (too coarse / too fine),
+does each dependency edge gate only the work-item it blocks, should anything merge or split. The
+two-turn order is groundwork step 5's, and it is what stops the table collapsing into the question
+prompt - read it there before running this gate. Iterate until approved; only the approved list goes
+to the ledger.
 
 ## When two items can't be made disjoint
 
@@ -113,12 +114,18 @@ item count.
 
 The parallel work-item list, one row each:
 
-- **name** - the work-item slug,
+- **title** - the human string, with the slug riding inside it:
+  `Wayfinder artifact typing (wayfinder-artifact-typing)`. This row is where the title is stored, so
+  every later surface that leads with it has somewhere to read it from,
 - **owns** - the paths / modules it owns,
 - **depends-on** - the frozen foundation surface it imports but must not touch,
-- **base** - staging (wave 1) or the item it follows (later waves),
-- **front-end** - `/plan-grill` (feature) or `/diagnose` (fix),
+- **base** - staging (wave 1) or the work-item it follows (later waves),
+- **type** - feature, fix, chore, or unblock; the type fixes the front-end and who answers the
+  work-item's open questions (groundwork step 4's table),
 - **wave** - 0 / 1 / 2…
 
-This list, plus the foundation contract, is the groundwork record written to the ledger (groundwork
-step 5).
+Each row says what the work-item is, never what has happened to it; groundwork step 5 names the one
+surface a work-item's state is read from.
+
+This list, plus the foundation contract, is the `## Work-items` section of the groundwork record
+written to the ledger (groundwork step 5).

@@ -44,7 +44,9 @@ the new diff, and an accepted finding whose cited seam the new diff never touche
 finding, not a pass. Record the table through the memory contract alongside the per-cycle statuses
 below, so the next cycle reads dispositions, not vibes. The table is also the seen-set a rotated
 re-review dedupes against (`/review` step 5): a `REBUTTED` row is a candidate the last round saw, so it
-cannot come back as a fresh finding.
+cannot come back as a fresh finding. A `NIT` the verdict disposed of itself arrives as a `REBUTTED` row
+already written with its reason - check it like any other rebuttal, and re-open it only where the reason
+is wrong rather than re-litigating a Minor the reviewer already closed.
 
 Skip the performative acknowledgements - "you're absolutely right", "great catch", any thanks. The changed
 code shows you heard the feedback. State the fix and move on. If you pushed back and turned out wrong, say

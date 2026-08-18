@@ -53,6 +53,18 @@ images are the `pbs.twimg.com/media/...` URLs in the markdown (`profile_images/`
 avatar junk), curl each into `media/`. This read also recovers truncated note-tweets:
 the thread page carries the full text the syndication API cuts at ~280 chars.
 
+**One page per process is wrong for a batch.** `headless-read.py` launches its own chromium,
+which is right for one page and thrashes at scale: 40 pages fanned out five-at-a-time managed
+four pages in ten minutes, while a single browser holding one context and reading four pages
+concurrently did nineteen in eighty-two seconds. For any batch past a handful, reuse one
+browser: launch chromium once, add the jar to one context, then `asyncio.gather` over the
+URL list behind a semaphore, writing the same `<out>.html` plus pandoc-cleaned `<out>.md` per
+page. Same capture contract, same cookie handling, one launch.
+
+**When only the text is wanted, try `api.fxtwitter.com` first.** It returns a full note-tweet
+where the syndication API truncates, for the cost of one request rather than a rendered page.
+It serves a single post with no reply tree, so it settles rung 1 and never rung 3.
+
 **The cookie jar is operator-run, once per batch.** Agent reads of the browser's
 cookie store are classifier-blocked (credential access), so hand the operator this
 paste-ready line (pbcopy it) and wait for the jar before the first authenticated read:
@@ -132,6 +144,20 @@ part of the article body; sed line ranges beat regex here.
 Notes: IG needs the logged-in browser cookies; the DYLD prefix fixes brew Python's
 pyexpat mismatch on DASH manifests; whisper output lines start with a space - strip
 with `sed 's/^ //'`. Post date comes from `.upload_date` in the info.json.
+
+**A near-empty transcript means the video is silent, not empty.** Product and skill
+announcements are routinely screen recordings with no narration: whisper returns a few dozen
+bytes and the payload is entirely on screen. Check the transcript's byte count, and where it
+is negligible, sample frames and read them:
+
+    ffmpeg -y -i media/<id>.mp4 -vf "fps=1/4,scale=1100:-1" media/frames/%02d.jpg
+
+One frame per four seconds is dense enough for a demo and cheap enough to read. Only the main
+agent can see conversation-pasted images, but frames written to disk are readable by
+extraction agents too, so name the frame directory in the brief rather than transcribing them
+all yourself. Three silent videos in one batch hid a sixteen-step pipeline table and a list of
+mechanically enforced invariants, which were that batch's two best finds; the whisper output
+for all three totalled 46 bytes.
 
 ## GitHub repo
 

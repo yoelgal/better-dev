@@ -149,6 +149,14 @@ never runs below the tier that produced the work.
 
 ## When a tier keeps missing a class
 
+- **An environment failure is not capability evidence.** The miss triage in `orchestrating-agents`
+  sorts a failure into a brief defect or a capability shortfall, and three causes fit neither: the tool
+  the task needed was never available to that worker, the check its done-criterion names was not
+  runnable there, or a path it had to write sat outside its edit boundary. Each one is answerable from
+  the brief and the receipt you already hold, each is fixed at the same tier, and each looks exactly
+  like a weak model from the outside. Name that cause in the receipt when it holds, and the failure
+  feeds neither the no-re-descend rule nor the rate below: a class routed up over an unwired tool stays
+  over-tiered for the rest of the run on evidence that was never about capability.
 - **Two failures is a spec problem, not a capability one.** After a second failure on the same subtask,
   don't escalate the model a third time - pull the task back into your own hands and re-examine the
   decomposition and the envelope. Capability is rarely the issue twice; the spec usually is.

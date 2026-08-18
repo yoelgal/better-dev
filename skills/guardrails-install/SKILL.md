@@ -221,6 +221,19 @@ it reads downstream as one. An invocation that cannot run locally (a matrix leg,
 a container) is recorded as it appears in CI with `(CI-only)` appended, never quietly substituted with
 the plain script name.
 
+**A recorded command is a claim until it has run.** Reading a `lint` script out of `package.json`
+observes a name, never that the command resolves - which is why the deploy keys below earn a probe on
+top of the same observation. The runnable keys earn it too: run each one once before recording it,
+`verify` green or red on its own merits, `dev-run` by standing the app up and stopping it, and
+`seed-reset` on a tree whose state you can throw away, the `(CI-only)` form above exempted. A key
+that will not run is a gap to ask about, not a value to write. This is also the one family a re-run
+re-probes rather than skips: a script renamed since the record was written surfaces three skills away
+as a worker's own check failing in a fresh worktree, where the cheapest reading is broken code and
+the cheapest fix is a local workaround that leaves the record wrong for every session after it. A
+probe that contradicts the record is re-recorded, and retiring the superseded line is an operator
+action - `remember` appends rather than replaces, so a corrected value otherwise leaves two rules in
+force - which puts it in the close-out with the rest.
+
 **Record the deploy surface.** Deploy commands travel exactly like the verify commands above - detected
 once, premise-verified, recorded, never guessed downstream. Detect the platform from files that exist
 (`fly.toml`, `render.yaml`, `vercel.json` / `.vercel/`, `netlify.toml`, `Procfile`, `railway.json` /
@@ -376,13 +389,15 @@ it turns that surface into something the loop, `/review`, and the PR brief recal
 one detection is reused everywhere and nothing downstream re-guesses it.
 
 Promote it as durable rules through the memory contract, keyed so a single `recall "safety"` returns the
-whole policy - the same shape this skill already uses for the verify commands. One write per key, and
-this skill's prose above is the authoritative home for what each key means:
+whole policy - the same shape this skill already uses for the verify commands. The line half of the scope
+key is calibrated from this repo's own merge history, the largest diffs its operator merged unchanged, and
+never inherited from another codebase: a borrowed ceiling gates the wrong diffs in both directions. One
+write per key, and this skill's prose above is the authoritative home for what each key means:
 
 ```bash
 .better-dev/bin/bd-mem remember "safety-denylist: <detected globs>"    # the paths a loop edit escalates on, not edits
 .better-dev/bin/bd-mem remember "safety-gate: <classes with a real surface here>"
-.better-dev/bin/bd-mem remember "safety-scope: <n>"                    # files touched that trip the scope gate; ~10 default
+.better-dev/bin/bd-mem remember "safety-scope: <files>/<substantive lines>"  # the two axes that trip the scope gate; ~10 files default, and a line ceiling counting neither lockfiles, snapshots, generated output, nor docs
 .better-dev/bin/bd-mem remember "merge-policy: <auto-on-green | human>" # standing allowance: who MAY merge a gates-passed green PR
 .better-dev/bin/bd-mem remember "release-cadence: <per-merge | on-demand>" # whether a merge continues into /release-promotion
 ```

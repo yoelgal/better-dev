@@ -1,6 +1,6 @@
 ---
 name: plan-grill
-description: Use when the user wants a new feature or capability built and it is not a one-to-two-step change - "I want to add X", "let's build a way to Y", "can we add", "new feature: Z", a rough intent that needs a plan before code, or somebody else's vague feedback or brief ("make it simpler", "we need a chatbot") that needs decoding into a measurable problem first. Checks the baseline, ideates and grills the design watertight, and pins the observable done-criteria the loop drives to. For a bug or "X is broken" reach for /diagnose; for a whole new app or epic, /groundwork; for a trivial one-to-two-step change, just make it - still in its own worktree branch, skipping only the planning. Chore-class work enters here too - "upgrade to React 19", clearing the CVE the audit gate flagged, a behavior-preserving refactor, test or docs debt - on the contract-lite path.
+description: Use when the user wants a new feature or capability built and it is not a one-to-two-step change - "I want to add X", "let's build a way to Y", "can we add", "new feature: Z", a rough intent that needs a plan before code. When the input is somebody else's adjective rather than an intent the operator owns, /brief-to-problem decodes it into a measurable problem first and hands the result here. Checks the baseline, ideates and grills the design watertight, and pins the observable done-criteria the loop drives to. For a bug or "X is broken" reach for /diagnose; for a whole new app or epic, /groundwork; for a trivial one-to-two-step change, just make it - still in its own worktree branch, skipping only the planning. Chore-class work enters here too - "upgrade to React 19", clearing the CVE the audit gate flagged, a behavior-preserving refactor, test or docs debt - on the contract-lite path.
 argument-hint: "[feature-slug or rough intent] [depth: light|full]"
 ---
 
@@ -53,13 +53,10 @@ Gate: the intent arrives as relayed language - stakeholder feedback, user feedba
 a ticket quoting someone else ("make it simpler", "we need a chatbot", "users say X feels slow").
 First-person intent from the user at the keyboard skips this step in one line.
 
-Record the brief verbatim before restating it - the requester's exact words in quotes, with who
-said them, carried into the contract above its `## Problem` section; the specific word chosen is
-evidence, and a paraphrase destroys it. Then run the six decode moves in `brief-decode.md`. The
-decode ends in one measurable problem sentence plus an in-scope and an out-of-scope line; those
-seed the contract's Problem, Goal, and Out-of-scope, and the trigger's factual claims become
-premises for step 1. A trigger event that turns out to be a defect routes to `/diagnose`; a decode
-that uncovers an epic routes to `/groundwork`.
+Enter `/brief-to-problem` and return with its artifact. Its quoted brief lands in the contract above
+`## Problem`, its problem sentence and its two scope lines seed Problem, Goal, and Out-of-scope, and
+the trigger's factual claims become premises for step 1. A trigger event that turns out to be a defect
+routes to `/diagnose`; a decode that uncovers an epic routes to `/groundwork`.
 
 ## 1. Check the baseline before planning on it
 
@@ -92,6 +89,11 @@ policy entering as premises. A need this item can't meet without contradicting a
 groundwork's pause-the-wave signal: stop and show the conflict rather than widening the answer inside
 this item. The carve's readiness gate is checked here too, not assumed: a foundation not yet merged
 green to the integration branch means this item isn't ready to grill.
+
+The repo's stated intent is a premise too, where one exists. `.better-dev/bin/bd-mem recall "vision"`
+names the acceptance policy `/vision` recorded; read it before grilling, and a feature its resist
+test rejects stops here - it goes to the user as a choice between the feature and the policy, never
+a plan to grill and never a line quietly reinterpreted to fit.
 
 ## 2. Ideate - propose, then pick one to grill
 
@@ -166,7 +168,10 @@ grill only the decisions the done-criteria will turn on and skip exhaustive bran
   corrects a default faster than they fill a blank. If the user answers "whatever you think," they
   lack confidence too - don't take it as a blank cheque; re-ask as a choice between two concrete options.
 - **Ask only what you can't discover.** A fact about this repo or system is yours to find, not the
-  user's to answer - go read it (this is where premise-checking pays off again). A lookup slow enough
+  user's to answer - go read it (this is where premise-checking pays off again). A fact about the
+  world is yours to find too - a vendor's claim, a published number, whether anyone has tried this
+  approach and abandoned it: run `/deep-research` and carry its answer with its provenance, rather
+  than asking the user or planning on a prior. A lookup slow enough
   to stall the interview goes to a background worker while the rounds continue - a lookup still in
   flight blocks nothing except its own dependents, which sit out of the rounds until the worker
   reports; the dispatched worker reads, never writes: an unfenced background errand fills its
@@ -210,23 +215,12 @@ grill only the decisions the done-criteria will turn on and skip exhaustive bran
   rewrite.
 - **When prose stops discriminating, prototype.** A must-ask that turns on how something should look
   or behave, whose options read the same written down, gets a cheap concrete artifact to react to
-  instead of a fourth paraphrase:
-
-  | Question type | Artifact |
-  |---|---|
-  | Look-question | Several radically different variants rendered on one route and toggled by a URL param, so the user reacts to each in place rather than one mockup at a time |
-  | Logic question, answerer reads code | A filled example |
-  | Logic question, answerer is the third party the async-questionnaire unblock below serves | One self-contained HTML file that renders the whole relevant state after every click, with a button per action for free play plus one tab per worked case - a tab spells its case out in plain words and numbers the clicks that drive it, and opening a tab rewinds the state so the case behaves identically however often it is replayed |
-
-  Keep the logic itself a pure module the page only calls into, so the answer survives the page
-  being thrown away. The artifact is throwaway from its first line and marked so, runs with one
-  command or opens with one double-click, and persists nothing. When it answers, keep the answer, not the code: the decision goes to
-  `decisions.md`, the decision-rich snippet may inline into the contract (the step-4 exception), and
-  the artifact is deleted, absorbed, or - when re-deriving it would cost real time, a multi-variant UI
-  set being the usual case - parked as evidence on a throwaway `prototype/<slug>` branch, its pointer recorded
-  beside the decision in `decisions.md`. Whichever way, the working tree is clean of it before the
-  gate closes - a prototype still sitting in the tree at contract seal is an
-  unfinished decision. UI direction still belongs to `/design-brief`; this move
+  instead of a fourth paraphrase. Enter `/prototype` before building it: that skill refuses to start
+  without the named decision, owns the look-versus-logic fork, the variant set and its picker, and
+  the exit that puts the verdict in `decisions.md` and the code back out of the working tree.
+  Whichever way the artifact ends - deleted, absorbed, or parked on a throwaway `prototype/<slug>`
+  branch - the tree is clean of it before the gate closes: a prototype still sitting in the tree at
+  contract seal is an unfinished decision. UI direction still belongs to `/design-brief`; this move
   settles a single question, not the aesthetic.
 - **Attack the plan before you close.** The grill so far argued *for* the design - it walked the
   tree and filled each node with your recommended answer. Spend one pass arguing against it, through
@@ -246,7 +240,15 @@ grill only the decisions the done-criteria will turn on and skip exhaustive bran
 
 ## 4. Capture the done-contract
 
-Synthesize what the grill settled - no fresh interview, just write down what you already know.
+Synthesize what the grill settled into the contract's index of it - no fresh interview, just write down
+what you already know. **The contract indexes the locked decisions and holds none of them in full.**
+Each locked decision keeps one canonical home, the `decisions.md` the grill appended to, and its full
+text lives there and nowhere else; it reaches the contract's Implementation decisions section as one
+line of gist - enough for the user to judge relevance - with the section closing on one pointer naming
+`decisions.md`. The check when a contract line looks borderline: if an edit to `decisions.md` alone
+would leave the contract wrong, that line stores the locked decision instead of indexing it.
+`/writing-skills` owns the general rule and the failure it prevents. The rule reaches the locked
+decisions only - the two things that stay put below are not copies to thin.
 
 The contract is the one artifact the user has to read and approve, so it is written for them as well
 as for the skills downstream. Better-dev's own vocabulary - `human-gate`, `pending-decision`, *attack
@@ -293,8 +295,9 @@ is obvious, and keep the committed goal set small - a main goal plus at most two
 three in all; when the grill surfaces a fourth, halt before code and split into focused work items so
 each stays reviewable. Right-size the criteria too: one per property the goal claims, dropping any whose
 removal would miss nothing. Keep file paths and code snippets out of the prose - they go stale - with one exception:
-inline a small prototype-derived type, schema, or state-machine when it pins a decision more
-precisely than words. For the full template (problem, goal shape, user stories, done-criteria,
+inline a small prototype-derived type, schema, or state-machine when it pins a locked decision more
+precisely than words; inlined that way it is that decision's canonical home rather than a copy of one.
+For the full template (problem, goal shape, user stories, done-criteria,
 implementation decisions, out-of-scope) read `done-contract.md`.
 
 ## Close the gate, then hand off

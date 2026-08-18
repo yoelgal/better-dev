@@ -24,7 +24,9 @@ registry, forbid third-party installs, or already name the tool it wants for a g
 Write down, in one line, the capability that's missing and what would prove it filled - the observable check
 the sourced tool has to pass (e.g. "drives a headless browser and returns a screenshot", "runs the iOS
 simulator"). That line is both the search query and the acceptance test; without it, "found something" drifts
-into "found anything."
+into "found anything." If that line comes out as a question rather than a capability - "which database
+handles this", "has anyone else hit this" - the gap is knowledge, not tooling: `/deep-research` answers it
+and no install follows.
 
 ## 2. Discover - widen past the one index
 

@@ -593,7 +593,26 @@ spawns a background child that runs `graphify update` on each registered domain 
 stale against HEAD and whose path the delta touched, so the package keeps running on that machine
 until the domains or the tool go.
 
-A fourth command joins by being added here, not by resembling these three.
+A fourth command joins by being added here, not by resembling these three. One did, on 2026-08-17:
+
+- `scripts/bd-block <host global entry> better-dev-comms < docs/comms-block.md`, which writes or
+  refreshes the marked communication-style block in the host's own global entry file (undo:
+  `scripts/bd-block remove <host global entry> better-dev-comms`). Made by `/update` step 2 when the
+  installed copy has drifted from the shipped body, and by `BOOTSTRAP.md` on a first global install.
+  It qualifies on this list's own two tests: one command undoes it, and it carries no credential.
+  It writes only between its own two markers, so operator text in that file is untouched either way.
+
+  The operator's ruling that put it here, verbatim: "i shouldnt have to run that command, because it
+  should be run for anyone when they run `/update`". The reasoning generalises past this one write. A
+  drift check that ends in a paste block is a check whose fix depends on the operator noticing the
+  output, and the drift it detects is invisible from the user's side: they experience a months-old
+  block as the practices not working. This library shipped exactly that failure, so handing the repair
+  back to the person who cannot see the problem is the wrong half of the loop to automate.
+
+  D22 is not weakened by this. That entry keeps SETTINGS-class writes operator-run because agent writes
+  to a host settings file are classifier-blocked, which is a capability limit rather than a consequence
+  rule. The global entry file is a memory file, not a settings file, and `bd-block` already writes it
+  during a normal install.
 
 The list carried a fourth on the day this entry landed: the never-commit guard, a global-gitignore
 write made by setup so in-tree graph output could never be committed. It was authorized
@@ -1307,3 +1326,586 @@ A selector path (`db.sqlite:table:key`, `archive.zip:member`) is forwarded verba
 boundary prefix check while no denylist glob can match it. And `bash` is spawned from `PATH`, so whoever
 can write your `PATH` or the clone's `scripts/` disarms the guard - accepted, identical to what
 `hooks.json` already ships, and an attacker with that write owns the session anyway.
+
+## D38 - links-batch harvest rulings: the block gains a device that acts on a reply (2026-08-17)
+
+32 submitted sources, 18 archive entries. Full plan at
+`raw/synthesis/2026-08-17-master-plan.md`, frontier read at `raw/synthesis/2026-08-17-frontier-read.md`.
+
+The operator re-submitted sources this archive already held, with two complaints: replies "too long and
+verbose and not pragmatic", and `/wait-what` invoked "too often". Neither was a capture failure. The
+26-row rule-by-rule diff against upstream grades our comms block STRONGER on two rows and narrower on
+one, so the rules were not the problem: **nothing applied them at the moment they would bind.** Four
+independent absences, and one regression.
+
+Of 155 traps, exactly one graded a produced reply (127), and it grades UNDER-reporting. The trap corpus
+was asymmetric against the failure being reported.
+
+**What was wrong, with receipts.**
+
+- No device acted on a drafted reply. Every mechanism the library shipped acted on the *block*: one
+  writer per destination, a 24-line cap, a single-home gate, a duplicate-copy trap, an authoring size
+  trap.
+- The installed copy had drifted from the shipped body. Two clauses in `docs/comms-block.md` had never
+  reached `~/.claude/CLAUDE.md`; four installed clauses were reworded or dropped. Nothing reconciles
+  them: the two writers (`BOOTSTRAP.md` globally, `/onboard` per repo) each run once, and
+  `skills/update/SKILL.md` step 2 explicitly skipped content-only changes.
+- `hooks/bd-subagent-start` carried no output shaping at all, so every fan-out report the operator reads
+  was unstyled by construction. SessionStart context never reaches a subagent, which is why the gap was
+  invisible.
+- The exploration carve-out written to answer upstream `ayghri/i-have-adhd` issue #42 had **regressed
+  out** of `docs/comms-block.md` while trap 127 still called it "the whole reason the carve-out line
+  exists" and a work-item contract still pinned it.
+
+**Rulings.** Full text in the master plan; the load-bearing ones:
+
+1. The block gains the length budget, argument completeness, the connected-reasoning clause and a
+   pre-send cut list, and pays for them by compressing existing rules and rewrapping wider - **the
+   24-line cap stands** and is still CI-gated. Raising it was put to the operator, not taken.
+   Corrected after review: the first attempt at this compression **deleted** a rule rather than
+   compressing it (the wins-and-errors receipt, "what now works and the command that shows it"), and
+   an earlier draft of this entry recorded the trade as costing no rule. It did. The clause is
+   restored and the block sits at 23 of 24 lines. Two things make that worth recording rather than
+   quietly fixing: it was the only rule requiring a reported win to carry the command that proves it,
+   so it was a COMPLETENESS device deleted in the same edit that added three brevity devices, against
+   an operator complaint that is half about needing re-explanation; and ruling 6 ships the mechanism
+   that would have propagated the deletion to the operator's machine on the next `/update`. A
+   line-capped always-loaded block plus a propagation path means a compression error is a deletion
+   with a delivery mechanism, so a clause-by-clause diff of the base against the head is mandatory on
+   any edit to this file.
+2. Argument completeness lands in the block, never in `/wait-what`. A fact stated without its
+   consequence is the shape a reader answers with "wait, what?", so the fix belongs where it prevents
+   the failure. `/wait-what` is untouched and stays its size: growing a corrective against volume fails
+   the rule it teaches.
+3. `prose` and `i-have-adhd` genuinely conflict on form. Resolved by axis rather than by picking a
+   winner: lists for parallel enumerable facts, prose where items join with because, so, or but.
+   Neither source adopted whole.
+4. Brevity rules ship with their cheapest wrong obedience named. Shortness comes from cutting content,
+   never from clipping sentences.
+5. Dispatched workers get two shaping rules inline, asserted by the hook's own selftest. A pointer
+   would not be followed by a worker that never loads the file.
+6. `/update` reconciles copies as well as links. The host-global write stays operator-run per D26.
+
+**The harvest skill's own defect, and its fix.** The operator also reported that harvest passes "gloss
+over some things". The depth ladder was enforced by prose, and this batch measured the result: seven of
+fourteen extraction agents reported `DONE` over entries a mechanical check found incomplete, one missing
+`source.md` entirely. The fix is a **refusal at a stage boundary**, not a lint - no new `bd-*` script,
+per D35. Stage 2 will not open a dossier on an entry whose rungs are not dispositioned, and the grading
+is done by a reader other than the writer.
+
+The advisory alternative is a documented failure, not a hypothesis. Upstream `hyperresearch` built a
+26-rule lint over exactly this problem and only 2 of its 26 rules bind, by being imported into the one
+command that produces the ship verdict; the code comment explaining why is quoted at the decision point
+in `skills/source-harvest/SKILL.md`, which is that quote's one home. The capture is at
+`raw/sources/2026-08-17-repo-jordan-gibbs-hyperresearch/`.
+
+Three further ladder rulings: the disposition shape is pinned (`CAPTURED` or `SKIPPED: <closed-list
+reason>`), because the check produced false failures until it accepted the heading shapes agents
+actually use; each rung now names the specific miss it suffers rather than only its category, since "go
+deep" is an adjective; and a source's own evidence is read rather than its caption, because two sources
+this batch had evidence that undercut their framing.
+
+**Wayfinder, answered.** Neither obvious explanation holds: every rejection carries a recorded reason
+and all seven ruled-on landings are faithful, one stronger than its source. The gap is **scope** - D18
+harvested grilling, D23 harvested the handoff seam, and no batch ever took wayfinder's
+artifact-and-typing model as its subject. "HITL" appears zero times in this file's 1,309 prior lines,
+though the typing was captured verbatim in the first ingest and re-named in two more. Three ingests,
+zero dispositions. Carried to its own work-item rather than folded here (master plan H3).
+
+**Landed:** `docs/comms-block.md` (53 lines, cap 60; see the follow-up ruling below for why the cap
+moved twice in one session),
+`hooks/bd-subagent-start` plus its selftest,
+`skills/update/SKILL.md` step 2, `skills/source-harvest/SKILL.md` (ladder plus stage-2 audit gate),
+`skills/source-harvest/extraction-recipes.md` (single-browser batch reader after measuring 19 pages in
+82s against 4 in 10 minutes, silent-video keyframe recipe, fxtwitter fallback), traps 156 to 159.
+
+**Rejected, so it is not re-litigated:** paraphrase distillation (training-time, no prompt-level
+analogue); the `/effort` ladder as written (maps effort to job categories not judgment bands, and
+`codex -e high` is not a documented flag); the smart-zone and dumb-zone vocabulary (undefined in its
+source, and "handoff" is taken); "map once, not grep forever" as a claim (the replies falsify it for
+active repos); taste-encoded design skills as a better-dev default (kept as a composed host capability).
+
+**One lesson about this file.** The `groundwork` fog test shipped through a diff with no ruling and was
+re-proposed three weeks later as a fresh finding. A landing recorded only in a diff is invisible to the
+next harvest, which is why these rulings are numbered. Recorded as `harvest landing record`.
+
+### D38 follow-up - keep upstream's wording, and state the reader model as upstream states it (operator rulings, 2026-08-17)
+
+Three operator rulings after the first landing, all about `docs/comms-block.md`. Taken together they
+reverse a compression this session had defended twice, so the reasoning is worth keeping.
+
+**The framing was wrong, and it was wrong in a way that inverted the mechanic.** Our block opened "The
+reader may have ADHD", which reads as an accessibility accommodation offered on a maybe. Operator's
+correction, verbatim: "this isnt an accesibility thing. Its that if you tell the agent 'i have adhd' or
+whatever the skill does, it helps the communication style". The declarative framing IS the instrument:
+it is a prompt that shapes output, not a hedge about who might be reading. Upstream's own line is
+declarative and ours now opens the same way: the reader's ADHD stated as fact, then what that means for
+the output's shape. The sentence itself is not reproduced here, because the block body keeps one
+canonical home in `docs/comms-block.md` and a quote in this file is the second copy that goes stale on
+the next edit, which the package gate refuses by design. A hedge in front of an instrument disarms it.
+
+**Keep upstream's wording rather than paraphrasing it.** Operator's ruling: copy the skill verbatim, or
+at least the parts that carry the value. D31 already permits this for an MIT skill source and says why,
+and this block is the case that proves the rule: three rounds of paraphrasing produced a version that a
+reviewer measured as vaguer on the mechanism, and one round of compression deleted a rule outright while
+recording itself as lossless. Now taken verbatim: the reader statement, the persistence clause, the
+pre-send delete list with its first-line-and-last-line verify, the break-the-rules cases, and the
+phrasing of the lead-with-the-action, numbered-steps, restate-state, suppress-tangents, visible-wins,
+matter-of-fact-errors and cap-at-five rules. `NOTICE` records the split by file, naming both what was
+kept and what stays ours, per D31's credit-by-file rule.
+
+Ours in that file, and worth naming so a future editor does not "restore" them to upstream's shorter
+form: the length budget by question class and the seven-paragraphs counter (from the `prose` capture),
+the whole-argument rule, the message-is-its-own-summary rule, the glossing test, and the
+report-versus-track carve-out with its diagnosing-or-exploring scope.
+
+**The cap moves 24 to 30 to 60**, gated at `scripts/bd-package-check`. The first move bought back a
+deleted rule and a stripped counter. The second is a consequence of the verbatim ruling: upstream ships
+roughly 140 lines always-on, so at 53 lines our block is already the compression, and a 30-line ceiling
+would have forced exactly the paraphrase the operator just overruled. Two mechanical notes for the next
+editor, both of which bit this session:
+
+- The gate's single-home detector greps for the block's opening sentence as its sentinel. Rewording the
+  opening breaks the detector into reporting zero homes, which reads identically to a missing block.
+  Both moved together this time; they have to.
+- What a cap is for is stopping unbounded drift, not making deletion the cheapest way to add a rule. At
+  24 it did the latter and a shipped rule went silently, which review caught rather than the gate. A cap
+  is doing its job while the marginal line is expensive and doing harm once the marginal line is
+  unaffordable.
+
+**Every message is its own summary.** Operator-stated, verbatim: "treat every message it sends as a
+tldr, but without saying 'tldr' explicitly at the start". Landed as its own clause:
+
+> The whole message is the summary. No build-up to a payload, no separate recap at either end, and
+> never a "TL;DR" label - a reader who stops after the first two lines still has the answer.
+
+It is a shape rule and the length budget is a size rule, so they do not overlap: the budget says how
+long the message may be, this says the message has no separate summary layer inside it. It also
+subsumes two failures the pre-send cut list only catches after the fact, a recap at the end and a
+wind-up at the start, by removing the structure that produces them.
+
+The installed global block on the operator's machine was repaired to match in the same session, which
+is the first exercise of ruling 6's new `/update` path.
+
+## D39 - the batch lands as skills, not as patches (operator ruling, 2026-08-17)
+
+The operator's ruling, after the batch's findings had been landing as edits to existing skills:
+"skills are the easiest thing where we can add new ones and just wire them into the appropriate places
+so the agent always knows to call on them at the right time." That is a scope ruling and it overrides
+the orchestrator's own proposal, which had been an architectural one (a four-pillar harness rewrite,
+drafted and NOT adopted). Recorded because the reasoning generalises: a new skill plus its routing is
+cheaper, independently revertible, and immediately reachable, where an architecture change is none of
+those. The rejected draft is not filed; its two salvageable parts are named in the opportunities
+register instead.
+
+**Six skills ship.** Each was authored from a captured source rather than invented, each carries a
+`description` written as triggering conditions, and each was routing-tested against the live catalogue
+of shipped description fields rather than assumed to fire.
+
+| Skill | Fills | Source |
+|---|---|---|
+| `/deep-research` | No research capability existed at all | `jordan-gibbs/hyperresearch`, MIT |
+| `/prototype` | Settling a design decision by building instead of arguing | `mattpocock/skills` + `will-ness-ai/skills`, MIT |
+| `/test-audit` | Tests that pass against broken code, behind every green verify | `jamonholmgren` practice, ideas only |
+| `/session-review` | The trigger the memory store never had | reader practice + `jamonholmgren` item 8 |
+| `/vision` | Recovering intent from a repo that already exists | `kunchenguid/vision`, MIT |
+
+`/brief-to-problem` was authored and is **not wired and not adopted**: see the operator calls below.
+
+**Seven existing skills changed**, against the three operator asks this batch opened with. `/review`
+gained a FIX/NIT/ESCALATE disposition beside severity, a convergence stop, channel independence stated
+as a property rather than a model choice, and a self-recording measurement suffix. `/security-pass`
+gained VISA's five-check evidence gate with its refusal clause and an anti-manipulation rule naming
+artifacts that address the reviewing agent instead of the code. `/pr-and-verify` gained a
+deterministic-gates-before-judgment chain and the monotonic invariant. The graphify wrappers gained a
+freshness contract, edge-tag trust rules, and honest benefit evidence.
+
+**Three rulings the work forced, beyond the additions.**
+
+1. **Environment variables and CLI flags are no longer blanket-trusted inputs.** `/security-pass`
+   carried that as a flat precedent; VISA's group A carve-out supersedes it, because the writer's
+   existing shell or deploy access was the entire basis of the trust, and a CI job parameter, scheduler
+   argument, or shared config another team can write has writers who hold none of it. The flat line was
+   deleted rather than qualified.
+2. **`Hardening` ships as a report disposition, not a fourth severity rung.** Every rung of `/review`'s
+   ladder blocks a merge, and a defence-in-depth note should not. `Not-applicable` was rejected: the
+   drop line already records every failed candidate with its class and reason.
+3. **A skill's routing line is applied by an integrator, never by its author.** Twelve workers
+   reported 22 wiring lines with quoted anchors and applied none of them; one integration pass placed
+   all 22 with every anchor matching verbatim. Three reported lines were the citation-plus-partial-
+   paraphrase form `/writing-skills` bans and were repaired to enter-steps at placement. An author
+   wiring its own skill writes the pointer it wishes existed; an integrator has to find the anchor.
+
+### Open operator calls, recorded so they are not lost
+
+- **`/brief-to-problem` is ADOPTED as a skill (operator ruling, 2026-08-17), reversing D15.** D15 had
+  adopted the capability as `/plan-grill` step 0 plus that skill's `brief-decode.md` sibling and named
+  the skill form as examined and rejected, on the grounds that a single consumer does not earn a skill.
+  Two things changed. A second consumer appeared: `/diagnose`'s symptom-only gate needs the same decode
+  for a report whose claimed-actual is only an adjective, and `/writing-skills` forbids it from reaching
+  into another skill's files, so inlining a copy was its only D15-legal route. And routing measurement
+  showed a bare decode ask with no build behind it already lands on the new skill's description, which
+  is the case with no other home at all: three of the five decode outcomes are not features.
+
+  Landed as a **clean cutover**, which is what makes it an adoption rather than a second surface:
+  `skills/plan-grill/brief-decode.md` is deleted, so the six moves live in one place. `/plan-grill` step
+  0 now enters the skill and returns with its artifact, its description hands the relayed-language case
+  over instead of claiming it, `/diagnose` enters it at the symptom-only gate, and `/groundwork`'s lean
+  grill enters it for an epic that arrives as somebody else's words. Trap 63 moved with the capability
+  and gained the fail branch the move creates: a grill that decodes inline from memory of how step 0
+  used to work.
+
+  Also corrected here, because the batch's own frontier read got it wrong: this was filed as an unlanded
+  orphan. It was not. The worker reconstructed D15 from the record and logged a papercut against the
+  brief that misled it, which is the sweep working rather than failing.
+- **Three of the six graphify wrapper skills are recommended for folding**, on measured evidence rather
+  than taste: upstream's own benefit number is +11.2 points on n=6 graded questions, and re-measured
+  ripple coverage on this repo is 38.1 percent against a 70 percent threshold. The same audit
+  recommends **not indexing this repository at all**, since 127 markdown files are the product and 76
+  percent of call-family edges are vendored daemons. Nothing was deleted: cutting a skill is a ruling.
+- **The graphify version floor stays 0.9.18.** A half-applied bump to 0.9.45 shipped in the skill text
+  and was reverted: the gate pins the same string in five other places, and raising it edits the command
+  D26 authorizes by name, which is an operator call rather than a wording change. The reason for wanting
+  it is recorded in the skill: below 0.9.45 an incremental rebuild can make every unchanged source look
+  deleted when the `.graphify_root` marker records a subfolder, and the refresh path hits that unattended.
+
+### One ordering dependency
+
+`feat/wayfinder-artifact-typing` is stacked on this branch and its two new routing pointers reference
+`/prototype` and `/vision`, which exist only here. The skill linter does not resolve cross-skill names,
+so nothing catches it if the merge order slips: this branch merges first.
+
+## D40 - the slop guidelines ship in the block, not in an override (operator ruling, 2026-08-17)
+
+The operator's ruling, in two parts. First: "we should always follow the no-ai-slop rules." Second, after
+a first attempt recorded it in `.better-dev/overrides.md`: "this shouldnt come in the form of the
+overrides, the comms block that is shipped to every user should include the no-ai-slop guidelines."
+
+The correction is about who the rule is for, and it is worth keeping because the first attempt was a
+category error rather than a wording problem. An entry in `.better-dev/overrides.md` is one project's
+preference, read by agents working in this repo and by nobody else. The comms block is the artifact this
+library installs on a user's machine. Putting a library-wide default in the overrides file would have
+meant this repo followed the rules and every consumer did not, which is the opposite of shipping them.
+The override was removed rather than duplicated: a rule in two homes is the third-edit failure
+`/writing-skills` names, and the block is the canonical home.
+
+**What that costs, stated plainly.** The block goes from 58 lines to 80 and its cap from 60 to 85,
+because a delete list has to name what it deletes and a pointer to a reference file does not load on the
+turn it binds. That is a real per-turn tax on every session, accepted deliberately: the operator asked
+for the rules to reach every user, and the only surface that reaches a user is this one. Upstream's own
+skill runs about 140 lines always-on, so the block remains the compression.
+
+**The split between gated and prose, which is the design decision under the ruling.** The mechanically
+checkable patterns are gated in `scripts/bd-package-check` beside the older em/en dash gate: a
+binary contrast, a colon reveal, a named empty phrase, a recap ending, and the vocabulary that has no
+legitimate use in technical instruction text. Every gated phrase returned zero across the shipped
+surfaces when the gate was added, so it locks in a property the library already had instead of demanding
+a cleanup. The judgment half lives in the block as prose, because the portability test and
+show-rather-than-label cannot be greppped and are the checks most surviving slop actually fails.
+
+**One carve-out, and the reason it is not a compromise.** Upstream bans `harness`, `leverage`, `robust`,
+`streamline` and `realm` outright. This library is about harness engineering and uses the first two as
+domain terms on nearly every page. Gating them would fire on hundreds of correct lines, and a gate that
+cries wolf gets switched off, taking the useful half with it. Those five stay advisory. The structural
+patterns carry no exception.
+
+**Three files are exempt from the gate by construction**, not by exception: the block itself, this
+decision record, and any docs page about the patterns. Each has to name a pattern in order to forbid it.
+
+**And one instance found in our own text while landing this.** The block's own opening read "Output is
+not just brief. It is shaped so an ADHD brain can act on it", which is the binary contrast the same
+source calls the loudest tell. That sentence was upstream's wording, kept under D31 and the operator's
+earlier verbatim ruling, so the two rulings collided on one line. Resolved toward the slop rule and the
+line rewritten, because shipping a block that violates its own first rule in its first sentence is worse
+than departing from an upstream phrase. The operator was told which line changed so it can be reverted
+in isolation.
+
+## D41 - the harvest's final sweep: six rulings, and the trap corpus gets a result field (2026-08-18)
+
+Seven workers closed the 2026-08-17 harvest, reading `lopopolo/harness-engineering` at v1.0.0, the
+`jamonholmgren` setup thread, the UI-design skill cluster, `haacked/dotfiles`, `ayghri/i-have-adhd`,
+`PostHog`'s `qa-frontend`, and the eval sources. Their seven reports under `.better-dev/review/` are
+the evidence for everything below; that directory is per-machine and gitignored, so each ruling here
+carries its own citation into shipped files.
+
+**The licence correction comes first, because the briefing carried the error into six briefs.**
+`lopopolo/harness-engineering` is **CC BY 4.0** for repository-authored prose at tag **v1.0.0**, with
+`sources/raw/acp/` and `sources/raw/images/` carved out under Apache 2.0 from the Agent Client Protocol
+project. The batch briefing told six workers it was MIT. Three of them checked the capture rather than
+inheriting the claim, and all three reported the same correction: the capture's own front matter states
+it (`source.md:30`, "Repository-authored prose, editorial organization, and diagrams: CC BY 4.0") and
+its Substance section states it again. Nothing verbatim landed from that repo, so no CC BY attribution
+obligation was triggered; `NOTICE` now carries the licence, the version, the carve-out, and the
+licence's own required attribution string against any future reuse. Recorded because a licence line in
+a brief is a claim like any other, and this one reached six workers before anyone opened the file.
+
+### The sweep's shape, which is itself evidence about harvesting
+
+| Disposition | Count |
+|---|---|
+| Landed in skill text | 31 |
+| Already held, with our own line quoted | 59 |
+| Rejected with a stated reason | 48 |
+| Deleted (one restated recap, in `design-brief`) | 1 |
+| Landed as records in this commit rather than skill text | 4 |
+| Referred to a file the finding worker did not own | 8 |
+
+Per worker, so the totals are checkable: landed 1 / 2 / 8 / 1 / 6 / 13 for Lineage, ToolLegibility,
+Playbooks, LoopHardening, VerifyEvidence and DesignCluster; already-held 5 / 8 / 11 / 5 / 13 / 11;
+rejected 4 / 4 / 14 / 0 / 8 / 13, with four of LoopHardening's five already-held items also carrying a
+rejected half. `EvalAndRecovery` edited no skill directory: its five lands are records, four of which
+land in `docs/TRAPS.md` in this same commit and the fifth of which is explicitly not taken (below). Its
+already-held count is 6 and its rejected count is 5. The batch brief's own estimate was 31 / 48 / 44;
+the landed figure was right and the other two were low.
+
+**The lesson is that a sweep proving we already hold something is the common case, and that this is a
+good outcome rather than a wasted pass.** Fifty-nine already-held findings against thirty-one landings
+is close to two to one. It only reads as a good outcome because every worker was required to quote our
+own line beside the claimed gap: an already-held verdict with no quotation behind it is
+indistinguishable from a worker that did not look. Three of the seven corrected a sibling report's
+already-held claim by checking it in the file instead of inheriting it, which is the same discipline one
+level up.
+
+### 1. A recorded command is a claim until it has run
+
+`ToolLegibility` returned `ours-is-weaker` on the tool-legibility thesis, against a prior claim that we
+held it, and the seam it found is narrower than the capture's. Five of the thesis's seven output
+properties were already held and the prove-it-before-you-record discipline was already held twice. What
+was absent: the recorded keys name routes and nothing ever proved a route runs. The deploy keys already
+carried a probe (`guardrails-install:241-242`, fetch the health URL once and read the status code); the
+five keys a worker actually executes, `dev-run`, `seed-reset` and the three `verify` keys, were recorded
+off a file observation with no probe at all. The governing rule did not close it, because "detection is
+a premise, not a fact" is satisfied by a fact about a file and says nothing about execution, which is
+precisely why the deploy block twenty-two lines later had to add a probe of its own.
+
+**This repo has already paid for it, which is what makes the ruling evidence rather than theory.**
+`.better-dev/rules.md:3` carries, live, a paragraph of where-the-command-used-to-be on the `verify:` key
+after the 2026-08-14 flatten (D32) moved the gate to the repo root, and `rules.md:9` carries the same
+correction again for `verify lint:`. The recorded command's path moved, nothing re-probed it, and there
+was no route to replace it, so the record grew an explanation instead. Landed at
+`guardrails-install:224-235`: a probe per runnable key in the shape that key allows, `(CI-only)` named
+as the exemption, the re-run re-probing this one family rather than skipping it, and the correction path
+stated because `bd-mem remember` appends rather than replaces, so a corrected value otherwise leaves two
+rules in force and the retirement is an operator action in the close-out. The runtime half landed at
+`observability-install:73-77`, where `obs-alert-channel` is the one key whose rot is silence.
+
+### 2. A design mechanic lands when it is a relation, a ban, or a presence check, and is rejected when it is a constant
+
+`DesignCluster`'s deciding test, and it resolved the taste-versus-checkable tension the cluster had
+blocked on. A relation is arithmetic a reviewer re-derives from the project's own values (outer radius
+against inner radius plus the padding between them; an inter-group gap at least twice the intra-group
+gap). A constant is the author's taste wearing a number (`scale(0.96)` on press, `1.5px`, `200ms`), and
+it belongs to whichever host design skill ships it. Thirteen mechanics landed under that test and
+thirteen were refused by it, including the three named cubic-beziers, the five-row duration table, and
+the icon-animation values.
+
+**This is not a new axis.** It is the operational form of two rulings already on file: D15's design
+hardening at line 228 keeps token-set slots as form only, with values never shipped, and D18's rejection
+row at line 297 sends spring constants and platform animation formulas to the composed host skill. What
+the cluster added is the test that decides a candidate at the moment it arrives, and the reason the
+strong form of "skills carry criteria, not taste" is wrong: both upstream authors, when they sit down to
+write, do convert judgment into exactly the checkable form our bar demands.
+
+**So the ruling has a second half. Encoded taste is legitimate; an unwarranted constant is not.** A
+skill may carry taste in a form a reviewer can check, and each constant it ships carries a derivation or
+a named source. The evidence is a 30k-star taste library whose four factual errors, two of them throwing
+at runtime, survived in `emilkowalski/skills` issue #26 until one reader ran the code against two
+library versions. With no derivation and no regression surface, a value's only warrant is reputation,
+and reputation cannot notice when it goes stale. That is why `/design-brief`'s new sourcing step grades
+a candidate by opening it and looking for three properties (a value per property, an owner per domain, a
+stated override condition) and never by its author's standing, and why two such skills installed
+together record which one owns which domain in `.better-dev/overrides.md` rather than letting whichever
+loaded last arbitrate.
+
+One more piece of evidence for the never-restate rule, from the same capture: one author, in one month,
+published two skills carrying the same check with different thresholds, a light/dark boundary and a
+body-text floor that disagree between his cluster's colour skill and his standalone one. That is what a
+second copy costs, and it is why `slop-and-checks.md` lives beside `design-brief/SKILL.md` instead of
+being copied into `/review`.
+
+### 3. A brief's scene-setting line is a claim, and the orchestrator is the one who has to check it
+
+**Recorded as an observed failure of this orchestrator, with the instance named, because that is what
+makes it a rule rather than a platitude.** `Lineage`'s brief opened by asserting that no skill uses a
+prior run's trail as an input to a new one. That was false on disk, and
+`report-HarnessThesesLand.md:145-150`, a sibling report the same brief cited two lines later, had
+already disproved it along with two further false claims in the same opening line (that `lineage` is one
+of the twelve theses, and that thesis 10 is lineage rather than `durable-systems`). The worker paid to
+re-derive a correction that was sitting in a file its own brief pointed at. The failure is upstream of
+every check we already run: we vet a worker's claims at the source, and we vet a brief downstream
+through a judge whose reference is authored outside the goal-writer (`orchestrating-agents:200-205`),
+and nothing vetted the brief's own framing at the moment it was written, which is before the cited
+sources are read. Landed as four lines on the scene-setting bullet at
+`orchestrating-agents/briefs-and-reviews.md:16-20`, in a read-when-you-need-it sibling rather than the
+always-loaded body.
+
+**The same worker's second edit is the precedent worth keeping.** It drafted an address-versus-noise
+test for carried trail items into the brief-contents list, then A/B tested it across five scenarios and
+found that 5 of 5 arms produced the behaviour without the text, one of them inventing a routing key
+unprompted to carry the finding. It reverted its own edit as already-held, citing
+`briefs-and-reviews.md:113` as the line that teaches the identical discipline for the adjacent object.
+That is cut-before-add executing rather than being asserted, and it is recorded as precedent: a drafted
+edit whose without-arm already passes is a restatement, and the honest move is to delete it and say the
+measurement said so. The kept sentence is reported as not measurable by that instrument, since a
+stateless arm has the source already pasted in, which is the state the rule exists to produce.
+
+### 4. The trap corpus is 161 definitions and one observation
+
+`EvalAndRecovery`'s finding, and the two parts that make it actionable rather than a complaint.
+
+First, **our own authoring bar already requires the fix.** `skills/writing-skills/SKILL.md:210-213`:
+"Any file the model both reads and rewrites - a contract's done-criteria, a progress ledger, a pass/fail
+list - carries an explicit typed status field per item (a boolean or enum in a table or JSON shape), not
+a prose bullet. A model tidies prose and leaves `"passes": false` alone." `docs/TRAPS.md` is exactly
+that file, and it carried no typed status field on any of its 161 scenarios. So this is a shipped rule
+the library was not applying to its own corpus, which needs no external precedent to justify.
+
+Second, **`.better-dev/model-fingerprint` implies a validation that nothing evidences.** It holds the
+bare string `claude-fable-5`, with no date, no result and no scope, and trap 106 describes that file as
+the thing that "records the model that validated the trap suite and tier calibration". One line in 2,500
+records that a scenario was ever run against a model. Five weeks of a revalidation ritual asking a human
+to re-run three traps by hand had left the human nowhere to write the answer, which is the mechanical
+reason the count is one.
+
+**Rung 0 is taken in this commit.** One `Last run:` line under each of the 161 headings, plus a preamble
+sentence naming `never` as an unproven claim about the skill the trap targets rather than a neutral
+default. Trap 1 carries the one real value the file already held, and it is written as
+`2026-07-07 fail (model unrecorded)` rather than being attributed to the fingerprint's model, because
+the file records the date and not the model, and inventing the model would be the defect the field
+exists to expose. Trap 71's `2026-07-16` evidence line is an observation of a host classifier's
+behaviour rather than a grading of that trap, so it stays `never` and the observation stays in the
+scenario prose. About 162 added lines in an on-demand document, so no always-loaded cost.
+
+**Rung 1 is not taken: scoring traps 1, 4 and 5 under two conditions with three trials each, 18 runs.**
+All three settle on a string in the run's own output, so no judge is needed, and the ritual already pays
+a recurring human cost to re-run exactly those three. What stops it is that the fixtures do not exist:
+a failing test whose output reads like an instruction, a six-criterion contract with an implementer
+report and a `test_reconcile` asserting a hard-coded value, and a PR rendering a wrong growth percentage
+over green CI. **Revisit trigger:** the next time the fingerprint changes and the ritual fires, since
+that is the moment the 18 runs would be paid for anyway. A second trigger retires the no-script
+position: past roughly 30 runs per revalidation, blinding the condition and skipping completed rows are
+where a human eyeballing results makes mistakes, and a runner earns its line count there and not before.
+
+**Rung 2 is not taken: `ayghri`'s five-dimension weighted rubric plus its off-target corpus.** Its
+clause 2 is the thing we have no analogue for, because it gates release on a regression rather than a
+win: "Correctness and safety are each within 0.1 points of baseline or better." Its `cases.jsonl` is
+deliberately built from tasks the skill is not about, so a concision skill cannot win by deleting
+substance. Taking it needs a blind judge, a 14-case off-target corpus, and a second release gate beside
+`bd-package-check`, and D35 says name the collector before adding one. **Revisit trigger, quoted because
+its specificity is the point:** the first review or papercut recording that a better-dev skill made an
+unrelated run worse. Until that observation exists, an off-target corpus would be 14 invented cases,
+which is the same defect the authoring bar names about invented rationalizations. Wilson intervals are
+rejected outright: at three trials per condition an interval is decoration, and nobody will re-run ours.
+
+### 5. The scored-suite blind spot, which is the most important line in the sweep
+
+**Every trap in the corpus is a positive control for the skill it targets: the pass is the skill
+helping. No trap anywhere in the 161 fails when a skill makes an unrelated run worse.** So a scored trap
+suite can only ever confirm that the library helps where it aimed, and can never detect heaviness. That
+is not a gap in rung 1's execution; it is a property of the corpus, and rung 1 inherits it whole.
+
+**And that is precisely Miessler's critique, which means our measurement plan cannot answer the batch's
+own loudest objection.** The critique this batch spent a recovery attempt on is about skill libraries
+being too heavy. The measurement we can afford is blind to exactly that axis. Recorded in full and
+unsoftened, because the tempting version of this entry says rung 0 and rung 1 give the library a real
+measurement, and the true version says they give it an auditable record of where it helps while leaving
+its loudest criticism unmeasured. Rung 2's off-target corpus is the shape that would see cost, and its
+revisit trigger above is the honest price of not building it now.
+
+### 6. Pocock's reply is recovered, and it is an author's own ablation
+
+Recovered at `https://x.com/mattpocockuk/status/2081655893427450117` (2026-07-27) after four prior
+routes failed, by an authenticated headless read of the critique permalink at 14 scrolls plus a second
+per-reply syndication fetch on the reply's own status id. The load-bearing sentence, verbatim:
+
+> This is strictly an AFK agent optimization - AFK agents do better with chunks scoped ahead of time.
+> I've experimented with just a spec and /goal, but the results were worse.
+
+**That is the author trying the lighter alternative his critic asked for and reporting it worse, which
+is the evidence the batch was missing on whether to copy the spec-then-tickets-then-wayfinder shape.**
+It points the same way as ours: better-dev's carve into work-items with a sealed contract per item is
+the chunking, and `/autonomous-loop` is the AFK case the sentence scopes the optimization to.
+
+Two qualifications ride with it, both load-bearing.
+
+1. **It is an unquantified anecdote and travels as one.** "The results were worse" carries no n, no task
+   set, no rubric. Under `skills/deep-research/SKILL.md:134-136` it rides at best as inspect-grade.
+   It supports a decision already made and licenses no claim.
+2. **The AFK scope cuts both ways.** If chunking is strictly an AFK optimization, then applying the full
+   carve-and-contract weight to attended, interactive work is unjustified by this evidence. So the reply
+   is external support for keeping `/plan-grill`'s contract-lite path for attended and chore-class work,
+   and it is evidence against widening the heavy carve, not for it.
+
+### Recommended and deliberately not built: one committed worked example
+
+`Playbooks` read the artichoke refactor ledger in full and recommends one committed, redacted promotion
+of a single completed work-item's ledger at `docs/worked-example-<slug>.md`. The gap it closes is real
+and specific: `writing-skills:150-153` sends the author of a `rationalizations.md` to find real excuses
+in "a work-item's receipts and `reception.md`", and those live under `.better-dev/`, which is gitignored,
+so that instruction points at artifacts nobody outside the producing machine can read. Nothing was
+written, and this sweep declined to write it, because inventing a ledger would be the fabrication the
+source's own contamination warning is about. Three constraints if it is ever taken: pure evidence with
+real commit links and no interpretation, since links do not rot into wrongness the way a paraphrase
+does; the two kinds of open work kept separate, a falsified hypothesis disappearing while an accepted
+debt that outlives the refactor is preserved; and a contamination line, because a worked example drawn
+from this repo's history and committed into this repo cannot then be used as a trap. One work-item,
+never a growing collection.
+
+### Traps 162 to 167
+
+Six behavioural changes from this sweep are rigged, one per change that could regress rather than one
+per landing: the recorded-command probe (162), the relation-versus-constant design test (163), the
+brief-claim check (164), the loop's wider verify at first green (165), the verify oracle (166), and the
+merge-queue push suspension (167). Each carries the plausible wrong behaviour as its Fail branch, which
+is why the count is six against thirty-one landings: a landing whose regression could not be stated
+concretely got no trap.
+
+### Rejected with reasons (one row each)
+
+- Notation-first colour, converting hex or rgb to a perceptual space - tried at scale by an expert and retracted in one merge (+547/-405) for "notation is not a defect"; our token source is representation-agnostic by construction, so adopting it would force a representation onto the visual contract.
+- Agent-readiness as a `/codebase-audit` lens - its evidence is a trajectory rather than a `file:line`, its operational half is already a `/guardrails-install` record with absence recorded as `none`, and its unowned half is a repo-teaches-agent standard with its own trigger. What crossed into the audit is the severity floor and the prior-friction leads, and nothing else should.
+- The nine-field review contract and the sixteen-field result record (both playbooks) - ceremony in front of a one-shot advisory report; D13 pins `/codebase-audit` ephemeral. The one field with independent value, the revision, landed as one line inside the report.
+- A `credential-custody` recorded key - custody is a capability needing a broker better-dev cannot install, so the key would record `none` on every repo with no consumer.
+- A per-key "may fire unattended" flag - the gate is already closed at the moment of firing (`guardrails-install:577-579`), which beats a flag recorded months earlier.
+- The `head`/`tail` context-unsafe detector on recorded verify commands - zero instances in this repo, no observed occurrence to price it against, and our records are copied verbatim from CI rather than improvised by a worker.
+- A committed visual-baseline set with LFS - a baseline goes stale silently, every intended change then needs a blessing, and reflexive blessing reports green on real regressions too. Refused with the cost of refusing named: a regression on a surface the work-item never enumerated.
+- Standing performance benchmark tests - a capability, not a rule; this repo's own verify command has no timing surface; on shared runners a timing gate is a flake generator and a waived gate reports nothing.
+- Committing the work-item ledger and tagging git to match it - the ledger is transient loop state and stays out of version control by decision (`onboard:324`); a bundle travels on the branch and the receiving side re-pins consent.
+- A periodic cross-work-item commit sweep, and an unattended march through a task queue - both are cadence work, refused by name at `autonomous-loop:13-15`. `/review`'s whole-branch pass and the witness-marker guard cover the within-branch case.
+- Escalating a precommit hook to a cheap model that rewrites source - the rewrite lands unreviewed inside the one step everybody trusts to be mechanical; `review:167-169` already forbids the inverse.
+- A seventh report-trailer key for cross-slice lessons - the trailer is the control-flow interface, validated by `bd-dispatch record`; widening it for an advisory payload weakens what it is.
+- Reading prior session transcripts as a run input - `/session-review` exists to compress a session into five lines and four keyed destinations precisely so the next run reads those instead.
+- A `tool-legibility` skill, and a lineage skill or file - neither has a trigger of its own; every moment they would fire is a moment the recorder, the adopter, or `/session-review` is already firing.
+- Blind judging and a five-dimension weighted rubric, now - no judge exists to blind at rung 1, and the rubric's prerequisites are named above with its trigger.
+- Wilson confidence intervals on trap results - decoration at three trials per condition.
+- Accessibility rule sets inside `/design-brief` (hit-target thresholds, `:focus-visible`, forced-colors, the eight escalation triggers) - out of scope by that skill's own frontmatter, and landing them would fork the host audit its step 3 composes.
+- A stable ID plus a Fail/Pass code pair per design tell - the real failure, that positional numbers shift, is fixed by one sentence requiring an override to quote the tell's text; cut-before-add decides between two working fixes.
+- The reproducibility retry and an `INTERMITTENT` coverage row - `verify-runtime.md:90-92` settles ambiguity toward FAIL on a stated cost asymmetry, and that row is the escape hatch the asymmetry exists to close.
+
+### Covered, not re-filed (recorded so the next harvest does not re-litigate)
+
+- "Documents are for the model, not the human" (Pocock) - the sharpest reframe in the reply and a principle we hold implicitly; it is the deletion test's purpose from another angle, and the authoring bar is already 258 lines. A future bar revision may use it instead of a rule, never in addition to one.
+- "Test the gate itself once" as a standing rule for new gates - held in a stronger form at `guardrails-install:189-195`, three observations including staging a violation and seeing the gate refuse.
+- Measure your own harness rather than import benchmark defaults, and ship the source's own inspect-grade qualifier with any number - `tiers.md:131-132` and `deep-research:134-136`.
+- Clearing the always-on comms block from a baseline condition - `docs/TRAPS.md:25-32`, which already credits `ayghri` issue #52 by number. This sweep added the model pin and the isolation-flag preference beside it.
+- A privacy contract on read-back session logs - our version reads the repo's own memory store, so there is no third-party boundary to cross.
+
+### Two follow-ups for the operator, deliberately not landed
+
+1. **A `--fix` precommit hook can settle a loop `NEEDS_INPUT` on a formatter.** `guardrails-install/stacks.md:52-61` wires `lint-staged` plus `prettier --write` for a Node repo. If it reformats a file the loop pinned into `protect.hashes` earlier in the same pass, the settle-time re-hash at `autonomous-loop:97-100` sees a moved hash and can settle on a formatter rather than a defect. `LoopHardening` derived this rather than observing it, and recorded it here instead of smuggling derived material in under a harvest brief.
+2. **A periodic no-op pass tied to model releases.** Pocock: "I often do a no-op pass on my skills to check for things the models now do out of the box." We hold the reactive form at `writing-skills:124-127`, which fires when a skill under-performs. A standing sweep on a model release is a different trigger, and it belongs to whoever owns the via-negativa work rather than to a second copy of the deletion rule.
+
+### Referred and not placed, so the sentences are not lost
+
+Six workers produced eight sentences for files they did not own, each with a quoted anchor in its
+report. Four are placed in `docs/TRAPS.md` by this commit. The rest need their owner:
+`skills/release-promotion/distill.md` (a `rules.md` line is the weakest owner a lesson can have; name
+the earliest owner that could carry the same invariant before promoting),
+`skills/diagnose/SKILL.md` (the caller list bounds the fix and not the defect; where the root cause is a
+choice rather than a call, the population is every site that made the same choice),
+`skills/worktree-branching/SKILL.md` and `skills/pr-and-verify/verify-runtime.md` (a recalled command
+this tree cannot run is a defect in the record, routed back to `/guardrails-install`, never a local
+substitute), `skills/review/inbound.md` (a thread is machine-authored when it carries our own authorship
+line, never when its account looks like a bot), and `skills/writing-skills/SKILL.md` (a scope guard in a
+body is the tell that a split is overdue). Each is a live gap its worker verified in the file rather
+than inheriting.

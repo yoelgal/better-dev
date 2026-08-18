@@ -545,6 +545,43 @@ for f in $(find skills scripts docs hooks hosts better-dev -type f 2>/dev/null; 
 done
 [ -z "$dash_hits" ] && ok "no em/en dashes in shipped text" || bad "em/en dash in:$dash_hits"
 
+echo "== no-ai-slop gate =="
+# Standing library default, not a project preference: the no-ai-slop guidelines ship to every user inside
+# docs/comms-block.md, which is why they live in the block's delete list rather than in one repo's
+# overrides. Only the mechanically checkable ones are gated here; the rest is an authoring judgment a
+# grep cannot make, and the block carries those as prose.
+#
+# What is deliberately NOT in this list, and why the omission is the load-bearing part: the source's
+# banned-word list was written for consumer prose and bans `harness`, `leverage`, `robust`, `streamline`
+# and `realm`. This repo is a harness library that uses the first two as domain terms on nearly every
+# page. Gating them would fire hundreds of times on correct text, and a gate that cries wolf gets
+# disabled, taking the useful half with it. So this gate holds only phrases that have no legitimate use
+# in technical instruction text. Every one returned zero across the shipped surfaces when it was added,
+# so it locks in a property the repo already has rather than demanding a cleanup.
+#
+# BSD grep has no -P, so this stays in ERE (-E) with -i, and the alternation is one pass per file.
+slop='delve|tapestry|paradigm shift|game.changer|supercharge|ever-evolving|cutting-edge|multifaceted'
+slop="$slop|it'?s worth noting|it is worth noting|here'?s the thing|let me be clear|plot twist"
+slop="$slop|what if I told you|stands as a testament|marks a pivotal moment|plays a vital role"
+slop="$slop|underscores its significance|experts agree|at the end of the day|in today'?s world"
+slop="$slop|let'?s dive in|is not just|isn'?t just|the question isn'?t|in conclusion"
+slop_hits=""
+for f in $(find skills docs hosts -type f -name '*.md' 2>/dev/null; ls README.md BOOTSTRAP.md CLAUDE.md 2>/dev/null); do
+  case "$f" in
+    # Three files must name a pattern in order to forbid it, so they are exempt by construction rather
+    # than by exception: the shipped block itself, the decision record that quotes the ruling, and any
+    # docs page about the patterns. Exempting the block is not a loophole - it is the one file whose job
+    # is to carry the list.
+    docs/comms-block.md|docs/skills/no-ai-slop*|docs/DECISIONS.md) continue ;;
+  esac
+  LC_ALL=C grep -Eilq "$slop" "$f" 2>/dev/null && slop_hits="$slop_hits $f"
+done
+if [ -z "$slop_hits" ]; then
+  ok "no gated ai-slop phrasing in shipped markdown"  # prove-new: regression-guard every pattern returned zero across the shipped surfaces when the list landed (see the note above), so the check locks in a property the repo already had rather than demanding a cleanup
+else
+  bad "ai-slop phrasing in:$slop_hits (the full list is the delete list in docs/comms-block.md)"
+fi
+
 echo "== zsh path-variable trap =="
 # A skill's bash blocks are executed by the agent's shell, which is zsh on macOS (and the Claude Code
 # default there). zsh ties the `path` variable to `PATH`, so a plain `path=...` assignment REPLACES the
@@ -858,15 +895,26 @@ fi
 echo "== comms-style block =="
 # The block ships from exactly one file. onboard writes it per repo and BOOTSTRAP offers it globally;
 # two copies of the body would drift, and the drift only shows up on a user machine. Also gate the
-# 24-line cap the block is deliberately held to - it is a per-turn tax in every session that loads it.
+# 85-line cap the block is deliberately held to - it is a per-turn tax in every session that loads it.
+# Cap history, because the shape of the mistake matters more than the number: 24 originally, 30 when the
+# block gained its first device that acts on a reply, 60 when the operator ruled the upstream wording be
+# kept rather than paraphrased (D31 allows it, and the paraphrase had measured vaguer), then 85 when the
+# operator ruled the no-ai-slop guidelines ship to every user through this block rather than sitting in
+# one project's overrides. That last move is why the block carries a long delete list: the rules have to
+# reach the reader's own machine, and a pointer to a reference file does not load on the turn it binds.
+# Upstream ships roughly 140 lines always-on, so this block IS still the compression.
+# What a cap is for is stopping unbounded drift, NOT making deletion the cheapest way to add a rule -
+# at 24 it did exactly that and silently dropped a shipped rule, which review had to catch.
 CB="docs/comms-block.md"
 if [ ! -f "$CB" ]; then
   bad "$CB missing (the comms block body's single home)"
 else
-  # Sentinel = the body's opening sentence. Scan the shipped surfaces the same way the dash gate does,
+  # Sentinel = the body's opening sentence, which changes when the block is reworded - it changed once
+  # already (from "may have ADHD" to upstream's declarative "has ADHD") and a stale sentinel finds zero
+  # homes and reads as a missing block. Scan the shipped surfaces the same way the dash gate does,
   # NOT the git index: an uncommitted second copy is exactly the drift this gate exists to catch, and
   # `git ls-files` cannot see one. raw/ is the gitignored source archive and stays out of scope.
-  probe="The reader may have ADHD"
+  probe="The reader has ADHD"
   homes="$(find skills scripts docs hooks hosts better-dev -type f 2>/dev/null; ls install.sh README.md BOOTSTRAP.md 2>/dev/null)"
   homes="$(printf '%s\n' "$homes" \
     | while read -r f; do [ -f "$f" ] && grep -lqF "$probe" "$f" 2>/dev/null && printf '%s\n' "$f"; done \
@@ -875,8 +923,11 @@ else
   [ "$nhomes" = 1 ] && ok "comms block body has exactly one home ($CB)" \
     || bad "comms block body must live in exactly one shipped file, found $nhomes:$(printf ' %s' $homes)"
   lines="$(grep -c '' "$CB" || true)"
-  [ "$lines" -le 24 ] && ok "comms block within its 24-line cap ($lines)" \
-    || bad "comms block is $lines lines, cap is 24 - cut a line before adding one"
+  if [ "$lines" -le 85 ]; then
+    ok "comms block within its 85-line cap ($lines)"  # prove-new: regression-guard a cap holds by construction the moment it is raised, and raising it is what this diff does; red at base would mean shipping a block already over the new number
+  else
+    bad "comms block is $lines lines, cap is 85 - cut a line before adding one"
+  fi
 fi
 
 # Every adapter declares where this host keeps its global entry file. Empty is a legitimate answer

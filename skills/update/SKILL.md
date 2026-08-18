@@ -81,6 +81,79 @@ it). Resolve the installer, never assume its path: `ls "$clone/install.sh"` - a 
 tool (0.7.0 moved it to `<repo>/better-dev/install.sh`) leaves the normalized `$clone` from step 1
 pointing at the right one, but a stale hand-typed path will not be. Empty output means content-only changes; the existing links already serve them - skip this step.
 
+Content-only is the right verdict for skill links and the wrong one for the always-loaded blocks this
+library installs into a host's own entry file, because those are copies rather than links: a pull that
+edits `docs/comms-block.md` changes nothing on a machine whose `CLAUDE.md` still carries the copy
+written at install. Nothing else reconciles them - the two writers (`BOOTSTRAP.md` globally,
+`/onboard` per repo) each run once - so a block installed months ago silently drifts, and the
+operator experiences it as the practices not working rather than as a stale file. Compare the marked
+block against the shipped body wherever one is installed:
+
+The whole check sits inside one `if` on the clone, because step 1 reports a failed resolve to stderr
+without exiting: with `$clone` empty, `diff` cannot open the shipped body, exits 2, and an exit-code
+test that only distinguishes zero from non-zero prints `STALE` for every entry file it finds. Scope is
+the guard rather than an early return, which would end an interactive or persistent shell instead of
+skipping a step.
+
+```bash
+if [ ! -f "$clone/docs/comms-block.md" ]; then
+  echo "clone unresolved - skipping the block check"
+else
+  found=0
+  # Global entry files come from the host adapters, never a hardcoded path: hosts/claude names
+  # ~/.claude/CLAUDE.md, hosts/codex names ~/.codex/AGENTS.md, and hermes and omp name "" to decline.
+  # Read every adapter rather than detecting the host - a machine may run more than one, and inlining
+  # one host's answer would report "clean" on every other.
+  globals=$(for a in "$clone"/hosts/*; do
+    ( . "$a" >/dev/null 2>&1; printf '%s\n' "${bd_host_global_entry:-}" )
+  done | grep . | sort -u)
+  for entry in $globals ./CLAUDE.md ./CLAUDE.local.md ./AGENTS.md; do
+    [ -f "$entry" ] || continue
+    grep -q 'BEGIN better-dev-comms' "$entry" || continue
+    found=$((found + 1))
+    if diff <(sed -n '/BEGIN better-dev-comms/,/END better-dev-comms/p' "$entry" | sed '1d;$d') \
+            "$clone/docs/comms-block.md" >/dev/null; then
+      echo "current: $entry"
+    else
+      echo "STALE: $entry"
+    fi
+  done
+  [ "$found" -gt 0 ] || echo "no better-dev-comms block installed anywhere"
+fi
+```
+
+An adapter that names no global entry file is declining one, not missing it: `grep .` drops the empty
+answers, so those hosts contribute nothing to the list and the per-repo files are still checked.
+
+Three readings, and the third is the one silence would hide. `current` everywhere means nothing is
+owed. Any `STALE` line is drift, handled below. `no better-dev-comms block installed anywhere` means
+the block was never installed on this machine, which is `/onboard` or `BOOTSTRAP.md` territory rather
+than drift - say which, because an empty loop reads as clean and that is exactly the failure this step
+exists to close.
+
+**Every `STALE` line is repaired here, including the host-global one.** One command each, idempotent and
+marker-aware, writing only between its own two markers so operator text in that file is untouched:
+
+```bash
+"$clone"/scripts/bd-block "$entry" better-dev-comms < "$clone"/docs/comms-block.md
+```
+
+D26 names this write on its authorized list, so it runs rather than being handed over. That is the
+point: a drift check ending in a paste block is a check whose fix waits on the operator noticing the
+output, and this particular drift is invisible from their side - a months-old block reads as the
+practices not working, never as a stale file. Announce each refresh with its undo
+(`scripts/bd-block remove "$entry" better-dev-comms`), which is what D26 requires of a write on that
+list, so the change is visible rather than silent.
+
+Report which entry files were current and which were refreshed. A silent refresh reads the same as no
+drift and teaches nobody that the copy had rotted.
+
+One thing to say out loud when refreshing, rather than after: the write rewrites the whole marked
+block, so it also drops anything that copy carried which the shipped body no longer does. A rule the
+operator added inside the markers by hand is not distinguishable from a rule this library retired, and
+only they can tell those apart. Where a refresh would discard a line the shipped body lacks, show the
+diff first and ask; where the copy is a clean older version of ours, refresh it and move on.
+
 ## 3. Read the release ledger
 
 `docs/RELEASES.md` in the clone holds one line per release, newest first:

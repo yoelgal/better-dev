@@ -41,6 +41,16 @@ earliest fit:
 When you patch an existing skill, read it in full this turn first and write the edit from those bytes, not
 from what you remember of it - a skill edited from memory drifts from what's actually on disk.
 
+**Is a skill the owner of this gap at all?** Every rung above writes prose, and prose owns a
+*knowledge* gap: the agent could have done the work and did not know how, when, or where. Where the
+run failed because the capability was not there, because no check could tell a right result from a
+wrong one, or because the authority to act was missing, prose instructing the agent around the hole
+is a note where the repo needs a mechanism - and it reads as covered on every future run, which is
+worse than the gap. Route by what was actually missing: an unavailable capability to
+`/tool-sourcing`, a missing gate, verify command, or blast-radius rule to `/guardrails-install`, an
+unproven claim to `/plan-grill`'s done-criteria. A skill is right again once the mechanism exists and
+the agent kept failing to reach it.
+
 **Some recurring lessons are the library's defect, not this repo's.** When the same correction keeps
 recurring - a lesson re-learned, an override re-recorded - and its root cause is shipped skill text (a
 better-dev default that is wrong here and would be wrong in any repo, a skill line that keeps producing
@@ -51,6 +61,17 @@ recurring correction, the skill line at fault, the fix that keeps being applied 
 operator to carry upstream, an issue or patch on the tool's own repo. The negative form is explicit
 too: a correction that holds only because of this repo's stack, domain, or house taste is a preference,
 not a defect - it stays a project override or lesson, recorded as such, and never travels upstream.
+
+**State what you keep at the level that fires again.** The gate above decides which observations
+survive; this decides how specific they are once written, and it binds a skill's trigger, a rule in its
+body, and the recorded lesson alike. A claim only reaches situations its antecedent matches, so before
+writing one down, name two situations other than the one you just saw where it still fires. If you
+cannot, the antecedent is pinned to one path, one PR number, one tool version, or one vendor, and what
+you have is a record of the run rather than a lesson from it: restate it at the level of the mechanism
+you understood. Stop at the least specific claim that still covers every case you observed, because a
+claim weaker than that asserts what no run has shown. Specificity belongs to the evidence, never the
+claim - the commands, paths, and signatures a rule carries stay exactly as the source gave them (step 2
+holds), while the rule around them generalises.
 
 ## 2. Gather the sources and the requirements
 
@@ -104,7 +125,11 @@ owns the two steps that have to be machine-enforced rather than trusted to prose
    candidate loaded and confirm the agent actually does what the skill promises, judged on the trace (the
    tool calls, the diff), not the narration. For a fragile or judgment-heavy skill, use a trap - an input a
    skill-less agent gets wrong - and confirm the skill catches it; a failed trap means the body is too vague,
-   so make the weak step procedural and re-run. For a skill that ships a script, also run that script's own
+   so make the weak step procedural and re-run. A trap you invented this session has an unrun half: run it
+   once without the candidate loaded before crediting the skill with the catch, because an input the
+   skill-less agent already handles grades nothing and the pass reads identical either way. A scenario from
+   the repo's trap record (better-dev's own is `docs/TRAPS.md`) carries that half already recorded, so take
+   it from there and skip the run. For a skill that ships a script, also run that script's own
    fixture and test inside the staging dir, asserting on real output, not just that it didn't throw. On a
    lint failure fix in place and retry at most twice, showing the diff each time; if the proof still fails,
    discard and stop rather than lower the bar.
@@ -144,8 +169,12 @@ output the prototype produced. If it drifted, surface the discrepancy rather tha
 commit; the caller deserves to see it.
 
 Record what the run taught through the memory contract: `.better-dev/bin/bd-mem learn "<lesson>"` for a
-durable technique, and `.better-dev/bin/bd-mem remember "authored <skill> for <capability>"` so the next time that gap
-surfaces the choice is reused instead of re-created. Separately and optionally, a skill that proves broadly
+durable technique, and `.better-dev/bin/bd-mem remember "authored <skill> for <capability>; retire when
+<condition>"` so the next time that gap surfaces the choice is reused instead of re-created. The retirement
+half is recorded now because now is when you know it: a skill authored to steer a weaker model caps a
+stronger one, and nothing downstream removes a skill - `/release-promotion`'s distill pass retires a stale
+*rule* on disuse, never a skill file - so a condition nobody wrote down is one nobody ever checks.
+Separately and optionally, a skill that proves broadly
 useful can be shared to the wider ecosystem for others to source (`/tool-sourcing` in reverse) - a distinct,
 deliberate choice, never automatic and unrelated to the local/global scoping above. Before it leaves this
 machine, read it once for what travels badly: a path under your own home, a vault or notes directory, a

@@ -88,6 +88,17 @@ for name in $names; do
   [ "$built" = 0 ] || { echo "[$name] build failed (rc=$built) - no carve check"; continue; }
   cross=$(gfx_cross_edges "$out/graph.json") && echo "[$name] cross-subtree edges: $cross"
 
+  # `graphify update` returns before re-stamping built_at_commit when a commit range
+  # changed no graph topology (watch.py:1583), so a domain that keeps drifting without
+  # topology changes reads `behind` forever and the refresh hook re-extracts it every
+  # session for no state change. A build that exited 0 re-extracted every drifted file,
+  # so the graph does describe HEAD: stamp it, same-dir temp then mv, so a killed write
+  # never leaves a torn graph.json behind.
+  stamp=$(mktemp "$out/.stamp.XXXXXX")
+  if jq --arg h "$(git -C "$this" rev-parse HEAD)" '.built_at_commit=$h' \
+       "$out/graph.json" > "$stamp"; then mv "$stamp" "$out/graph.json"
+  else rm -f "$stamp"; echo "[$name] stamp failed - freshness will read behind"; fi
+
   # One-time callflow page, default filename only - never --output. The default
   # name sits on graphify's *-callflow.html auto-regen glob, so every later sync
   # refreshes the page for free; a custom name is correct once, then silently stale.
@@ -125,14 +136,34 @@ done
   so a build leaves the indexed tree byte-unchanged and there is nothing here to
   commit or ignore. A fresh worktree has no graph until its first build.
 
+## Freshness
+
+A graph answers about the commit it was built at, never about the working tree, so a domain nobody
+re-syncs hands back a map that is well-structured and wrong - the loudest objection graphify gets
+in public, and this skill is the whole answer to it. Name the build commit with every report, and
+sync a domain under active change before anything queries it.
+
+One predicate gap sits under that. `graphify update` returns early when a commit range changed no
+graph topology, without re-stamping `built_at_commit`, so a graph that does describe HEAD can
+report `behind` indefinitely while the refresh hook re-extracts it every session for no state
+change. The loop above closes that on this path by stamping HEAD after a build that exits 0; a
+domain the SessionStart hook refreshed is still unstamped. Load `graph-trust.md` for the
+one-command fix in that case, and for the per-domain coverage check that decides whether a domain's
+graph is worth querying at all - run that check on a domain's first build.
+
 ## Report
 
 Two lines per index, page first - the page is what a human opens, the JSON is
-what an agent reads - with the action taken, node+edge counts, and the
-cross-subtree edge count on the second line:
+what an agent reads - with the action taken, node+edge counts, and the cross-subtree edge count
+plus the edge-confidence split on the second line:
 
     [api] page: ~/.claude/graphify/acme__mono/worktrees/9f2c1a7b40de/api/graph.html (+ api-callflow.html)
-    [api] refresh, AST - 812 nodes / 3104 edges - ~/.claude/graphify/acme__mono/worktrees/9f2c1a7b40de/api/graph.json - cross-subtree edges: 1
+    [api] refresh, AST - 812 nodes / 3104 edges - 3091 EXTRACTED / 13 INFERRED / 0 AMBIGUOUS - ~/.claude/graphify/acme__mono/worktrees/9f2c1a7b40de/api/graph.json - cross-subtree edges: 1
+
+The split comes from `jq -r '.links[]|.confidence' "$out/graph.json" | sort | uniq -c`. An AST
+build is near-fully `EXTRACTED`, which is what makes its edges facts rather than leads; `INFERRED`
+climbing, or any `AMBIGUOUS` at all (only a `--semantic` build emits that tag), is the cue that
+answers off this graph need confirming at `file:line`.
 
 graph.html and the callflow page are serverless single-file pages whose
 renderer is fetched from a CDN on first open - call them that, never
