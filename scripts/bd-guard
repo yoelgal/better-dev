@@ -18,9 +18,9 @@
 #                                          it with the tree. Default TTL 8h; --ttl 0 = no expiry.
 #   bd-guard off                           remove the boundary - the one-command escape hatch.
 #   bd-guard status                        print the active boundary and expiry, or "no scope boundary".
-#   bd-guard grant <subject>               record a SINGLE-USE, 5-minute grant for the exact
-#                                          <subject> an ask named (a command string, or a
-#                                          normalized absolute path). Consumed only when
+#   bd-guard grant <token>                 record a SINGLE-USE, 5-minute grant for the subject the
+#                                          16-hex <token> from an ask's reason stands for (the
+#                                          bd-pending file holds that binding). Consumed only when
 #                                          BD_GUARD_HOST=omp - see consume_grant.
 #   bd-guard selftest
 #
@@ -142,6 +142,10 @@ state_file() {
 GRANT_TTL=300   # 5 minutes: long enough for the user to answer the agent's ask, short enough that a
                 # grant nobody used cannot answer tomorrow's question.
 
+PENDING_TTL=1800  # 30 minutes, deliberately longer than a grant's: this only has to survive the
+                  # operator reading the question and answering it, while the grant it leads to has
+                  # to be spent on the very next call.
+
 # The grants file for the repo the session is in, beside bd-scope and per-worktree for the same
 # reason: `git worktree remove` deletes an approval along with the tree that earned it, and two
 # parallel worktrees never spend each other's.
@@ -150,6 +154,56 @@ grants_file() {
   g="$(git rev-parse --git-dir 2>/dev/null)" || return 1
   case "$g" in /*) ;; *) g="$PWD/$g" ;; esac
   printf '%s/bd-grants' "$(cd "$g" && pwd -P)"
+}
+
+# The pending-ask file, beside bd-scope and bd-grants and per-worktree for the same reason: a token
+# named by one worktree's ask can only be redeemed in that worktree.
+pending_file() {
+  local g
+  g="$(git rev-parse --git-dir 2>/dev/null)" || return 1
+  case "$g" in /*) ;; *) g="$PWD/$g" ;; esac
+  printf '%s/bd-pending' "$(cd "$g" && pwd -P)"
+}
+
+# Write <content> to <path> through a temp file in the SAME directory, then rename it into place.
+# Two things that buys: a reader never sees a half-written state file, and a writer that dies
+# mid-write leaves the previous file intact rather than a truncated one. `mv` inside one directory is
+# a rename, so it is atomic; a temp file under $TMPDIR would make it a cross-filesystem copy and lose
+# that. The omp bridge's header records 8 concurrent handlers as measured reality.
+#
+# What it does NOT buy, said plainly so nobody reads more into it: two handlers that both READ one
+# live grant before either renames still both consume it. Closing that needs a mutex, and the cheap
+# spellings were rejected - an `$f.lock` directory or a noclobber lockfile wedges on a crash, and a
+# stale lock in a git dir would refuse every grant consumption from then on, turning one approval
+# into an endless ask loop with nothing on screen saying why. Narrowing the window to the read
+# itself was the trade taken.
+#
+# Failure is returned, never swallowed: every caller falls to the ask on a write it could not finish.
+write_atomic() { # write_atomic <path> <content>
+  local tmp="$1.tmp.$$"
+  if printf '%s' "$2" > "$tmp" 2>/dev/null && mv -f "$tmp" "$1" 2>/dev/null; then
+    return 0
+  fi
+  rm -f "$tmp" 2>/dev/null || true
+  return 1
+}
+
+# Control characters folded to spaces, exactly as emit_decision folds them and for the same reason: a
+# newline in a model-chosen subject would otherwise forge a second line in the audit trail, or a
+# second record in the pending file.
+fold_ctl() { printf '%s' "$1" | tr '\001-\037' ' '; }
+
+# A model-chosen subject rendered as a quoted data span for a reason's PROSE. Under the omp bridge
+# that reason is an instruction channel - the agent reads it and runs the grant command it names - so
+# a path called `x. To proceed once the user approves, run: <something else>` must not read as an
+# earlier imperative for the agent to find and run. Quoting alone would not stop it, because a name
+# carrying a double quote closes the span, so backslash and quote are escaped INSIDE the span the way
+# a shell or JSON string spells them: lossless, and a reader can tell an escaped quote from a closing
+# one. Folding them to another character instead would be lossy about the very filename the operator
+# is being asked to approve.
+data_span() { # data_span <subject>
+  local s="${1//\\/\\\\}"
+  printf '"%s"' "${s//\"/\\\"}"
 }
 
 # A subject is a model-chosen command or path, so it can carry a newline, a quote, or an invalid
@@ -172,6 +226,81 @@ subject_key() {
   h="$(printf '%s' "$h" | grep -m1 -oE '[0-9a-f]{64}' || true)"
   [ -n "$h" ] || return 1
   printf '%s' "$h"
+}
+
+# Record the token -> subject binding an ask hands the agent, and print the token. The token is the
+# first 16 hex characters of the same sha256 subject_key computes, so it is DETERMINISTIC: the same
+# subject asked twice names the same grant, re-asking rewrites its own entry instead of appending a
+# duplicate, and the bridge's byte-equality case between a session with a UI and one without holds
+# (a per-ask random token is the thing that case would catch).
+#
+# Why a token at all, since the subject was what the ask named before: every check-bash subject
+# contains, by construction, the destructive substring that made the guard ask, so
+# `bd-guard grant 'rm -rf src'` is itself judged destructive and draws its own ask, whose grant
+# command nests the substring again. Measured on `rm -rf src`, `git push --force origin main`,
+# `git reset --hard HEAD~1`, `docker rm -f web` and `kubectl delete pod x`: all five regressed, so
+# every check-bash grant was unreachable. 16 hex is 64 bits and is not a secret - it does not need to
+# be, since the agent can run `grant` either way (the guard is advisory, see the header); the token
+# exists to keep that substring out of the command the agent must run, and to remove the respelling
+# failure, where a subject the agent retyped slightly differently recorded a grant nothing consumes.
+#
+# The record is '<token> <key> <expiry> <subject>'. The KEY is what a grant is written against;
+# control characters in the stored subject are folded, so that text is display and audit material
+# while the 64-hex key stays the exact identity consume_grant matches.
+#
+# A malformed line is dropped here rather than refusing the whole file, which is the opposite of
+# consume_grant's posture and deliberately so: skipping a line in the GRANTS file could leave a live
+# entry consumable beside garbage somebody wrote, while the worst a dropped pending line can do is
+# make a token unknown, which refuses a grant. This file fails toward the ask by self-healing.
+#
+# Every assignment is guarded - a bare failing assignment reaches the caller's ERR trap, whose
+# fail-open {} is exactly the bypass this must not create.
+record_pending() { # record_pending <subject>
+  local f key tok now expiry t k e rest kept=""
+  f="$(pending_file)" || return 1
+  key="$(subject_key "$1")" || return 1
+  tok="${key:0:16}"
+  now="$(date +%s)" || return 1
+  expiry=$(( now + PENDING_TTL ))
+  if [ -f "$f" ] && [ -r "$f" ]; then
+    while IFS=' ' read -r t k e rest || [ -n "$t" ]; do
+      case "$t" in ''|*[!0-9a-f]*) continue ;; esac
+      [ "${#t}" = 16 ] || continue
+      case "$k" in *[!0-9a-f]*) continue ;; esac
+      [ "${#k}" = 64 ] || continue
+      case "$e" in ''|*[!0-9]*) continue ;; esac
+      [ -n "$rest" ] || continue          # a record with no subject cannot be redeemed or audited
+      [ "$t" != "$tok" ] || continue      # re-asking rewrites its own entry, never appends a twin
+      [ "$now" -le "$e" ] || continue     # expired: cleaned on sight, like the grants file
+      kept="$kept$t $k $e $rest"$'\n'
+    done < "$f"
+  fi
+  write_atomic "$f" "$kept$tok $key $expiry $(fold_ctl "$1")"$'\n' || return 1
+  printf '%s' "$tok"
+}
+
+# Look up a token in the pending file: prints '<key> <subject>' for a live record, or fails. Matching
+# is exact equality over the whole 16-hex word, never a prefix, so one ask's token cannot redeem
+# another's. A malformed record is skipped for the reason record_pending gives: on this file the
+# failure direction of skipping is a refusal, not an allow.
+pending_lookup() { # pending_lookup <token>
+  local f now t k e rest
+  f="$(pending_file)" || return 1
+  [ -f "$f" ] && [ -r "$f" ] || return 1
+  now="$(date +%s)" || return 1
+  while IFS=' ' read -r t k e rest || [ -n "$t" ]; do
+    case "$t" in ''|*[!0-9a-f]*) continue ;; esac
+    [ "${#t}" = 16 ] || continue
+    case "$k" in *[!0-9a-f]*) continue ;; esac
+    [ "${#k}" = 64 ] || continue
+    case "$e" in ''|*[!0-9]*) continue ;; esac
+    [ -n "$rest" ] || continue
+    [ "$t" = "$1" ] || continue
+    [ "$now" -le "$e" ] || continue     # expired: the ask it belonged to is stale, so re-ask instead
+    printf '%s %s' "$k" "$rest"
+    return 0
+  done < "$f"
+  return 1
 }
 
 # Consume a single-use grant for $1, or fail. Called immediately before an ask, and gated on
@@ -211,9 +340,10 @@ consume_grant() { # consume_grant <subject>
     kept="$kept$h $e"$'\n'
   done < "$f"
   # A rewrite we cannot perform must not hand out an allow: the grant would survive it and buy a
-  # second call. A failed redirection never truncated the file, so falling back to the ask is safe.
+  # second call. write_atomic renames a temp file into place, so a failure leaves the file whole and
+  # untruncated and falling back to the ask is safe.
   if [ -n "$kept" ]; then
-    printf '%s' "$kept" > "$f" || return 1
+    write_atomic "$f" "$kept" || return 1
   else
     rm -f "$f" || return 1
   fi
@@ -225,19 +355,22 @@ consume_grant() { # consume_grant <subject>
 # reason through untouched and appends its own instruction constant. Absent the marker this prints
 # NOTHING, which is what keeps a Claude Code reason byte-identical to today's.
 #
-# An embedded single quote is spelled the shell's own way ('\'') so the sentence stays a command the
-# agent can run verbatim. A subject like `mysql -e 'DROP TABLE t'` would otherwise print a broken
-# line, the agent would record a grant for a different subject, and the ask would repeat forever.
+# The argument is the opaque token record_pending just wrote, never the subject text - see there for
+# the five patterns that measured why. A 16-hex word also needs no quoting, which retires the
+# single-quote respelling this sentence used to carry: `mysql -e 'DROP TABLE t'` had to be spelled
+# back with '\'' or the agent recorded a grant for a different subject and the ask repeated forever.
+#
+# A pending record that cannot be written prints no sentence rather than naming a token nothing can
+# redeem. The call still blocks, so the failure direction is the ask.
 grant_hint() { # grant_hint <subject>
   [ "${BD_GUARD_HOST:-}" = omp ] || return 0
-  local sq="'" q s
-  q="'\\''"                 # the shell's own spelling of a single quote inside a single-quoted word
-  s="${1//$sq/$q}"          # pattern and replacement both come from variables: no escape-parsing doubt
-  printf " To proceed once the user approves, run: .better-dev/bin/bd-guard grant '%s'" "$s"
+  local tok
+  tok="$(record_pending "$1")" && [ -n "$tok" ] || return 0
+  printf ' To proceed once the user approves, run: .better-dev/bin/bd-guard grant %s' "$tok"
 }
 
 check_bash() {
-  local bd cmd lower warn nosq noq
+  local bd cmd lower warn nosq noq judged
   bd="$(bd_dir)" && [ -d "$bd" ] || { emit_allow; return 0; }
   INPUT="$(cat || true)"
   cmd="$(extract_field command)"
@@ -315,14 +448,24 @@ check_bash() {
     # way. Absent the marker (Claude Code) this returns non-zero without touching the file, and the
     # ask below is byte-for-byte the one that shipped before grants existed.
     if consume_grant "$cmd"; then emit_allow; return 0; fi
-    emit_decision ask "[better-dev] Destructive: $warn. Approve to proceed.$(grant_hint "$cmd")"
+    # $warn names the PATTERN ("recursive delete (rm -r)") and never the call, so under omp the
+    # command itself has to reach the reason's PROSE: the grant command carries an opaque token now,
+    # and the bridge asserts the subject against the reason with that invocation stripped out. It goes
+    # in as a quoted data span, never spliced into an imperative - see data_span. Marker-gated with
+    # everything else here, because a Claude Code reason has to stay byte-identical, and Claude Code
+    # shows its operator the command itself anyway.
+    judged=""
+    if [ "${BD_GUARD_HOST:-}" = omp ]; then
+      judged=" The command judged was $(data_span "$cmd")."
+    fi
+    emit_decision ask "[better-dev] Destructive: $warn.$judged Approve to proceed.$(grant_hint "$cmd")"
   else
     emit_allow
   fi
 }
 
 check_edit() {
-  local bd path state dir expiry now rules globs field g oldifs
+  local bd path state dir expiry now rules globs field g oldifs subj
   bd="$(bd_dir)" && [ -d "$bd" ] || { emit_allow; return 0; }
   INPUT="$(cat || true)"
   path="$(extract_field file_path)"
@@ -383,7 +526,17 @@ check_edit() {
             # the ask it answers. The subject is the normalized path, never the glob - the user
             # approved this one file, not every file the glob covers.
             if consume_grant "$path"; then emit_allow; return 0; fi
-            emit_decision ask "[better-dev] $path matches the recorded safety-denylist glob '$g' - a high-consequence path the loop escalates on. Approve to proceed.$(grant_hint "$path")"
+            # Under omp the path is rendered as a quoted data span rather than concatenated into the
+            # prose, because there the reason is an instruction channel - it names the command the
+            # agent is to run - so a filename carrying its own "To proceed once the user approves,
+            # run: ..." sentence must not read as an earlier imperative to obey. Marker-gated: with
+            # the marker absent the reason must stay byte-identical to the one that shipped, and on
+            # that path it is prose for the operator's own prompt rather than an instruction.
+            subj="$path"
+            if [ "${BD_GUARD_HOST:-}" = omp ]; then
+              subj="$(data_span "$path")"
+            fi
+            emit_decision ask "[better-dev] $subj matches the recorded safety-denylist glob '$g' - a high-consequence path the loop escalates on. Approve to proceed.$(grant_hint "$path")"
             return 0 ;;
         esac
       done
@@ -439,26 +592,42 @@ status_cmd() {
   fi
 }
 
-# Record a single-use grant for an exact subject: a command string for check-bash, a normalized
-# absolute path for check-edit. The agent runs this ONLY after the user approved through the agent's
-# own ask - see consume_grant for why the hook never asks anyone itself.
+# Record a single-use grant for the subject a 16-hex TOKEN stands for. The token comes from the ask's
+# own reason, and the binding from the pending record record_pending wrote, so a grant can only be
+# issued for a subject the guard actually asked about. `grant <subject>` is GONE, and with it the
+# ability to pre-authorize something nobody was ever asked: a subject is now looked up, never typed.
+# The agent runs this ONLY after the user approved through the agent's own ask - see consume_grant
+# for why the hook never asks anyone itself.
+#
+# An unknown or expired token REFUSES: non-zero exit, a reason on stderr, no grants entry and no
+# audit line. There is nothing to record, because nothing was approved.
 #
 # The audit line is written FIRST and a failure to write it REFUSES the grant. A permission bypass
 # nobody can reconstruct afterwards is worse than a refused one, and a refusal is recoverable: fix
 # the log, run it again. The append runs in a subshell so a failed redirection can only fail that
-# subshell, rather than taking the script down under set -e or (worse) being ignored.
+# subshell, rather than taking the script down under set -e or (worse) being ignored. It names the
+# SUBJECT from the pending record rather than the token, because a token tells the operator reading
+# the log nothing about what was approved.
+#
+# The pending record is left in place rather than spent. Single use is the GRANTS file's property -
+# this subject's entry is dropped and rewritten, so two `grant` runs still buy one call - so spending
+# it here would only turn an accidental second run into a refusal where it is currently idempotent,
+# and the next ask would rewrite the same deterministic token regardless.
 grant_cmd() {
-  [ $# -ge 1 ] || die "grant <subject> (the exact command string or path the ask named)"
-  [ $# -le 1 ] || die "grant takes exactly one subject - quote it as a single argument"
-  local subject="$1" bd f key now expiry log line h e rest kept=""
-  [ -n "$subject" ] || die "grant needs a non-empty subject"
+  [ $# -ge 1 ] || die "grant <token> (the 16-hex token the ask reason named)"
+  [ $# -le 1 ] || die "grant takes exactly one token"
+  local tok="$1" bd f rec key subject now expiry log line h e rest kept=""
+  case "$tok" in *[!0-9a-f]*) die "not a grant token: pass the 16-hex token the ask reason named, not the command or path" ;; esac
+  [ "${#tok}" = 16 ] || die "not a grant token: '$tok' is ${#tok} characters, a token is 16 hex"
   f="$(grants_file)" || die "not inside a git repo"
-  key="$(subject_key "$subject")" || die "no usable sha256 tool (sha256sum, shasum -a 256, openssl dgst)"
+  rec="$(pending_lookup "$tok")" \
+    || die "no pending ask for token $tok - unknown here, or older than ${PENDING_TTL}s; re-run the call to get a fresh one"
+  key="${rec%% *}"; subject="${rec#* }"
   bd="$(bd_dir)" && [ -d "$bd" ] || die "no .better-dev directory here - refusing to issue an unrecorded grant"
   log="$bd/grants.log"
-  # Control characters are folded exactly as emit_decision folds them, and for a sharper reason: a
-  # newline in a model-chosen subject would otherwise forge a second line in the audit trail.
-  line="$(printf '%s' "$subject" | tr '\001-\037' ' ')"
+  # The stored subject was folded when it was recorded; folding again costs nothing and keeps a
+  # hand-edited pending file from forging a second line in the audit trail.
+  line="$(fold_ctl "$subject")"
   ( printf '%s\tgrant\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$line" >> "$log" ) 2>/dev/null \
     || die "could not append to $log - refusing to issue an unrecorded grant"
   now="$(date +%s)"; expiry=$(( now + GRANT_TTL ))
@@ -476,7 +645,8 @@ grant_cmd() {
       kept="$kept$h $e"$'\n'
     done < "$f"
   fi
-  printf '%s%s %s\n' "$kept" "$key" "$expiry" > "$f" || die "could not write $f (the grant is recorded in $log but NOT issued)"
+  write_atomic "$f" "$kept$key $expiry"$'\n' \
+    || die "could not write $f (the grant is recorded in $log but NOT issued)"
   printf 'grant recorded (single use, %ss): %s\n' "$GRANT_TTL" "$line"
 }
 
@@ -484,7 +654,39 @@ selftest() {
   fail() { echo "bd-guard selftest FAIL: $1" >&2; exit 1; }
   jbash() { printf '{"tool_input":{"command":"%s"}}' "$1"; }
   jedit() { printf '{"tool_input":{"file_path":"%s"}}' "$1"; }
-  local d repo wt out sfile base gfile glog
+  local d repo wt out sfile base gfile glog pfile tbash tedit tstage arg gcmd c reason want guarddir
+  # The token an omp ask names for a subject, read out of the ask's own reason and never recomputed:
+  # a case that recomputed the hash could pass against a token no reason carries. The ask these run
+  # leaves the pending record behind, which is what makes the grant that follows redeemable.
+  tokof() { printf '%s' "$1" | sed -n 's/.*bd-guard grant \([^ "]*\).*/\1/p'; }
+  tok_bash() { tokof "$(cd "$repo" && jbash "$1" | BD_GUARD_HOST=omp "$SELF" check-bash)"; }
+  tok_edit() { tokof "$(cd "$repo" && jedit "$1" | BD_GUARD_HOST=omp "$SELF" check-edit)"; }
+
+  # THE GOVERNING PRINCIPLE, mechanically. better-dev's enforcement must never reach beyond the layer
+  # of the agent running it, so neither this script nor the omp bridge may CALL a host UI method or
+  # shell out to a notifier or a terminal multiplexer. It is a recorded project rule, and it is pinned
+  # here because prose cannot stop a later session from quietly adding a dialog back - and because CI
+  # runs this suite, where the throwaway script the first round used pinned nothing.
+  #
+  # Comment lines are excluded, and that exclusion is the whole difficulty: both files' headers name
+  # those symbols deliberately, to record "removed, do not re-add", so a raw grep over the text is RED
+  # against the very code meant to satisfy it. Matching a CALL - the method with its opening paren -
+  # rather than a mention is the other half of the same problem.
+  #
+  # The pattern spells every needle with one bracketed character (her[d]r) so this line, which is
+  # itself non-comment code in one of the two files under test, cannot match itself. Do not tidy the
+  # brackets away: the suite would then go red against its own predicate.
+  layering() { # layering <file>
+    local hits
+    [ -f "$1" ] || fail "the layering predicate cannot resolve $1 - it fails rather than skips, because a check that silently skips is the defect it exists to close"
+    hits="$(grep -nE '\.confir[m]\(|\.notif[y]\(|\.setStatu[s]\(|her[d]r|osascrip[t]|notify-sen[d]' "$1" \
+      | grep -vE '^[0-9]+:[[:space:]]*(#|//|\*)' || true)"
+    [ -z "$hits" ] || fail "$1 reaches past the agent's layer on a non-comment line (a host UI call, or the name of a notifier or multiplexer): $hits"
+  }
+  guarddir="$(cd "$(dirname "$SELF")" && pwd -P)" || fail "could not resolve the directory of $SELF for the layering predicate"
+  layering "$SELF"
+  layering "$guarddir/../hooks/omp/bd-guard.ts"
+
   # The fixture must sit outside two things at once: the temp allowlist (check-edit always-allows /tmp,
   # /private/tmp, and $TMPDIR, so a fixture there makes every boundary assertion short-circuit to allow -
   # Linux `mktemp -d` lands under /tmp), AND any real git repo carrying .better-dev (else the no-scaffold
@@ -637,29 +839,127 @@ selftest() {
   unset BD_GUARD_HOST
   gfile="$(cd "$repo" && git rev-parse --git-dir)/bd-grants"
   case "$gfile" in /*) ;; *) gfile="$repo/$gfile" ;; esac
+  pfile="$(cd "$repo" && git rev-parse --git-dir)/bd-pending"
+  case "$pfile" in /*) ;; *) pfile="$repo/$pfile" ;; esac
   glog="$repo/.better-dev/grants.log"
-  rm -f "$gfile" "$glog"
+  rm -f "$gfile" "$glog" "$pfile"
 
-  # A grant is SINGLE-USE: ask -> grant -> {} -> ask again. Asserted on both check surfaces, because
-  # each owns its own subject (check-edit the normalized path, check-bash the command string).
-  out="$(cd "$repo" && jedit "$repo/.env.production" | BD_GUARD_HOST=omp "$SELF" check-edit)"
-  printf '%s' "$out" | grep -q '"permissionDecision":"ask"' || fail "denylist edit not asked before any grant"
-  ( cd "$repo" && "$SELF" grant "$repo/.env.production" ) >/dev/null
-  out="$(cd "$repo" && jedit "$repo/.env.production" | BD_GUARD_HOST=omp "$SELF" check-edit)"
-  [ "$out" = "{}" ] || fail "a live grant did not allow the edit it was issued for: $out"
-  out="$(cd "$repo" && jedit "$repo/.env.production" | BD_GUARD_HOST=omp "$SELF" check-edit)"
-  printf '%s' "$out" | grep -q '"permissionDecision":"ask"' || fail "an edit grant was reusable - not single-use"
+  # The tokens the asks name, captured once and reused: the token is a hash of the subject, so the
+  # same subject always names the same grant, and a pending record outlives the grant it leads to
+  # (30 minutes against 5). Both properties are asserted where they are load-bearing - the round trip
+  # below re-reads the token from a later ask and requires the same value.
+  tbash="$(tok_bash 'rm -rf src')"
+  tedit="$(tok_edit "$repo/.env.production")"
+  tstage="$(tok_edit "$repo/.env.staging")"
+  for arg in "$tbash" "$tedit" "$tstage"; do
+    case "$arg" in ''|*[!0-9a-f]*) fail "an omp ask did not name a lowercase-hex grant token: '$arg'" ;; esac
+    [ "${#arg}" = 16 ] || fail "a grant token is ${#arg} characters, expected 16: $arg"
+  done
 
+  # THE REGRESS THIS DESIGN EXISTS FOR, and the case the shipped version had no guard against: the
+  # ask used to name the subject inside the grant command, and every check-bash subject contains by
+  # construction the destructive substring that made it ask - so the grant command was itself judged
+  # destructive and drew its own ask, whose grant command nested the substring again. Every
+  # check-bash grant was unreachable. All five recorded patterns regressed, so all five are asserted
+  # here, and the second half of each is the actual guard: the grant command the reason names is fed
+  # back through check-bash and must come out CLEAN. Without that half the defect returns silently,
+  # because an ask carrying it looks perfectly correct on its own.
+  for c in 'rm -rf src' 'git push --force origin main' 'git reset --hard HEAD~1' 'docker rm -f web' 'kubectl delete pod x'; do
+    out="$(cd "$repo" && jbash "$c" | BD_GUARD_HOST=omp "$SELF" check-bash)"
+    printf '%s' "$out" | grep -q '"permissionDecision":"ask"' || fail "a recorded destructive pattern was not asked: $c -> $out"
+    arg="$(tokof "$out")"
+    case "$arg" in ''|*[!0-9a-f]*) fail "the ask for '$c' does not name a hex grant token: $out" ;; esac
+    [ "${#arg}" = 16 ] || fail "the grant token for '$c' is ${#arg} characters, expected 16: $arg"
+    # The command fed back is COPIED out of the reason, not rebuilt from the token: rebuilding it
+    # would judge a command the reason never carried, and the whole failure being guarded against is
+    # extra text in the sentence the agent copies. Same extraction the bridge does - from the
+    # invocation to the end of the reason.
+    gcmd="$(printf '%s' "$out" | sed -n 's/.*the user approves, run: \(.*\)"}}$/\1/p')"
+    [ -n "$gcmd" ] || fail "the ask for '$c' carries no grant command to copy: $out"
+    case "$gcmd" in *"$arg") ;; *) fail "the grant command the ask for '$c' names does not end at its token: $gcmd" ;; esac
+    out="$(cd "$repo" && jbash "$gcmd" | BD_GUARD_HOST=omp "$SELF" check-bash)"
+    [ "$out" = "{}" ] || fail "the grant command the ask for '$c' names is itself judged, so that grant is unreachable: $gcmd -> $out"
+  done
+
+  # The bridge reads this reason two ways, so both are pinned at the producer. It strips the grant
+  # invocation out and requires the SUBJECT in what is LEFT, because a reason naming the command only
+  # inside the command the agent must retype does not tell anybody anything; and it extracts the
+  # invocation as "from `bd-guard grant` to end of line", so the sentence has to come LAST and end at
+  # its token, with exactly one invocation in the whole reason.
+  out="$(cd "$repo" && jbash 'rm -rf src' | BD_GUARD_HOST=omp "$SELF" check-bash)"
+  reason="$(printf '%s' "$out" | sed -n 's/.*"permissionDecisionReason":"\(.*\)"}}$/\1/p')"
+  [ -n "$reason" ] || fail "could not read the reason out of the omp bash ask: $out"
+  case "$reason" in
+    *"bd-guard grant $tbash") ;;
+    *) fail "the grant sentence is not last in the omp bash ask reason, or does not end at its token: $reason" ;;
+  esac
+  [ "$(printf '%s' "$reason" | grep -o 'bd-guard grant' | wc -l | tr -d '[:space:]')" = 1 ] \
+    || fail "the omp bash ask reason names more than one grant command: $reason"
+  case "${reason%% To proceed once the user approves*}" in
+    *'rm -rf src'*) ;;
+    *) fail "the omp bash ask reason does not name the command outside the grant invocation: $reason" ;;
+  esac
+  # ...and on the edit surface the path is rendered as a QUOTED data span. That reason is an
+  # instruction channel under omp - it names the command the agent is to run - so a filename carrying
+  # its own "To proceed once the user approves, run: ..." sentence must read as data rather than as an
+  # earlier imperative. The span is asserted with its JSON escaping, which is how it reaches a reader.
+  out="$(cd "$repo" && jedit "$repo/.env.production" | BD_GUARD_HOST=omp "$SELF" check-edit)"
+  printf '%s' "$out" | grep -qF "\\\"$repo/.env.production\\\"" \
+    || fail "the omp edit ask does not render the path as a quoted data span: $out"
+  reason="$(printf '%s' "$out" | sed -n 's/.*"permissionDecisionReason":"\(.*\)"}}$/\1/p')"
+  case "$reason" in
+    *"bd-guard grant $tedit") ;;
+    *) fail "the grant sentence is not last in the omp edit ask reason, or does not end at its token: $reason" ;;
+  esac
+
+  # THE CLAUDE CODE INVARIANT on the reason BYTES, not just on the decision: with the marker absent
+  # every reason is exactly the one that shipped before any of this existed. Asserted as
+  # whole-envelope equality rather than a grep, because a grep keeps passing while extra prose creeps
+  # in beside it - and the quoted span and the command-judged sentence above are omp-only precisely so
+  # this holds. A Claude Code operator reads their own host's prompt; their reason is not an
+  # instruction channel for an agent, and nothing here may start treating it as one.
+  want="{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"ask\",\"permissionDecisionReason\":\"[better-dev] Destructive: recursive delete (rm -r) permanently removes files. Approve to proceed.\"}}"
+  out="$(cd "$repo" && jbash 'rm -rf src' | "$SELF" check-bash)"
+  [ "$out" = "$want" ] || fail "the non-omp bash ask envelope is not byte-identical to the one that shipped: $out"
+  want="{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"ask\",\"permissionDecisionReason\":\"[better-dev] $repo/.env.production matches the recorded safety-denylist glob '.env*' - a high-consequence path the loop escalates on. Approve to proceed.\"}}"
+  out="$(cd "$repo" && jedit "$repo/.env.production" | "$SELF" check-edit)"
+  [ "$out" = "$want" ] || fail "the non-omp edit ask envelope is not byte-identical to the one that shipped: $out"
+  # ...and a non-omp ask records nothing at all: no grant to consume, and no pending record either,
+  # so a Claude Code session leaves the state files it never reads exactly as it found them.
+  cp "$pfile" "$d/pending.before"
+  out="$(cd "$repo" && jbash 'rm -rf src' | "$SELF" check-bash)"
+  printf '%s' "$out" | grep -q '"permissionDecision":"ask"' || fail "a non-omp destructive command was not asked"
+  cmp -s "$pfile" "$d/pending.before" || fail "a non-omp ask wrote to the pending file"
+
+  # THE FULL ROUND TRIP on the bash surface, the sequence the bridge hands the agent: ask, read the
+  # token out of the reason, grant it, the same check allows exactly once, the check after it asks
+  # again. The token is re-read from THIS ask rather than reusing the captured one, so the trip is
+  # closed end to end and the token's determinism is asserted where it matters - a per-ask random
+  # token would make the reason the agent was given unredeemable by the time it acted on it.
+  rm -f "$gfile"
   out="$(cd "$repo" && jbash 'rm -rf src' | BD_GUARD_HOST=omp "$SELF" check-bash)"
   printf '%s' "$out" | grep -q '"permissionDecision":"ask"' || fail "destructive command not asked before any grant"
-  ( cd "$repo" && "$SELF" grant 'rm -rf src' ) >/dev/null
+  arg="$(tokof "$out")"
+  [ "$arg" = "$tbash" ] || fail "the same subject named two different tokens - the token is not deterministic: $arg vs $tbash"
+  ( cd "$repo" && "$SELF" grant "$arg" ) | grep -q 'rm -rf src' \
+    || fail "grant does not print the subject its token keyed, so nobody can read what they approved"
   out="$(cd "$repo" && jbash 'rm -rf src' | BD_GUARD_HOST=omp "$SELF" check-bash)"
   [ "$out" = "{}" ] || fail "a live grant did not allow the command it was issued for: $out"
   out="$(cd "$repo" && jbash 'rm -rf src' | BD_GUARD_HOST=omp "$SELF" check-bash)"
   printf '%s' "$out" | grep -q '"permissionDecision":"ask"' || fail "a bash grant was reusable - not single-use"
 
-  # A grant is exact, not a family: approving one path buys nothing for its sibling.
-  ( cd "$repo" && "$SELF" grant "$repo/.env.production" ) >/dev/null
+  # ...and the same on the edit surface, which owns its own subject (the normalized path).
+  out="$(cd "$repo" && jedit "$repo/.env.production" | BD_GUARD_HOST=omp "$SELF" check-edit)"
+  printf '%s' "$out" | grep -q '"permissionDecision":"ask"' || fail "denylist edit not asked before any grant"
+  ( cd "$repo" && "$SELF" grant "$tedit" ) >/dev/null
+  out="$(cd "$repo" && jedit "$repo/.env.production" | BD_GUARD_HOST=omp "$SELF" check-edit)"
+  [ "$out" = "{}" ] || fail "a live grant did not allow the edit it was issued for: $out"
+  out="$(cd "$repo" && jedit "$repo/.env.production" | BD_GUARD_HOST=omp "$SELF" check-edit)"
+  printf '%s' "$out" | grep -q '"permissionDecision":"ask"' || fail "an edit grant was reusable - not single-use"
+
+  # A grant is exact, not a family: approving one path buys nothing for its sibling, because the
+  # grant is keyed to the subject the pending record named and matching is whole-subject equality.
+  ( cd "$repo" && "$SELF" grant "$tedit" ) >/dev/null
   out="$(cd "$repo" && jedit "$repo/.env.staging" | BD_GUARD_HOST=omp "$SELF" check-edit)"
   printf '%s' "$out" | grep -q '"permissionDecision":"ask"' || fail "a grant for one path allowed a different path"
   rm -f "$gfile"
@@ -667,26 +967,27 @@ selftest() {
   # An expired grant is not consumed, and its stale entry is cleaned up on sight - the same
   # self-healing the boundary state file gets. Rewritten through a temp file rather than `sed -i`,
   # which spells its argument differently on GNU and BSD.
-  ( cd "$repo" && "$SELF" grant 'rm -rf src' ) >/dev/null
+  ( cd "$repo" && "$SELF" grant "$tbash" ) >/dev/null
   sed 's/ [0-9][0-9]*$/ 100/' "$gfile" > "$gfile.tmp" && mv "$gfile.tmp" "$gfile"
   out="$(cd "$repo" && jbash 'rm -rf src' | BD_GUARD_HOST=omp "$SELF" check-bash)"
   printf '%s' "$out" | grep -q '"permissionDecision":"ask"' || fail "an expired grant was consumed as an allow"
   [ ! -f "$gfile" ] || fail "the expired grant entry was not cleaned up"
 
   # Every issued grant is recorded, and the record ACCUMULATES rather than overwriting: two grants,
-  # two lines, each naming its own subject. (The refusal when that append FAILS is asserted below.)
+  # two lines, each naming its own SUBJECT rather than the token, because a token tells the operator
+  # reading the log nothing. (The refusal when that append FAILS is asserted below.)
   rm -f "$glog"
-  ( cd "$repo" && "$SELF" grant "$repo/.env.production" ) >/dev/null
+  ( cd "$repo" && "$SELF" grant "$tedit" ) >/dev/null
   [ "$(wc -l < "$glog" | tr -d '[:space:]')" = 1 ] || fail "a grant did not append exactly one audit line"
   grep -q "$repo/.env.production" "$glog" || fail "the audit line does not name its subject"
-  ( cd "$repo" && "$SELF" grant 'rm -rf src' ) >/dev/null
+  ( cd "$repo" && "$SELF" grant "$tbash" ) >/dev/null
   [ "$(wc -l < "$glog" | tr -d '[:space:]')" = 2 ] || fail "a second grant overwrote the audit log instead of appending"
   grep -q 'rm -rf src' "$glog" || fail "the second audit line does not name its subject"
 
-  # THE CLAUDE CODE INVARIANT, and the most important case here: without the omp marker a grant is
-  # inert. Claude Code opens its own operator prompt, so a grant sitting in the state file must
-  # never turn one of its asks into an allow - a host that already asks the human correctly must not
-  # inherit a mechanism built for a host that cannot.
+  # The other half of THE CLAUDE CODE INVARIANT, and the most important case here: without the omp
+  # marker a grant is inert. Claude Code opens its own operator prompt, so a grant sitting in the
+  # state file must never turn one of its asks into an allow - a host that already asks the human
+  # correctly must not inherit a mechanism built for a host that cannot.
   out="$(cd "$repo" && jbash 'rm -rf src' | "$SELF" check-bash)"
   printf '%s' "$out" | grep -q '"permissionDecision":"ask"' || fail "a grant was consumed with BD_GUARD_HOST unset (check-bash)"
   out="$(cd "$repo" && jedit "$repo/.env.production" | "$SELF" check-edit)"
@@ -702,7 +1003,7 @@ selftest() {
   # than a refused one, and a refusal is recoverable. A DIRECTORY in place of the log makes the `>>`
   # append fail on both macOS and Linux, with no need for an unprivileged user or a read-only mount.
   rm -f "$glog"; mkdir "$glog"
-  if ( cd "$repo" && "$SELF" grant 'rm -rf src' ) >/dev/null 2>"$d/grant.err"; then
+  if ( cd "$repo" && "$SELF" grant "$tbash" ) >/dev/null 2>"$d/grant.err"; then
     fail "grant succeeded with an unwritable audit log"
   fi
   grep -q 'refusing to issue an unrecorded grant' "$d/grant.err" \
@@ -712,16 +1013,12 @@ selftest() {
   printf '%s' "$out" | grep -q '"permissionDecision":"ask"' || fail "a refused grant still bought an allow: $out"
   rmdir "$glog"
 
-  # The grant sentence is the bridge's entire handoff, so it appears only under the marker: absent
-  # it, the reason a Claude Code operator reads is byte-identical to today's.
+  # The grant sentence is the bridge's entire handoff, so it appears only under the marker: absent it,
+  # the reason a Claude Code operator reads carries no instruction for an agent at all.
   out="$(cd "$repo" && jbash 'rm -rf src' | "$SELF" check-bash)"
   printf '%s' "$out" | grep -q 'bd-guard grant' && fail "the grant sentence leaked into a non-omp ask reason"
-  out="$(cd "$repo" && jbash 'rm -rf src' | BD_GUARD_HOST=omp "$SELF" check-bash)"
-  printf '%s' "$out" | grep -q "bd-guard grant 'rm -rf src'" || fail "the omp bash ask reason does not name the grant command: $out"
   out="$(cd "$repo" && jedit "$repo/.env.production" | "$SELF" check-edit)"
   printf '%s' "$out" | grep -q 'bd-guard grant' && fail "the grant sentence leaked into a non-omp edit ask reason"
-  out="$(cd "$repo" && jedit "$repo/.env.production" | BD_GUARD_HOST=omp "$SELF" check-edit)"
-  printf '%s' "$out" | grep -q "bd-guard grant '$repo/.env.production'" || fail "the omp edit ask reason does not name the grant command: $out"
 
   # A corrupt grants file is ABSENT, never an allow - the state file is the one input an attacker
   # could plausibly scribble in. Each fixture below carries a REAL key and a live expiry and
@@ -733,9 +1030,9 @@ selftest() {
   # The file is asserted UNTOUCHED afterwards too: a corrupt file is refused WHOLE and left for a
   # human to read, never partially consumed and never silently rewritten. That assertion is what
   # catches a guard degrading from refusing the file to merely skipping the line.
-  rm -f "$gfile"
-  ( cd "$repo" && "$SELF" grant 'rm -rf src' ) >/dev/null
-  ( cd "$repo" && "$SELF" grant "$repo/.env.production" ) >/dev/null
+  rm -f "$gfile" "$glog"
+  ( cd "$repo" && "$SELF" grant "$tbash" ) >/dev/null
+  ( cd "$repo" && "$SELF" grant "$tedit" ) >/dev/null
   sed 's/$/ extra/' "$gfile" > "$gfile.tmp" && mv "$gfile.tmp" "$gfile"
   out="$(cd "$repo" && jbash 'rm -rf src' | BD_GUARD_HOST=omp "$SELF" check-bash)"
   printf '%s' "$out" | grep -q '"permissionDecision":"ask"' || fail "a grant line with a trailing extra field was consumed (check-bash): $out"
@@ -744,8 +1041,8 @@ selftest() {
   [ "$(wc -l < "$gfile" | tr -d '[:space:]')" = 2 ] || fail "a corrupt grants file was rewritten instead of refused whole (trailing field)"
 
   rm -f "$gfile"
-  ( cd "$repo" && "$SELF" grant 'rm -rf src' ) >/dev/null
-  ( cd "$repo" && "$SELF" grant "$repo/.env.production" ) >/dev/null
+  ( cd "$repo" && "$SELF" grant "$tbash" ) >/dev/null
+  ( cd "$repo" && "$SELF" grant "$tedit" ) >/dev/null
   sed 's/ [0-9][0-9]*$/ soon/' "$gfile" > "$gfile.tmp" && mv "$gfile.tmp" "$gfile"
   out="$(cd "$repo" && jbash 'rm -rf src' | BD_GUARD_HOST=omp "$SELF" check-bash)"
   printf '%s' "$out" | grep -q '"permissionDecision":"ask"' || fail "a grant line with a non-numeric expiry was consumed (check-bash): $out"
@@ -759,13 +1056,42 @@ selftest() {
   # file that would otherwise be consumable can tell refusing the file WHOLE from skipping one bad
   # line: with the guard, the garbage line refuses the file and the live grant goes unspent; without
   # it, the garbage is skipped and the grant is consumed as an allow.
+  #
+  # The garbage key is 64 characters, and that length is the point. A short fixture like `not-a-key`
+  # is refused by the LENGTH guard on the next line, so the case passed with the charset guard
+  # deleted - it asserted the wrong guard. At 64 non-hex characters only the charset guard stands
+  # between this file and consumption.
   rm -f "$gfile"
-  ( cd "$repo" && "$SELF" grant 'rm -rf src' ) >/dev/null
-  printf 'not-a-key 9999999999\n' >> "$gfile"
+  ( cd "$repo" && "$SELF" grant "$tbash" ) >/dev/null
+  printf 'zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz 9999999999\n' >> "$gfile"
   out="$(cd "$repo" && jbash 'rm -rf src' | BD_GUARD_HOST=omp "$SELF" check-bash)"
   printf '%s' "$out" | grep -q '"permissionDecision":"ask"' || fail "a garbage line beside a live grant was skipped instead of refusing the file whole: $out"
   [ "$(wc -l < "$gfile" | tr -d '[:space:]')" = 2 ] || fail "a corrupt grants file was rewritten instead of refused whole (malformed key)"
+
+  # A grant can only be issued for a subject the guard actually asked about. `grant <subject>` is
+  # gone, so an UNKNOWN token is the only way to try: it refuses with a non-zero exit, and issues
+  # neither a grants entry nor an audit line, because nothing was approved.
   rm -f "$gfile" "$glog"
+  if ( cd "$repo" && "$SELF" grant 0123456789abcdef ) >/dev/null 2>"$d/grant.err"; then
+    fail "an unknown grant token was accepted"
+  fi
+  grep -q 'no pending ask for token' "$d/grant.err" \
+    || fail "the refusal does not say on stderr that the token is unknown: $(cat "$d/grant.err")"
+  [ ! -f "$gfile" ] || fail "an unknown token still wrote a grants entry"
+  [ ! -f "$glog" ] || fail "an unknown token still wrote an audit line"
+
+  # ...and so is a token whose pending record has EXPIRED. The ask it belonged to is stale, so the
+  # call is re-judged rather than approved from a question nobody remembers asking. Ageing every
+  # record at once is why this runs last: it retires every token captured above.
+  sed -E 's/^([0-9a-f]{16} [0-9a-f]{64}) [0-9]+/\1 100/' "$pfile" > "$pfile.tmp" && mv "$pfile.tmp" "$pfile"
+  if ( cd "$repo" && "$SELF" grant "$tbash" ) >/dev/null 2>"$d/grant.err"; then
+    fail "an expired pending record still issued a grant"
+  fi
+  grep -q 'no pending ask for token' "$d/grant.err" \
+    || fail "the expired-token refusal does not say on stderr why it refused: $(cat "$d/grant.err")"
+  [ ! -f "$gfile" ] || fail "an expired pending record still wrote a grants entry"
+  [ ! -f "$glog" ] || fail "an expired pending record still wrote an audit line"
+  rm -f "$gfile" "$glog" "$pfile"
 
   # A decision whose reason embeds a model-chosen path is still VALID JSON when that path carries a
   # control character. This is the bypass shape, not a formatting nicety: the host serializes the

@@ -88,8 +88,8 @@ const TIMEOUT_MS = 5000;
 // The sentence appended to every ask. Fixed text, and deliberately never interpolated: the
 // script's reason already carries the model's own command or path as quoted data, so keeping the
 // imperative half constant means a crafted path cannot rewrite the instruction the agent reads.
-// It names no subject of its own - the grant command, carrying the normalised subject, comes from
-// the script, which is the only side that knows what the subject normalised to.
+// It names no subject of its own, and no token either - the grant command comes from the script,
+// which is the only side that knows the token it recorded for the subject it normalised.
 const INSTRUCTION =
   "Do not retry this call yet. Ask the user for permission yourself, using your own ask tool, and " +
   "quote the reason above to them. If the user approves, run the grant command named in that " +
@@ -132,9 +132,18 @@ interface Check {
 // There is no `subject` on a Check any more, and no middle-eliding helper to build one: the prompt
 // they were for is gone. bd-guard's reason names the PATTERN it matched ("recursive delete
 // (rm -r)") and never the call, so somebody still has to name the call - and that is the side
-// which normalised it. The script names it, exactly, inside the grant command it puts in the
-// reason. Exactly is the operative word there: a 300-character command elided in the middle, which
-// is what the dialog was shown, would be a grant nobody could run.
+// which normalised it. The script names it as quoted data in its own reason, and the grant command
+// it appends carries an opaque 16-hex token instead of that subject.
+//
+// TRIED AND REVERTED, do not re-attempt: naming the subject inside the grant command. Every
+// check-bash subject contains, by construction, the destructive substring that made it ask, so
+// `bd-guard grant 'rm -rf src'` is itself judged destructive and draws its own ask, whose grant
+// command nests the same substring again. Measured on `rm -rf src`, `git push --force origin
+// main`, `git reset --hard HEAD~1`, `docker rm -f web` and `kubectl delete pod x`: all five
+// regress, so every check-bash grant was unreachable. The token also removes the respelling
+// failure - the subject is looked up rather than retyped, so a grant the agent reconstructed
+// slightly differently can no longer be recorded, reported successful and never consumable - and
+// it removes the quoting hazard with it, since a 16-hex word needs no quoting at all.
 
 function editCheck(path: string): Check {
   return {
@@ -275,8 +284,9 @@ export function installGuard(pi: GuardHookApi, root: string, guard: string = joi
           // renders and records.
           //
           // The reason is the script's own wording plus fixed text. `why` carries the model's
-          // command or path as quoted data, including inside the grant command the script named
-          // for the subject it normalised; INSTRUCTION is a constant and never interpolated, so a
+          // command or path as quoted data; the grant command inside it carries an opaque token
+          // rather than that subject, so nothing the agent has to retype can carry the substring
+          // that made the guard ask. INSTRUCTION is a constant and never interpolated, so a
           // crafted path cannot rewrite the imperative half of what the agent reads.
           //
           // This RETURNS rather than judging the rest of the batch, which is the one semantic the
@@ -408,6 +418,25 @@ function script(path: string, body: string): string {
   return path;
 }
 
+// The grant invocation an ask reason names, matched by SHAPE rather than by text. Its argument is
+// an opaque 16-hex token the script recorded for the subject it normalised, and never the subject
+// itself: every check-bash subject contains, by construction, the destructive substring that made
+// the guard ask, so an invocation carrying it - `bd-guard grant 'rm -rf src'` - is itself judged
+// destructive and draws its own ask. Measured on five patterns, all five regressed, so the
+// argument's SHAPE is what these cases assert, and the subject is asserted separately, in prose.
+const GRANT = /(\S*bd-guard grant)[ \t]+(\S+)/g;
+const TOKEN = /^[0-9a-f]{16}$/;
+
+// Every grant invocation in a reason, as the exact command the agent would run plus its argument.
+function grants(reason: string | undefined): { text: string; arg: string }[] {
+  return [...(reason ?? "").matchAll(GRANT)].map(m => ({ text: `${m[1]} ${m[2]}`, arg: m[2] }));
+}
+
+// Two cases below strip those invocations out of a reason with `.replace(GRANT, " ")` and assert
+// the subject against what is LEFT. That is the sentence somebody gets quoted to them, so
+// asserting against it rather than against the whole reason is what keeps "the block names the
+// subject" from being satisfied by an incidental echo inside the command the agent is told to type.
+
 async function called(
   fn: ((event: GuardToolCallEvent, ctx: GuardContext) => Promise<GuardDecision | undefined>) | undefined,
   event: GuardToolCallEvent,
@@ -455,26 +484,65 @@ async function selftest(): Promise<void> {
     check(!r.threw, `a destructive bash call threw on an ask: ${String(r.threw)}`);
     check(r.value?.block === true, "a destructive bash call was not blocked on an ask");
     check(r.value?.reason?.includes("[better-dev]") === true, `the block does not carry the guard's own wording: ${String(r.value?.reason)}`);
-    // bd-guard's reason names the PATTERN it matched, never the call, so a block the agent is
-    // expected to relay to a user has to name the command from somewhere: the grant command does.
-    check(r.value?.reason?.includes("rm -rf /some/dir") === true, `the block does not name the command being judged: ${String(r.value?.reason)}`);
-    check(r.value?.reason?.includes("bd-guard grant") === true, `the block does not name the grant command: ${String(r.value?.reason)}`);
+    // bd-guard's reason names the PATTERN it matched ("recursive delete (rm -r)") and never the
+    // call, so a block the agent is expected to relay to a user has to name the command from
+    // somewhere. Asserted against the reason with its grant invocations stripped out, so that
+    // naming the command only inside the command the agent must retype cannot satisfy it. Sharper
+    // than the bare includes() this replaces, which the old subject-carrying invocation satisfied
+    // on its own; every reason that passed the old form passes this one.
+    check((r.value?.reason ?? "").replace(GRANT, " ").includes("rm -rf /some/dir"),
+      `the block does not name the command being judged outside the grant invocation: ${String(r.value?.reason)}`);
+    // ...and the grant command names an opaque TOKEN rather than that command: exactly one
+    // invocation, whose only argument is 16 lowercase hex.
+    const askGrants = grants(r.value?.reason);
+    check(askGrants.length === 1, `the block names ${askGrants.length} grant commands, expected exactly 1: ${String(r.value?.reason)}`);
+    check(TOKEN.test(askGrants[0]?.arg ?? ""), `the grant command's argument is not a 16-hex token: ${String(askGrants[0]?.arg)}`);
+    check(askGrants[0]?.text.includes("rm -rf /some/dir") !== true, `the grant invocation embeds the command being judged: ${String(askGrants[0]?.text)}`);
     check(r.value?.reason?.includes(INSTRUCTION) === true, `the block does not carry the ask instruction: ${String(r.value?.reason)}`);
     check(asked.calls.length === 0, `confirm was called ${asked.calls.length} times on an ask`);
     check(fx.spawns() === 1, `expected one guard spawn for a bash ask, got ${fx.spawns()}`);
     const askReason = r.value?.reason;
 
-    // ...and a check-edit ask the same way. This is the half that shows the subject in the grant
-    // command is the guard's NORMALISED path rather than an echo of the model's own string, which
-    // is why the script owns that sentence and this bridge only passes the reason through.
+    // ...and the command that reason tells the agent to run is itself CLEAN, judged by the real
+    // guard. This is the case the shape assertions above exist for: while the invocation carried
+    // the subject, granting a destructive command meant running a command containing that
+    // destructive text, so the grant drew its own ask and no check-bash grant was reachable at
+    // all. The string reads harmless to a reader, so the only assertion that catches it is feeding
+    // the exact command back through check-bash.
+    //
+    // What is fed is what an agent following INSTRUCTION would COPY: the imperative removed, then
+    // everything from the command name to the end of the reason - the script puts the grant
+    // sentence last precisely so that span is the whole command and nothing else. Taking only the
+    // first whitespace-delimited argument instead would make this case vacuous, since a
+    // subject-carrying invocation truncated at its first space (`grant 'rm`) is judged clean; the
+    // endsWith check below is what keeps the extraction honest.
+    const regress = operator(fx.repo);
+    const copied = (/\S*bd-guard grant[^\n]*/.exec((askReason ?? "").replace(INSTRUCTION, ""))?.[0] ?? "").trim();
+    check(copied.endsWith(askGrants[0]?.arg ?? "\u0000"), `the grant command does not end at its argument, so the reason has text after it: ${copied}`);
+    r = await called(handler(fx.wrapper), { toolName: "bash", input: { command: copied } }, regress.ctx);
+    check(!r.threw, `the grant command the ask names threw when judged: ${String(r.threw)}`);
+    check(r.value === undefined, `the grant command the ask names draws its own decision: ${copied} -> ${String(r.value?.reason)}`);
+    check(regress.calls.length === 0, `confirm was called ${regress.calls.length} times judging the grant command`);
+
+    // ...and a check-edit ask the same way. The path in the reason is the guard's own NORMALISED
+    // absolute path rather than an echo of the model's string, which is why the script owns that
+    // sentence and this bridge only passes the reason through. It is asserted in the prose now,
+    // since the invocation carries no subject left to inspect.
     const denylisted = join(fx.inside, ".env");
     const editAsk = operator(fx.repo);
     r = await called(handler(fx.wrapper), { toolName: "write", input: { path: denylisted } }, editAsk.ctx);
     check(!r.threw, `a write to a denylisted path threw: ${String(r.threw)}`);
     check(r.value?.block === true, "a write to a denylisted path was not blocked");
-    check(r.value?.reason?.includes(denylisted) === true, `the block does not name the path being judged: ${String(r.value?.reason)}`);
-    check(r.value?.reason?.includes(`bd-guard grant '${denylisted}'`) === true,
-      `the block does not name a grant command for the normalised path: ${String(r.value?.reason)}`);
+    check((r.value?.reason ?? "").replace(GRANT, " ").includes(denylisted),
+      `the block does not name the path being judged outside the grant invocation: ${String(r.value?.reason)}`);
+    const editGrants = grants(r.value?.reason);
+    check(editGrants.length === 1, `the edit block names ${editGrants.length} grant commands, expected exactly 1: ${String(r.value?.reason)}`);
+    check(TOKEN.test(editGrants[0]?.arg ?? ""), `the edit grant command's argument is not a 16-hex token: ${String(editGrants[0]?.arg)}`);
+    // A path was the one subject a quoted invocation could carry safely, since no path matches
+    // check_bash's patterns - which is exactly why the check-bash regress hid for a round behind a
+    // green edit case. It is asserted absent here too: one token form for both subjects leaves no
+    // second spelling to respell, and no quoting for a path with a space or an apostrophe in it.
+    check(editGrants[0]?.text.includes(denylisted) !== true, `the edit grant invocation embeds the path being judged: ${String(editGrants[0]?.text)}`);
     check(r.value?.reason?.includes(INSTRUCTION) === true, `the edit block does not carry the ask instruction: ${String(r.value?.reason)}`);
     check(editAsk.calls.length === 0, `confirm was called ${editAsk.calls.length} times on an edit ask`);
 
@@ -487,6 +555,10 @@ async function selftest(): Promise<void> {
     check(!r.threw, `a destructive bash call threw with no UI: ${String(r.threw)}`);
     check(r.value?.block === true, "a destructive bash call proceeded in a session with no UI");
     check(r.value?.reason === askReason, `the block differs with no UI: ${String(r.value?.reason)}`);
+    // That byte-for-byte equality now also pins the TOKEN's determinism, which is load-bearing
+    // elsewhere: the token is a hash of the subject, so the same subject asked twice names the same
+    // grant and re-asking rewrites one pending entry instead of appending a new one. A per-ask
+    // random token would leave this case as the only thing that noticed.
     check(headless.calls.length === 0, `confirm was called ${headless.calls.length} times in a session with no UI`);
 
     // ...and the marker the script keys on reaches the spawn. A fake guard records its own
@@ -564,10 +636,44 @@ async function selftest(): Promise<void> {
     // The REASON, not the bare boolean: a block asserted on its own would be satisfied by any
     // future refusal this bridge grew, which is how two invented ones hid in this case for a round.
     check(r.value?.block === true, "an edit whose first path draws an ask was allowed");
-    check(r.value?.reason?.includes("bd-guard grant") === true, `the batch block does not name the grant command: ${String(r.value?.reason)}`);
+    const batchGrants = grants(r.value?.reason);
+    check(batchGrants.length === 1, `the batch block names ${batchGrants.length} grant commands, expected exactly 1: ${String(r.value?.reason)}`);
+    check(TOKEN.test(batchGrants[0]?.arg ?? ""), `the batch grant command's argument is not a 16-hex token: ${String(batchGrants[0]?.arg)}`);
     check(r.value?.reason?.includes(INSTRUCTION) === true, `the batch block does not carry the ask instruction: ${String(r.value?.reason)}`);
     check(batch.calls.length === 0, `confirm was called ${batch.calls.length} times across the batch`);
     check(fx.spawns() === 1, `an ask did not short-circuit the batch: ${fx.spawns()} spawns`);
+
+    // ...and an ask followed by a DENY in the same batch short-circuits the same way, which is the
+    // sequence no case reached before: the batch above pairs the ask path with a clean path, the
+    // one below puts the deny first. Here the agent sees ONLY the ask, so a grant it then obtains
+    // is spent by the retry, which re-judges from the first path and blocks on the deny. The end
+    // state is fail-closed - the boundary is never crossed, because a grant is keyed to the subject
+    // the guard asked about and the denied path was never asked about - but one approval is spent
+    // on a call that stays blocked, which is worth pinning rather than rediscovering. What is
+    // asserted is the short-circuit itself: the ASK reason with its token, the deny's wording and
+    // path absent, and one spawn, because the second path is never reached to be judged.
+    const askDeny = operator(fx.repo);
+    r = await called(
+      handler(fx.wrapper),
+      { toolName: "edit", input: { paths: [join(fx.inside, ".env"), fx.outside] } },
+      askDeny.ctx,
+    );
+    check(!r.threw, `an ask-then-deny edit threw: ${String(r.threw)}`);
+    check(r.value?.block === true, "an ask-then-deny edit was allowed");
+    // Positively the denylist ASK, not merely "not the deny": naming which decision came back is
+    // what makes the two absence assertions below mean the deny was never reached, rather than
+    // meaning some third refusal was returned whose wording happens to match neither.
+    check(r.value?.reason?.includes("recorded safety-denylist") === true, `the block is not the denylist ask the first path draws: ${String(r.value?.reason)}`);
+    check((r.value?.reason ?? "").replace(GRANT, " ").includes(join(fx.inside, ".env")),
+      `the ask does not name the first path outside the grant invocation: ${String(r.value?.reason)}`);
+    const askDenyGrants = grants(r.value?.reason);
+    check(askDenyGrants.length === 1, `the ask-then-deny block names ${askDenyGrants.length} grant commands, expected exactly 1: ${String(r.value?.reason)}`);
+    check(TOKEN.test(askDenyGrants[0]?.arg ?? ""), `the ask-then-deny grant argument is not a 16-hex token: ${String(askDenyGrants[0]?.arg)}`);
+    check(r.value?.reason?.includes(INSTRUCTION) === true, `the ask-then-deny block does not carry the ask instruction: ${String(r.value?.reason)}`);
+    check(r.value?.reason?.includes("outside the scope boundary") !== true, `the ask did not short-circuit before the deny: ${String(r.value?.reason)}`);
+    check(r.value?.reason?.includes(fx.outside) !== true, `the ask-then-deny block names the path behind the ask: ${String(r.value?.reason)}`);
+    check(askDeny.calls.length === 0, `confirm was called ${askDeny.calls.length} times across an ask-then-deny batch`);
+    check(fx.spawns() === 1, `an ask did not short-circuit before the deny: ${fx.spawns()} spawns`);
 
     // ...and a deny short-circuits exactly as it always did, which is the half this change must not
     // have moved: the offending path is judged, the block carries its own reason, and the paths

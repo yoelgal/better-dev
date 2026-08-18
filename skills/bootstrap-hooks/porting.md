@@ -122,6 +122,15 @@ running it. That is not only a boundary, it is what makes the wait visible - the
 first-class host event that omp, herdr and other integrations already observe, where a hook's private
 dialog emits nothing and the session sits with its pane still reporting work.
 
+One step is easy to miss and fails silently when missed: the grant half is gated on the bridge exporting
+`BD_GUARD_HOST=omp` into every `bd-guard` spawn it makes. Without it the guard names no grant command in
+the reason, while the bridge's own instruction still tells the agent to run the grant command named
+there - an instruction with no referent - and the receipt would be refused even if the agent guessed it.
+The result is an unbounded ask loop on the newly ported host, with nothing to read. So a new bridge sets
+that variable, and the marker is worth reading as a capability claim rather than a host name: what it
+asserts is "this bridge translates an ask into a block the agent can act on", which is the only thing
+the grant path depends on.
+
 omp inverts the failure direction, and that is what makes this the dangerous hook to port: the `tool_call`
 gotcha above holds with its consequence turned up. The runner converts a handler that throws or outruns its
 bound into a block itself, so a broken guard denies every bash, write and edit on the machine rather than
