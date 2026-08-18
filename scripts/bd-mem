@@ -26,6 +26,7 @@
 #   bd-mem ledger approve <work-item>                  pin approval to contract.md's exact bytes (+ snapshot)
 #   bd-mem ledger check-approval <work-item>           exit 0 = unchanged since approval; else gate re-opened
 #   bd-mem ledger settle <work-item> <STATE> [note]    record the terminal state as progress.md's last line
+#   bd-mem ledger reap [--apply]                       preview (or settle) in-flight items whose PR is already in the integration branch
 #
 # The four operations skills use are remember, recall, persist(-override) and read; `learn`, `init`,
 # `prune`, and `ledger` are helpers. The backend is swappable via BETTER_DEV_MEMORY:
@@ -253,7 +254,79 @@ ledger() {
       else printf '%s\n' "$2" >>"$d/progress.md"; fi
       lock_release
       printf 'settled %s %s\n' "$1" "$2" ;;
-    *) die "ledger where|dir|init|resume|put|read|list|status|approve|check-approval|settle" ;;
+    reap) # settle the in-flight rows whose work provably landed, and ONLY those.
+          # Why this exists: an item's terminal state is written by the session that finishes it, and a
+          # session that ends at the merge - or crashes, or hands off - never writes one. The row then
+          # reads in-flight forever while its branch and worktree are long gone, which is how 12 rows sat
+          # open for up to 13 days with every one of their PRs merged. `status` could already see them;
+          # nothing could ACT on them, so the operator got an invitation to resume dead work instead of a
+          # command to close it.
+          #
+          # The evidence is deliberately mechanical and deliberately LOCAL - no gh, no network, no API
+          # token. This repo squash-merges, so a landed PR leaves a commit whose subject ends `(#N)` in
+          # the integration branch's own history; that commit IS the proof, and `git log -F --grep`
+          # finds it offline. A repo that merges some other way finds nothing and reaps nothing, which
+          # is the right failure: this verb never guesses, and a row it cannot prove stays exactly as
+          # it was for a human to read.
+          #
+          # Judgment stays out. A row whose branch still exists with commits the integration branch does
+          # not have is a LIVE lane and is kept even when a PR number matches - that is the case where a
+          # follow-up landed under the same PR while the work continued. Anything needing a human to
+          # weigh it (an epic whose item was cancelled by a later decision, a lane abandoned on purpose)
+          # has no mechanical proof and so is never touched here. Dry-run is the default for the same
+          # reason `prune` previews: the operator reads the evidence column before anything is written.
+      local apply=0
+      [ "${1:-}" = --apply ] && apply=1
+      local primary pr n ref sha d s st last br verdict detail ahead
+      # Git commands run against the PRIMARY checkout, the same tree BD_DIR resolves to: a worktree's
+      # HEAD is a feature branch, and reading merge history from there would answer about the lane
+      # rather than about the integration branch every row merged into.
+      primary="$(cd "$BD_DIR/.." && pwd -P)"
+      # The ref every row's PR landed on. `origin/HEAD` is what the remote itself calls default, so it
+      # survives a repo whose integration branch is not named main; the fallbacks cover a clone with no
+      # remote HEAD and a repo working entirely locally. Never the recorded integration-branch override:
+      # that names where work merges NEXT, and a repo that has since renamed it would make every
+      # already-landed row unprovable.
+      ref=""
+      for cand in "$(git -C "$primary" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || true)" origin/main main HEAD; do
+        [ -n "$cand" ] || continue
+        git -C "$primary" rev-parse --verify --quiet "$cand" >/dev/null 2>&1 && { ref="$cand"; break; }
+      done
+      [ -n "$ref" ] || { printf 'reap: no integration ref to read merge history from - nothing verifiable\n' >&2; return 0; }
+      for d in "$BD_DIR/ledger"/*/; do
+        [ -d "$d" ] || continue
+        s="$(basename "$d")"
+        last="$(awk 'NF{l=$0} END{print l}' "$d/progress.md" 2>/dev/null || true)"
+        st="$(printf '%s' "$last" | grep -oE '^(DONE_WITH_CONCERNS|DONE|BLOCKED|NEEDS_INPUT|EXHAUSTED|NO_PROGRESS)' | head -n1 || true)"
+        [ -n "$st" ] && continue   # already settled - reap only ever touches in-flight rows
+        # The PR number comes from pr.md's own first line (`PR #78 -> DONE: ...`, written by
+        # /pr-and-verify), never from a scan of every artifact: a brief that happens to cite issue
+        # numbers would otherwise hand this verb a number that was never this row's PR.
+        n="$(sed -n '1s/^PR #\([0-9][0-9]*\).*/\1/p' "$d/pr.md" 2>/dev/null || true)"
+        if [ -z "$n" ]; then
+          printf 'keep\t%s\tno pr.md naming a PR - nothing mechanical to prove\n' "$s"; continue
+        fi
+        sha="$(git -C "$primary" log "$ref" -F --grep="(#$n)" --format=%h -n1 2>/dev/null || true)"
+        if [ -z "$sha" ]; then
+          printf 'keep\t%s\tPR #%s is not in %s yet\n' "$s" "$n" "$ref"; continue
+        fi
+        br="$(sed -n 's/^branch:[[:space:]]*//p' "$d/worktree.md" 2>/dev/null | head -n1 || true)"
+        if [ -n "$br" ] && git -C "$primary" rev-parse --verify --quiet "$br" >/dev/null 2>&1; then
+          ahead="$(git -C "$primary" rev-list --count "$ref..$br" 2>/dev/null || echo 0)"
+          if [ "${ahead:-0}" -gt 0 ] 2>/dev/null; then
+            printf 'keep\t%s\tPR #%s landed but %s still has %s commit(s) not in %s - live lane\n' "$s" "$n" "$br" "$ahead" "$ref"; continue
+          fi
+        fi
+        detail="landed as PR #$n ($sha in $ref)"
+        if [ "$apply" = 1 ]; then
+          ledger settle "$s" DONE "$detail; settled by ledger reap $BD_NOW" >/dev/null
+          printf 'reaped\t%s\t%s\n' "$s" "$detail"
+        else
+          printf 'reap\t%s\t%s\n' "$s" "$detail"
+        fi
+      done
+      [ "$apply" = 1 ] || printf 'reap: preview only - settle these with: bd-mem ledger reap --apply\n' >&2 ;;
+    *) die "ledger where|dir|init|resume|put|read|list|status|approve|check-approval|settle|reap" ;;
   esac
 }
 
@@ -1000,6 +1073,52 @@ case "$op" in
 second line" >/dev/null
       "$SELF" ledger status | grep -q "^settle-probe${TAB}DONE${TAB}" || { echo "FAIL: a multi-line note broke the line-initial invariant"; exit 1; }
       [ "$(awk 'NF{l=$0} END{print l}' .better-dev/ledger/settle-probe/progress.md)" = "DONE - first line second line" ] || { echo "FAIL: settle must flatten a multi-line note onto one line"; exit 1; }
+      # --- ledger reap: settle the in-flight rows whose PR is provably in the integration branch ---
+      # The failure this guards: a session that ends at the merge never writes a terminal state, so the
+      # row reads in-flight forever with its branch long gone. A red here is a reap that either misses a
+      # landed row or, far worse, settles one it could not prove.
+      #
+      # The fixture is a real git repo, because the proof this verb rests on IS git history: a squash
+      # commit whose subject ends `(#N)`. The selftest's cwd is already a temp dir; git init makes
+      # `$BD_DIR/..` the primary checkout reap reads from.
+      git init -q -b main . 2>/dev/null || git init -q . 2>/dev/null
+      git config user.email a@b.c; git config user.name t
+      : >reap-fixture; git add reap-fixture
+      git commit -qm "feat(x): a landed change (#42)"
+      "$SELF" ledger put reap-landed pr.md - <<<'PR #42 -> DONE: squash-merged' >/dev/null
+      "$SELF" ledger put reap-unlanded pr.md - <<<'PR #4242 -> DONE: merged somewhere else' >/dev/null
+      "$SELF" ledger put reap-nopr notes.md - <<<'no pr artifact here' >/dev/null
+      out="$("$SELF" ledger reap 2>/dev/null)"
+      printf '%s' "$out" | grep -q "^reap${TAB}reap-landed${TAB}landed as PR #42 " || { echo "FAIL: reap did not offer a row whose PR is in the integration branch"; exit 1; }
+      printf '%s' "$out" | grep -q "^keep${TAB}reap-unlanded${TAB}PR #4242 is not in " || { echo "FAIL: reap must keep a row whose PR never landed"; exit 1; }
+      printf '%s' "$out" | grep -q "^keep${TAB}reap-nopr${TAB}no pr.md" || { echo "FAIL: reap must keep a row with no PR artifact"; exit 1; }
+      # A dry run WRITES NOTHING - the whole reason it is the default.
+      "$SELF" ledger status | grep -q "^reap-landed${TAB}in-flight${TAB}" || { echo "FAIL: dry-run reap settled a row"; exit 1; }
+      # An already-settled row is never re-reported: reap only ever touches in-flight.
+      printf '%s' "$out" | grep -q "settle-probe" && { echo "FAIL: reap reported an already-settled row"; exit 1; }
+      # A live lane is kept even though its PR number landed: the branch still carries commits the
+      # integration branch does not have, which is work in progress, not a stale row.
+      git branch reap/live-lane >/dev/null 2>&1
+      git checkout -q reap/live-lane; : >live-work; git add live-work; git commit -qm "wip on the lane"; git checkout -q -
+      "$SELF" ledger put reap-live pr.md - <<<'PR #42 -> DONE: first slice merged' >/dev/null
+      printf 'branch: reap/live-lane\n' | "$SELF" ledger put reap-live worktree.md - >/dev/null
+      # Capture, then grep the variable - never `reap | grep -q`. `grep -q` exits on its first match,
+      # the loop's next write hits a closed pipe, and `set -o pipefail` reports that SIGPIPE as the
+      # pipeline's status - so a PASSING assertion reads as a failure. The earlier asserts in this
+      # block already capture for the same reason.
+      out="$("$SELF" ledger reap 2>/dev/null)"
+      printf '%s' "$out" | grep -q "^keep${TAB}reap-live${TAB}PR #42 landed but reap/live-lane still has 1 commit" \
+        || { echo "FAIL: reap must keep a row whose branch still carries unlanded commits"; exit 1; }
+      # --apply settles exactly the proven row, with the evidence in the note, and leaves the rest.
+      out="$("$SELF" ledger reap --apply 2>/dev/null)"
+      printf '%s' "$out" | grep -q "^reaped${TAB}reap-landed${TAB}" || { echo "FAIL: --apply did not report the settled row"; exit 1; }
+      "$SELF" ledger status | grep -q "^reap-landed${TAB}DONE${TAB}" || { echo "FAIL: --apply did not settle the landed row"; exit 1; }
+      grep -q '^DONE - landed as PR #42 ' .better-dev/ledger/reap-landed/progress.md || { echo "FAIL: reaped note must carry the evidence, line-initial"; exit 1; }
+      "$SELF" ledger status | grep -q "^reap-unlanded${TAB}in-flight${TAB}" || { echo "FAIL: --apply settled an unproven row"; exit 1; }
+      "$SELF" ledger status | grep -q "^reap-live${TAB}in-flight${TAB}" || { echo "FAIL: --apply settled a live lane"; exit 1; }
+      # Re-running is a no-op: the row it settled is no longer in-flight, so it is no longer a candidate.
+      out="$("$SELF" ledger reap 2>/dev/null)"
+      printf '%s' "$out" | grep -q "reap-landed" && { echo "FAIL: reap re-offered a row it already settled"; exit 1; }
       # --- distill nudge: a fat lesson store surfaces at ledger init, on stderr, stdout untouched ---
       i=0; while [ "$i" -lt 200 ]; do printf '{"kind":"lesson","text":"bulk lesson %s","confidence":0.6}\n' "$i"; i=$((i+1)); done >>.better-dev/learnings.jsonl
       out="$("$SELF" ledger init feat/nudge-probe 2>/dev/null)"
