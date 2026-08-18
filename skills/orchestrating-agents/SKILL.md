@@ -151,6 +151,13 @@ and is re-read every turn. Move artifacts as files instead:
   high-consequence denylist with the standing instruction to escalate rather than edit those paths (settle
   `NEEDS_INPUT`), so a fresh worker doesn't discover the rule only at review. Not your session history.
   `.better-dev/bin/bd-dispatch brief <work-item> <role>` writes a skeleton into the shared ledger and prints its path.
+- **The project's skill list** - a project can record the skills a dispatched worker should use
+  (`.better-dev/bin/bd-mem remember "dispatch-skills: <skill or capability> (<when it applies>), ..."`).
+  Resolve it once per run (`.better-dev/bin/bd-mem recall "dispatch-skills"`) and paste the entries
+  bearing on a slice into its brief as an imperative to load them before it starts, never a mention: a
+  skill named in passing prose does not reliably load, and the worker then solves in its own ad-hoc way
+  a problem this project already has a skill for. No record means no line and dispatch as today.
+  `briefs-and-reviews.md` holds the entry shape, the unresolvable entry, and the per-item addition.
 - **Report** - the worker writes its full report (steps taken, files changed, deviations, judgment
   calls, and the full line for each question it parked) to the report file named in the brief, and ends
   its reply with the **report trailer**: the last lines of the reply, one key per line, nothing after

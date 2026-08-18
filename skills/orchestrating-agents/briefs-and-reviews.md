@@ -33,6 +33,21 @@ What belongs in the brief:
   the rule surface only at review. `/guardrails-install` records that list per repo; recall it with
   `.better-dev/bin/bd-mem recall "safety"`, then apply any `.better-dev/overrides.md` adjustments (which
   win), so the brief carries this repo's actual set rather than a generic one.
+- The entries from the project's skill list (`bd-mem recall "dispatch-skills"`, per this skill's
+  SKILL.md) that bear on this slice, pasted as an instruction to load them before starting. The record
+  pairs each skill with when it applies, so a worker whose slice touches none of them loads none:
+
+  ```
+  dispatch-skills: /security-pass on any auth, money, or upload surface; the host's design-review
+  skill on any UI diff; the repo's own docs-lookup skill before writing against a library API
+  ```
+
+  Two cases the brief settles rather than leaving to the worker. An entry naming a capability this host
+  doesn't ship resolves like the tool-name mismatch above: find the equivalent under another name, or
+  proceed without it and report the substitution, never `BLOCKED`. And a slice whose area has a skill the
+  standing record doesn't name earns that entry in this brief alone - the record is per-project, and a
+  per-item need never rewrites it. Have the report name which listed skills it loaded, so "the list was
+  consulted" is a claim you can check against the diff rather than assume.
 - The report file path, and the report trailer the reply must end with (the **Report** bullet in this
   skill's SKILL.md defines the keys - point at it, don't restate them; `bd-dispatch brief` emits the
   block). Ask for structured, capped output - a fixed skeleton, a named length bound. A report with no

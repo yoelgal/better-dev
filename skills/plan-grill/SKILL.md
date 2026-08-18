@@ -240,7 +240,15 @@ grill only the decisions the done-criteria will turn on and skip exhaustive bran
 
 ## 4. Capture the done-contract
 
-Synthesize what the grill settled - no fresh interview, just write down what you already know.
+Synthesize what the grill settled into the contract's index of it - no fresh interview, just write down
+what you already know. **The contract indexes the locked decisions and holds none of them in full.**
+Each locked decision keeps one canonical home, the `decisions.md` the grill appended to, and its full
+text lives there and nowhere else; it reaches the contract's Implementation decisions section as one
+line of gist - enough for the user to judge relevance - with the section closing on one pointer naming
+`decisions.md`. The check when a contract line looks borderline: if an edit to `decisions.md` alone
+would leave the contract wrong, that line stores the locked decision instead of indexing it.
+`/writing-skills` owns the general rule and the failure it prevents. The rule reaches the locked
+decisions only - the two things that stay put below are not copies to thin.
 
 The contract is the one artifact the user has to read and approve, so it is written for them as well
 as for the skills downstream. Better-dev's own vocabulary - `human-gate`, `pending-decision`, *attack
@@ -287,8 +295,9 @@ is obvious, and keep the committed goal set small - a main goal plus at most two
 three in all; when the grill surfaces a fourth, halt before code and split into focused work items so
 each stays reviewable. Right-size the criteria too: one per property the goal claims, dropping any whose
 removal would miss nothing. Keep file paths and code snippets out of the prose - they go stale - with one exception:
-inline a small prototype-derived type, schema, or state-machine when it pins a decision more
-precisely than words. For the full template (problem, goal shape, user stories, done-criteria,
+inline a small prototype-derived type, schema, or state-machine when it pins a locked decision more
+precisely than words; inlined that way it is that decision's canonical home rather than a copy of one.
+For the full template (problem, goal shape, user stories, done-criteria,
 implementation decisions, out-of-scope) read `done-contract.md`.
 
 ## Close the gate, then hand off
