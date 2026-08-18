@@ -68,7 +68,7 @@ setopt no_nomatch 2>/dev/null || true                     # zsh aborts on an unm
 ls CLAUDE.md AGENTS.md 2>/dev/null                        # entry file(s)
 grep -l '@AGENTS.md' CLAUDE.md 2>/dev/null                # which imports which
 ls -d .better-dev .better-dev/bin .mcp.json 2>/dev/null   # prior data scaffold? bin bridge? MCP?
-ls "$HOME"/.*/skills/.better-dev-install "$HOME"/.config/*/skills/.better-dev-install 2>/dev/null  # tool installed for any host? (marker holds clone path)
+ls "$HOME"/.[!.]*/skills/.better-dev-install "$HOME"/.[!.]*/*/skills/.better-dev-install 2>/dev/null  # tool installed for any host? (marker holds clone path; both dir depths - .claude vs .omp/agent)
 git rev-parse --is-inside-work-tree 2>/dev/null && git branch --format='%(refname:short)'
 git remote -v 2>/dev/null | head -1
 git log --merges --oneline -n 5 2>/dev/null              # which base merged PRs actually target
@@ -234,7 +234,9 @@ refresh):
 setopt no_nomatch 2>/dev/null || true   # zsh: an unmatched glob must fall through to the -f test, not abort the loop
 sd=""
 # Glob, don't name hosts: any adapter's convention leaves the marker at <skills-dir>/.better-dev-install.
-for m in "$HOME"/.*/skills/.better-dev-install "$HOME"/.config/*/skills/.better-dev-install; do
+# Two patterns, because that dir sits one level under $HOME (.claude) or two (.omp/agent, .config/<host>);
+# reading hosts/* instead is not open here - it lives in the clone this loop is still looking for.
+for m in "$HOME"/.[!.]*/skills/.better-dev-install "$HOME"/.[!.]*/*/skills/.better-dev-install; do
   [ -f "$m" ] && sd="$(cat "$m")/scripts" && [ -f "$sd/bd-mem" ] && break
 done
 if [ -n "$sd" ] && [ -f "$sd/bd-link" ]; then
