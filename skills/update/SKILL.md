@@ -131,23 +131,28 @@ the block was never installed on this machine, which is `/onboard` or `BOOTSTRAP
 than drift - say which, because an empty loop reads as clean and that is exactly the failure this step
 exists to close.
 
-A `STALE` per-repo entry file is repaired in place, one command each, idempotent and marker-aware:
-`"$clone"/scripts/bd-block "$entry" better-dev-comms < "$clone"/docs/comms-block.md`. Report which
-entry files were current and which were refreshed; a silent refresh reads the same as no drift and
-teaches nobody that the copy had rotted.
+**Every `STALE` line is repaired here, including the host-global one.** One command each, idempotent and
+marker-aware, writing only between its own two markers so operator text in that file is untouched:
 
-**The host-global entry file is operator-run, always.** It is a machine-global write and D26 does not
-name it, so it is handed over as a paste block rather than executed here - and that holds whatever the
-repo's settings policy says, because D26 authorizes specific named commands and never an open class.
-Print the one line and let the operator run it:
-
-```
-<clone>/scripts/bd-block <entry_global> better-dev-comms < <clone>/docs/comms-block.md
+```bash
+"$clone"/scripts/bd-block "$entry" better-dev-comms < "$clone"/docs/comms-block.md
 ```
 
-A refresh of that file rewrites the whole marked block, so it also removes anything the operator's copy
-carried that the shipped body no longer does. Say that when handing the line over, because the
-difference between a stale rule and a deliberately local one is the operator's to know.
+D26 names this write on its authorized list, so it runs rather than being handed over. That is the
+point: a drift check ending in a paste block is a check whose fix waits on the operator noticing the
+output, and this particular drift is invisible from their side - a months-old block reads as the
+practices not working, never as a stale file. Announce each refresh with its undo
+(`scripts/bd-block remove "$entry" better-dev-comms`), which is what D26 requires of a write on that
+list, so the change is visible rather than silent.
+
+Report which entry files were current and which were refreshed. A silent refresh reads the same as no
+drift and teaches nobody that the copy had rotted.
+
+One thing to say out loud when refreshing, rather than after: the write rewrites the whole marked
+block, so it also drops anything that copy carried which the shipped body no longer does. A rule the
+operator added inside the markers by hand is not distinguishable from a rule this library retired, and
+only they can tell those apart. Where a refresh would discard a line the shipped body lacks, show the
+diff first and ask; where the copy is a clean older version of ours, refresh it and move on.
 
 ## 3. Read the release ledger
 
