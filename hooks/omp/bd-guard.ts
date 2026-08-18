@@ -2,10 +2,10 @@
 //
 // Claude Code registers the pair as two PreToolUse entries (hooks/hooks.json). omp has no hook
 // config to register them in, but it has the one capability the pair needs: a tool_call handler
-// may answer {block: true, reason}, and ctx.ui.confirm() is a real prompt. So the pair reaches
-// omp as a handler that pipes the tool input to the same bd-guard the Claude entries call and
-// translates its answer into omp's own vocabulary - a deny becomes a blocked call carrying the
-// reason, an ask becomes a confirm the operator answers.
+// may answer {block: true, reason}. So the pair reaches omp as a handler that pipes the tool
+// input to the same bd-guard the Claude entries call and translates its answer into omp's own
+// vocabulary - a deny becomes a blocked call carrying the reason, and an ask becomes a blocked
+// call whose reason tells the agent to go and get the user's permission itself.
 //
 // This is a module the awareness bridge calls into, NOT a second installed hook. The install
 // stays one stub at one target path, so hosts/omp, bd-omp-hook-wire, install.sh, --verify and
@@ -30,15 +30,34 @@
 // operator's machine, with better-dev named as the reason. Every path below catches everything
 // and falls back to allowing the call.
 //
-// The bound covers SPAWN time, not wall-clock time in the handler: the operator's own
-// deliberation at a confirm prompt is the deliberate exception, and the interval spent waiting on
-// the prompt is added back to the budget. That mirrors the runner rather than working around it.
-// omp 17.3.5 hands a hook its UI through `u = async (g) => { h?.pause(); try { return await g() }
-// finally { h?.resume() } }`, where `h` is that handler's own timeout budget - so the runner's
-// 30s bound is an ACTIVE-WORK bound that excludes dialog time by construction, and an unbounded
-// prompt cannot trip it into blocking. Billing thinking time against the spawn budget is what a
-// review round proved leaves the rest of a batch unjudged: it is the ONE budget correction that
-// survived, because it takes nothing away from the operator and invents no refusal.
+// The bound covers SPAWN time, and spawn time is now all there is: nothing in this handler waits
+// on a human. An ask returns its block immediately, so the 5s budget is spent entirely on
+// bd-guard spawns and the runner's 30s bound is approached by nothing else. The passage that
+// stood here described the operator's own deliberation at a confirm prompt being added back to
+// the budget, and it was right for as long as the prompt existed - omp 17.3.5 hands a hook its UI
+// through `u = async (g) => { h?.pause(); try { return await g() } finally { h?.resume() } }`,
+// where `h` is the handler's own budget, so the runner's bound was already an active-work bound.
+// What survives that round is the finding rather than the mechanism: billing human time against a
+// spawn budget leaves the rest of a batch unjudged, which is why no path here spends the budget
+// on anything but a spawn.
+//
+// GOVERNING PRINCIPLE: better-dev's enforcement never reaches beyond the layer of the agent
+// running it. A hook talks to its agent through that agent's own interface - a blocked call and a
+// reason - and the agent owns every layer above, including the user. So an ask does NOT open a
+// dialog here: it blocks the call and tells the agent to obtain the user's permission with the
+// agent's own ask tool, record the single-use grant the reason names, and retry. The agent's ask
+// is a first-class host event that omp, herdr and every other integration already observe, render
+// and record; a dialog opened from inside a hook is visible to none of them, belongs to no
+// conversation, and cannot be answered in the transcript somebody reads later.
+//
+// REMOVED, do not re-add - the same standing as the TRIED AND REVERTED note below: a host dialog
+// (ctx.ui.confirm, and the CONFIRM_TITLE it carried), a host status line (setStatus), a host toast
+// (ctx.ui.notify), and any shell-out to a notifier or a multiplexer (herdr, cmux, osascript,
+// notify-send). Every one of them reaches past this agent to the operator's screen from inside a
+// hook, so it escalates with no conversation to escalate into, and it leaves a headless run to
+// either hang on a prompt nobody can answer or self-approve the class the recorded policy
+// escalates. The hasUI branch went with them: with no dialog to open there is no UI case and no
+// no-UI case, only one block carrying one reason, so the branch had nothing left to decide.
 
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
@@ -50,7 +69,7 @@ const GUARD = "scripts/bd-guard";
 
 // The budget is the whole handler's spawn time, not one spawn's: omp's runner turns its own 30s
 // expiry into a block, so an edit carrying several paths must not be able to add spawns until it
-// gets there. Time spent waiting on the operator is added back rather than billed here.
+// gets there. Nothing else spends it: no path here waits on a human.
 const TIMEOUT_MS = 5000;
 
 // TRIED AND REVERTED, do not re-attempt: refusing on an answer this bridge could not decode, and
@@ -65,7 +84,17 @@ const TIMEOUT_MS = 5000;
 // each was standing in for is a MIS-ENCODING, and that is fixed in the encoder: emit_decision now
 // escapes losslessly under LC_ALL=C, which fixes Claude Code at the same time. Anything unclear
 // allows - that is bd-guard's charter and this bridge only translates it.
-const CONFIRM_TITLE = "better-dev safety gate";
+
+// The sentence appended to every ask. Fixed text, and deliberately never interpolated: the
+// script's reason already carries the model's own command or path as quoted data, so keeping the
+// imperative half constant means a crafted path cannot rewrite the instruction the agent reads.
+// It names no subject of its own - the grant command, carrying the normalised subject, comes from
+// the script, which is the only side that knows what the subject normalised to.
+const INSTRUCTION =
+  "Do not retry this call yet. Ask the user for permission yourself, using your own ask tool, and " +
+  "quote the reason above to them. If the user approves, run the grant command named in that " +
+  "reason and then retry the call once. If the user declines, or there is nobody to ask, abandon " +
+  "the call and report it as refused.";
 
 // omp dispatches its tool devices as write calls to xd://<device>, so a scope-boundary check on
 // xd://ast_edit would deny every device dispatch in every session. A target carrying a scheme is
@@ -74,8 +103,6 @@ const URI = /^[a-z][a-z0-9+.-]*:\/\//i;
 
 export interface GuardContext {
   cwd?: string;
-  hasUI?: boolean;
-  ui?: { confirm?: (title: string, message: string) => Promise<boolean> };
 }
 
 export interface GuardDecision {
@@ -100,25 +127,19 @@ export interface GuardHookApi {
 interface Check {
   sub: "check-bash" | "check-edit";
   stdin: string;
-  // What the operator is being asked about, for the prompt. bd-guard's reason names the PATTERN it
-  // matched ("recursive delete (rm -r)"), never the call, so a prompt built from the reason alone
-  // asks somebody to approve a command they cannot see.
-  subject: string;
 }
 
-// A long command is elided in the middle rather than truncated: the tail of a shell line is where
-// the redirect and the target live, and those are what an operator needs to see to answer.
-function subjectOf(kind: string, value: string): string {
-  const flat = value.replace(/\s+/g, " ").trim();
-  const shown = flat.length > 300 ? `${flat.slice(0, 180)} [...] ${flat.slice(-100)}` : flat;
-  return `${kind}: ${shown}`;
-}
+// There is no `subject` on a Check any more, and no middle-eliding helper to build one: the prompt
+// they were for is gone. bd-guard's reason names the PATTERN it matched ("recursive delete
+// (rm -r)") and never the call, so somebody still has to name the call - and that is the side
+// which normalised it. The script names it, exactly, inside the grant command it puts in the
+// reason. Exactly is the operative word there: a 300-character command elided in the middle, which
+// is what the dialog was shown, would be a grant nobody could run.
 
 function editCheck(path: string): Check {
   return {
     sub: "check-edit",
     stdin: JSON.stringify({ tool_input: { file_path: path } }),
-    subject: subjectOf("path", path),
   };
 }
 
@@ -155,7 +176,7 @@ function plan(event: GuardToolCallEvent | undefined): Check[] {
     case "bash": {
       const command = str(input.command);
       return command
-        ? [{ sub: "check-bash", stdin: JSON.stringify({ tool_input: { command } }), subject: subjectOf("command", command) }]
+        ? [{ sub: "check-bash", stdin: JSON.stringify({ tool_input: { command } }) }]
         : [];
     }
     case "write": {
@@ -191,6 +212,12 @@ function consult(guard: string, check: Check, cwd: string | undefined, deadline:
   const res = spawnSync("bash", [guard, check.sub], {
     cwd,
     input: check.stdin,
+    // The marker the script keys its host-specific behaviour on. Only this bridge sets it: Claude
+    // Code's hook entries do not, so the script can tell the two hosts apart and its Claude Code
+    // decisions stay byte-identical while it names a grant command here. The process environment
+    // is EXTENDED, never replaced - the script reads PATH, TMPDIR and git's own variables, and a
+    // guard that cannot find git fails as an ALLOW, which is a hole that shows up nowhere.
+    env: { ...process.env, BD_GUARD_HOST: "omp" },
     timeout: budget,
     encoding: "utf8",
     stdio: ["pipe", "pipe", "ignore"],
@@ -228,7 +255,7 @@ export function installGuard(pi: GuardHookApi, root: string, guard: string = joi
       try {
         const checks = plan(event);
         if (checks.length === 0) return undefined;
-        let deadline = Date.now() + TIMEOUT_MS;
+        const deadline = Date.now() + TIMEOUT_MS;
         for (const check of checks) {
           // A spawn that could not answer - missing script, non-zero exit, or the budget gone -
           // does not stop the call, and does not stop the remaining paths from being judged. A
@@ -241,39 +268,23 @@ export function installGuard(pi: GuardHookApi, root: string, guard: string = joi
           if (decision !== "deny" && decision !== "ask") continue;
           const why = reason ?? "[better-dev] refused under the recorded safety policy.";
           if (decision === "deny") return { block: true, reason: why };
-          // An ask with nobody to escalate to is a refusal, not an approval: a headless run
-          // (omp -p, an unattended loop) would otherwise silently self-approve exactly the
-          // class the recorded policy escalates.
-          const ui = ctx?.hasUI === true ? ctx.ui : undefined;
-          if (!ui || typeof ui.confirm !== "function") {
-            return { block: true, reason: `${why} (no interactive prompt in this session, so the ask is refused)` };
-          }
-          // The prompt text is DATA. `why` carries the model's own path verbatim, so an operator
-          // reading this dialog is reading model-influenced prose: omp renders it as data and
-          // never as markup, but a crafted path can still make the sentence read misleadingly.
-          // Escaping cannot fix prose, so it is named here instead.
-          const asked = Date.now();
-          let approved = false;
-          try {
-            approved = (await ui.confirm(CONFIRM_TITLE, `${why}\n\n${check.subject}`)) === true;
-          } catch {
-            // A prompt that failed is not an approval: it is the no-UI condition arriving late,
-            // and nobody answered.
-            return { block: true, reason: `${why} (the confirm prompt failed, so the ask is refused)` };
-          } finally {
-            // The operator's deliberation is not spawn time. Without adding it back, any prompt a
-            // human actually reads spends the budget, every later path comes back unjudged, and
-            // one approval carries the whole batch across the boundary. Leaving the prompt itself
-            // unbounded is safe for the same reason this restore is correct: omp's runner pauses
-            // a handler's own timeout budget for the duration of a UI dialog, so its 30s bound
-            // measures active work, never the operator.
-            deadline += Date.now() - asked;
-          }
-          if (!approved) return { block: true, reason: `${why} (declined)` };
-          // An approved ask clears THIS path and nothing else: the operator answered for the file
-          // they were shown, so the remaining paths are still judged. Returning here would let one
-          // approval carry a batch across the boundary, one prompt at a time.
-          continue;
+          // An ask is a BLOCK carrying an instruction, and never a dialog. better-dev's
+          // enforcement stops at the layer of the agent running it: the guard tells this agent
+          // what it may not do and why, and the agent owns everything above - including asking the
+          // user, which it does with its own ask tool, a first-class host event omp already
+          // renders and records.
+          //
+          // The reason is the script's own wording plus fixed text. `why` carries the model's
+          // command or path as quoted data, including inside the grant command the script named
+          // for the subject it normalised; INSTRUCTION is a constant and never interpolated, so a
+          // crafted path cannot rewrite the imperative half of what the agent reads.
+          //
+          // This RETURNS rather than judging the rest of the batch, which is the one semantic the
+          // dialog's removal moves. An approval used to clear the single path the operator had been
+          // shown and leave the others to be judged; nobody has answered anything at this point, so
+          // there is nothing to carry, and the whole call is refused. The retry after a grant
+          // re-enters this handler and judges every path again from the first.
+          return { block: true, reason: `${why} ${INSTRUCTION}` };
         }
         return undefined;
       } catch {
@@ -311,9 +322,13 @@ interface Recorder {
   calls: { title: string; message: string }[];
 }
 
-// `delay` is what makes a timing case able to fail: a confirm that resolves in microseconds
-// cannot show operator deliberation being billed against the spawn budget.
-function operator(cwd: string, answer: boolean, hasUI = true, delay = 0): Recorder {
+// A TRIPWIRE, not a UI. GuardContext no longer declares `hasUI` or `ui` because nothing in the
+// handler reads them, but omp's real ctx still carries both, so the fake still hands them over -
+// cast in, since the interface has dropped them - and counts every confirm it is asked for. That
+// is what makes "confirm was never called" an assertion rather than an absence: the recorder
+// answers TRUE, so a re-added dialog would show up twice over, as a call it counted and as the
+// allow that call used to produce.
+function operator(cwd: string, hasUI = true): Recorder {
   const calls: { title: string; message: string }[] = [];
   return {
     calls,
@@ -323,15 +338,10 @@ function operator(cwd: string, answer: boolean, hasUI = true, delay = 0): Record
       ui: {
         confirm: async (title: string, message: string) => {
           calls.push({ title, message });
-          if (delay > 0) {
-            const waited = Promise.withResolvers<void>();
-            setTimeout(waited.resolve, delay);
-            await waited.promise;
-          }
-          return answer;
+          return true;
         },
       },
-    },
+    } as unknown as GuardContext,
   };
 }
 
@@ -437,38 +447,67 @@ async function selftest(): Promise<void> {
     check(r.value?.block === true, "an obfuscated-shell bash call was not blocked");
     check(r.value?.reason?.includes("[better-dev]") === true, `the refusal does not carry the marker: ${String(r.value?.reason)}`);
 
-    // 2. an ask becomes a confirm the operator answers, and their answer decides the call.
-    const declined = operator(fx.repo, false);
-    r = await called(handler(fx.wrapper), { toolName: "bash", input: { command: "rm -rf /some/dir" } }, declined.ctx);
-    check(!r.threw, `a destructive bash call threw on a declined confirm: ${String(r.threw)}`);
-    check(r.value?.block === true, "a destructive bash call proceeded after the operator declined");
-    check(declined.calls.length === 1, `expected exactly one confirm on a declined ask, got ${declined.calls.length}`);
-    check(declined.calls[0]?.title === CONFIRM_TITLE, `the confirm carries the wrong title: ${String(declined.calls[0]?.title)}`);
-    check(declined.calls[0]?.message.includes("[better-dev]") === true, "the confirm prompt does not carry the guard's reason");
-    // bd-guard's reason names the PATTERN it matched, never the call, so a prompt built from the
-    // reason alone asks the operator to approve a command they cannot see.
-    check(declined.calls[0]?.message.includes("rm -rf /some/dir") === true,
-      `the confirm prompt does not name the command being judged: ${String(declined.calls[0]?.message)}`);
-    check(r.value?.reason?.endsWith("(declined)") === true, `the refusal does not say the operator declined: ${String(r.value?.reason)}`);
+    // 2. an ask becomes a BLOCK whose reason carries the guard's own wording, the subject, and the
+    // grant command the agent is to run once the user approves. No dialog is opened: the tripwire
+    // ctx would have counted one, and would have answered yes.
+    const asked = operator(fx.repo);
+    r = await called(handler(fx.wrapper), { toolName: "bash", input: { command: "rm -rf /some/dir" } }, asked.ctx);
+    check(!r.threw, `a destructive bash call threw on an ask: ${String(r.threw)}`);
+    check(r.value?.block === true, "a destructive bash call was not blocked on an ask");
+    check(r.value?.reason?.includes("[better-dev]") === true, `the block does not carry the guard's own wording: ${String(r.value?.reason)}`);
+    // bd-guard's reason names the PATTERN it matched, never the call, so a block the agent is
+    // expected to relay to a user has to name the command from somewhere: the grant command does.
+    check(r.value?.reason?.includes("rm -rf /some/dir") === true, `the block does not name the command being judged: ${String(r.value?.reason)}`);
+    check(r.value?.reason?.includes("bd-guard grant") === true, `the block does not name the grant command: ${String(r.value?.reason)}`);
+    check(r.value?.reason?.includes(INSTRUCTION) === true, `the block does not carry the ask instruction: ${String(r.value?.reason)}`);
+    check(asked.calls.length === 0, `confirm was called ${asked.calls.length} times on an ask`);
     check(fx.spawns() === 1, `expected one guard spawn for a bash ask, got ${fx.spawns()}`);
+    const askReason = r.value?.reason;
 
-    const approved = operator(fx.repo, true);
-    r = await called(handler(fx.wrapper), { toolName: "bash", input: { command: "rm -rf /some/dir" } }, approved.ctx);
-    check(!r.threw, `a destructive bash call threw on an approved confirm: ${String(r.threw)}`);
-    check(r.value === undefined, "a destructive bash call was blocked after the operator approved it");
-    check(approved.calls.length === 1, `expected exactly one confirm on an approved ask, got ${approved.calls.length}`);
+    // ...and a check-edit ask the same way. This is the half that shows the subject in the grant
+    // command is the guard's NORMALISED path rather than an echo of the model's own string, which
+    // is why the script owns that sentence and this bridge only passes the reason through.
+    const denylisted = join(fx.inside, ".env");
+    const editAsk = operator(fx.repo);
+    r = await called(handler(fx.wrapper), { toolName: "write", input: { path: denylisted } }, editAsk.ctx);
+    check(!r.threw, `a write to a denylisted path threw: ${String(r.threw)}`);
+    check(r.value?.block === true, "a write to a denylisted path was not blocked");
+    check(r.value?.reason?.includes(denylisted) === true, `the block does not name the path being judged: ${String(r.value?.reason)}`);
+    check(r.value?.reason?.includes(`bd-guard grant '${denylisted}'`) === true,
+      `the block does not name a grant command for the normalised path: ${String(r.value?.reason)}`);
+    check(r.value?.reason?.includes(INSTRUCTION) === true, `the edit block does not carry the ask instruction: ${String(r.value?.reason)}`);
+    check(editAsk.calls.length === 0, `confirm was called ${editAsk.calls.length} times on an edit ask`);
 
-    // 3. the same ask with no UI blocks and never prompts. This is the headless case: an ask is
-    // a decision, and a run with nobody to escalate to must not read it as an allow.
-    const headless = operator(fx.repo, true, false);
+    // 3. the same ask with no UI is the SAME block, reason for reason. There is no dialog to be
+    // missing, so there is no headless special case to get wrong: what the agent is told does not
+    // depend on whether the host could have drawn a prompt. The old code had a refusal of its own
+    // here, naming the absent prompt, and that is what this case now forbids.
+    const headless = operator(fx.repo, false);
     r = await called(handler(fx.wrapper), { toolName: "bash", input: { command: "rm -rf /some/dir" } }, headless.ctx);
     check(!r.threw, `a destructive bash call threw with no UI: ${String(r.threw)}`);
     check(r.value?.block === true, "a destructive bash call proceeded in a session with no UI");
-    check(r.value?.reason?.includes("no interactive prompt") === true, `the no-UI refusal does not name the escalation: ${String(r.value?.reason)}`);
+    check(r.value?.reason === askReason, `the block differs with no UI: ${String(r.value?.reason)}`);
     check(headless.calls.length === 0, `confirm was called ${headless.calls.length} times in a session with no UI`);
 
+    // ...and the marker the script keys on reaches the spawn. A fake guard records its own
+    // environment because the spawn is the only place the value has to arrive: the real script
+    // reads BD_GUARD_HOST to decide whether to consume a grant and whether to name one, so a
+    // bridge that stopped passing it would silently take the Claude Code path in an omp session -
+    // an ask with no way to approve it, and nothing else different enough to notice.
+    const spawnEnvLog = join(fx.root, "spawn-env.txt");
+    const recording = script(join(fx.root, "recording"), `printf '%s\\n' "host=$BD_GUARD_HOST path=$PATH" >> "${spawnEnvLog}"\nprintf '{}\\n'`);
+    r = await called(handler(recording), { toolName: "bash", input: { command: "rm -rf /some/dir" } }, { cwd: fx.repo });
+    check(!r.threw, `an env-recording guard threw: ${String(r.threw)}`);
+    check(r.value === undefined, "a guard answering {} blocked the call");
+    const spawnEnv = existsSync(spawnEnvLog) ? readFileSync(spawnEnvLog, "utf8") : "";
+    check(spawnEnv.includes("host=omp"), `the guard spawn did not carry BD_GUARD_HOST=omp: ${JSON.stringify(spawnEnv)}`);
+    // ...and the process environment was EXTENDED rather than replaced. Replacing it strips PATH,
+    // the script then cannot find git, and a guard that cannot answer ALLOWS - so this failure mode
+    // is silent everywhere else in this file.
+    check(/\bpath=[^\s]*\//.test(spawnEnv), `the guard spawn replaced the process environment: ${JSON.stringify(spawnEnv)}`);
+
     // 4. an allow is silent: a build clean draws neither a block nor a prompt.
-    const clean = operator(fx.repo, false);
+    const clean = operator(fx.repo);
     r = await called(handler(fx.wrapper), { toolName: "bash", input: { command: "rm -rf node_modules" } }, clean.ctx);
     check(!r.threw, `a safe rm threw: ${String(r.threw)}`);
     check(r.value === undefined, "a safe rm target was interrogated");
@@ -508,35 +547,44 @@ async function selftest(): Promise<void> {
     check(!r.threw, `a single-path edit threw: ${String(r.threw)}`);
     check(r.value?.block === true, "an edit carrying only `path` was not judged");
 
-    // ...and an approved ask does NOT stand in for the paths the operator never saw. A patch whose
-    // first path draws a denylist ask and whose second sits outside the boundary is still refused:
-    // the operator answered for the file they were shown, and reading their yes as consent for the
-    // rest of the batch is how a boundary gets crossed one approval at a time.
-    //
-    // The confirm here resolves only AFTER the guard's whole bound has elapsed, which is the half
-    // that bites: with deliberation billed against the spawn budget, the second path's spawn gets
-    // a budget of <= 0, comes back as silence, and the batch proceeds unjudged. A microsecond
-    // confirm cannot see that, and this case passed with one before the review round.
-    const mixed = operator(fx.repo, true, true, TIMEOUT_MS + 200);
-    const mixedStarted = Date.now();
+    // ...and an ask short-circuits the batch, which is the ONE semantic the dialog's removal moves.
+    // An approval used to clear the single path the operator had been shown and leave the rest to be
+    // judged, because reading their yes as consent for the whole batch is how a boundary gets crossed
+    // one approval at a time. Nobody has answered anything by the time the block is returned now, so
+    // there is nothing to carry: the whole call is refused, and the retry after a grant judges every
+    // path again from the first. The second path here is clean and inside the boundary, so the spawn
+    // count is what shows it was never reached.
+    const batch = operator(fx.repo);
     r = await called(
       handler(fx.wrapper),
-      { toolName: "edit", input: { paths: [join(fx.inside, ".env"), fx.outside] } },
-      mixed.ctx,
+      { toolName: "edit", input: { paths: [join(fx.inside, ".env"), join(fx.inside, "a.ts")] } },
+      batch.ctx,
     );
-    const mixedElapsed = Date.now() - mixedStarted;
-    check(!r.threw, `an approved-ask-then-denied edit threw: ${String(r.threw)}`);
-    check(mixedElapsed >= TIMEOUT_MS, `the slow confirm did not outlast the bound, so the case proves nothing: ${mixedElapsed}ms`);
+    check(!r.threw, `an ask-then-clean edit threw: ${String(r.threw)}`);
     // The REASON, not the bare boolean: a block asserted on its own would be satisfied by any
     // future refusal this bridge grew, which is how two invented ones hid in this case for a round.
-    check(r.value?.block === true, "an approved ask on the first path waived the boundary deny on the second");
-    check(r.value?.reason?.includes(fx.outside) === true, `the refusal does not name the denied path: ${String(r.value?.reason)}`);
+    check(r.value?.block === true, "an edit whose first path draws an ask was allowed");
+    check(r.value?.reason?.includes("bd-guard grant") === true, `the batch block does not name the grant command: ${String(r.value?.reason)}`);
+    check(r.value?.reason?.includes(INSTRUCTION) === true, `the batch block does not carry the ask instruction: ${String(r.value?.reason)}`);
+    check(batch.calls.length === 0, `confirm was called ${batch.calls.length} times across the batch`);
+    check(fx.spawns() === 1, `an ask did not short-circuit the batch: ${fx.spawns()} spawns`);
+
+    // ...and a deny short-circuits exactly as it always did, which is the half this change must not
+    // have moved: the offending path is judged, the block carries its own reason, and the paths
+    // behind it are never spawned for.
+    r = await called(
+      handler(fx.wrapper),
+      { toolName: "edit", input: { paths: [fx.outside, join(fx.inside, "a.ts")] } },
+      { cwd: fx.repo },
+    );
+    check(!r.threw, `a deny-first edit threw: ${String(r.threw)}`);
+    check(r.value?.block === true, "an edit whose first path is outside the boundary was allowed");
     check(
       r.value?.reason?.includes("outside the scope boundary") === true,
-      `the refusal is not the boundary deny the second path draws: ${String(r.value?.reason)}`,
+      `the block is not the boundary deny the first path draws: ${String(r.value?.reason)}`,
     );
-    check(mixed.calls.length === 1, `expected exactly one confirm across the batch, got ${mixed.calls.length}`);
-    check(fx.spawns() === 2, `expected both paths judged, got ${fx.spawns()} spawns`);
+    check(r.value?.reason?.includes(fx.outside) === true, `the block does not name the denied path: ${String(r.value?.reason)}`);
+    check(fx.spawns() === 1, `a deny did not short-circuit the batch: ${fx.spawns()} spawns`);
 
     // 8. ast_edit is covered under its own tool name, which is where its real paths appear.
     r = await called(
@@ -667,18 +715,20 @@ async function selftest(): Promise<void> {
     r = await called(handler(fx.wrapper), { toolName: "write", input: { path: fx.outside } }, undefined as unknown as GuardContext);
     check(!r.threw, `an absent ctx threw: ${String(r.threw)}`);
 
-    // ...and a confirm that REJECTS is the no-UI condition arriving late: a session tearing down
-    // mid-prompt, or a host whose confirm throws outside an interactive context. Nobody answered,
-    // so it refuses rather than landing in the allow bucket with the errors.
-    const broken: GuardContext = {
+    // ...and a ctx whose confirm THROWS is now indistinguishable from any other ask. The old code
+    // read a rejecting prompt as the no-UI condition arriving late - a session tearing down
+    // mid-prompt, a host whose confirm throws outside an interactive context - and refused with
+    // wording of its own. Nothing consults it any more, so the block is the ordinary one, and a
+    // re-added dialog fails here loudly rather than quietly changing a reason.
+    const hostile = {
       cwd: fx.repo,
       hasUI: true,
       ui: { confirm: async () => { throw new Error("prompt torn down"); } },
-    };
-    r = await called(handler(fx.wrapper), { toolName: "bash", input: { command: "rm -rf /some/dir" } }, broken);
-    check(!r.threw, `a rejecting confirm threw out of the handler: ${String(r.threw)}`);
-    check(r.value?.block === true, "a confirm that failed was read as an approval");
-    check(r.value?.reason?.includes("confirm prompt failed") === true, `the refusal does not name the failed prompt: ${String(r.value?.reason)}`);
+    } as unknown as GuardContext;
+    r = await called(handler(fx.wrapper), { toolName: "bash", input: { command: "rm -rf /some/dir" } }, hostile);
+    check(!r.threw, `a ctx carrying a throwing confirm threw out of the handler: ${String(r.threw)}`);
+    check(r.value?.block === true, "an ask was not blocked when ctx carried a throwing confirm");
+    check(r.value?.reason === askReason, `the block changed because ctx carried a throwing confirm: ${String(r.value?.reason)}`);
   } finally {
     rmSync(fx.root, { recursive: true, force: true });
   }

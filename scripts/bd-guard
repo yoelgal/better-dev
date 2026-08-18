@@ -18,6 +18,10 @@
 #                                          it with the tree. Default TTL 8h; --ttl 0 = no expiry.
 #   bd-guard off                           remove the boundary - the one-command escape hatch.
 #   bd-guard status                        print the active boundary and expiry, or "no scope boundary".
+#   bd-guard grant <subject>               record a SINGLE-USE, 5-minute grant for the exact
+#                                          <subject> an ask named (a command string, or a
+#                                          normalized absolute path). Consumed only when
+#                                          BD_GUARD_HOST=omp - see consume_grant.
 #   bd-guard selftest
 #
 # The check-* hooks FAIL OPEN: on unparseable input or an internal error they emit {} and exit 0 -
@@ -135,6 +139,103 @@ state_file() {
   printf '%s/bd-scope' "$(cd "$g" && pwd -P)"
 }
 
+GRANT_TTL=300   # 5 minutes: long enough for the user to answer the agent's ask, short enough that a
+                # grant nobody used cannot answer tomorrow's question.
+
+# The grants file for the repo the session is in, beside bd-scope and per-worktree for the same
+# reason: `git worktree remove` deletes an approval along with the tree that earned it, and two
+# parallel worktrees never spend each other's.
+grants_file() {
+  local g
+  g="$(git rev-parse --git-dir 2>/dev/null)" || return 1
+  case "$g" in /*) ;; *) g="$PWD/$g" ;; esac
+  printf '%s/bd-grants' "$(cd "$g" && pwd -P)"
+}
+
+# A subject is a model-chosen command or path, so it can carry a newline, a quote, or an invalid
+# byte. Store its sha256 rather than the text: the file stays one fixed-width token per line, no
+# quoting question arises, and matching is exact equality over the WHOLE subject - never a prefix,
+# never a glob, so an approval for one path can never cover its siblings. GNU sha256sum first, then
+# macOS's shasum, then openssl; the hex run is extracted by shape because the three print it in
+# three different places ("<hex>  -", "<hex>  -", "(stdin)= <hex>").
+subject_key() {
+  local h
+  if command -v sha256sum >/dev/null 2>&1; then
+    h="$(printf '%s' "$1" | sha256sum 2>/dev/null || true)"
+  elif command -v shasum >/dev/null 2>&1; then
+    h="$(printf '%s' "$1" | shasum -a 256 2>/dev/null || true)"
+  elif command -v openssl >/dev/null 2>&1; then
+    h="$(printf '%s' "$1" | openssl dgst -sha256 2>/dev/null || true)"
+  else
+    return 1
+  fi
+  h="$(printf '%s' "$h" | grep -m1 -oE '[0-9a-f]{64}' || true)"
+  [ -n "$h" ] || return 1
+  printf '%s' "$h"
+}
+
+# Consume a single-use grant for $1, or fail. Called immediately before an ask, and gated on
+# BD_GUARD_HOST=omp - a marker the omp bridge (hooks/omp/bd-guard.ts) sets on every spawn it makes
+# and nothing else sets. Under Claude Code the marker is absent, so this returns non-zero without
+# reading or writing anything and every decision byte stays what it was before grants existed.
+#
+# Why grants exist: an omp hook cannot answer its own question. better-dev's enforcement must not
+# reach past the layer of the agent running it - no dialog of its own, no notification, no status
+# line, no terminal multiplexer - so the bridge blocks the call and hands the agent a reason, the
+# agent asks the USER through its own ask tool, and this grant is the receipt that the answer was
+# yes. Single-use and five-minute, so the receipt covers the one call it was written for.
+#
+# Fails toward the ask in every ambiguous case: no marker, no file, no hash tool, an unreadable
+# file, or any non-blank line that is not exactly '<64 hex> <digits>' treats the whole file as
+# absent. A corrupt file read as an allow would be a bypass reachable by writing garbage into a
+# state file, which is the opposite of what the file is for.
+consume_grant() { # consume_grant <subject>
+  [ "${BD_GUARD_HOST:-}" = omp ] || return 1
+  local f key now h e rest kept="" found=false
+  f="$(grants_file)" || return 1
+  [ -f "$f" ] && [ -r "$f" ] || return 1
+  key="$(subject_key "$1")" || return 1
+  now="$(date +%s)" || return 1     # explicit: an internal failure here must fall to the ask, and a
+                                    # bare failing assignment would reach the caller's ERR trap,
+                                    # whose fail-open {} is exactly the bypass this guards against.
+  while IFS=' ' read -r h e rest || [ -n "$h" ]; do
+    [ -n "$h" ] || continue
+    [ -z "$rest" ] || return 1
+    case "$h" in *[!0-9a-f]*) return 1 ;; esac
+    [ "${#h}" = 64 ] || return 1
+    case "$e" in ''|*[!0-9]*) return 1 ;; esac
+    if [ "$h" = "$key" ] && [ "$now" -le "$e" ]; then
+      found=true; continue            # consumed: dropped from the rewrite below, so it buys one call
+    fi
+    [ "$now" -le "$e" ] || continue   # expired: not consumable, and the stale entry goes with it
+    kept="$kept$h $e"$'\n'
+  done < "$f"
+  # A rewrite we cannot perform must not hand out an allow: the grant would survive it and buy a
+  # second call. A failed redirection never truncated the file, so falling back to the ask is safe.
+  if [ -n "$kept" ]; then
+    printf '%s' "$kept" > "$f" || return 1
+  else
+    rm -f "$f" || return 1
+  fi
+  [ "$found" = true ]
+}
+
+# The trailing sentence on an omp ask reason: the exact command that records the receipt. Only this
+# script knows the normalized subject, so only this script can name it - the bridge passes the
+# reason through untouched and appends its own instruction constant. Absent the marker this prints
+# NOTHING, which is what keeps a Claude Code reason byte-identical to today's.
+#
+# An embedded single quote is spelled the shell's own way ('\'') so the sentence stays a command the
+# agent can run verbatim. A subject like `mysql -e 'DROP TABLE t'` would otherwise print a broken
+# line, the agent would record a grant for a different subject, and the ask would repeat forever.
+grant_hint() { # grant_hint <subject>
+  [ "${BD_GUARD_HOST:-}" = omp ] || return 0
+  local sq="'" q s
+  q="'\\''"                 # the shell's own spelling of a single quote inside a single-quoted word
+  s="${1//$sq/$q}"          # pattern and replacement both come from variables: no escape-parsing doubt
+  printf " To proceed once the user approves, run: .better-dev/bin/bd-guard grant '%s'" "$s"
+}
+
 check_bash() {
   local bd cmd lower warn nosq noq
   bd="$(bd_dir)" && [ -d "$bd" ] || { emit_allow; return 0; }
@@ -209,7 +310,12 @@ check_bash() {
   fi
 
   if [ -n "$warn" ]; then
-    emit_decision ask "[better-dev] Destructive: $warn. Approve to proceed."
+    # Under the omp bridge the user has already approved this exact command through the agent's own
+    # ask, and the agent recorded a single-use grant as the receipt - consume it and get out of the
+    # way. Absent the marker (Claude Code) this returns non-zero without touching the file, and the
+    # ask below is byte-for-byte the one that shipped before grants existed.
+    if consume_grant "$cmd"; then emit_allow; return 0; fi
+    emit_decision ask "[better-dev] Destructive: $warn. Approve to proceed.$(grant_hint "$cmd")"
   else
     emit_allow
   fi
@@ -273,7 +379,11 @@ check_edit() {
         g="$(printf '%s' "$g" | sed 's/\*\*/\*/g')"
         case "$path" in
           $g|*/$g)
-            emit_decision ask "[better-dev] $path matches the recorded safety-denylist glob '$g' - a high-consequence path the loop escalates on. Approve to proceed."
+            # See consume_grant: the omp bridge's approved-once receipt, spent immediately before
+            # the ask it answers. The subject is the normalized path, never the glob - the user
+            # approved this one file, not every file the glob covers.
+            if consume_grant "$path"; then emit_allow; return 0; fi
+            emit_decision ask "[better-dev] $path matches the recorded safety-denylist glob '$g' - a high-consequence path the loop escalates on. Approve to proceed.$(grant_hint "$path")"
             return 0 ;;
         esac
       done
@@ -329,11 +439,52 @@ status_cmd() {
   fi
 }
 
+# Record a single-use grant for an exact subject: a command string for check-bash, a normalized
+# absolute path for check-edit. The agent runs this ONLY after the user approved through the agent's
+# own ask - see consume_grant for why the hook never asks anyone itself.
+#
+# The audit line is written FIRST and a failure to write it REFUSES the grant. A permission bypass
+# nobody can reconstruct afterwards is worse than a refused one, and a refusal is recoverable: fix
+# the log, run it again. The append runs in a subshell so a failed redirection can only fail that
+# subshell, rather than taking the script down under set -e or (worse) being ignored.
+grant_cmd() {
+  [ $# -ge 1 ] || die "grant <subject> (the exact command string or path the ask named)"
+  [ $# -le 1 ] || die "grant takes exactly one subject - quote it as a single argument"
+  local subject="$1" bd f key now expiry log line h e rest kept=""
+  [ -n "$subject" ] || die "grant needs a non-empty subject"
+  f="$(grants_file)" || die "not inside a git repo"
+  key="$(subject_key "$subject")" || die "no usable sha256 tool (sha256sum, shasum -a 256, openssl dgst)"
+  bd="$(bd_dir)" && [ -d "$bd" ] || die "no .better-dev directory here - refusing to issue an unrecorded grant"
+  log="$bd/grants.log"
+  # Control characters are folded exactly as emit_decision folds them, and for a sharper reason: a
+  # newline in a model-chosen subject would otherwise forge a second line in the audit trail.
+  line="$(printf '%s' "$subject" | tr '\001-\037' ' ')"
+  ( printf '%s\tgrant\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$line" >> "$log" ) 2>/dev/null \
+    || die "could not append to $log - refusing to issue an unrecorded grant"
+  now="$(date +%s)"; expiry=$(( now + GRANT_TTL ))
+  # Carry forward only live entries for OTHER subjects. Dropping this subject's existing entry is
+  # what keeps a grant single-use under a double `grant` (two stacked lines would buy two allows),
+  # and dropping a line the consumer would refuse to read self-heals a corrupt file on next use.
+  if [ -f "$f" ]; then
+    while IFS=' ' read -r h e rest || [ -n "$h" ]; do
+      [ -n "$h" ] && [ -z "$rest" ] || continue
+      case "$h" in *[!0-9a-f]*) continue ;; esac
+      [ "${#h}" = 64 ] || continue
+      case "$e" in ''|*[!0-9]*) continue ;; esac
+      [ "$h" != "$key" ] || continue
+      [ "$now" -le "$e" ] || continue
+      kept="$kept$h $e"$'\n'
+    done < "$f"
+  fi
+  printf '%s%s %s\n' "$kept" "$key" "$expiry" > "$f" || die "could not write $f (the grant is recorded in $log but NOT issued)"
+  printf 'grant recorded (single use, %ss): %s\n' "$GRANT_TTL" "$line"
+}
+
 selftest() {
   fail() { echo "bd-guard selftest FAIL: $1" >&2; exit 1; }
   jbash() { printf '{"tool_input":{"command":"%s"}}' "$1"; }
   jedit() { printf '{"tool_input":{"file_path":"%s"}}' "$1"; }
-  local d repo wt out sfile base
+  local d repo wt out sfile base gfile glog
   # The fixture must sit outside two things at once: the temp allowlist (check-edit always-allows /tmp,
   # /private/tmp, and $TMPDIR, so a fixture there makes every boundary assertion short-circuit to allow -
   # Linux `mktemp -d` lands under /tmp), AND any real git repo carrying .better-dev (else the no-scaffold
@@ -480,6 +631,142 @@ selftest() {
   printf '%s' "$out" | grep -q '"permissionDecision":"ask"' || fail "prose-form denylist did not enforce .env*"
   printf '%s' "$out" | grep -q '\.env\*' || fail "prose-form denylist ask does not name the glob"
 
+  # Grants: the omp bridge's approved-once receipt. Every case below runs with the marker set
+  # EXPLICITLY on the check invocation, so an operator who happens to have BD_GUARD_HOST=omp in
+  # their own environment cannot silently pass the invariant case that requires it absent.
+  unset BD_GUARD_HOST
+  gfile="$(cd "$repo" && git rev-parse --git-dir)/bd-grants"
+  case "$gfile" in /*) ;; *) gfile="$repo/$gfile" ;; esac
+  glog="$repo/.better-dev/grants.log"
+  rm -f "$gfile" "$glog"
+
+  # A grant is SINGLE-USE: ask -> grant -> {} -> ask again. Asserted on both check surfaces, because
+  # each owns its own subject (check-edit the normalized path, check-bash the command string).
+  out="$(cd "$repo" && jedit "$repo/.env.production" | BD_GUARD_HOST=omp "$SELF" check-edit)"
+  printf '%s' "$out" | grep -q '"permissionDecision":"ask"' || fail "denylist edit not asked before any grant"
+  ( cd "$repo" && "$SELF" grant "$repo/.env.production" ) >/dev/null
+  out="$(cd "$repo" && jedit "$repo/.env.production" | BD_GUARD_HOST=omp "$SELF" check-edit)"
+  [ "$out" = "{}" ] || fail "a live grant did not allow the edit it was issued for: $out"
+  out="$(cd "$repo" && jedit "$repo/.env.production" | BD_GUARD_HOST=omp "$SELF" check-edit)"
+  printf '%s' "$out" | grep -q '"permissionDecision":"ask"' || fail "an edit grant was reusable - not single-use"
+
+  out="$(cd "$repo" && jbash 'rm -rf src' | BD_GUARD_HOST=omp "$SELF" check-bash)"
+  printf '%s' "$out" | grep -q '"permissionDecision":"ask"' || fail "destructive command not asked before any grant"
+  ( cd "$repo" && "$SELF" grant 'rm -rf src' ) >/dev/null
+  out="$(cd "$repo" && jbash 'rm -rf src' | BD_GUARD_HOST=omp "$SELF" check-bash)"
+  [ "$out" = "{}" ] || fail "a live grant did not allow the command it was issued for: $out"
+  out="$(cd "$repo" && jbash 'rm -rf src' | BD_GUARD_HOST=omp "$SELF" check-bash)"
+  printf '%s' "$out" | grep -q '"permissionDecision":"ask"' || fail "a bash grant was reusable - not single-use"
+
+  # A grant is exact, not a family: approving one path buys nothing for its sibling.
+  ( cd "$repo" && "$SELF" grant "$repo/.env.production" ) >/dev/null
+  out="$(cd "$repo" && jedit "$repo/.env.staging" | BD_GUARD_HOST=omp "$SELF" check-edit)"
+  printf '%s' "$out" | grep -q '"permissionDecision":"ask"' || fail "a grant for one path allowed a different path"
+  rm -f "$gfile"
+
+  # An expired grant is not consumed, and its stale entry is cleaned up on sight - the same
+  # self-healing the boundary state file gets. Rewritten through a temp file rather than `sed -i`,
+  # which spells its argument differently on GNU and BSD.
+  ( cd "$repo" && "$SELF" grant 'rm -rf src' ) >/dev/null
+  sed 's/ [0-9][0-9]*$/ 100/' "$gfile" > "$gfile.tmp" && mv "$gfile.tmp" "$gfile"
+  out="$(cd "$repo" && jbash 'rm -rf src' | BD_GUARD_HOST=omp "$SELF" check-bash)"
+  printf '%s' "$out" | grep -q '"permissionDecision":"ask"' || fail "an expired grant was consumed as an allow"
+  [ ! -f "$gfile" ] || fail "the expired grant entry was not cleaned up"
+
+  # Every issued grant is recorded, and the record ACCUMULATES rather than overwriting: two grants,
+  # two lines, each naming its own subject. (The refusal when that append FAILS is asserted below.)
+  rm -f "$glog"
+  ( cd "$repo" && "$SELF" grant "$repo/.env.production" ) >/dev/null
+  [ "$(wc -l < "$glog" | tr -d '[:space:]')" = 1 ] || fail "a grant did not append exactly one audit line"
+  grep -q "$repo/.env.production" "$glog" || fail "the audit line does not name its subject"
+  ( cd "$repo" && "$SELF" grant 'rm -rf src' ) >/dev/null
+  [ "$(wc -l < "$glog" | tr -d '[:space:]')" = 2 ] || fail "a second grant overwrote the audit log instead of appending"
+  grep -q 'rm -rf src' "$glog" || fail "the second audit line does not name its subject"
+
+  # THE CLAUDE CODE INVARIANT, and the most important case here: without the omp marker a grant is
+  # inert. Claude Code opens its own operator prompt, so a grant sitting in the state file must
+  # never turn one of its asks into an allow - a host that already asks the human correctly must not
+  # inherit a mechanism built for a host that cannot.
+  out="$(cd "$repo" && jbash 'rm -rf src' | "$SELF" check-bash)"
+  printf '%s' "$out" | grep -q '"permissionDecision":"ask"' || fail "a grant was consumed with BD_GUARD_HOST unset (check-bash)"
+  out="$(cd "$repo" && jedit "$repo/.env.production" | "$SELF" check-edit)"
+  printf '%s' "$out" | grep -q '"permissionDecision":"ask"' || fail "a grant was consumed with BD_GUARD_HOST unset (check-edit)"
+  # ...and a foreign host value is not the marker either.
+  out="$(cd "$repo" && jbash 'rm -rf src' | BD_GUARD_HOST=claude-code "$SELF" check-bash)"
+  printf '%s' "$out" | grep -q '"permissionDecision":"ask"' || fail "a grant was consumed under a foreign BD_GUARD_HOST"
+  # The two grants above survived all three checks unspent, which is the other half of the claim.
+  [ "$(wc -l < "$gfile" | tr -d '[:space:]')" = 2 ] || fail "a non-omp check mutated the grants file"
+  rm -f "$gfile"
+
+  # An unwritable record REFUSES the grant: an approval nobody can reconstruct afterwards is worse
+  # than a refused one, and a refusal is recoverable. A DIRECTORY in place of the log makes the `>>`
+  # append fail on both macOS and Linux, with no need for an unprivileged user or a read-only mount.
+  rm -f "$glog"; mkdir "$glog"
+  if ( cd "$repo" && "$SELF" grant 'rm -rf src' ) >/dev/null 2>"$d/grant.err"; then
+    fail "grant succeeded with an unwritable audit log"
+  fi
+  grep -q 'refusing to issue an unrecorded grant' "$d/grant.err" \
+    || fail "the refusal does not say on stderr why it refused: $(cat "$d/grant.err")"
+  [ ! -f "$gfile" ] || fail "a refused grant still wrote an entry to the grants file"
+  out="$(cd "$repo" && jbash 'rm -rf src' | BD_GUARD_HOST=omp "$SELF" check-bash)"
+  printf '%s' "$out" | grep -q '"permissionDecision":"ask"' || fail "a refused grant still bought an allow: $out"
+  rmdir "$glog"
+
+  # The grant sentence is the bridge's entire handoff, so it appears only under the marker: absent
+  # it, the reason a Claude Code operator reads is byte-identical to today's.
+  out="$(cd "$repo" && jbash 'rm -rf src' | "$SELF" check-bash)"
+  printf '%s' "$out" | grep -q 'bd-guard grant' && fail "the grant sentence leaked into a non-omp ask reason"
+  out="$(cd "$repo" && jbash 'rm -rf src' | BD_GUARD_HOST=omp "$SELF" check-bash)"
+  printf '%s' "$out" | grep -q "bd-guard grant 'rm -rf src'" || fail "the omp bash ask reason does not name the grant command: $out"
+  out="$(cd "$repo" && jedit "$repo/.env.production" | "$SELF" check-edit)"
+  printf '%s' "$out" | grep -q 'bd-guard grant' && fail "the grant sentence leaked into a non-omp edit ask reason"
+  out="$(cd "$repo" && jedit "$repo/.env.production" | BD_GUARD_HOST=omp "$SELF" check-edit)"
+  printf '%s' "$out" | grep -q "bd-guard grant '$repo/.env.production'" || fail "the omp edit ask reason does not name the grant command: $out"
+
+  # A corrupt grants file is ABSENT, never an allow - the state file is the one input an attacker
+  # could plausibly scribble in. Each fixture below carries a REAL key and a live expiry and
+  # corrupts exactly ONE field, because that is the only shape that can fail: a line of `garbage`
+  # matches no subject, so the check asks whether or not any guard reads it, and the case asserted
+  # nothing. Both surfaces are covered, so both lines carry a correct key. Rewritten through a temp
+  # file rather than `sed -i`, which spells its argument differently on GNU and BSD.
+  #
+  # The file is asserted UNTOUCHED afterwards too: a corrupt file is refused WHOLE and left for a
+  # human to read, never partially consumed and never silently rewritten. That assertion is what
+  # catches a guard degrading from refusing the file to merely skipping the line.
+  rm -f "$gfile"
+  ( cd "$repo" && "$SELF" grant 'rm -rf src' ) >/dev/null
+  ( cd "$repo" && "$SELF" grant "$repo/.env.production" ) >/dev/null
+  sed 's/$/ extra/' "$gfile" > "$gfile.tmp" && mv "$gfile.tmp" "$gfile"
+  out="$(cd "$repo" && jbash 'rm -rf src' | BD_GUARD_HOST=omp "$SELF" check-bash)"
+  printf '%s' "$out" | grep -q '"permissionDecision":"ask"' || fail "a grant line with a trailing extra field was consumed (check-bash): $out"
+  out="$(cd "$repo" && jedit "$repo/.env.production" | BD_GUARD_HOST=omp "$SELF" check-edit)"
+  printf '%s' "$out" | grep -q '"permissionDecision":"ask"' || fail "a grant line with a trailing extra field was consumed (check-edit): $out"
+  [ "$(wc -l < "$gfile" | tr -d '[:space:]')" = 2 ] || fail "a corrupt grants file was rewritten instead of refused whole (trailing field)"
+
+  rm -f "$gfile"
+  ( cd "$repo" && "$SELF" grant 'rm -rf src' ) >/dev/null
+  ( cd "$repo" && "$SELF" grant "$repo/.env.production" ) >/dev/null
+  sed 's/ [0-9][0-9]*$/ soon/' "$gfile" > "$gfile.tmp" && mv "$gfile.tmp" "$gfile"
+  out="$(cd "$repo" && jbash 'rm -rf src' | BD_GUARD_HOST=omp "$SELF" check-bash)"
+  printf '%s' "$out" | grep -q '"permissionDecision":"ask"' || fail "a grant line with a non-numeric expiry was consumed (check-bash): $out"
+  out="$(cd "$repo" && jedit "$repo/.env.production" | BD_GUARD_HOST=omp "$SELF" check-edit)"
+  printf '%s' "$out" | grep -q '"permissionDecision":"ask"' || fail "a grant line with a non-numeric expiry was consumed (check-edit): $out"
+  [ "$(wc -l < "$gfile" | tr -d '[:space:]')" = 2 ] || fail "a corrupt grants file was rewritten instead of refused whole (non-numeric expiry)"
+
+  # A malformed KEY needs a fixture of its own, and it needs a LIVE grant beside it. The two cases
+  # above corrupt the trailing field and the expiry, so their lines still carry a valid hex key and
+  # the key guard never runs - a mutation degrading that guard to `continue` passes them both. Only a
+  # file that would otherwise be consumable can tell refusing the file WHOLE from skipping one bad
+  # line: with the guard, the garbage line refuses the file and the live grant goes unspent; without
+  # it, the garbage is skipped and the grant is consumed as an allow.
+  rm -f "$gfile"
+  ( cd "$repo" && "$SELF" grant 'rm -rf src' ) >/dev/null
+  printf 'not-a-key 9999999999\n' >> "$gfile"
+  out="$(cd "$repo" && jbash 'rm -rf src' | BD_GUARD_HOST=omp "$SELF" check-bash)"
+  printf '%s' "$out" | grep -q '"permissionDecision":"ask"' || fail "a garbage line beside a live grant was skipped instead of refusing the file whole: $out"
+  [ "$(wc -l < "$gfile" | tr -d '[:space:]')" = 2 ] || fail "a corrupt grants file was rewritten instead of refused whole (malformed key)"
+  rm -f "$gfile" "$glog"
+
   # A decision whose reason embeds a model-chosen path is still VALID JSON when that path carries a
   # control character. This is the bypass shape, not a formatting nicety: the host serializes the
   # tool input correctly, so a newline arrives here as a real newline in $path, and an unescaped one
@@ -526,7 +813,8 @@ case "${1:-}" in
   scope) shift; scope_cmd "$@" ;;
   off) off_cmd ;;
   status) status_cmd ;;
+  grant) shift; grant_cmd "$@" ;;
   selftest) selftest ;;
-  ""|-h|--help) sed -n '2,30p' "$SELF"; exit 0 ;;
-  *) die "unknown command '$1' (check-bash | check-edit | scope | off | status | selftest)" ;;
+  ""|-h|--help) sed -n '2,34p' "$SELF"; exit 0 ;;
+  *) die "unknown command '$1' (check-bash | check-edit | scope | off | status | grant | selftest)" ;;
 esac

@@ -105,18 +105,22 @@ The awareness hooks inject a note; the enforcement pair (`bd-guard check-bash`, 
 vetoes or asks before a tool runs, so a host earns them only if it exposes a pre-tool-execution hook that
 can return a deny/ask decision. Claude Code's is `PreToolUse`: `check-bash` on the Bash-equivalent tool,
 `check-edit` on the edit/write tools. omp's is a `tool_call` handler, which earns the pair too - it returns
-`{block: true, reason}` to refuse the call, and `ctx.hasUI` with `ctx.ui.confirm(title, message)` gives the
-ask somewhere to land.
+`{block: true, reason}` to refuse the call, and that reason reaches the agent, which is where an ask lands.
+A host needs no dialog API to earn the pair; it needs a blocked call whose reason the agent reads.
 
 Whether a host needs its own branch in `bd-guard`'s `emit_decision` is the same distinction `## Output
 shapes` above draws: a host that parses the decision off the hook's stdout needs one, a host whose bridge
 parses needs none, because the bridge is ours. So `bd-guard` gained no omp case - omp's enforcement bridge
 translates Claude's `hookSpecificOutput.{permissionDecision, permissionDecisionReason}` shape unchanged.
 
-Three translations, none of them a free choice. A `deny` becomes a blocked call carrying the reason. An
-`ask` with a UI becomes a confirm, and a declined confirm blocks, because a refused prompt read as
-approval is worse than no gate at all. An `ask` with no UI blocks too: a headless session has nobody to
-escalate to, so allowing it would silently self-approve the one class the policy escalates.
+Two translations, neither of them a free choice, and one rule deciding both. A `deny` becomes a blocked
+call carrying the reason. An `ask` becomes a blocked call too, whose reason tells the agent to obtain the
+user's permission through its own ask mechanism and then record a single-use grant before retrying - and
+it is identical whether or not the session has a UI. A hook never opens a host dialog, writes a host
+status line, or shells out to a notifier: enforcement must not reach beyond the layer of the agent
+running it. That is not only a boundary, it is what makes the wait visible - the agent's own ask is a
+first-class host event that omp, herdr and other integrations already observe, where a hook's private
+dialog emits nothing and the session sits with its pane still reporting work.
 
 omp inverts the failure direction, and that is what makes this the dangerous hook to port: the `tool_call`
 gotcha above holds with its consequence turned up. The runner converts a handler that throws or outruns its
