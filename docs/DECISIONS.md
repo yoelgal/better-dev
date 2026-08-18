@@ -1393,7 +1393,7 @@ artifact-and-typing model as its subject. "HITL" appears zero times in this file
 though the typing was captured verbatim in the first ingest and re-named in two more. Three ingests,
 zero dispositions. Carried to its own work-item rather than folded here (master plan H3).
 
-**Landed:** `docs/comms-block.md` (23 of 24 lines, so one line of headroom and no more),
+**Landed:** `docs/comms-block.md` (30 lines, at the cap the operator raised from 24 to 30),
 `hooks/bd-subagent-start` plus its selftest,
 `skills/update/SKILL.md` step 2, `skills/source-harvest/SKILL.md` (ladder plus stage-2 audit gate),
 `skills/source-harvest/extraction-recipes.md` (single-browser batch reader after measuring 19 pages in
@@ -1408,3 +1408,38 @@ active repos); taste-encoded design skills as a better-dev default (kept as a co
 **One lesson about this file.** The `groundwork` fog test shipped through a diff with no ruling and was
 re-proposed three weeks later as a fresh finding. A landing recorded only in a diff is invisible to the
 next harvest, which is why these rulings are numbered. Recorded as `harvest landing record`.
+
+### D38 follow-up - the cap goes to 30, and the message is its own summary (operator rulings, 2026-08-17)
+
+Two operator rulings after the first landing, both about `docs/comms-block.md`.
+
+**The cap moves 24 to 30.** Ruling 1 above put the cap question to the operator; the answer was "up to
+30". Gated at `scripts/bd-package-check`. What the extra six lines bought back, in order of how much
+they cost to lose:
+
+- The wins-and-errors receipt, restored at full wording rather than folded into another clause.
+- The glossary clause's escape and its counter, both of which the 24-line squeeze had stripped: "or
+  belongs only in the record the next skill reads" and "Easy to fail while obeying every rule here: the
+  terms change per skill". `/writing-skills` is explicit that a gate bites through the counter inlined
+  at its decision point, so a rule shipped without its counter is a weaker rule, not a shorter one.
+- Readable structure. At 24 the block had collapsed into three dense prose paragraphs; at 30 it is a
+  bulleted list again, which is what a reader meeting it every turn actually scans.
+
+The lesson worth keeping is not "caps are bad". A cap is what forced every line to earn its place, and
+it caught real bloat. The defect was that at 24 the cheapest way to add a rule had become deleting one,
+which is how a compression turned into a silent deletion that review had to catch. A cap is doing its
+job while the marginal line is expensive; it is doing harm once the marginal line is unaffordable.
+
+**Every message is its own summary.** Operator-stated, verbatim: "treat every message it sends as a
+tldr, but without saying 'tldr' explicitly at the start". Landed as its own clause:
+
+> The whole message is the summary. No build-up to a payload, no separate recap at either end, and
+> never a "TL;DR" label - a reader who stops after the first two lines still has the answer.
+
+It is a shape rule and the length budget is a size rule, so they do not overlap: the budget says how
+long the message may be, this says the message has no separate summary layer inside it. It also
+subsumes two failures the pre-send cut list only catches after the fact, a recap at the end and a
+wind-up at the start, by removing the structure that produces them.
+
+The installed global block on the operator's machine was repaired to match in the same session, which
+is the first exercise of ruling 6's new `/update` path.

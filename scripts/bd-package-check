@@ -858,7 +858,11 @@ fi
 echo "== comms-style block =="
 # The block ships from exactly one file. onboard writes it per repo and BOOTSTRAP offers it globally;
 # two copies of the body would drift, and the drift only shows up on a user machine. Also gate the
-# 24-line cap the block is deliberately held to - it is a per-turn tax in every session that loads it.
+# 30-line cap the block is deliberately held to - it is a per-turn tax in every session that loads it.
+# Raised from 24 to 30 by operator ruling (D38 follow-up, 2026-08-17): the block gained its first
+# device that acts on a reply, and fitting it under 24 had cost a rule outright and stripped the
+# inline counter off another. A cap exists to force each line to earn its place, not to make a
+# deletion the cheapest way to add - 30 buys back both losses with headroom to spare.
 CB="docs/comms-block.md"
 if [ ! -f "$CB" ]; then
   bad "$CB missing (the comms block body's single home)"
@@ -875,8 +879,8 @@ else
   [ "$nhomes" = 1 ] && ok "comms block body has exactly one home ($CB)" \
     || bad "comms block body must live in exactly one shipped file, found $nhomes:$(printf ' %s' $homes)"
   lines="$(grep -c '' "$CB" || true)"
-  [ "$lines" -le 24 ] && ok "comms block within its 24-line cap ($lines)" \
-    || bad "comms block is $lines lines, cap is 24 - cut a line before adding one"
+  [ "$lines" -le 30 ] && ok "comms block within its 30-line cap ($lines)" \
+    || bad "comms block is $lines lines, cap is 30 - cut a line before adding one"
 fi
 
 # Every adapter declares where this host keeps its global entry file. Empty is a legitimate answer
