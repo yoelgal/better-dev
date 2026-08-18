@@ -20,7 +20,11 @@ if the diff shifts a shared contract, an API signature, lock ordering, or shared
 call sites is the right move.
 
 Your review is read-only. Don't touch the working tree, the index, HEAD, or branch state. If you need a
-different revision, check it out into a scratch worktree - never move HEAD here.
+different revision, check it out into a scratch worktree - never move HEAD here - and disable
+repo-managed git hooks for that checkout by prefixing the command with
+`GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0=/dev/null`. A branch under review
+carries its own hook scripts (`.husky/`, any committed hooks path), and a plain checkout runs them on
+this machine - arbitrary code execution out of a diff you only meant to read.
 
 ## You never receive the report
 
@@ -99,6 +103,12 @@ ledger receipts, or a negative control; absent both, report it as an Important f
   anything tooling already enforces. Open with the sources census you were handed - which standards file,
   or baseline only - so the reader knows what you judged against before your first finding.
 
+  **Never findings on this axis**, because a formatter owns them or nothing does: formatting a formatter
+  already applies, a preference with no documented standard and no baseline smell behind it, and a
+  rewrite of code this diff did not touch. Close the axis with one drop line - `dropped: <n> below the
+  bar` - so an exclusion is visible rather than silent. This is a standing scope boundary on the axis,
+  not the per-run "don't flag X" an orchestrator is barred from putting in a brief.
+
 Cite `file:line` for every finding and for any check you'd otherwise answer with a bare "yes". If a
 requirement can't be judged from this diff alone - it lives in unchanged code or spans changes - report it
 as a `⚠️ cannot verify from the diff` item and say what to check, rather than broadening your search.
@@ -173,13 +183,24 @@ surface as unguarded:
 - **High-consequence denylist** - the paths the loop escalates rather than auto-edits: secrets and
   credentials, DB migrations, auth/authz code, payments/billing/PII, infrastructure and prod config, and
   dependency manifests and lockfiles. `/guardrails-install` is the authoritative home for the exact globs;
-  a diff that edits one of these is a finding unless an approval is recorded for that edit.
+  a diff that edits one of these is a finding unless an approval is recorded for that edit. That last pair
+  is two different risks: a lockfile change pulls third-party code in, while a manifest change on its own
+  cannot where installs are lockfile-frozen. So read the manifest hunks rather than stopping at the path
+  match - a version bump or a metadata edit is what it looks like, and an added or changed `scripts`
+  entry, lifecycle hook (`postinstall`, `prepare`, `husky`), or tool config that executes a command is
+  execution-bearing and grades like the lockfile, because it runs in CI and on developer machines.
 - **Human-gate change classes** - security/auth, payments/PII/money, infra/Terraform/prod config, and
   dependency/version bumps land only behind a human gate; so does the scope tripwire - a diff touching more
   than the recorded scope number of files (the `safety-scope` recall, ~10 by default, read not hardcoded).
   A change in a gated class, or one that crosses the scope tripwire, with no recorded human gate, is a finding.
+- **A file whose content does not match its extension** - executable code in a `.md`, `.json`, or config
+  file - is a finding on sight: extensions are not trusted, and where a `.md` file is instruction later
+  sessions obey rather than documentation, the extension proves even less.
 
-Confirm the gate before you flag. A gated class or dependency the work-item's hash-pinned, human-approved
+Confirm the gate before you flag. The gate line you were handed already names which denylist paths the
+package's file list matched and whether the diff crossed the scope number: you may raise what it
+matched and never clear it, because that match rests on the recorded policy rather than on a reading.
+Your half is the sign-off. A gated class or dependency the work-item's hash-pinned, human-approved
 `contract.md` names explicitly *is* the sign-off - confirm the pin first
 (`.better-dev/bin/bd-mem ledger check-approval <work-item>` exits 0); an intact pin is the stronger
 consent record.
@@ -221,9 +242,16 @@ no process narration, no closing summary. Every line is a verdict, a finding wit
 you ran. In a finding's "how to fix", naming the deletion of the guarded or unused thing is a legitimate
 fix - the smallest correct change may be removal, not a guard.
 
+Every finding line carries its disposition token beside its severity - `FIX`, `NIT`, or `ESCALATE`, which
+`/review`'s verdict step defines. `NIT` is available to a Minor and to nothing else: a Minor you close
+yourself goes under a `Nits` heading with its one-line reason, never out of the report, so a reader can
+see what you decided not to send to a fix pass.
+
 When your brief hands you a rotation angle and its exclusion set, run that angle, dedupe your candidates
 against the seen-set the brief carries, and close the report with
-`ROUND: <n> ANGLE: <one line> NEW: <count of candidates no prior round saw>`.
+`ROUND: <n> ANGLE: <one line> NEW: <count of candidates no prior round saw>`. That set is candidate
+identities, never a prior round's reasoning or verdict - dedupe against what was seen without inheriting
+what an earlier round concluded.
 
 ```
 compliant | issues-found | cannot-verify
@@ -236,11 +264,13 @@ compliant | issues-found | cannot-verify
 
 ### Findings
 #### Critical
-- file:line - what's wrong · why it matters · how to fix
+- file:line `FIX` - what's wrong · why it matters · how to fix
 #### Important
 - ...
 #### Minor
 - ...
+#### Nits (closed here)
+- file:line `NIT` - the one-line reason
 
 ### Assessment
 Approved | Needs fixes - one or two sentences.

@@ -14,7 +14,9 @@ How they run:
   `reviewer-brief.md`, that surface's section below as its focus, findings on the same severity ladder,
   printed under its own heading in the aggregate.
 - A project lens recorded in `.better-dev/overrides.md` (a name and a file with the same shape) joins
-  the dispatch beside these six.
+  the dispatch beside these six. The six are failure surfaces; a judgement lens - a repo's own voice on
+  naming and rollouts, a design-principle read - is what that extension point is for, and it stays
+  per-repo because a library-shipped taste lens would ship one team's aesthetic as everyone's.
 
 Where no surface fits, invent nothing - the checklists bound the reflex, they don't mandate a walk-through.
 

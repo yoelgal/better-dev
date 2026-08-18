@@ -50,6 +50,18 @@ contradicts a verified state triggers a
 which-surface-are-you-looking-at check before any re-diagnosis: a worktree's server shows this tree, while
 the habitual dev server shows stale code until the merge lands.
 
+## UI evidence - one capture per state
+
+"I looked at it", backed by one screenshot of the happy path, is how a UI criterion passes without being
+observed. A change with UI surface earns a capture of every state it reaches - empty, loading, error,
+populated - plus one capture of the key interaction driven end to end, a short recording where the host
+can make one and a frame per step where it cannot. Where behavior changed, capture the before beside the
+after, so the delta is visible without building the old revision.
+
+The captures go where the operator reads them: their paths ride in the evidence rows `/pr-and-verify`
+step 3 splices into the PR body. A capture taken before the last commit to that surface is evidence for
+code that no longer runs, so a later push re-captures the states it touched instead of reusing the frames.
+
 ## Probe past the happy path
 
 Confirming the happy path is the first half, not the job. Try to break your own change at the same surface
