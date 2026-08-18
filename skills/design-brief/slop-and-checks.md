@@ -12,14 +12,19 @@ filtered to empty: a register with no applicable seed tells gets its register's 
 as the audit question instead - a zero-item walk that declares slop-free is a vacuous audit, not a
 pass. Each tell is something a screenshot or the markup can answer. Motion tells are the exception:
 they are answered from the stylesheet or a repeated-trigger capture driven via
-`/browser-capability` - a static screenshot is motion-blind, and a still that "shows no motion
-problem" is a vacuous pass, the same species as the zero-item audit walk.
+`/browser-capability`, replayed at reduced speed - a static screenshot is motion-blind, a still that
+"shows no motion problem" is a vacuous pass, the same species as the zero-item audit walk, and at
+full speed the wrong easing half and an overlong duration both read as fine. A filter or an addition
+recorded in overrides quotes the tell it means rather than its list number, which shifts as this
+list grows.
 
 1. A saturated violet-or-indigo gradient as a hero or section background.
 2. The three-up feature grid - icon, title, two-line blurb, times three.
 3. Icons floated in tinted circles that communicate nothing the icon alone would not.
 4. Centered text as the default - more than one in five text blocks center-aligned.
-5. One border radius on everything - inputs, cards, and modals all sharing the same rounding.
+5. One border radius on everything - inputs, cards, and modals all sharing the same rounding, or a
+   nested pair sharing one value with padding between them (concentric rounding is the inner radius
+   plus that padding).
 6. Decorative blobs, floating shapes, or wavy section dividers.
 7. Emoji doing a design element's job in a heading, button, or card.
 8. A colored accent stripe down the card edge that encodes nothing.
@@ -44,6 +49,12 @@ problem" is a vacuous pass, the same species as the zero-item audit walk.
     on tap).
 24. Movement with no reduced-motion handling anywhere in the stylesheet.
 25. The everything-at-once page entrance - all sections animating in simultaneously on load.
+26. A theme toggle that smears instead of snapping - every color, background, border, and shadow
+    transition on the page firing together on the flip, with nothing suppressing them for the frame.
+27. A decorative layer - glow, gradient, blur panel - over a control without `pointer-events: none`,
+    swallowing the clicks meant for what is beneath it.
+28. One spacing value carrying every gap, so a group's members separate from each other exactly as
+    far as the groups separate (a group reads as one when its outer gap is at least twice its inner).
 
 Imagery is also a criterion, not only a tell: step 4's "Real assets or none" rule owns the
 placeholder ban; this audit adds the mechanical tail - every referenced image URL resolves at
