@@ -1063,7 +1063,7 @@ printf '%s' "$offer_step" | grep -q 'offer' \
 sweep_step="$(awk '/^## 5\. Sweep this repo/{f=1} f&&/^## 6\./{exit} f{print}' skills/update/SKILL.md 2>/dev/null)"
 if printf '%s' "$sweep_step" | grep -q 'ledger reap --apply' \
    && printf '%s' "$sweep_step" | grep -qi 'every run' \
-   && printf '%s' "$sweep_step" | grep -q 'not gated on the pull'; then
+   && printf '%s' "$sweep_step" | grep -qi 'not gated on the pull'; then
   ok "update sweeps stale ledger rows every run, applies rather than only previewing, and is not gated on the pull"
 else
   bad "skills/update step 5 no longer sweeps the ledger unconditionally - a pull-only run (the common case) then leaves settled work reading in-flight forever, which is the failure /update was given this step to end"
