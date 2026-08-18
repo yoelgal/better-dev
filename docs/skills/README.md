@@ -78,25 +78,29 @@ below.
 
 Entry and planning: [onboard](onboard.md) · [groundwork](groundwork.md) ·
 [plan-grill](plan-grill.md) · [diagnose](diagnose.md) · [gauntlet](gauntlet.md) ·
-[design-brief](design-brief.md) · [codebase-audit](codebase-audit.md)
+[design-brief](design-brief.md) · [pick-ui-library](pick-ui-library.md) ·
+[prototype](prototype.md) · [codebase-audit](codebase-audit.md) ·
+[brief-to-problem](brief-to-problem.md) (not adopted yet)
 
 The build loop: [worktree-branching](worktree-branching.md) ·
 [autonomous-loop](autonomous-loop.md) · [orchestrating-agents](orchestrating-agents.md) ·
-[review](review.md) · [security-pass](security-pass.md)
+[review](review.md) · [security-pass](security-pass.md) · [test-audit](test-audit.md)
 
 Shipping: [pr-and-verify](pr-and-verify.md) · [release-promotion](release-promotion.md) ·
 [deploy-capability](deploy-capability.md) · [observability-install](observability-install.md) ·
 [guardrails-install](guardrails-install.md)
 
-Repo understanding: [codebase-map](codebase-map.md) · [graphify-wrapper-map](graphify-wrapper-map.md) ·
+Repo understanding: [codebase-map](codebase-map.md) · [vision](vision.md) ·
+[graphify-wrapper-map](graphify-wrapper-map.md) ·
 [graphify-wrapper-query](graphify-wrapper-query.md) · [graphify-wrapper-sync](graphify-wrapper-sync.md) ·
 [graphify-wrapper-index](graphify-wrapper-index.md) · [graphify-wrapper-status](graphify-wrapper-status.md) ·
 [graphify-wrapper-setup](graphify-wrapper-setup.md)
 
 Capabilities: [browser-capability](browser-capability.md) · [ios-capability](ios-capability.md) ·
 [tool-sourcing](tool-sourcing.md) · [self-extension](self-extension.md) ·
-[source-harvest](source-harvest.md)
+[source-harvest](source-harvest.md) · [deep-research](deep-research.md)
 
 Meta and upkeep: [writing-skills](writing-skills.md) · [overrides](overrides.md) ·
+[session-review](session-review.md) · [human-review](human-review.md) ·
 [wait-what](wait-what.md) · [bootstrap-hooks](bootstrap-hooks.md) · [packaging](packaging.md) ·
 [update](update.md) · [uninstall](uninstall.md)
