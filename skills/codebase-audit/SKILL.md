@@ -50,6 +50,12 @@ rationale. A tradeoff the team already settled and wrote down is not a finding; 
 wastes their attention and reads as an audit that didn't do its homework. Carry those decided tradeoffs
 forward - they scope what the sweep is allowed to report.
 
+The repo's own record of what already went wrong is evidence too, and it costs one command rather
+than a sweep: `.better-dev/bin/bd-mem recall "<area>"` for the lessons a prior run paid for, and
+`.better-dev/bin/bd-mem papercut list` for the friction someone hit and logged. Read both as leads,
+never as findings - a papercut names a symptom and no location, so it points the sweep at a file and
+step 3 still has to open it.
+
 Close step 1 by writing the purpose sentence: one sentence naming the single job the audited area exists
 to do - the area's job, not this skill's. One job, not three. Every finding is graded against it, and a
 ranking with no purpose sentence behind it is taste wearing a table: the report then argues that a piece
@@ -104,12 +110,35 @@ recommendation. Three things to catch on the way in:
   there. "Probably an N+1 somewhere" is not a finding; `orders/api.ts:142 runs one query per item in a
   loop` is. No location, no finding.
 
-## 4. Rank by leverage
+## 4. Rank over a floor, then by leverage
 
-Order by leverage: impact weighed against effort, discounted by confidence and by how risky the fix
-itself is. Two things float above equal-leverage peers: a finding that **unblocks other findings** (a
-missing verification baseline, a characterization test) and a finding whose fix has a **clean
-verification story** - those are the ones a downstream loop lands cleanly.
+Six classes of finding never compete on leverage, because discounting by effort sinks a catastrophic
+finding whose fix is large and the reader takes item one. Sort these to the top of the table before any
+leverage ordering runs, each Finding cell opening `not ready:`:
+
+- data loss, or a migration that silently changes what stored values mean;
+- a release path that can ship something other than the artifact the checks passed;
+- a credential or an untrusted input reaching authority nobody granted it;
+- a consequential operation with no gate before it and no recovery after it;
+- documentation that promises a guarantee nothing enforces;
+- a claimed outcome - a compatibility surface, a security property, a user-visible behaviour - with
+  no way to prove it holds at all.
+
+The excuse this floor exists to refuse, from a 2026-08-18 run against the un-floored version of this
+step over a rigged release-bypass finding: "arguably the most serious finding on the list ... but large
+effort, medium confidence, and a fix that moves a signing step makes it the riskiest change of the
+five; it wants its own scoped piece of work ... first, not a slot in a batch." Every clause of that can
+be true and none of it moves the row: the floor grades what the defect costs while it stands, not how
+convenient its fix is to schedule, and the ranking is the reader's only view of that. A missing
+verification baseline is a legitimate second row and never a reason to demote a first.
+
+The floor promotes what the sweep already found, on the same evidence as any other row - it is not a
+checklist to go fill, and an area with none of these says so in one line.
+
+Then order the rest by leverage: impact weighed against effort, discounted by confidence and by how
+risky the fix itself is. Two things float above equal-leverage peers: a finding that **unblocks other
+findings** (a missing verification baseline, a characterization test) and a finding whose fix has a
+**clean verification story** - those are the ones a downstream loop lands cleanly.
 
 "Not worth doing" is a valid verdict. When the evidence says an issue costs more to fix than it's worth,
 record it as considered-and-rejected with one line of reasoning, so the human knows it was weighed
@@ -117,7 +146,10 @@ rather than missed.
 
 ## 5. Present: table, then directions, then rejections
 
-The output is a report to the human, in three parts:
+The output is a report to the human. It opens with one line naming what was audited and against what:
+the area, the revision (`git rev-parse --short HEAD`), and anything the override file or the human
+excluded. Every `file:line` below is true of that revision only, and a reader who comes back to the
+report a week later has no other way to tell whether the evidence has moved. Then three parts:
 
 - **Ranked findings** - a table with typed columns so each field is a value, not prose:
 
@@ -128,6 +160,18 @@ The output is a report to the human, in three parts:
   Every finding carries exactly one Move: **cut** (overbuilt or redundant - the fix is deletion), **fix**
   (fragile or wrong), **add** (missing for the stated goal), **restructure** (the structure fights the
   goal).
+
+  Two sentences ride in the Finding cell where they apply, and they are what turns a row into a gate
+  fix rather than one patch:
+
+  - **What should have caught it, and did not.** For a correctness, security, or tests finding, name
+    the check whose blind spot let it through - the test that does not exist, the lint that does not
+    run on that path, the review with no rule for it. A fix that lands while the gate stays blind
+    buys one instance and leaves the class open.
+  - **What the fix makes redundant.** Where the correction puts the invariant upstream - a type, a
+    parse at the boundary, one owner for a value copied into four files - name the downstream defence
+    it retires. Otherwise the guard stays behind its new owner forever, and an audit that keeps
+    proposing another validator over a missing model has added machinery while reporting cuts.
 
   A `cut` row clears one check the others don't, and it costs a read this sweep has not done yet:
   **open the runners before filing it.** The CI workflows, the build scripts, and the dependency
@@ -150,7 +194,7 @@ The output is a report to the human, in three parts:
   `/autonomous-loop` will not start one: no red-capable check, no loop. A baseline that is already red
   says so in the row, since a check that was failing before the cut proves nothing about it.
 
-  Leverage-ordered, highest first.
+  Leverage-ordered, highest first, under the floor rows.
 
 - **Direction suggestions, separately** - options for the human to weigh, not problems ranked against
   bugs. Each must cite repo evidence: a suggestion that could apply to any project in the category ("add
