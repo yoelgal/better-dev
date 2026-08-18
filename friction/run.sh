@@ -7,6 +7,7 @@
 #   ./run.sh --perm typical               # realistic new-user allowlist - surfaces permission prompts
 #   ./run.sh --hooks                      # add better-dev's hooks (your personal hooks leak in too)
 #   ./run.sh --turns 16                   # cap the human<->agent exchange (default 12)
+#   ./run.sh --ask 41                     # pin the drawn corpus ask instead of sampling (repeatable)
 #   ./run.sh --model sonnet               # model for the sandbox sessions (default: CLI default)
 #   ./run.sh --keep-going                 # do not stop the whole run when one fixture errors
 #
@@ -23,7 +24,8 @@
 #      sessions will load - and records its branch and SHA
 #   3. writes a session settings file: hooks cleared, permission profile pinned
 #   4. generates each fixture repo from fixtures/<name>.sh, outside this repo
-#   5. drives a real `claude -p` session in each, with persona.md answering every question
+#   5. drives a real `claude -p` session in each, with persona.md answering every question: the
+#      fixture's opening ask, its own handoff ask, then one ask drawn from fixtures/asks.txt
 #   6. reduces it all to facts.md: turns, tool inventory, denials, and the human's gripes
 #
 # Your personal hooks and every installed plugin are switched off for the run, so a personal
@@ -44,6 +46,7 @@ HOOKS=0
 TURNS=12
 MODEL=""
 KEEP_GOING=0
+ASK_PINS=""
 
 die() { printf 'friction: %s\n' "$*" >&2; exit 1; }
 say() { printf '\033[1m==>\033[0m %s\n' "$*"; }
@@ -55,6 +58,7 @@ while [ $# -gt 0 ]; do
     --perm) PERM="${2:?}"; shift 2 ;;
     --hooks) HOOKS=1; shift ;;
     --turns) TURNS="${2:?}"; shift 2 ;;
+    --ask) ASK_PINS="${ASK_PINS:+$ASK_PINS }${2:?}"; shift 2 ;;
     --model) MODEL="${2:?}"; shift 2 ;;
     --keep-going) KEEP_GOING=1; shift ;;
     -h|--help) awk 'NR>1 && /^#/{sub(/^# ?/,""); print; next} NR>1{exit}' "$0"; exit 0 ;;
@@ -68,6 +72,16 @@ case "$PERM" in open|typical) ;; *) die "--perm must be open or typical" ;; esac
 for c in claude jq git uuidgen; do command -v "$c" >/dev/null 2>&1 || die "need '$c' on PATH"; done
 [ -f "$CLONE/install.sh" ] || die "expected $CLONE/install.sh - run this from a better-dev checkout"
 for f in $FIXTURES; do [ -f "$ROOT/fixtures/$f.sh" ] || die "no such fixture: $f"; done
+# The ask corpus: one drawable line per ask, comments and blanks stripped. A pin is a position among
+# the DRAWABLE lines, which is why asks.txt is append-only - inserting a line mid-file silently
+# repoints every --ask a past run recorded, and two runs stop being comparable without saying so.
+[ -f "$ROOT/fixtures/asks.txt" ] || die "missing $ROOT/fixtures/asks.txt (the ask corpus)"
+CORPUS_N="$(awk 'NF && $0 !~ /^#/' "$ROOT/fixtures/asks.txt" | grep -c '')"
+[ "$CORPUS_N" -gt 0 ] || die "fixtures/asks.txt has no drawable lines"
+for n in $ASK_PINS; do
+  case "$n" in ''|*[!0-9]*) die "--ask takes a line number, got '$n'" ;; esac
+  [ "$n" -ge 1 ] && [ "$n" -le "$CORPUS_N" ] || die "--ask $n is outside the corpus (1..$CORPUS_N)"
+done
 
 STAMP="$(date +%Y%m%d-%H%M%S)"
 # Runs live OUTSIDE this repo on purpose: the greenfield fixture has no .git of its own, and a run dir
@@ -76,6 +90,10 @@ RUNS_ROOT="${BD_FRICTION_RUNS:-${TMPDIR:-/tmp}/bd-friction}"
 RUN="$RUNS_ROOT/$STAMP"
 mkdir -p "$RUN/repos" "$RUN/transcripts" "$RUN/probe"
 say "run dir: $RUN"
+# Snapshot the drawable corpus into the run dir: the run then records the exact text it drew from, so
+# a --ask replay can be checked against what that run actually saw.
+CORPUS="$RUN/asks.txt"
+awk 'NF && $0 !~ /^#/' "$ROOT/fixtures/asks.txt" > "$CORPUS"
 
 # ── 1. installer smoke test, against a throwaway HOME ────────────────────────
 say "smoke-testing install.sh"
@@ -102,6 +120,10 @@ say "sessions will load: $GLOBAL_CLONE ($GLOBAL_BRANCH @ $GLOBAL_REF)"
 # ── 3. session settings: strip personal hooks, pin the permission profile ────
 # open    - everything allowed; the flow runs to the end and cost is read off the tool inventory
 # typical - what a cautious new user actually has allowed; every denial is a dialog they would face
+# Neither profile confines WHERE a session writes: `open` grants Write and Bash outright, and the
+# sandbox is the run dir being outside this clone, not a sandbox the tools enforce. So the harness
+# points sessions at throwaway repos and never at anything it audits - see README, "No write access
+# to what it audits".
 if [ "$PERM" = open ]; then
   PERMS='{"allow":["Bash","Edit","Write","Read","Glob","Grep","WebFetch","WebSearch","Task","TodoWrite","NotebookEdit"],"deny":[]}'
 else
@@ -169,7 +191,7 @@ run_fixture() {
   local name="$1"
   local repo="$RUN/repos/$name"
   local tdir="$RUN/transcripts/$name"
-  local sid prompt turn out last raw friction reply started
+  local sid prompt turn out last raw friction reply started ask ask_n
   mkdir -p "$repo" "$tdir"
 
   BRIEF=""; OPENING=""; FOLLOWUP=""
@@ -178,6 +200,20 @@ run_fixture() {
   # These two return rather than die: `die` exits the whole script, which --keep-going could never catch,
   # and a malformed or unbuildable fixture is exactly what it exists to skip past.
   [ -n "$BRIEF" ] && [ -n "$OPENING" ] || { warn "fixture $name sets no BRIEF/OPENING"; return 1; }
+  # Drawn, not fixed: a harness that always sends the same asks measures how well the library handles
+  # four remembered jobs. One corpus line per fixture, by the system RNG unless --ask pinned it.
+  if [ -n "$ASK_PINS" ]; then
+    ask_n="${ASK_PINS%% *}"
+    if [ "$ask_n" = "$ASK_PINS" ]; then ASK_PINS=""; else ASK_PINS="${ASK_PINS#* }"; fi
+  else
+    ask_n=$(( $(od -An -N4 -tu4 </dev/urandom | tr -d ' ') % CORPUS_N + 1 ))
+  fi
+  ask="$(sed -n "${ask_n}p" "$CORPUS")"
+  printf '%s\t%s\n' "$ask_n" "$ask" > "$tdir/ask.tsv"
+  # The persona has to own the drawn ask, or every question the agent asks about it comes back as a
+  # persona that has never heard of it, and the reviewer reads that as a harness bug.
+  BRIEF="$BRIEF
+One more thing you want done in this repo, in your own words: $ask"
   ( fixture_build "$repo" ) >"$tdir/build.log" 2>&1 \
     || { warn "fixture $name failed to build - see $tdir/build.log"; return 1; }
   ( cd "$repo" && find . -not -path './.git/*' -not -name .git | sort ) > "$tdir/before.txt"
@@ -213,11 +249,15 @@ run_fixture() {
     [ -n "$reply" ] || reply="__DONE__"
     case "$reply" in
       __DONE__*)
-        # A fixture with a FOLLOWUP is testing a handoff: the first ask settles, and the SECOND ask is
-        # the one under test - does the routing the agent just wrote actually route it?
+        # The asks fire in order. A fixture with a FOLLOWUP is testing a handoff: does the routing the
+        # agent just wrote actually route it? The drawn ask goes last, on a repo the agent has now
+        # finished setting up, which is where a real second day starts.
         if [ -n "$FOLLOWUP" ]; then
           say "  fixture $name settled after $turn turn(s) - sending the follow-up"
           reply="$FOLLOWUP"; FOLLOWUP=""
+        elif [ -n "$ask" ]; then
+          say "  fixture $name settled after $turn turn(s) - sending drawn ask $ask_n"
+          reply="$ask"; ask=""
         else
           say "  fixture $name settled after $turn turn(s)"; break
         fi ;;
@@ -247,6 +287,11 @@ say "summarising"
   printf -- '- permission profile: `%s`\n- hooks: `%s`\n- turn cap: %s\n- model: `%s`\n' \
     "$PERM" "$([ "$HOOKS" = 1 ] && echo "bd + yours" || echo none)" "$TURNS" "${MODEL:-default}"
   printf -- '- probe (skill visible / ponytail leaked): `%s`\n' "$(head -1 "$RUN/probe.txt")"
+  printf -- '- ask corpus: %s drawable line(s) in `%s`, snapshot at `%s`\n' \
+    "$CORPUS_N" "$ROOT/fixtures/asks.txt" "$CORPUS"
+  printf -- '- dedup ledger: %s row(s) in `%s` - a finding already there is not filed again\n' \
+    "$(awk '/^## Findings/{f=1} f && /^\| F-/{n++} END{print n+0}' "$ROOT/seen.md" 2>/dev/null || echo 0)" \
+    "$ROOT/seen.md"
   printf -- '- isolation: personal hooks off, all plugins off; one leak remains - global ~/.claude/CLAUDE.md still loads\n\n'
 
   for f in $FIXTURES; do
@@ -255,6 +300,8 @@ say "summarising"
     printf '## %s\n\n' "$f"
     printf -- '- turns: %s\n' "$(ls "$tdir"/turn-*.jsonl 2>/dev/null | wc -l | tr -d ' ')"
     printf -- '- wall seconds: %s\n' "$(cat "$tdir/elapsed-seconds" 2>/dev/null || echo '?')"
+    [ -s "$tdir/ask.tsv" ] && printf -- '- drawn ask: line %s - "%s"\n' \
+      "$(cut -f1 "$tdir/ask.tsv")" "$(cut -f2 "$tdir/ask.tsv")"
 
     cat "$tdir"/turn-*.jsonl 2>/dev/null \
       | jq -r 'select(.type=="assistant") | .message.content[]? | select(.type=="tool_use")
@@ -264,14 +311,17 @@ say "summarising"
       "$(wc -l < "$tdir/tools.tsv" | tr -d ' ')" \
       "$(awk -F'\t' '$1=="Bash"{print $2}' "$tdir/tools.tsv" | awk '{print $1}' | sort -u | wc -l | tr -d ' ')"
     printf -- '- skills invoked: %s\n' \
-      "$(awk -F'\t' '$1=="Skill"{print $2}' "$tdir/tools.tsv" | sort -u | paste -sd, - | sed 's/^$/none/')"
+      "$(awk -F'\t' '$1=="Skill"{print $2}' "$tdir/tools.tsv" | sort -u | paste -sd, - | grep . || echo none)"
 
     cat "$tdir"/turn-*.jsonl 2>/dev/null \
       | jq -r 'select(.type=="user") | .message.content[]? | select(.type=="tool_result")
                | select(.is_error == true) | (.content | if type=="array" then map(.text? // "") | join(" ") else tostring end)' \
       2>/dev/null | grep -iE 'permission|denied|approval|blocked' > "$tdir/denials.txt" || true
     printf -- '- permission denials: %s\n' "$(wc -l < "$tdir/denials.txt" | tr -d ' ')"
-    printf -- '- files added/removed: %s\n' "$(grep -c '^[<>]' "$tdir/files-changed.diff" 2>/dev/null || echo 0)"
+    # awk, not `grep -c || echo 0`: grep -c PRINTS 0 and EXITS 1 on no match, so the || fires too and
+    # the substitution carries two lines - a stray 0 lands under the bullet in facts.md.
+    printf -- '- files added/removed: %s\n' \
+      "$(awk '/^[<>]/{n++} END{print n+0}' "$tdir/files-changed.diff" 2>/dev/null || echo 0)"
 
     if [ -s "$tdir/friction.md" ]; then
       printf -- '\n**What the human griped about, in the moment:**\n\n'
@@ -284,4 +334,5 @@ say "summarising"
 say "done"
 printf '\n  facts:       %s\n  transcripts: %s\n  fixtures:    %s\n\n' \
   "$RUN/facts.md" "$RUN/transcripts" "$RUN/repos"
-printf 'Next: hand facts.md, the transcripts, and the left-behind repos to a reviewer running %s/review.md\n' "$ROOT"
+printf 'Next: hand facts.md, the transcripts, and the left-behind repos to a reviewer running %s/review.md.\n' "$ROOT"
+printf 'It dedups against %s/seen.md before it files anything.\n' "$ROOT"

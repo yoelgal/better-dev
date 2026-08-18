@@ -52,6 +52,17 @@ operator to carry upstream, an issue or patch on the tool's own repo. The negati
 too: a correction that holds only because of this repo's stack, domain, or house taste is a preference,
 not a defect - it stays a project override or lesson, recorded as such, and never travels upstream.
 
+**State what you keep at the level that fires again.** The gate above decides which observations
+survive; this decides how specific they are once written, and it binds a skill's trigger, a rule in its
+body, and the recorded lesson alike. A claim only reaches situations its antecedent matches, so before
+writing one down, name two situations other than the one you just saw where it still fires. If you
+cannot, the antecedent is pinned to one path, one PR number, one tool version, or one vendor, and what
+you have is a record of the run rather than a lesson from it: restate it at the level of the mechanism
+you understood. Stop at the least specific claim that still covers every case you observed, because a
+claim weaker than that asserts what no run has shown. Specificity belongs to the evidence, never the
+claim - the commands, paths, and signatures a rule carries stay exactly as the source gave them (step 2
+holds), while the rule around them generalises.
+
 ## 2. Gather the sources and the requirements
 
 The request mixes two kinds of content in any order: **sources** to gather (paths, directories, URLs, "what

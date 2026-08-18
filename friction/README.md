@@ -10,6 +10,7 @@ Nothing here is used at runtime. It is a release gate you point at a version.
 friction/run.sh                     # all four fixtures
 friction/run.sh --fixture messy     # just one
 friction/run.sh --perm typical      # the permission audit (see below)
+friction/run.sh --ask 41            # pin the drawn ask instead of sampling (see below)
 friction/run.sh --help
 ```
 
@@ -25,11 +26,13 @@ friction/run.sh --help
    any of that is untrue.
 5. For each fixture: generates the repo under `$TMPDIR/bd-friction/<stamp>` (override with
    `BD_FRICTION_RUNS`), then drives a real `claude -p` session in it, with `persona.md` answering
-   every question the agent asks, up to `--turns` exchanges.
-6. Reduces everything to `facts.md`: turn counts, tool inventory, skills invoked, permission denials,
-   files the agent added or removed, and the human's in-the-moment gripes.
+   every question the agent asks, up to `--turns` exchanges. Three asks in order: the fixture's
+   opening ask, its own handoff ask, then one drawn from the corpus.
+6. Reduces everything to `facts.md`: turn counts, the ask each fixture drew, tool inventory, skills
+   invoked, permission denials, files the agent added or removed, and the human's in-the-moment gripes.
 
-Then hand `facts.md`, the transcripts, and the left-behind repos to a reviewer running `review.md`.
+Then hand `facts.md`, the transcripts, and the left-behind repos to a reviewer running `review.md`,
+which reads `seen.md` before it files anything.
 
 ## The fixtures
 
@@ -42,6 +45,32 @@ Then hand `facts.md`, the transcripts, and the left-behind repos to a reviewer r
 
 The greenfield fixture has no `.git` of its own. That is why runs live outside this repo - inside it,
 the agent under test would walk up and discover `better-dev`, and the fixture would be a lie.
+
+## The sampled ask
+
+The four fixtures are the terrain. The ask is drawn, so the harness is not measuring how well the
+library handles four remembered jobs: once the agent believes a fixture is finished, the human sends
+one more ask, drawn from `fixtures/asks.txt` by the system RNG, or the one you pinned with `--ask N`.
+
+The corpus is append-only. A pin is a position among the drawable lines, so inserting a line in the
+middle silently repoints every `--ask` a past run recorded.
+
+A drawn ask can land in a repo that cannot support it - a test-suite complaint in the fixture with no
+tests. That is the interesting case rather than a bug, and `review.md` says what to do with it.
+
+**What makes two runs comparable**: the better-dev SHA is the only difference between them. Same
+fixture set, same permission profile, same turn cap, same model, and the same drawn lines - which is
+what `--ask` is for. All of it is recorded in `facts.md`, so any run you keep is replayable from its
+own record. Two unpinned runs are two different questions, and their turn counts do not compare.
+
+## The dedup ledger
+
+`seen.md` carries every finding a review has ever filed, and the status it was given. The review
+reads it first and does not file what is already there, whatever the status says - `review.md` owns
+that rule and the routing that follows it. Confirmed friction goes to the papercut queue the operator
+already triages (`.better-dev/bin/bd-mem papercut list`). The ledger is the harness's memory, not a
+second queue: a standing harness that re-reports what was declined last time trains its reader to
+skip the whole report.
 
 ## Permission profiles
 
@@ -81,11 +110,31 @@ One caveat: `--settings` **merges** hooks rather than replacing them, so `--hook
 better-dev's own SessionStart/PreToolUse hooks) necessarily drags your personal hooks back in. There
 is no third option. Default is no hooks at all, which is also the harsher discovery test.
 
+## No write access to what it audits
+
+Nothing this harness drives gets write access to what it is judging. A driven session touches only its
+own throwaway repo: no branch, no commit, no issue, no pull request anywhere else, and no edit to the
+library text under test. The reviewer writes exactly two records - a papercut and a row in `seen.md` -
+and never the skill text it is forming findings about, because a reviewer that can edit what it judges
+is one rationalization away from doing so.
+
+The reason is the loop this directory's sampling and dedup came from: a standing swarm of synthetic
+users holding git credentials, pushing to a fork, filing issues and PRs at roughly eighteen write
+actions an hour against a live repo, with two stated rails. The mechanics are worth taking. The write
+access is what makes that design unrepeatable here.
+
+What the boundary rests on, stated plainly: `run.sh` writes only under `$BD_FRICTION_RUNS`, and every
+session it drives runs in a fixture repo outside this clone that never names it. The tools do not
+enforce that. Under `--perm open` a session holds `Write` and `Bash`, so it could reach the global
+better-dev clone it loaded if it went looking - the containment is where the run dir sits, not a deny
+rule. A profile that denies writes outside the run dir would turn it into one.
+
 ## Cost
 
 Four fixtures at a 12-turn cap is up to 48 agent turns plus 48 short persona turns, and `/onboard`
-turns are not small. Start with `--fixture node-clean --turns 8` to check the harness works, then run
-the set.
+turns are not small. The drawn ask does not raise that ceiling; it spends the turns a fixture used to
+leave unspent by settling early. Start with `--fixture node-clean --turns 8` to check the harness
+works, then run the set.
 
 ## When the harness is what broke
 

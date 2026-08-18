@@ -1,0 +1,79 @@
+# The ask corpus. One line per ask, in the words a busy senior developer types. run.sh draws one line
+# per fixture with the system RNG and sends it as that fixture's last ask, so two runs probe different
+# work rather than the same four hardcoded jobs. Comment lines and blanks are never drawn.
+#
+# Rules for a line you add:
+#   - it is a user's ask, never a better-dev word: no skill name, no phase, no "contract", no "loop".
+#     The persona speaks it verbatim, and a persona that names a skill has coached the agent.
+#   - it names no stack. A line that says "npm" only works in one fixture; a line that says "the test
+#     suite" works in all four, and lands in a repo that has none - which is the interesting case.
+#   - it is one sentence, lowercase, no trailing period. It should read like it was typed in a hurry.
+#   - it is a distinct ask class, not a rephrasing of a line already here. The corpus buys coverage of
+#     what an ask routes to; a synonym buys nothing and dilutes every draw.
+#   - append it at the END. run.sh pins a draw by position among the drawable lines, so inserting one
+#     mid-file silently repoints every --ask a past run recorded.
+add a health check endpoint that reports version and uptime, and wire it into whatever we already serve
+i want a --dry-run flag on the main entry point that prints what would change and touches nothing
+build me a small admin page that lists the last hundred records with search and pagination
+add structured logging with a request id that follows one call all the way through
+we need rate limiting on the public endpoints, per key, with a sane default
+add csv export to the list view, streamed, so a big export does not eat all the memory
+i want a config file that overrides the env vars, with the precedence written down somewhere
+add a background job that retries failed webhook deliveries with backoff
+put a cache in front of the expensive lookup and give me a way to bust it
+add cursor based pagination to the api and keep the old offset params working
+i want a subcommand that validates a config file and exits nonzero on the first problem
+add soft delete with a restore path, so nothing actually goes away for thirty days
+something's off with dates near midnight, people an hour ahead see yesterday's data
+it crashes on an empty input file instead of telling me the file is empty
+two requests at the same time both create the record and we end up with duplicates
+the retry logic retries the one thing it must not retry and gives up on everything else
+numbers come back as strings sometimes and whatever reads them falls over
+a unicode name in an upload kills the whole import silently, nothing in the log
+the error says permission denied when the real problem is a directory that isn't there
+it works on my laptop and fails on the server, same input, and i cannot see why
+the counter resets whenever the process restarts and nobody noticed for a week
+one bad item in a batch loses the entire batch
+upgrade the main framework a major version, and i want the deprecation warnings gone too
+there's a known vulnerability in a dependency and i need it off the tree today
+pin the toolchain version so a fresh clone builds the same thing i build
+the config is read from env vars in eight places, make it one place
+there are three ways of formatting code in here, pick one and make it stick
+drop the oldest runtime we claim to support and delete the branches that exist for it
+the lockfile and the manifest disagree, sort it out and tell me which one was wrong
+split the giant module everything imports, without changing what it does
+the same validation is copy pasted across four handlers, make it one thing
+this function takes nine positional arguments and i cannot read the call sites any more
+replace the hand rolled retry helper with whatever the standard library already gives us
+the data layer and the http layer are tangled together, separate them without a rewrite
+we have flags nobody has flipped in a year, find them and take them out
+rename the core noun in this codebase, it is called two different things and both are wrong
+the list endpoint takes two seconds and i am fairly sure it is a query in a loop
+startup takes eight seconds and it used to take one, work out when that changed
+memory climbs all day and only a restart brings it back
+the build takes six minutes for a one line change
+the test suite takes four minutes and i only touched one file
+the main screen looks like a template from 2014, make it look like somebody chose it
+it is unusable on a phone, the table just runs off the side of the screen
+nothing tells you anything is happening while it loads, give the user real feedback
+the form throws away everything i typed when validation fails
+keyboard only users cannot reach the primary action at all
+we log the whole request body including the auth header, that has to stop
+anyone with a valid token can read anyone's records, we check the token and not the owner
+uploads accept anything of any size and get written wherever the filename says
+credentials are in the git history and i need them rotated and kept out
+i want one command that gets this running on a clean laptop, and it has to actually work
+shipping is three manual steps and i got one of them wrong last friday
+when it falls over at night nothing tells me, i hear about it from a user
+the schema change and the code deploy are not ordered and one day that bites us
+i need a way to put the last release back within a minute
+the readme's setup steps do not work, i followed them on a clean machine
+there are no tests on the money path and that is the part that scares me
+the tests share one fixture and fail in a different order every run
+write down how this thing actually works, right now i am the only one who knows
+the error codes are undocumented and support guesses at what they mean
+review the last three commits, i wrote them tired
+this branch is as done as i can tell, get it landed
+somebody sent me a pull request and i do not know if it is safe to merge
+i want something that stops a commit that would break the build before it lands
+give me a staging environment that is not just my laptop with a different name
