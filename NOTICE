@@ -215,7 +215,8 @@ we actually copied verbatim/substantially, which MIT requires us to attribute, a
   garrytan/gstack document-release (MIT; diff-driven docs sweep, act-vs-ask split,
     debt-in-PR-body, discoverability rule - reimplemented; also credited above)
   "/brief-to-problem" - @nurijanian (George, prodmgmt.world) (X article, ideas;
-    brief-decode mechanics reimplemented - also credited above for the edge-case pass)
+    decode mechanics reimplemented in skills/brief-to-problem/SKILL.md, which superseded and replaced
+    plan-grill's brief-decode.md sibling on 2026-08-17 - also credited above for the edge-case pass)
   Fable 5 advisor/orchestrator patterns + advisor-tool doc - ClaudeDevs / Anthropic
     (X thread + official docs, ideas; consult-direction bounds reimplemented)
   Three-tier delegation + same-agent fixes - @pablostanley (Pablo Stanley) (X post, ideas)

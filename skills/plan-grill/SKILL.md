@@ -1,6 +1,6 @@
 ---
 name: plan-grill
-description: Use when the user wants a new feature or capability built and it is not a one-to-two-step change - "I want to add X", "let's build a way to Y", "can we add", "new feature: Z", a rough intent that needs a plan before code, or somebody else's vague feedback or brief ("make it simpler", "we need a chatbot") that needs decoding into a measurable problem first. Checks the baseline, ideates and grills the design watertight, and pins the observable done-criteria the loop drives to. For a bug or "X is broken" reach for /diagnose; for a whole new app or epic, /groundwork; for a trivial one-to-two-step change, just make it - still in its own worktree branch, skipping only the planning. Chore-class work enters here too - "upgrade to React 19", clearing the CVE the audit gate flagged, a behavior-preserving refactor, test or docs debt - on the contract-lite path.
+description: Use when the user wants a new feature or capability built and it is not a one-to-two-step change - "I want to add X", "let's build a way to Y", "can we add", "new feature: Z", a rough intent that needs a plan before code. When the input is somebody else's adjective rather than an intent the operator owns, /brief-to-problem decodes it into a measurable problem first and hands the result here. Checks the baseline, ideates and grills the design watertight, and pins the observable done-criteria the loop drives to. For a bug or "X is broken" reach for /diagnose; for a whole new app or epic, /groundwork; for a trivial one-to-two-step change, just make it - still in its own worktree branch, skipping only the planning. Chore-class work enters here too - "upgrade to React 19", clearing the CVE the audit gate flagged, a behavior-preserving refactor, test or docs debt - on the contract-lite path.
 argument-hint: "[feature-slug or rough intent] [depth: light|full]"
 ---
 
@@ -53,13 +53,10 @@ Gate: the intent arrives as relayed language - stakeholder feedback, user feedba
 a ticket quoting someone else ("make it simpler", "we need a chatbot", "users say X feels slow").
 First-person intent from the user at the keyboard skips this step in one line.
 
-Record the brief verbatim before restating it - the requester's exact words in quotes, with who
-said them, carried into the contract above its `## Problem` section; the specific word chosen is
-evidence, and a paraphrase destroys it. Then run the six decode moves in `brief-decode.md`. The
-decode ends in one measurable problem sentence plus an in-scope and an out-of-scope line; those
-seed the contract's Problem, Goal, and Out-of-scope, and the trigger's factual claims become
-premises for step 1. A trigger event that turns out to be a defect routes to `/diagnose`; a decode
-that uncovers an epic routes to `/groundwork`.
+Enter `/brief-to-problem` and return with its artifact. Its quoted brief lands in the contract above
+`## Problem`, its problem sentence and its two scope lines seed Problem, Goal, and Out-of-scope, and
+the trigger's factual claims become premises for step 1. A trigger event that turns out to be a defect
+routes to `/diagnose`; a decode that uncovers an epic routes to `/groundwork`.
 
 ## 1. Check the baseline before planning on it
 

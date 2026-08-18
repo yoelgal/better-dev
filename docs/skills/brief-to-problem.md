@@ -22,22 +22,28 @@ The adopted path first, because it is the one the rest of the chain enters:
 | A bug report that arrived as an adjective with no event behind it | `/diagnose` - the trigger event has to be recovered before a reproduction can be picked |
 | First-person intent the operator owns ("I want to add X") | `/plan-grill` - no decode is owed; interrogating the design is the grill's job |
 | A link rather than a brief | `/source-harvest` first - a link is not a brief until the text is captured |
-| A bare decode with no build ask behind it | may land here on its description alone; read the status above before running it |
+| A bare decode with no build ask behind it | lands here, and that is now its own front door rather than a collision |
 
 ## Where it fits
 
-It does not, yet. D15 adopted this capability as `/plan-grill` step 0 plus that skill's own
-`brief-decode.md` sibling, and the same ruling names it as examined and rejected in its own right, so no
-skill points here. D39 records the open operator call: adopt this skill as a clean cutover and delete the
-sibling file, justified by a second consumer that did not exist at D15 (`/diagnose` needs the same decode
-for an adjective-only report and cannot reach into another skill's files), or keep D15 and delete this
-skill with one sentence inlined at `/diagnose`'s symptom-only gate. Overturning a user-ratified ruling is
-the operator's call, and this page does not argue it.
+`/plan-grill` step 0 enters it whenever the intent arrives as relayed language, and returns with its
+artifact: the quoted brief lands in the contract above `## Problem`, the problem sentence and two scope
+lines seed Problem, Goal and Out-of-scope, and the trigger's factual claims become premises for the
+baseline check. `/diagnose`'s symptom-only gate enters it too, for a report whose claimed-actual is only
+an adjective with no event and no artifact behind it. `/groundwork`'s lean grill enters it where an epic
+arrives as somebody else's words.
+
+Adopted 2026-08-17 by operator ruling, as a clean cutover: `skills/plan-grill/brief-decode.md` was
+deleted in the same change, so the six decode moves live here and nowhere else. That reverses D15, which
+had adopted the capability as plan-grill step 0 plus that sibling and named the skill form as examined
+and rejected. What changed since D15 is a second consumer: `/diagnose` needs the same decode for an
+adjective-only report and cannot reach into another skill's files, and the authoring standard forbids it
+from trying.
 
 ## Prerequisites
 
-Nothing wires it, so nothing hands it a brief. Read this page's status before running it: doing so beside
-`/plan-grill` step 0 decodes the same brief twice, which is the one concrete cost of the current state.
+Nothing. Three skills hand it a brief, and it also fires on a bare decode ask with no build behind it,
+which is the case that has no other home: three of the five decode outcomes are not features at all.
 
 ## Common questions
 

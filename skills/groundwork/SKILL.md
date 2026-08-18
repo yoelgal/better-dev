@@ -82,8 +82,8 @@ module/interface/seam/depth vocabulary for the boundaries you'll draw in step 2;
 the glossary and any hard-to-reverse decision as it crystallizes. A clear gap one of them would fill is
 a `/tool-sourcing` candidate - never a blocker.
 
-Otherwise run a lean built-in grill, reusing `/plan-grill`'s discipline - including its
-brief-decode step when the epic arrives as somebody else's words: questions batched by settled
+Otherwise run a lean built-in grill, reusing `/plan-grill`'s discipline - entering
+`/brief-to-problem` first where the epic arrives as somebody else's words: questions batched by settled
 prerequisites into small rounds, each carrying the answer you'd pick and why, exploring the
 codebase before spending the user's attention, and confirming each decision as it locks. The lean
 grill stays human-in-the-loop - a grill that answers its own questions inside groundwork has

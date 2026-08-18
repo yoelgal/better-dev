@@ -1538,14 +1538,26 @@ freshness contract, edge-tag trust rules, and honest benefit evidence.
 
 ### Open operator calls, recorded so they are not lost
 
-- **`/brief-to-problem`, and this one corrects a mistake in this batch's own frontier read.** It was
-  filed as an unlanded orphan. It is not: D15 adopted the capability as `/plan-grill` step 0 plus
-  `skills/plan-grill/brief-decode.md`, and `docs/DECISIONS.md:238` lists it under examined-and-rejected
-  non-goals as a skill. The worker reconstructed that ruling and logged a papercut against the brief.
-  Option A adopts the skill as a clean cutover deleting `brief-decode.md`, justified by two consumers,
-  one of them new since D15 (`/diagnose` needs the same decode for an adjective-only bug report and
-  cannot reach into another skill's files). Option B keeps D15, deletes the new skill, and inlines one
-  sentence at `/diagnose`'s symptom-only gate. Overturning a user-ratified ruling is the operator's.
+- **`/brief-to-problem` is ADOPTED as a skill (operator ruling, 2026-08-17), reversing D15.** D15 had
+  adopted the capability as `/plan-grill` step 0 plus that skill's `brief-decode.md` sibling and named
+  the skill form as examined and rejected, on the grounds that a single consumer does not earn a skill.
+  Two things changed. A second consumer appeared: `/diagnose`'s symptom-only gate needs the same decode
+  for a report whose claimed-actual is only an adjective, and `/writing-skills` forbids it from reaching
+  into another skill's files, so inlining a copy was its only D15-legal route. And routing measurement
+  showed a bare decode ask with no build behind it already lands on the new skill's description, which
+  is the case with no other home at all: three of the five decode outcomes are not features.
+
+  Landed as a **clean cutover**, which is what makes it an adoption rather than a second surface:
+  `skills/plan-grill/brief-decode.md` is deleted, so the six moves live in one place. `/plan-grill` step
+  0 now enters the skill and returns with its artifact, its description hands the relayed-language case
+  over instead of claiming it, `/diagnose` enters it at the symptom-only gate, and `/groundwork`'s lean
+  grill enters it for an epic that arrives as somebody else's words. Trap 63 moved with the capability
+  and gained the fail branch the move creates: a grill that decodes inline from memory of how step 0
+  used to work.
+
+  Also corrected here, because the batch's own frontier read got it wrong: this was filed as an unlanded
+  orphan. It was not. The worker reconstructed D15 from the record and logged a papercut against the
+  brief that misled it, which is the sweep working rather than failing.
 - **Three of the six graphify wrapper skills are recommended for folding**, on measured evidence rather
   than taste: upstream's own benefit number is +11.2 points on n=6 graded questions, and re-measured
   ripple coverage on this repo is 38.1 percent against a 70 percent threshold. The same audit

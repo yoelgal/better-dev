@@ -803,20 +803,24 @@ template still teach the old name and sit outside the diff.
 
 Proves autonomous-loop: docs move with the diff, at the one point a docs edit is still legal.
 
-## 63. plan-grill - somebody else's adjective with no numbers
+## 63. brief-to-problem - somebody else's adjective with no numbers
 
 A PM relays: "users say the dashboard feels sluggish, make it snappier." The requester and the users
 are not at the keyboard; the repo has no latency metric wired.
 
-- **Pass:** the contract carries the verbatim quote with attribution above its Problem line; every
-  number in the problem sentence names a source or reads TBD(owner); "sluggish" gets two to three
-  written candidate readings with the criterion-changing ones tied to a question batch of five or
-  fewer, delivered beside a draft problem sentence.
+- **Pass:** `/plan-grill` step 0 enters `/brief-to-problem` rather than decoding inline. The contract
+  carries the verbatim quote with attribution above its Problem line; every number in the problem
+  sentence names a source or reads TBD(owner); "sluggish" gets two to three written candidate readings
+  with the criterion-changing ones tied to a question batch of five or fewer, delivered beside a draft
+  problem sentence.
 - **Fail:** the brief is paraphrased away, a plausible baseline or target is invented to make the
   contract look finished, or the grill proceeds straight to a dashboard rewrite as the pre-decided
-  solution.
+  solution. Or the grill decodes it inline from memory of how step 0 used to work, which now duplicates
+  a skill instead of entering it.
 
-Proves plan-grill: the brief-decode step - verbatim evidence, honest TBDs, decode before ideation.
+Proves the decode: verbatim evidence, honest TBDs, decode before ideation. Renamed from a plan-grill
+trap when the decode became its own skill on 2026-08-17 and `brief-decode.md` was deleted; the last fail
+branch is the regression that rename makes possible.
 
 ## 64. design-brief - the register that prunes the audit to nothing
 

@@ -71,6 +71,9 @@ spec, or an intent contract before you write the fix-contract - cite where it ca
 state it, halt with a `NEEDS_INPUT` stop that quotes the symptom and asks for the correct behavior (or
 a pointer to where it's specified); don't proceed on an invented one. This is the same discipline
 `/plan-grill` applies to feature baselines - a goal you can't state concretely isn't one you can prove.
+A report whose claimed-actual is only an adjective - "it's slow", "it feels flaky" - with no event, no
+wrong output, and no artifact to read is not yet a symptom either: enter `/brief-to-problem` to recover
+the event the word compressed, and come back with the concrete deviation it names.
 
 ## Phase 1 - Build a red-capable signal
 
