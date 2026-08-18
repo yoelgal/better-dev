@@ -576,8 +576,11 @@ for f in $(find skills docs hosts -type f -name '*.md' 2>/dev/null; ls README.md
   esac
   LC_ALL=C grep -Eilq "$slop" "$f" 2>/dev/null && slop_hits="$slop_hits $f"
 done
-[ -z "$slop_hits" ] && ok "no gated ai-slop phrasing in shipped markdown" \
-  || bad "ai-slop phrasing in:$slop_hits (the full list is the delete list in docs/comms-block.md)"
+if [ -z "$slop_hits" ]; then
+  ok "no gated ai-slop phrasing in shipped markdown"  # prove-new: regression-guard every pattern returned zero across the shipped surfaces when the list landed (see the note above), so the check locks in a property the repo already had rather than demanding a cleanup
+else
+  bad "ai-slop phrasing in:$slop_hits (the full list is the delete list in docs/comms-block.md)"
+fi
 
 echo "== zsh path-variable trap =="
 # A skill's bash blocks are executed by the agent's shell, which is zsh on macOS (and the Claude Code
@@ -920,8 +923,11 @@ else
   [ "$nhomes" = 1 ] && ok "comms block body has exactly one home ($CB)" \
     || bad "comms block body must live in exactly one shipped file, found $nhomes:$(printf ' %s' $homes)"
   lines="$(grep -c '' "$CB" || true)"
-  [ "$lines" -le 85 ] && ok "comms block within its 85-line cap ($lines)" \
-    || bad "comms block is $lines lines, cap is 85 - cut a line before adding one"
+  if [ "$lines" -le 85 ]; then
+    ok "comms block within its 85-line cap ($lines)"  # prove-new: regression-guard a cap holds by construction the moment it is raised, and raising it is what this diff does; red at base would mean shipping a block already over the new number
+  else
+    bad "comms block is $lines lines, cap is 85 - cut a line before adding one"
+  fi
 fi
 
 # Every adapter declares where this host keeps its global entry file. Empty is a legitimate answer
