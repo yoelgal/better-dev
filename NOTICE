@@ -164,6 +164,42 @@ we actually copied verbatim/substantially, which MIT requires us to attribute, a
     maintainer's nine-word verdict from graphify issue #1667 ("real bug, no clean in-code fix
     yet") as attributed quotation of a GitHub comment, not as licensed reuse. The
     ripple-coverage check those files describe is better-dev's own.
+  jakubkrehel/skills - Jakub Krehel (MIT, (c) 2026 Jakub Krehel), commit
+    ba35986bcf433fdca78ea571b0a3dc329cea89ba. Credited by FILE per D31, which keeps the wording
+    where the wording is what carries the value.
+      skills/design-brief/slop-and-checks.md <- better-ui/SKILL.md P1 (the concentric relation
+        between a nested pair's radii and the padding between them) and P11 (the theme-flip smear);
+        better-accessibility/SKILL.md's decorative-layer-swallows-clicks row;
+        better-layout/SKILL.md P1's 2x grouping ratio. Ours in those same tells: the per-tell
+        phrasing as detectables, the numbering and audit form, and the reduced-speed replay clause.
+      skills/design-brief/SKILL.md <- better-colors/SKILL.md P4 and P5 (the primitive/semantic
+        two-tier seam and the never-borrow-a-role rule) plus its mistakes table's
+        one-theme-switching-mechanism row; better-ui/SKILL.md P16 (motion is never the only
+        feedback channel). Ours: the icon/font import extension of the deviation criterion, and
+        the capability grading in step 3.
+      Deliberately NOT shipped: every constant in that cluster - scale(0.96) on press, the icon
+        animation values, the three named cubic-beziers and the five-row duration table. D228 keeps
+        token-set slots form-only and D297 sends implementation values to the composed host skill.
+      No expression from jakubkrehel/oklch-skill, which has no LICENSE (the GitHub API reports
+        license=null): nothing from it landed, and its own author retracted its notation-first
+        position in jakubkrehel/skills PR #13.
+  emilkowalski/skills - Emil Kowalski (MIT, (c) 2026 Emil Kowalski), commit
+    78761e1b57f97dce65b983d640c70a68f39e8163. Credited by FILE per D31; also courtesy-credited
+    below for the motion rules that are reimplemented rather than kept.
+      skills/pick-ui-library/SKILL.md <- upstream skills/pick-ui-library/SKILL.md. Four operating
+        imperatives are kept close to the author's wording: identify the task, not the library the
+        user named; flag the recommendation but do not churn the dependency without being asked;
+        recommend one library, state what it is for in one sentence, and do not present a menu of
+        options; and the off-list honesty clause (say so explicitly, recommend from your own
+        knowledge, and be clear you have left the list). Ours: the solved-problem class taxonomy
+        and its what-hand-rolling-gets-wrong column, the observable-fact vetting checks and the
+        finished-versus-abandoned tie-break, the whole hand-roll branch, the recorded-preference
+        routing that replaces upstream's curated package list, and the step-5 decision block.
+        Upstream's 22-package lookup table is deliberately not shipped.
+      skills/design-brief/slop-and-checks.md's reduced-speed replay clause draws on upstream
+        skills/animate/SKILL.md's feel-check handoff. The component-level-picks sentence in
+        skills/design-brief/SKILL.md exists because of upstream pick-ui-library; the sentence
+        itself is ours.
 
 ── Pattern inspiration (courtesy credit, not legally required) ──
   mattpocock/skills - Matt Pocock       (MIT) (also: the wait-what listener-state corrective,
@@ -229,7 +265,8 @@ we actually copied verbatim/substantially, which MIT requires us to attribute, a
   "Claude Code + SKILL.md" guide - @nyk_builderz (Nyk) (X article, ideas;
     least-privilege allowed-tools + shown-format rules reimplemented)
   emilkowalski/skills - Emil Kowalski (MIT; frequency-budget motion rule, motion tell
-    set, reduced-motion criterion nuance - reimplemented)
+    set, reduced-motion criterion nuance - reimplemented; where text was kept, it is named in
+    the verbatim section above)
   Amp handoff pattern - Sourcegraph (ideas only; the handoff artifact that moves a
     half-finished item between machines - reimplemented in worktree-branching's handoff
     notes, with better-dev's own consent re-pin on pick-up)
@@ -240,7 +277,9 @@ we actually copied verbatim/substantially, which MIT requires us to attribute, a
     matter-of-fact-errors and cap-at-five rules. Ours in that file: the length budget by question
     class, the whole-argument rule, the message-is-its-own-summary rule, the glossing test, and the
     report-versus-track carve-out. Written per repo by onboard and machine-wide by BOOTSTRAP's
-    install-time ask)
+    install-time ask. Also ideas-only behind docs/TRAPS.md's revalidation ritual: the baseline
+    contamination bug from that repo's issue #52, credited in the file itself, plus its evals
+    README's model pin and its prefer-an-isolation-flag-over-remove-and-restore posture)
   Papercuts CLI - Steve Ruiz (@steveruizok, tldraw) (X post, ideas; the agent-facing
     friction-log channel reimplemented as bd-mem's papercut command and its session-start
     surfacing)
@@ -260,12 +299,41 @@ we actually copied verbatim/substantially, which MIT requires us to attribute, a
     ordering, the tighten-but-never-loosen invariant, the substantive-line size axis and the
     familiarity-based escalation routing from tools/pr-approval-agent/ and .stamphog/, plus
     the per-state UI capture matrix from that repo's qa-frontend skill - reimplemented, no
-    wording reused, and their per-repo numbers deliberately not carried. Also credited above
-    for the two reviewer-brief mechanics)
-  jamonholmgren - X thread, item 14 (no licence; ideas only: a periodic audit for tests that
+    wording reused, and their per-repo numbers deliberately not carried, plus that same
+    qa-frontend skill's PASS-oracle rule - an expectation sourced outside the change rather than
+    read off the diff the check just made - reimplemented in
+    skills/pr-and-verify/verify-runtime.md. Also credited above for the two reviewer-brief
+    mechanics)
+  jamonholmgren - X thread (no licence; ideas only). Item 14: a periodic audit for tests that
     do not test what you think they test, named as a distinct practice. skills/test-audit/'s
     body - the mutation spine, the lenses, the revert protocol, the NOT REACHED verdict - is
-    ours, and the fix-them-too half is deliberately not absorbed)
+    ours, and the fix-them-too half is deliberately not absorbed. Item 15: the split between a
+    comparison tool's diff and an agent's own visual review, behind
+    skills/browser-capability/SKILL.md's screenshot-harness paragraph, with his
+    commit-the-baselines half refused on a stated cost. Item 18: the end-of-shift full
+    validation, reduced to the one clause that survives pricing - the repo's own recorded verify
+    key runs once at the loop's first green (skills/autonomous-loop/SKILL.md) - with
+    "performance, agent reviews, sweeps, everything" refused as unbounded.
+  lopopolo/harness-engineering - Ryan Lopopolo, tag v1.0.0. Licence: CC BY 4.0 for
+    repository-authored prose, editorial organization and diagrams; sources/raw/acp/ and
+    sources/raw/images/ are Apache 2.0 from the Agent Client Protocol project and are NOT
+    relicensed under CC BY. The 2026-08-17 batch briefing told six workers this repo was MIT and
+    that was wrong; the licence and the version are recorded here so the record is right. Nothing
+    verbatim landed, so no CC BY attribution obligation was triggered, and any future verbatim
+    reuse owes the licence's own required string - "Ryan Lopopolo, Harness Engineering, CC BY 4.0,
+    https://github.com/lopopolo/harness-engineering" - plus a note that changes were made. Ideas
+    reimplemented in our own words: the twelve theses read against our skills; the two playbooks
+    behind skills/codebase-audit/SKILL.md's severity floor and its two finding fields, and behind
+    skills/self-extension/SKILL.md's prose-owner gate and ablation clause; tool-legibility behind
+    skills/guardrails-install/SKILL.md's recorded-command probe; and the artichoke ledger's
+    pure-evidence discipline behind the worked-example recommendation recorded in D41. Neither
+    Apache carve-out was used.
+  haacked/dotfiles - haacked (no LICENSE and no terms named in the README, so ideas only,
+    nothing copied): ai/skills/babysit-prs/SKILL.md's handled-only comment-cursor advance and its
+    merge-queue push suspension, both reimplemented in skills/pr-and-verify/watch.md in this
+    library's voice, with the fail-closed reason (an idle queue reads the same as no queue, and
+    the push cannot be undone) rewritten rather than quoted. Its cross-session state file, its
+    multi-PR sweep, and its comment-count requeue budget were examined and refused.
 
 ── NOT copied - inspiration only, NOT redistributable ──
   Andrej Karpathy - LOOPS.md v060726 ("personal use permitted"). Concepts reimplemented
@@ -278,3 +346,14 @@ we actually copied verbatim/substantially, which MIT requires us to attribute, a
   asgeirtj/system_prompts_leaks aggregates third-party proprietary system prompts.
   The aggregation is CC0, but the underlying prompts are not ours to copy: techniques
   studied and reimplemented as ideas only; no leaked prompt text ships in better-dev.
+  Victor Taelin - the AGENTS.md and BIP gists (no license file, so all rights reserved).
+  Only the generalisable residue of the machine rules reached shipped text: a threshold
+  measurement reports the machine and the repetition count beside it, in
+  skills/pr-and-verify/verify-runtime.md, in our own words. None of his caps, none of his
+  numbers, and not the product-coupled prompt table.
+  Matt Pocock - the reply at x.com/mattpocockuk/status/2081655893427450117 (2026-07-27),
+  recovered for the 2026-08-17 harvest, and the Daniel Miessler critique it answers
+  (x.com/DanielMiessler/status/2081502127181218249). One sentence of the reply is quoted in
+  docs/DECISIONS.md D41 as attributed quotation of the author's own ablation, not as licensed
+  reuse, and none of it ships in skill text. Distinct from mattpocock/skills, which is credited
+  above under its own licence.
