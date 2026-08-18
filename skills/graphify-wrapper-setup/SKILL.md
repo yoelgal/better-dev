@@ -17,8 +17,13 @@ Make a repo ready for graphify-wrapper. Idempotent - safe to re-run.
 ## 1. Ensure the CLI
 
 The PyPI package is `graphifyy` (double-y); the binary is `graphify`. Pin the
-version: below the 0.9.18 floor graph writes are non-atomic (the refresh hook's
-own floor is far older - `built_at_commit`, 0.7.0). `--default-index` is
+version: below 0.9.18 graph writes are non-atomic. A second floor is warranted and
+not yet authorized: below 0.9.45 an incremental rebuild can make every unchanged
+source look deleted when the `.graphify_root` marker records a subfolder, which the
+refresh path hits unattended. Raising the floor edits the command D26 authorizes by
+name, so it is an operator call rather than a wording change, and until it is taken
+a run that hits that bug on 0.9.18 to 0.9.44 upgrades rather than working around it.
+`--default-index` is
 best-effort and bounds nothing: it sets uv's **lowest-priority** index, so it
 turns back a `UV_DEFAULT_INDEX` / `UV_INDEX_URL` redirect of the base index and
 nothing more. `UV_INDEX` and `UV_EXTRA_INDEX_URL` add indexes uv searches first
@@ -58,6 +63,13 @@ The central home holds the registry and every graph this repo builds. Keyed by
 git identity, so every worktree of this repo shares it, and graphs sit under a
 per-worktree key inside it (`gfx_out_dir`) - outside the tree they index, which
 is why no gitignore of any kind is needed.
+
+That git identity is `git remote get-url origin`, so renaming the remote makes this a fresh repo
+to graphify: this step seeds an empty registry, and every domain and graph under the old key stops
+resolving with nothing left to sweep them. After a rename, re-register the domains with
+`/graphify-wrapper-map`, sync, and delete `~/.claude/graphify/<old key>/` by hand - observed here,
+better-dev's own 0.13.0 rename orphaned a 1929-node graph and left the live key with no index at
+all.
 
 ```bash
 # gfx_home refuses (printing why) where it would land inside the tree being

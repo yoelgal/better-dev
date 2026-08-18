@@ -68,6 +68,12 @@ Rules for the proposal:
   (`claude-cli`). Everything else stays AST-only (free).
 - Explicitly list what you're **leaving unindexed** and why (vendored deps,
   generated code, build output, docs, fixtures).
+- A subtree that is mostly prose or vendored dependencies yields headings and doc
+  links rather than a call graph, so `--affected` and `--path` answer nothing
+  there. Measured on this repo: two vendored daemons carry 76 percent of the
+  call-family edges and the 127 markdown files that are the actual product
+  contribute one. Propose such a subtree only for shape questions, and name the
+  answers it cannot give.
 - Flag overlaps/nesting: two domains must not nest (a parent path's graph would
   re-cover the child). If they do, pick one granularity.
 - If a logical domain spans multiple disjoint subtrees, either pick their common
@@ -107,3 +113,8 @@ For a large first domain, suggest an AST-only sync to gauge build time before a
 Sync reports each domain's cross-subtree edge count - that checks one half of this
 carve, whether a domain wants splitting further. The other half, whether two
 domains should have been one, is in neither graph and stays a judgment call.
+
+Sync also runs a ripple-coverage check on a domain's first build, against the
+files the repo has actually been changing. A domain that fails it is one to drop
+or re-carve here rather than query, because its graph cannot answer the
+blast-radius question the consumer skills reach for.

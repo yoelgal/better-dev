@@ -38,10 +38,27 @@ responsibilities is a higher-ranked finding than the same defect in a leaf, and 
 otherwise a judgement call made blind. The index builds itself on first use, so a never-indexed repo
 is not a reason to skip this.
 
+Read that list as an ordering of leads. A rank position is not a citable fact: it is a degree
+ranking over one build, ties fall in the graph's own node order, and cluster IDs shift between
+builds because the clustering is not reproducible across runs (upstream's verdict: "real bug, no
+clean in-code fix yet"). On a prose-heavy repo the top ranks are markdown headings measuring which
+document has the most sections - a `docs/TRAPS.md` heading ranked first here - so a hub whose file
+is documentation is noise, and step 3's `file:line` still decides every finding.
+
 Then read the repo's own decision and intent docs - an ADR, a `DESIGN.md`, a `CONTEXT.md`, the README's
 rationale. A tradeoff the team already settled and wrote down is not a finding; surfacing it as one
 wastes their attention and reads as an audit that didn't do its homework. Carry those decided tradeoffs
 forward - they scope what the sweep is allowed to report.
+
+Close step 1 by writing the purpose sentence: one sentence naming the single job the audited area exists
+to do - the area's job, not this skill's. One job, not three. Every finding is graded against it, and a
+ranking with no purpose sentence behind it is taste wearing a table: the report then argues that a piece
+is bad rather than that it fails a stated job, which is the only form the reader can act on without it
+landing as a verdict on whoever wrote the code.
+
+Where the intent docs and the code disagree on that job, or the honest answer needs three sentences, put
+both readings to the human and have them pin one before the sweep runs. A contested purpose makes every
+finding downstream arguable, and one question now is cheaper than a whole report the reader dismisses.
 
 ## 2. Sweep the areas the intent and risk point at
 
@@ -54,6 +71,17 @@ spots pull the sweep first - a finding in code nobody touches is leverage that n
 pays, so dormant corners earn attention only through the risk lenses, not the
 improvement ones. Correctness, security, performance, tests, and debt are lenses, not
 a checklist to fill; a finding earns its place by evidence, not by filling a category.
+
+The tests lens is the one a sweep reads backwards by default, because a green suite looks like the
+evidence rather than the thing needing evidence: run `/test-audit` over the swept area when the
+ranking turns on how well-defended the code is, and file each `MISSED` it returns as a tests-category
+finding whose Evidence column carries the mutation that stayed green.
+
+Bloat is the lens a sweep reads as absence, because nothing in superfluous code announces itself - a
+wrong line has a `file:line` and a piece that should not exist has nothing. Read `subtraction.md` and
+run its pass when the ask names complexity, when step 1's purpose sentence turns out narrower than what
+the area contains, or when a mature area comes back with no `cut` rows; its cut rows file into step 5's
+table. Skipping it is how a mature codebase gets audited into a list of things to add.
 
 Where the host can spawn workers, fan out through `/orchestrating-agents` - one worker per area or
 cluster, sized to the repo, no fixed count. Each brief carries the decided tradeoffs from step 1 (so a
@@ -99,8 +127,7 @@ The output is a report to the human, in three parts:
 
   Every finding carries exactly one Move: **cut** (overbuilt or redundant - the fix is deletion), **fix**
   (fragile or wrong), **add** (missing for the stated goal), **restructure** (the structure fights the
-  goal). A sweep that returns no `cut` rows on a mature codebase is worth a second look - deletion
-  findings are the ones category-thinking under-surfaces.
+  goal).
 
   A `cut` row clears one check the others don't, and it costs a read this sweep has not done yet:
   **open the runners before filing it.** The CI workflows, the build scripts, and the dependency
@@ -116,6 +143,12 @@ The output is a report to the human, in three parts:
     Either way the Evidence column carries the reference, so the reader sees what deletion would take
     with it.
   - **You could not read the runners** - `cut` at low confidence, saying so in the Evidence column.
+
+  Every `cut` row also names the check that would show the deletion safe - the command a downstream loop
+  runs once the deletion lands - and its Evidence column records that command's result on the current
+  tree, run once for a baseline. A cut list with no such command is a refactor with no green signal, and
+  `/autonomous-loop` will not start one: no red-capable check, no loop. A baseline that is already red
+  says so in the row, since a check that was failing before the cut proves nothing about it.
 
   Leverage-ordered, highest first.
 

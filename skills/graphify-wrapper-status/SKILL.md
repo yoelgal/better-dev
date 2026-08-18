@@ -52,10 +52,14 @@ done
   question: `/graphify-wrapper-query` builds a missing graph on first use. Graphs
   live under `graphs:` above, outside this or any repo, keyed per worktree - a
   fresh worktree starts with none.
-- `FRESH = behind` → the graph's `built_at_commit` is behind HEAD. A
-  SessionStart hook auto-runs an AST `graphify update` on drifted, affected
-  domains; or run `/graphify-wrapper-sync <name>` now. The semantic layer isn't
-  auto-refreshed - use `--semantic` when you need fresh community naming.
+- `FRESH = behind` → the graph's `built_at_commit` is behind HEAD, and `RENDER` reads
+  `stale` with it. Run `/graphify-wrapper-sync <name>`, which re-extracts every
+  drifted file and stamps the graph to HEAD. A domain still reading `behind` after
+  that was refreshed by the SessionStart hook rather than by a sync (the hook leaves
+  the stamp alone, so the graph may already describe HEAD), or its build failed and
+  said so - `/graphify-wrapper-sync` owns that distinction and the hand-stamp for the
+  first case. The semantic layer is never auto-refreshed: use `--semantic` when you
+  need fresh community naming.
 - `RENDER` → whether the rendered pages (`graph.html`,
   `<name>-callflow.html`) beside the graph are current: `absent` (none rendered
   yet - run `/graphify-wrapper-sync <name>` or a one-time `graphify export`),
