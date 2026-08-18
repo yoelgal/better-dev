@@ -14,48 +14,73 @@ to remember it.
 Two preconditions, checked first:
 
 - This repo has no `.better-dev/` - it was never wired. Point at `/onboard` and stamp nothing.
-- No installed clone resolves below - the tool is not installed for this host. Point at the
-  install bootstrap (the README quick start / `BOOTSTRAP.md`) and stop.
+- No installed clone resolves below - the tool is not installed for this host. Step 1's recovery
+  command is the whole remedy; stamp nothing.
 
 ## 1. Locate the clone and pull it
 
 ```bash
 setopt no_nomatch 2>/dev/null || true
-clone="${CLAUDE_PLUGIN_ROOT:-}"
-if [ -z "$clone" ]; then   # fall back to reading a host skill symlink back to the clone
-  # Both depths: a host's skills dir sits one level under $HOME (.claude, .codex, .hermes) or two
-  # (.omp/agent/skills, and the XDG shape .config/<host>/skills). The `.[!.]*` head skips `.` and
-  # `..`, which the two-level pattern would otherwise turn into a wildcard over $HOME's siblings.
-  for s in "$HOME"/.[!.]*/skills/onboard "$HOME"/.[!.]*/*/skills/onboard; do
-    [ -L "$s" ] || continue
-    t="$(readlink "$s")"; clone="${t%/skills/onboard}"   # strip, never cd: a moved clone's link is DANGLING, and cd into it fails
-    [ "$clone" != "$t" ] && break
-    clone=""
-  done
-fi
-if [ -n "$clone" ] && [ ! -d "$clone/skills" ]; then
-  if [ -d "$clone/better-dev/skills" ]; then
-    clone="$clone/better-dev"   # 0.7.0 monorepo layout: the tool lived one level down, not yet re-pulled
-  elif [ "${clone##*/}" = better-dev ] && [ -d "${clone%/*}/skills" ]; then
-    clone="${clone%/*}"         # moved clone: recorded one level down, but the pull flattened it away
+# Candidate clones, exact source first. `.better-dev/bin` is this repo's own bridge, a symlink to
+# <clone>/scripts, so one suffix strip names the clone while assuming nothing about the host's dirs.
+set --
+b="$(readlink .better-dev/bin 2>/dev/null)"           # empty when bin is absent, or a copy (no symlinks here)
+[ "${b%/scripts}" != "$b" ] && set -- "${b%/scripts}"
+[ -n "${CLAUDE_PLUGIN_ROOT:-}" ] && set -- "$@" "$CLAUDE_PLUGIN_ROOT"
+# Both depths: a host's skills dir sits one level under $HOME (.claude, .codex, .hermes) or two
+# (.omp/agent/skills, and the XDG shape .config/<host>/skills). The `.[!.]*` head skips `.` and
+# `..`, which the two-level pattern would otherwise turn into a wildcard over $HOME's siblings.
+for s in "$HOME"/.[!.]*/skills/onboard "$HOME"/.[!.]*/*/skills/onboard; do
+  [ -L "$s" ] || continue
+  t="$(readlink "$s")"; clone="${t%/skills/onboard}"   # strip, never cd: a moved clone's link is DANGLING, and cd into it fails
+  [ "$clone" != "$t" ] && set -- "$@" "$clone"
+done
+clone=""
+for c in "$@"; do                                      # first candidate that is really a checkout wins
+  clone="$c"
+  if [ ! -d "$clone/skills" ]; then
+    if [ -d "$clone/better-dev/skills" ]; then
+      clone="$clone/better-dev"   # 0.7.0 monorepo layout: the tool lived one level down, not yet re-pulled
+    elif [ "${clone##*/}" = better-dev ] && [ -d "${clone%/*}/skills" ]; then
+      clone="${clone%/*}"         # moved clone: recorded one level down, but the pull flattened it away
+    else
+      clone=""; continue          # nothing holds skills/ there - dangling link, stale bridge: next source
+    fi
   fi
-fi
-if [ -n "$clone" ] && [ -d "$clone/skills" ] && git -C "$clone" rev-parse --git-dir >/dev/null 2>&1; then   # git -C "" acts on the cwd; pull only a resolved clone
+  git -C "$clone" rev-parse --git-dir >/dev/null 2>&1 && break   # git -C "" acts on the cwd, so only a real checkout resolves
+  clone=""
+done
+if [ -n "$clone" ]; then
   old="$(git -C "$clone" rev-parse HEAD)"
   git -C "$clone" pull --ff-only
 else
-  echo "no better-dev clone found - install it first (see BOOTSTRAP.md)" >&2
+  echo "no better-dev clone found - nothing installed here can repair that; see the recovery command below" >&2
 fi
 ```
 
-The clone dir a host resolves may be the repo root (current), or the `better-dev/` subdir inside it -
-either because the clone is still on the 0.7.0-era monorepo layout, or because it has already pulled
-the flatten and the recorded path now points at a directory that no longer exists. The guard
-normalizes all three to the dir that holds `skills/`, stepping down and up, which is also why the git
-probe is not a `.git` dir check: a subdir of a checkout has none of its own. The link is read as a
-string rather than followed with `cd` for the same reason - the third case's link is **dangling**, so
-`cd` into it fails and the whole resolution silently reports no clone found on exactly the install
-that most needs updating.
+Three sources, and the order is the fix rather than a preference. `.better-dev/bin` is **exact**:
+`/onboard` wrote it as a symlink to `<clone>/scripts` on this machine, so the strip names the clone and
+no host layout is assumed. `$CLAUDE_PLUGIN_ROOT` follows, set on one host only. The `$HOME` globs come
+last because they are the guess - they encode where a host keeps its skills dir, and when that guess was
+wrong (`hosts/omp` declares a dir two levels down while every resolver globbed one) `/update` resolved
+nothing on an omp-only machine, while `/update` was the verb that would have delivered the fix for the
+glob. A mechanism whose repair path runs through the thing it repairs cannot reach the installs that
+need it most, which is why the exact source goes first and the guesses are fallbacks.
+
+Candidates are validated one at a time rather than the last one being taken on trust. A candidate
+holding no `skills/` is normalized down (0.7.0's monorepo layout) and up (the pull flattened the
+recorded subdir away) before it is rejected, and rejection falls through to the next source. Both
+directions stay reachable: the globs hand back either shape, and so does a bridge written before a
+flatten. That is also why the link is read as a string rather than followed with `cd` - the flattened
+case's link is **dangling**, `cd` into it fails, and the resolution would report no clone found on
+exactly the install that most needs updating.
+
+**A stale bridge is rejected in favour of the next source, never a hard stop.** `.better-dev/bin` is
+per-machine and gitignored, so a dangling one is ordinary debris (the clone moved, or this repo arrived
+from another machine), and letting one gitignored symlink veto an install the globs can still find would
+recreate the failure this order exists to end. Say it when it happens: the same stale bridge breaks
+every `.better-dev/bin/bd-mem` call in this repo, step 5 included, and once a clone is resolved
+`"$clone"/scripts/bd-link link` repairs it.
 
 The search itself has to span both depths a host adapter may declare, because `hosts/*` is only
 readable once the clone is found and finding the clone is what this loop is for - a glob is the only
@@ -64,6 +89,19 @@ awareness in the strip: `clone="${t%/skills/onboard}"` cuts the suffix off the l
 is always `<clone>/skills/onboard` no matter how deep under `$HOME` the link that carried it sat. So
 a new host nesting its skills dir three levels down needs a wider glob and nothing else, and the
 package gate asserts the glob covers every declared dir rather than trusting that it does.
+
+**When no source resolves, name the way out.** A machine with no install has no clone for any source to
+find, and no installed skill can fix that - so the recovery is the one pair of commands that needs
+nothing installed, `BOOTSTRAP.md` step 2:
+
+```sh
+git clone https://github.com/yoelgal/better-dev ~/better-dev && ~/better-dev/install.sh
+```
+
+That route is dependency-free by inspection, not by framing: it runs `git clone` and then the installer
+out of the fresh clone, and reaches for `/onboard` only after both. Re-running it where a clone exists
+but is unreachable is safe - the installer repoints every link and prunes the dangling ones - and
+`/onboard` re-wires this repo's bridge after, which is what makes the next `/update` resolve exactly.
 
 Where the host gates machine-touching commands, hand the pull to the operator paste-ready
 (`git -C <clone> pull --ff-only`). `--ff-only` never clobbers local edits: a refused pull means
