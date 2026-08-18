@@ -70,6 +70,12 @@ route removed afterward) and confirm the event lands *and the alert arrives* - t
 "got the page" is the pass. A dashboard that merely looks delivered answers a different question than
 the one this skill runs on.
 
+A re-run proves it again rather than reading a recorded key as still true. An alert path decays with
+no commit touching the repo - a channel archived, a rule disabled, the named person gone - and the
+decay is invisible in exactly the direction that matters: an `obs-alert-channel` naming a route that
+has stopped delivering answers this skill's opening test from memory, and downstream it reads as a
+production nobody has broken.
+
 ## Record, absence as a named gap
 
 ```bash
