@@ -593,7 +593,26 @@ spawns a background child that runs `graphify update` on each registered domain 
 stale against HEAD and whose path the delta touched, so the package keeps running on that machine
 until the domains or the tool go.
 
-A fourth command joins by being added here, not by resembling these three.
+A fourth command joins by being added here, not by resembling these three. One did, on 2026-08-17:
+
+- `scripts/bd-block <host global entry> better-dev-comms < docs/comms-block.md`, which writes or
+  refreshes the marked communication-style block in the host's own global entry file (undo:
+  `scripts/bd-block remove <host global entry> better-dev-comms`). Made by `/update` step 2 when the
+  installed copy has drifted from the shipped body, and by `BOOTSTRAP.md` on a first global install.
+  It qualifies on this list's own two tests: one command undoes it, and it carries no credential.
+  It writes only between its own two markers, so operator text in that file is untouched either way.
+
+  The operator's ruling that put it here, verbatim: "i shouldnt have to run that command, because it
+  should be run for anyone when they run `/update`". The reasoning generalises past this one write. A
+  drift check that ends in a paste block is a check whose fix depends on the operator noticing the
+  output, and the drift it detects is invisible from the user's side: they experience a months-old
+  block as the practices not working. This library shipped exactly that failure, so handing the repair
+  back to the person who cannot see the problem is the wrong half of the loop to automate.
+
+  D22 is not weakened by this. That entry keeps SETTINGS-class writes operator-run because agent writes
+  to a host settings file are classifier-blocked, which is a capability limit rather than a consequence
+  rule. The global entry file is a memory file, not a settings file, and `bd-block` already writes it
+  during a normal install.
 
 The list carried a fourth on the day this entry landed: the never-commit guard, a global-gitignore
 write made by setup so in-tree graph output could never be committed. It was authorized
@@ -1393,7 +1412,8 @@ artifact-and-typing model as its subject. "HITL" appears zero times in this file
 though the typing was captured verbatim in the first ingest and re-named in two more. Three ingests,
 zero dispositions. Carried to its own work-item rather than folded here (master plan H3).
 
-**Landed:** `docs/comms-block.md` (30 lines, at the cap the operator raised from 24 to 30),
+**Landed:** `docs/comms-block.md` (53 lines, cap 60; see the follow-up ruling below for why the cap
+moved twice in one session),
 `hooks/bd-subagent-start` plus its selftest,
 `skills/update/SKILL.md` step 2, `skills/source-harvest/SKILL.md` (ladder plus stage-2 audit gate),
 `skills/source-harvest/extraction-recipes.md` (single-browser batch reader after measuring 19 pages in
@@ -1409,26 +1429,49 @@ active repos); taste-encoded design skills as a better-dev default (kept as a co
 re-proposed three weeks later as a fresh finding. A landing recorded only in a diff is invisible to the
 next harvest, which is why these rulings are numbered. Recorded as `harvest landing record`.
 
-### D38 follow-up - the cap goes to 30, and the message is its own summary (operator rulings, 2026-08-17)
+### D38 follow-up - keep upstream's wording, and state the reader model as upstream states it (operator rulings, 2026-08-17)
 
-Two operator rulings after the first landing, both about `docs/comms-block.md`.
+Three operator rulings after the first landing, all about `docs/comms-block.md`. Taken together they
+reverse a compression this session had defended twice, so the reasoning is worth keeping.
 
-**The cap moves 24 to 30.** Ruling 1 above put the cap question to the operator; the answer was "up to
-30". Gated at `scripts/bd-package-check`. What the extra six lines bought back, in order of how much
-they cost to lose:
+**The framing was wrong, and it was wrong in a way that inverted the mechanic.** Our block opened "The
+reader may have ADHD", which reads as an accessibility accommodation offered on a maybe. Operator's
+correction, verbatim: "this isnt an accesibility thing. Its that if you tell the agent 'i have adhd' or
+whatever the skill does, it helps the communication style". The declarative framing IS the instrument:
+it is a prompt that shapes output, not a hedge about who might be reading. Upstream's own line is
+declarative and ours now opens the same way: the reader's ADHD stated as fact, then what that means for
+the output's shape. The sentence itself is not reproduced here, because the block body keeps one
+canonical home in `docs/comms-block.md` and a quote in this file is the second copy that goes stale on
+the next edit, which the package gate refuses by design. A hedge in front of an instrument disarms it.
 
-- The wins-and-errors receipt, restored at full wording rather than folded into another clause.
-- The glossary clause's escape and its counter, both of which the 24-line squeeze had stripped: "or
-  belongs only in the record the next skill reads" and "Easy to fail while obeying every rule here: the
-  terms change per skill". `/writing-skills` is explicit that a gate bites through the counter inlined
-  at its decision point, so a rule shipped without its counter is a weaker rule, not a shorter one.
-- Readable structure. At 24 the block had collapsed into three dense prose paragraphs; at 30 it is a
-  bulleted list again, which is what a reader meeting it every turn actually scans.
+**Keep upstream's wording rather than paraphrasing it.** Operator's ruling: copy the skill verbatim, or
+at least the parts that carry the value. D31 already permits this for an MIT skill source and says why,
+and this block is the case that proves the rule: three rounds of paraphrasing produced a version that a
+reviewer measured as vaguer on the mechanism, and one round of compression deleted a rule outright while
+recording itself as lossless. Now taken verbatim: the reader statement, the persistence clause, the
+pre-send delete list with its first-line-and-last-line verify, the break-the-rules cases, and the
+phrasing of the lead-with-the-action, numbered-steps, restate-state, suppress-tangents, visible-wins,
+matter-of-fact-errors and cap-at-five rules. `NOTICE` records the split by file, naming both what was
+kept and what stays ours, per D31's credit-by-file rule.
 
-The lesson worth keeping is not "caps are bad". A cap is what forced every line to earn its place, and
-it caught real bloat. The defect was that at 24 the cheapest way to add a rule had become deleting one,
-which is how a compression turned into a silent deletion that review had to catch. A cap is doing its
-job while the marginal line is expensive; it is doing harm once the marginal line is unaffordable.
+Ours in that file, and worth naming so a future editor does not "restore" them to upstream's shorter
+form: the length budget by question class and the seven-paragraphs counter (from the `prose` capture),
+the whole-argument rule, the message-is-its-own-summary rule, the glossing test, and the
+report-versus-track carve-out with its diagnosing-or-exploring scope.
+
+**The cap moves 24 to 30 to 60**, gated at `scripts/bd-package-check`. The first move bought back a
+deleted rule and a stripped counter. The second is a consequence of the verbatim ruling: upstream ships
+roughly 140 lines always-on, so at 53 lines our block is already the compression, and a 30-line ceiling
+would have forced exactly the paraphrase the operator just overruled. Two mechanical notes for the next
+editor, both of which bit this session:
+
+- The gate's single-home detector greps for the block's opening sentence as its sentinel. Rewording the
+  opening breaks the detector into reporting zero homes, which reads identically to a missing block.
+  Both moved together this time; they have to.
+- What a cap is for is stopping unbounded drift, not making deletion the cheapest way to add a rule. At
+  24 it did the latter and a shipped rule went silently, which review caught rather than the gate. A cap
+  is doing its job while the marginal line is expensive and doing harm once the marginal line is
+  unaffordable.
 
 **Every message is its own summary.** Operator-stated, verbatim: "treat every message it sends as a
 tldr, but without saying 'tldr' explicitly at the start". Landed as its own clause:
@@ -1443,3 +1486,124 @@ wind-up at the start, by removing the structure that produces them.
 
 The installed global block on the operator's machine was repaired to match in the same session, which
 is the first exercise of ruling 6's new `/update` path.
+
+## D39 - the batch lands as skills, not as patches (operator ruling, 2026-08-17)
+
+The operator's ruling, after the batch's findings had been landing as edits to existing skills:
+"skills are the easiest thing where we can add new ones and just wire them into the appropriate places
+so the agent always knows to call on them at the right time." That is a scope ruling and it overrides
+the orchestrator's own proposal, which had been an architectural one (a four-pillar harness rewrite,
+drafted and NOT adopted). Recorded because the reasoning generalises: a new skill plus its routing is
+cheaper, independently revertible, and immediately reachable, where an architecture change is none of
+those. The rejected draft is not filed; its two salvageable parts are named in the opportunities
+register instead.
+
+**Six skills ship.** Each was authored from a captured source rather than invented, each carries a
+`description` written as triggering conditions, and each was routing-tested against the live catalogue
+of shipped description fields rather than assumed to fire.
+
+| Skill | Fills | Source |
+|---|---|---|
+| `/deep-research` | No research capability existed at all | `jordan-gibbs/hyperresearch`, MIT |
+| `/prototype` | Settling a design decision by building instead of arguing | `mattpocock/skills` + `will-ness-ai/skills`, MIT |
+| `/test-audit` | Tests that pass against broken code, behind every green verify | `jamonholmgren` practice, ideas only |
+| `/session-review` | The trigger the memory store never had | reader practice + `jamonholmgren` item 8 |
+| `/vision` | Recovering intent from a repo that already exists | `kunchenguid/vision`, MIT |
+
+`/brief-to-problem` was authored and is **not wired and not adopted**: see the operator calls below.
+
+**Seven existing skills changed**, against the three operator asks this batch opened with. `/review`
+gained a FIX/NIT/ESCALATE disposition beside severity, a convergence stop, channel independence stated
+as a property rather than a model choice, and a self-recording measurement suffix. `/security-pass`
+gained VISA's five-check evidence gate with its refusal clause and an anti-manipulation rule naming
+artifacts that address the reviewing agent instead of the code. `/pr-and-verify` gained a
+deterministic-gates-before-judgment chain and the monotonic invariant. The graphify wrappers gained a
+freshness contract, edge-tag trust rules, and honest benefit evidence.
+
+**Three rulings the work forced, beyond the additions.**
+
+1. **Environment variables and CLI flags are no longer blanket-trusted inputs.** `/security-pass`
+   carried that as a flat precedent; VISA's group A carve-out supersedes it, because the writer's
+   existing shell or deploy access was the entire basis of the trust, and a CI job parameter, scheduler
+   argument, or shared config another team can write has writers who hold none of it. The flat line was
+   deleted rather than qualified.
+2. **`Hardening` ships as a report disposition, not a fourth severity rung.** Every rung of `/review`'s
+   ladder blocks a merge, and a defence-in-depth note should not. `Not-applicable` was rejected: the
+   drop line already records every failed candidate with its class and reason.
+3. **A skill's routing line is applied by an integrator, never by its author.** Twelve workers
+   reported 22 wiring lines with quoted anchors and applied none of them; one integration pass placed
+   all 22 with every anchor matching verbatim. Three reported lines were the citation-plus-partial-
+   paraphrase form `/writing-skills` bans and were repaired to enter-steps at placement. An author
+   wiring its own skill writes the pointer it wishes existed; an integrator has to find the anchor.
+
+### Open operator calls, recorded so they are not lost
+
+- **`/brief-to-problem`, and this one corrects a mistake in this batch's own frontier read.** It was
+  filed as an unlanded orphan. It is not: D15 adopted the capability as `/plan-grill` step 0 plus
+  `skills/plan-grill/brief-decode.md`, and `docs/DECISIONS.md:238` lists it under examined-and-rejected
+  non-goals as a skill. The worker reconstructed that ruling and logged a papercut against the brief.
+  Option A adopts the skill as a clean cutover deleting `brief-decode.md`, justified by two consumers,
+  one of them new since D15 (`/diagnose` needs the same decode for an adjective-only bug report and
+  cannot reach into another skill's files). Option B keeps D15, deletes the new skill, and inlines one
+  sentence at `/diagnose`'s symptom-only gate. Overturning a user-ratified ruling is the operator's.
+- **Three of the six graphify wrapper skills are recommended for folding**, on measured evidence rather
+  than taste: upstream's own benefit number is +11.2 points on n=6 graded questions, and re-measured
+  ripple coverage on this repo is 38.1 percent against a 70 percent threshold. The same audit
+  recommends **not indexing this repository at all**, since 127 markdown files are the product and 76
+  percent of call-family edges are vendored daemons. Nothing was deleted: cutting a skill is a ruling.
+- **The graphify version floor stays 0.9.18.** A half-applied bump to 0.9.45 shipped in the skill text
+  and was reverted: the gate pins the same string in five other places, and raising it edits the command
+  D26 authorizes by name, which is an operator call rather than a wording change. The reason for wanting
+  it is recorded in the skill: below 0.9.45 an incremental rebuild can make every unchanged source look
+  deleted when the `.graphify_root` marker records a subfolder, and the refresh path hits that unattended.
+
+### One ordering dependency
+
+`feat/wayfinder-artifact-typing` is stacked on this branch and its two new routing pointers reference
+`/prototype` and `/vision`, which exist only here. The skill linter does not resolve cross-skill names,
+so nothing catches it if the merge order slips: this branch merges first.
+
+## D40 - the slop guidelines ship in the block, not in an override (operator ruling, 2026-08-17)
+
+The operator's ruling, in two parts. First: "we should always follow the no-ai-slop rules." Second, after
+a first attempt recorded it in `.better-dev/overrides.md`: "this shouldnt come in the form of the
+overrides, the comms block that is shipped to every user should include the no-ai-slop guidelines."
+
+The correction is about who the rule is for, and it is worth keeping because the first attempt was a
+category error rather than a wording problem. An entry in `.better-dev/overrides.md` is one project's
+preference, read by agents working in this repo and by nobody else. The comms block is the artifact this
+library installs on a user's machine. Putting a library-wide default in the overrides file would have
+meant this repo followed the rules and every consumer did not, which is the opposite of shipping them.
+The override was removed rather than duplicated: a rule in two homes is the third-edit failure
+`/writing-skills` names, and the block is the canonical home.
+
+**What that costs, stated plainly.** The block goes from 58 lines to 80 and its cap from 60 to 85,
+because a delete list has to name what it deletes and a pointer to a reference file does not load on the
+turn it binds. That is a real per-turn tax on every session, accepted deliberately: the operator asked
+for the rules to reach every user, and the only surface that reaches a user is this one. Upstream's own
+skill runs about 140 lines always-on, so the block remains the compression.
+
+**The split between gated and prose, which is the design decision under the ruling.** The mechanically
+checkable patterns are gated in `scripts/bd-package-check` beside the older em/en dash gate: a
+binary contrast, a colon reveal, a named empty phrase, a recap ending, and the vocabulary that has no
+legitimate use in technical instruction text. Every gated phrase returned zero across the shipped
+surfaces when the gate was added, so it locks in a property the library already had instead of demanding
+a cleanup. The judgment half lives in the block as prose, because the portability test and
+show-rather-than-label cannot be greppped and are the checks most surviving slop actually fails.
+
+**One carve-out, and the reason it is not a compromise.** Upstream bans `harness`, `leverage`, `robust`,
+`streamline` and `realm` outright. This library is about harness engineering and uses the first two as
+domain terms on nearly every page. Gating them would fire on hundreds of correct lines, and a gate that
+cries wolf gets switched off, taking the useful half with it. Those five stay advisory. The structural
+patterns carry no exception.
+
+**Three files are exempt from the gate by construction**, not by exception: the block itself, this
+decision record, and any docs page about the patterns. Each has to name a pattern in order to forbid it.
+
+**And one instance found in our own text while landing this.** The block's own opening read "Output is
+not just brief. It is shaped so an ADHD brain can act on it", which is the binary contrast the same
+source calls the loudest tell. That sentence was upstream's wording, kept under D31 and the operator's
+earlier verbatim ruling, so the two rulings collided on one line. Resolved toward the slop rule and the
+line rewritten, because shipping a block that violates its own first rule in its first sentence is worse
+than departing from an upstream phrase. The operator was told which line changed so it can be reverted
+in isolation.

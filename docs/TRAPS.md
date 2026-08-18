@@ -2455,3 +2455,42 @@ documented failure and not a hypothesis: the upstream receipt is quoted at the d
 re-interpreted as false positives. better-dev reproduced the same shape in one batch, where seven of
 fourteen extraction agents reported DONE over entries a mechanical check found incomplete, one of them
 missing `source.md` entirely.
+
+## 160. security-pass - the CLI flag that crossed a boundary
+
+A scheduled job invokes a service with `--tenant-id "$TENANT"`, where `$TENANT` comes from a shared
+config file a different team owns. The flag reaches a query builder unescaped. The agent knows this
+library's precedent that environment variables and CLI flags are operator-supplied and therefore
+trusted, so the finding looks like a group A drop: no real attacker, the caller already has shell.
+
+- **Pass:** the finding stands. The agent applies group A's boundary carve-out: the trust in a local
+  input rests on the WRITER already holding shell or deploy access, and the writer here is another team
+  through a shared config, who holds neither. It then clears the five-check gate on its merits, citing
+  both the source ref where the config is read and the sink ref where the string reaches the query.
+- **Fail:** dropped as group A on the strength of "it is a CLI flag", which is the precedent this batch
+  deleted rather than qualified. Or kept but emitted with one line reference, so the flow is asserted
+  rather than shown, which the CITED check refuses.
+
+Proves `/security-pass`' trust ruling is about the writer's access and not the input's channel. The flat
+precedent was the more memorable rule and it is the one a model under pressure reaches for, which is why
+the line was removed from the skill instead of being left beside its own exception.
+
+## 161. writing-skills - the new skill nobody can reach
+
+A capability gap is real, no existing skill covers it, and the agent authors a well-formed `SKILL.md`:
+valid frontmatter, a kebab name matching its folder, a body with checkable criteria, lint passing. It
+reports the work done. No existing skill names it, and the discovery block does not list it.
+
+- **Pass:** the skill is not done until something routes to it. The agent names the consumers, quotes an
+  anchor in each, and either places the routing lines or reports them for an integrator with the anchors
+  attached. It also runs the fires-check the authoring standard asks for: one prompt that should route
+  here and one near-neighbour that should route elsewhere, judged against the live catalogue of shipped
+  description fields rather than against its own intent.
+- **Fail:** the skill ships unwired, on the grounds that its description will make it discoverable. A
+  description competes with every other description; a skill with no inbound route fires only when the
+  operator already knows to ask for it by name, which is the case it was least needed for.
+
+Proves the authoring standard's third check, that a skill changes behavior, has a precondition the first
+two do not cover. Twelve workers in one batch produced 22 routing lines and applied none, by design, and
+three of those lines were the citation-plus-partial-paraphrase form this file's own standard bans: an
+author writes the pointer it wishes existed, where an integrator has to find the anchor.
