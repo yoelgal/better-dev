@@ -93,6 +93,11 @@ groundwork's pause-the-wave signal: stop and show the conflict rather than widen
 this item. The carve's readiness gate is checked here too, not assumed: a foundation not yet merged
 green to the integration branch means this item isn't ready to grill.
 
+The repo's stated intent is a premise too, where one exists. `.better-dev/bin/bd-mem recall "vision"`
+names the acceptance policy `/vision` recorded; read it before grilling, and a feature its resist
+test rejects stops here - it goes to the user as a choice between the feature and the policy, never
+a plan to grill and never a line quietly reinterpreted to fit.
+
 ## 2. Ideate - propose, then pick one to grill
 
 Before sketching options, put the premise itself on trial in two lines: the outcome this feature
@@ -166,7 +171,10 @@ grill only the decisions the done-criteria will turn on and skip exhaustive bran
   corrects a default faster than they fill a blank. If the user answers "whatever you think," they
   lack confidence too - don't take it as a blank cheque; re-ask as a choice between two concrete options.
 - **Ask only what you can't discover.** A fact about this repo or system is yours to find, not the
-  user's to answer - go read it (this is where premise-checking pays off again). A lookup slow enough
+  user's to answer - go read it (this is where premise-checking pays off again). A fact about the
+  world is yours to find too - a vendor's claim, a published number, whether anyone has tried this
+  approach and abandoned it: run `/deep-research` and carry its answer with its provenance, rather
+  than asking the user or planning on a prior. A lookup slow enough
   to stall the interview goes to a background worker while the rounds continue - a lookup still in
   flight blocks nothing except its own dependents, which sit out of the rounds until the worker
   reports; the dispatched worker reads, never writes: an unfenced background errand fills its
@@ -210,23 +218,12 @@ grill only the decisions the done-criteria will turn on and skip exhaustive bran
   rewrite.
 - **When prose stops discriminating, prototype.** A must-ask that turns on how something should look
   or behave, whose options read the same written down, gets a cheap concrete artifact to react to
-  instead of a fourth paraphrase:
-
-  | Question type | Artifact |
-  |---|---|
-  | Look-question | Several radically different variants rendered on one route and toggled by a URL param, so the user reacts to each in place rather than one mockup at a time |
-  | Logic question, answerer reads code | A filled example |
-  | Logic question, answerer is the third party the async-questionnaire unblock below serves | One self-contained HTML file that renders the whole relevant state after every click, with a button per action for free play plus one tab per worked case - a tab spells its case out in plain words and numbers the clicks that drive it, and opening a tab rewinds the state so the case behaves identically however often it is replayed |
-
-  Keep the logic itself a pure module the page only calls into, so the answer survives the page
-  being thrown away. The artifact is throwaway from its first line and marked so, runs with one
-  command or opens with one double-click, and persists nothing. When it answers, keep the answer, not the code: the decision goes to
-  `decisions.md`, the decision-rich snippet may inline into the contract (the step-4 exception), and
-  the artifact is deleted, absorbed, or - when re-deriving it would cost real time, a multi-variant UI
-  set being the usual case - parked as evidence on a throwaway `prototype/<slug>` branch, its pointer recorded
-  beside the decision in `decisions.md`. Whichever way, the working tree is clean of it before the
-  gate closes - a prototype still sitting in the tree at contract seal is an
-  unfinished decision. UI direction still belongs to `/design-brief`; this move
+  instead of a fourth paraphrase. Enter `/prototype` before building it: that skill refuses to start
+  without the named decision, owns the look-versus-logic fork, the variant set and its picker, and
+  the exit that puts the verdict in `decisions.md` and the code back out of the working tree.
+  Whichever way the artifact ends - deleted, absorbed, or parked on a throwaway `prototype/<slug>`
+  branch - the tree is clean of it before the gate closes: a prototype still sitting in the tree at
+  contract seal is an unfinished decision. UI direction still belongs to `/design-brief`; this move
   settles a single question, not the aesthetic.
 - **Attack the plan before you close.** The grill so far argued *for* the design - it walked the
   tree and filled each node with your recommended answer. Spend one pass arguing against it, through

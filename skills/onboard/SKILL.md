@@ -447,13 +447,18 @@ itself - a tool you name wins over a row:
 | "review this PR", "review my colleague's PR" | `/review` | inbound path: host mechanics + this repo's recorded policy |
 | "what's in flight?", "where did we leave off?" | `.better-dev/bin/bd-mem ledger status` | one line per work-item with its state |
 | "these are all done", "clean up the ledger" | `.better-dev/bin/bd-mem ledger reap` | previews the in-flight rows whose PR is already in the integration branch; `--apply` settles them |
+| "we're done - anything worth recording?", before a `/clear` or session end | `/session-review` | routes the session's lessons, friction, and instruction defects to the store; "no durable lesson" is a valid line |
 | "hand this off", "pick up X's work" | `/worktree-branching` (handoff) | the bundle rides the branch; consent re-pins on pickup |
 | "make it look good", "design the page" | `/design-brief` | -> `/plan-grill` or the loop |
+| "we can't decide between two options", "build something throwaway to settle it" | `/prototype` | the verdict lands in `decisions.md`; the code leaves the tree |
 | "is this safe", a security pass on a risky diff | `/security-pass` | composed by `/review` automatically |
 | "is there a tool or skill for X" | `/tool-sourcing` | -> `/self-extension` only if discovery is empty |
+| "does this claim hold up", "what's the prior art on X" | `/deep-research` | a sourced answer carrying its provenance; changes nothing |
 | "who calls this / what breaks if I change X" | `/codebase-map` | queries the code graph before grepping; changes nothing |
 | "index the repo", "build / refresh the code graph" | `/graphify-wrapper-map` (or `-sync`) | `/graphify-wrapper-query` answers from it; hooks keep worktree graphs fresh |
 | "what's worth doing here", "audit this codebase" | `/codebase-audit` | ranked findings; you pick -> front-ends |
+| "are these tests actually testing anything", a green suite that keeps shipping bugs | `/test-audit` | mutation-settled findings; you pick -> `/plan-grill` -> the loop |
+| "what is this project even for", "write down what we refuse to build" | `/vision` | recovers the acceptance policy from the repo's own history into `VISION.md` |
 | "here are some links / ingest these / harvest this", a link or dump of source material for the library - even one framed as "implement this" | `/source-harvest` | captures verbatim -> critical synthesis; a build ask then -> `/plan-grill` |
 | "just push to the PR / use feat/ / skip the grill" | `/overrides` | records the standing default |
 | "wait, you lost me", "what does that mean?" - a reply that didn't land | `/wait-what` | re-pitches it plainly in this repo's own vocabulary |
@@ -626,6 +631,12 @@ for it, so a close-out that offers only `/groundwork` silently picks the steered
 the route is a real choice about how they want to spend their day, not an implementation detail.
 Record a durable rule for anything worth remembering next session
 (`.better-dev/bin/bd-mem remember "<rule>"`).
+
+When this was not greenfield but a repo that already has history, the counterpart step is `/vision`:
+run it before the first grill. An adopted repo's non-goals and invariants usually live in one
+person's head, and the acceptance policy that skill recovers is what lets a later `/plan-grill` or
+`/review` judge a change nobody anticipated - without it, every session re-derives the project's
+intent from whatever files it happened to open.
 
 ## Composability
 

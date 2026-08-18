@@ -365,7 +365,11 @@ The loop's own green is not the acceptance verdict - the two stay separate so th
 its own check. Acceptance has two parts the loop doesn't self-grade: a fresh reviewer that distrusts the
 report and reads the diff, not the claims (`/review`), and runtime observation - the change driven to
 where it executes and watched past its happy path (`/pr-and-verify`). Exit 0 is the working signal,
-runtime observation is the acceptance; a passing command is not yet a driven flow. Findings of every
+runtime observation is the acceptance; a passing command is not yet a driven flow. A green suite is
+evidence only where its tests can still go red for the right reason, and the loop's own negative
+control covers only the tests it authored this pass: where a done-criterion rests on a test that
+arrived before this work-item, enter `/test-audit` to settle whether that test defends the criterion
+it is credited with, and a `MISSED` row leaves the criterion unproven rather than met. Findings of every
 severity, Minor included, go back as a fix pass, then re-review; the fix pass answers every finding per the
 accept-or-rebut table `/review`'s reception owns - `ACCEPTED` with the fix or `REBUTTED` in one line, and
 a finding answered with silence re-blocks at re-review. A re-review round reporting zero findings with no
@@ -457,4 +461,7 @@ that earned it. Keep the WHAT filter: capture signature, root cause, and fix, ne
 pass's receipt as `prior lesson applied: <key> (confidence <c>, from <date>)`, so the operator can audit
 what the store contributed. The same law fires earlier too - a root cause a
 stuck-check named before a restart, the infra recovery recorded under "Triage the red" - so a lesson
-lands where it's learned, not only at the finish. When you revise this skill, follow `/writing-skills`.
+lands where it's learned, not only at the finish. When this settle also ends the session, run
+`/session-review` once afterwards: the item's lesson is written here, and the session's friction, its
+trap-worthy gaps, and any instruction that misled the run are recorded there instead of dying with
+the transcript. When you revise this skill, follow `/writing-skills`.

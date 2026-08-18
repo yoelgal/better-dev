@@ -118,6 +118,10 @@ confident match returns a known root cause and the fix that resolved it last tim
 re-run the Phase 1 signal to confirm it goes green here too, rather than re-deriving from scratch. A
 match that no longer holds (the signal stays red) isn't wasted: it rules out a candidate and tells you
 the shape recurred for a new reason. No match, or a stale one, drops you into fresh hypotheses below.
+Where the signature looks like someone else's bug rather than ours - a dependency's error text, a
+platform behaviour, a symptom that appeared at a version boundary - spend one light `/deep-research`
+pass on the prior art before generating hypotheses: an upstream issue naming the cause beats five
+hypotheses of our own.
 
 Before free-generating, run the failure signature down the pattern table - a matched row seeds one
 ranked hypothesis with its search area attached; no match just means every hypothesis is fresh, not

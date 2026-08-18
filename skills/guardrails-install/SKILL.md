@@ -376,13 +376,15 @@ it turns that surface into something the loop, `/review`, and the PR brief recal
 one detection is reused everywhere and nothing downstream re-guesses it.
 
 Promote it as durable rules through the memory contract, keyed so a single `recall "safety"` returns the
-whole policy - the same shape this skill already uses for the verify commands. One write per key, and
-this skill's prose above is the authoritative home for what each key means:
+whole policy - the same shape this skill already uses for the verify commands. The line half of the scope
+key is calibrated from this repo's own merge history, the largest diffs its operator merged unchanged, and
+never inherited from another codebase: a borrowed ceiling gates the wrong diffs in both directions. One
+write per key, and this skill's prose above is the authoritative home for what each key means:
 
 ```bash
 .better-dev/bin/bd-mem remember "safety-denylist: <detected globs>"    # the paths a loop edit escalates on, not edits
 .better-dev/bin/bd-mem remember "safety-gate: <classes with a real surface here>"
-.better-dev/bin/bd-mem remember "safety-scope: <n>"                    # files touched that trip the scope gate; ~10 default
+.better-dev/bin/bd-mem remember "safety-scope: <files>/<substantive lines>"  # the two axes that trip the scope gate; ~10 files default, and a line ceiling counting neither lockfiles, snapshots, generated output, nor docs
 .better-dev/bin/bd-mem remember "merge-policy: <auto-on-green | human>" # standing allowance: who MAY merge a gates-passed green PR
 .better-dev/bin/bd-mem remember "release-cadence: <per-merge | on-demand>" # whether a merge continues into /release-promotion
 ```

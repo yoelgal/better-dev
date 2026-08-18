@@ -42,6 +42,11 @@ default-template pull is mode collapse, and asking for the distribution is what 
 candidate with one concrete noun; two candidates sharing a label, or one label that fits them all, is a
 rework signal, not a style note.
 
+When candidate directions stop separating on description alone, stop describing them: enter
+`/prototype` to render them on a real surface with real data and real density, one zoom level per
+round. A direction judged on a blank page always reads fine, and the label check above only catches
+the candidates that were already too close to write down differently.
+
 When the read is blank, or an existing render reads as generic, don't reason from an empty page:
 source a specific admired reference - a real product this brief's audience would call premium - and
 diff against it. Adopt its layout, structure, and information hierarchy; re-skin them in this
