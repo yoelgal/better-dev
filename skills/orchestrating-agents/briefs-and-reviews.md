@@ -13,7 +13,11 @@ that the brief itself can't know. Nothing else.
 
 What belongs in the brief:
 
-- One line on where this task fits in the project - enough scene-setting to orient, no more.
+- One line on where this task fits in the project - enough scene-setting to orient, no more. That line is
+  a claim, so check it against the sources the brief cites before you send: the framing gets drafted
+  before those sources are read, and one wrong assumption there enters every brief in the batch
+  (observed: a brief's opening line asserted a premise that the sibling report it cited two lines later
+  had already disproved, and the worker paid again to re-derive the correction).
 - The task itself, and the exact values it must use verbatim: numbers, magic strings, signatures, test
   cases. These live in the brief, not in your prose around it.
 - Interfaces and decisions from earlier tasks that the brief can't derive on its own.
