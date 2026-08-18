@@ -22,8 +22,14 @@ case "$0" in /*) SELF="$0" ;; *) SELF="$PWD/$0" ;; esac
 
 # One-line user-visible welcome, emitted on every run. Static strings with no
 # JSON-special characters, so they embed without escaping.
-WELCOME_WIRED="better-dev ready - practices wired in this repo"
-WELCOME_UNWIRED="better-dev ready - not wired in this repo (run /onboard to wire it)"
+#
+# The tool name is its own constant because versioned_welcome splices the installed
+# version in after it. Anchoring that splice on a named prefix rather than a literal
+# keeps the two in step: reword the welcome and the splice still lands, and a custom
+# per-repo welcome that does not start with this prefix is left alone.
+WELCOME_PREFIX="better-dev"
+WELCOME_WIRED="$WELCOME_PREFIX ready - practices wired in this repo"
+WELCOME_UNWIRED="$WELCOME_PREFIX ready - not wired in this repo (run /onboard to wire it)"
 
 # Host-scoped paths. The hosts/ adapters own their own dir names, so each of
 # these names what THIS host uses, defaulting to Claude Code's value - an unset
@@ -137,17 +143,52 @@ normalize_clone() {
   fi
 }
 
+# --- bounded fetch: refresh one clone's upstream refs, never blocking longer than
+# $2 seconds. Own function because the `timeout` binary cannot be a premise here:
+# stock macOS ships neither `timeout` nor `gtimeout`, and gating the fetch on one
+# meant the majority host never fetched at all - the behind-count then read off
+# refs frozen at install time and answered 0 forever, so an operator who never
+# fetched by hand was never told an update existed. That is the whole failure this
+# replaces: a nudge that could only fire for someone who had already done the thing
+# it nudges.
+#
+# Backgrounded with a poll loop instead, which every bash has. SIGTERM (plain
+# `kill`) is what `timeout` sends too, and git's own atexit clears its lock files on
+# it - so a fetch cut short leaves the refs exactly as they were, never a stale
+# .lock a later fetch would trip over.
+#
+# The loop counts TENTHS, because the poll interval is the floor on what this costs
+# every session, not the ceiling: a local-network fetch answers in well under a
+# second, and a whole-second first tick would charge every session start for a wait
+# that was already over. A `sleep` that rejects a fractional argument exits non-zero
+# without sleeping at all, which would spin this loop hot - so that exit is the
+# signal to fall back to whole seconds and decrement by ten, keeping the same bound
+# on a userland without fractional sleep.
+bounded_fetch() {
+  local clone="$1" secs="$2" pid left
+  git -C "$clone" fetch --quiet >/dev/null 2>&1 &
+  pid=$!
+  left=$((secs * 10))
+  while [ "$left" -gt 0 ] && kill -0 "$pid" 2>/dev/null; do
+    if sleep 0.1 2>/dev/null; then left=$((left - 1)); else sleep 1; left=$((left - 10)); fi
+  done
+  kill "$pid" 2>/dev/null || true
+  # Reap it either way, so a killed fetch leaves no zombie behind the session. Job
+  # status is silent in a non-interactive shell, and a non-zero wait is expected on
+  # the timeout path - neither may trip set -e.
+  wait "$pid" 2>/dev/null || true
+}
+
 # --- update nudge: is the installed better-dev clone behind its origin? -------
 # Best-effort and strictly non-blocking. Locates the clone via CLAUDE_PLUGIN_ROOT
 # when it looks like a git checkout, else the same readlink fallback link_nudge
 # uses (the clone install path); if neither finds one, or it isn't a git
 # checkout with an upstream, we say nothing. A bounded fetch refreshes the count
-# when we can time-box it; when we can't (no `timeout`), we skip the fetch and
-# report from the last-known upstream rather than risk a hang. Never pulls -
-# unless the project opted into ff-only auto-update in overrides, which can
-# only fast-forward, never clobber.
+# first, so the answer is about the remote as it is now rather than as it was at
+# the last hand-run fetch. Never pulls - unless the project opted into ff-only
+# auto-update in overrides, which can only fast-forward, never clobber.
 update_nudge() {
-  local overrides="$1" mark="$2" clone tobin behind msg
+  local overrides="$1" mark="$2" clone behind msg
   # Fall back on THIS nudge's usability predicate, not mere skills/ presence: a
   # copy-fallback plugin root has skills/ but no git, and the linked clone must
   # still get its pull nudge. The probe is git, not a .git dir - the clone may
@@ -157,10 +198,9 @@ update_nudge() {
   { [ -n "$clone" ] && git -C "$clone" rev-parse --git-dir >/dev/null 2>&1; } || return 0
   git -C "$clone" rev-parse --abbrev-ref '@{u}' >/dev/null 2>&1 || return 0
 
-  # Bound the fetch well inside the hook's own timeout (hooks.json: 5s) so a slow
-  # remote can starve the nudge but never the awareness note this hook exists for.
-  tobin="$(command -v timeout || command -v gtimeout || true)"
-  [ -n "$tobin" ] && "$tobin" 2 git -C "$clone" fetch --quiet 2>/dev/null || true
+  # Bounded well inside the hook's own timeout (hooks.json: 5s) so a slow remote can
+  # starve the nudge but never the awareness note this hook exists for.
+  bounded_fetch "$clone" 2
 
   behind="$(git -C "$clone" rev-list --count 'HEAD..@{u}' 2>/dev/null || echo 0)"
   [ "${behind:-0}" -gt 0 ] 2>/dev/null || return 0
@@ -372,6 +412,31 @@ clone_version() {
     "$clone/.claude-plugin/plugin.json" 2>/dev/null | head -1
 }
 
+# --- name the installed version in the operator's welcome line ------------------
+# "which better-dev am I running" had no answer the operator could read: the manifest
+# lives inside the clone, and .better-dev/wired-version answers a different question -
+# which release last moved this repo's surface - so a reader who diffs the two reports
+# drift on every pull-only release and prescribes a /update that owes nothing. Naming
+# the one number that is genuinely the tool's closes that at the only place every
+# session already looks.
+#
+# What it deliberately does NOT say is "up to date". The fetch above is bounded and
+# best-effort, so a session on a slow or absent network cannot back that claim, and a
+# welcome that asserts currency it did not verify is worse than one that only names
+# what it read locally. When the clone IS behind, update_nudge's marker appends to
+# this same line - so currency is reported by the nudge that measured it, never by
+# the greeting.
+#
+# Falls through unchanged on anything unreadable or on a custom per-repo welcome
+# (which will not carry the prefix), so this can only ever add a version.
+versioned_welcome() {
+  local ver
+  case "$1" in "$WELCOME_PREFIX"*) ;; *) printf '%s' "$1"; return 0 ;; esac
+  ver="$(clone_version)"
+  printf '%s' "$ver" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$' || { printf '%s' "$1"; return 0; }
+  printf '%s %s%s' "$WELCOME_PREFIX" "$ver" "${1#"$WELCOME_PREFIX"}"
+}
+
 reonboard_nudge() {
   local root="$1" clone releases wired newest ver msg
   # Same retry rule as update_nudge: fall back when the plugin root fails THIS
@@ -426,6 +491,9 @@ emit() {
   # has no case-insensitive flag.
   custom="$(grep -iEm1 'better-dev[[:space:]]+welcome:' "$root/.better-dev/overrides.md" 2>/dev/null | sed -E 's/^.*[Ww][Ee][Ll][Cc][Oo][Mm][Ee]:[[:space:]]*//; s/[[:space:]]*$//' || true)"
   [ -n "$custom" ] && welcome="$(escape_for_json "$custom")"
+  # After the custom resolution, so a project that reworded its welcome keeps exactly
+  # what it wrote - the prefix guard inside is what lets one call serve both.
+  welcome="$(versioned_welcome "$welcome")"
   # Point at the overrides layer only when the project actually has one, so the
   # note never sends the agent to an empty file.
   note=""
@@ -885,6 +953,20 @@ PYST
   out="$(cd "$tmp/proj" && CLAUDE_PLUGIN_ROOT="$clone" "$SELF")"
   printf '%s' "$out" | grep -q "update available" || fail "no update nudge when clone is behind"
 
+  # The case the timeout-gated fetch could not serve: a clone whose refs are stale -
+  # origin has moved and nothing has fetched since - must still be told. That is the
+  # everyday state on a host with no `timeout` binary (stock macOS ships neither it nor
+  # `gtimeout`), where the count read off frozen refs answered 0 forever and the nudge
+  # stayed silent for exactly the operator who had never fetched by hand. Deliberately
+  # no `git fetch` in this fixture: the hook's own bounded fetch is what has to find
+  # the new commit, so a regression to a binary-gated fetch fails here.
+  stale="$tmp/staleclone"; git clone -q "$origin" "$stale"
+  mkdir -p "$stale/skills/onboard"; : > "$stale/skills/onboard/SKILL.md"
+  ( cd "$seed" && echo four >> f && git commit -qam four && git push -q origin HEAD:main ) >/dev/null 2>&1
+  out="$(cd "$tmp/proj" && HOME="$tmp" CLAUDE_PLUGIN_ROOT="$stale" "$SELF")"
+  printf '%s' "$out" | grep -q "update available" \
+    || fail "no update nudge when the clone's refs are stale - the bounded fetch did not run"
+
   # Same behind-origin clone, but CLAUDE_PLUGIN_ROOT unset (the clone install path,
   # no plugin) - resolved through the host skill-symlink fallback link_nudge already
   # used. The fixture clone needs a real skills/<name>/SKILL.md for the link to point at.
@@ -972,6 +1054,24 @@ PYST
   printf '%s' "$out" | grep -q "no link for this host" && fail "link nudge fired with everything linked"
   # Nothing pending -> the welcome stays exactly the default, no marker.
   [ "$(printf '%s' "$out" | jq -r '.systemMessage')" = "$WELCOME_WIRED" ] || fail "welcome carried a marker with nothing pending"
+
+  # The welcome names the installed version when the resolved clone has a manifest.
+  # Same fixture, same nothing-pending state as the assert above - the only change is
+  # a readable plugin.json, so this pins exactly what the version adds and nothing else.
+  printf '{ "version": "1.2.3" }\n' > "$lclone/plugin-tmp"; mkdir -p "$lclone/.claude-plugin"
+  mv "$lclone/plugin-tmp" "$lclone/.claude-plugin/plugin.json"
+  out="$(cd "$tmp/proj" && HOME="$home1" CLAUDE_PLUGIN_ROOT="$lclone" "$SELF")"
+  [ "$(printf '%s' "$out" | jq -r '.systemMessage')" = "better-dev 1.2.3 ready - practices wired in this repo" ] \
+    || fail "welcome did not name the installed version"
+  # ...and a per-repo custom welcome is left alone even with a manifest to hand: the
+  # prefix guard is what lets one call serve both paths, and splicing a version into
+  # someone else's wording would be this change reaching past its remit.
+  cp "$tmp/proj/.better-dev/overrides.md" "$tmp/ovsave"
+  printf 'better-dev welcome: ACME\n' > "$tmp/proj/.better-dev/overrides.md"
+  out="$(cd "$tmp/proj" && HOME="$home1" CLAUDE_PLUGIN_ROOT="$lclone" "$SELF")"
+  [ "$(printf '%s' "$out" | jq -r '.systemMessage')" = 'ACME' ] || fail "version spliced into a custom welcome"
+  cp "$tmp/ovsave" "$tmp/proj/.better-dev/overrides.md"
+  rm -rf "$lclone/.claude-plugin"   # later asserts on this fixture expect the unversioned welcome
 
   # Host skills dir with no better-dev entries at all (plugin-only) -> silent.
   home2="$tmp/home2"; mkdir -p "$home2/.claude/skills/unrelated"
@@ -1285,7 +1385,9 @@ if ! bd_root="$(find_bd_root)"; then
   link_nudge || true
   hook_nudge || true
   plugin_nudge || true
-  printf '{ "systemMessage": "%s%s" }\n' "$WELCOME_UNWIRED" "$(marks)"
+  # Versioned here too: the operator about to run /onboard is exactly who needs to see
+  # which tool version is about to wire this repo.
+  printf '{ "systemMessage": "%s%s" }\n' "$(versioned_welcome "$WELCOME_UNWIRED")" "$(marks)"
   exit 0
 fi
 FP_WRITE=""
