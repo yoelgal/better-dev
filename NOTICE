@@ -10,17 +10,11 @@ we actually copied verbatim/substantially, which MIT requires us to attribute, a
 ── Copied verbatim / substantially (attribution required) ──
   .omp/config.yml - destructive-command pattern set adapted from garrytan/gstack careful/
     (MIT, (c) 2026 Garry Tan); the patterns are theirs, the approval policy around them
-    is the harness's own. It reached this file through scripts/bd-guard, which carried the
-    same set until the harness's native command-approval policy replaced it.
-  Nothing else is vendored. The browse/ and ios-qa/ daemon trees were vendored from
-    garrytan/gstack (MIT, (c) 2026 Garry Tan) until they were removed: the browser half is
-    the harness's own tool now, and skills/ios-capability fetches the on-device QA tool from
-    upstream on demand (github.com/garrytan/gstack, subdir ios-qa/, MIT, commit 11de390)
-    rather than carrying a copy. Fetched code stays under its own upstream license, which
-    travels with it; no copied expression ships here.
-    The skills/graphify-wrapper-* practices were ported substantially verbatim from
-    orrgal1/claude-plugins graphify-wrapper v1.2.0 (MIT, (c) 2026 orrgal1) until they were
-    removed too; nothing of that port ships now.
+    is the harness's own.
+  Nothing else is vendored. skills/ios-capability fetches the on-device QA tool from upstream
+    on demand (github.com/garrytan/gstack, subdir ios-qa/, MIT, commit 11de390) rather than
+    carrying a copy. Fetched code stays under its own upstream license, which travels with it;
+    no copied expression ships here.
   mattpocock/skills - Matt Pocock (MIT, (c) 2026 Matt Pocock). Under D31 this library
     keeps that repo's wording wherever the wording is what carries the value, so the
     files below hold passages in their author's expression and not only reimplemented
@@ -171,8 +165,7 @@ we actually copied verbatim/substantially, which MIT requires us to attribute, a
         feedback channel). Ours: the icon/font import extension of the deviation criterion, and
         the capability grading in step 3.
       Deliberately NOT shipped: every constant in that cluster - scale(0.96) on press, the icon
-        animation values, the three named cubic-beziers and the five-row duration table. D228 keeps
-        token-set slots form-only and D297 sends implementation values to the composed host skill.
+        animation values, the three named cubic-beziers and the five-row duration table.
       No expression from jakubkrehel/oklch-skill, which has no LICENSE (the GitHub API reports
         license=null): nothing from it landed, and its own author retracted its notation-first
         position in jakubkrehel/skills PR #13.
@@ -193,120 +186,21 @@ we actually copied verbatim/substantially, which MIT requires us to attribute, a
         skills/animate/SKILL.md's feel-check handoff. The component-level-picks sentence in
         skills/design-brief/SKILL.md exists because of upstream pick-ui-library; the sentence
         itself is ours.
-
-── Pattern inspiration (courtesy credit, not legally required) ──
-  mattpocock/skills - Matt Pocock       (MIT) (also: the wait-what listener-state corrective,
-    frontier-rounds grill rhythm, guided-walkthrough logic demos, the authoring bar widened
-    past the SKILL.md format to the sibling files a skill sends the agent off to read -
-    reimplemented, no shipped text; where text was kept, it is named in the section above)
-  Whamp (Will Hampson) - wayfinder-to-spec gist (no license; ideas only, reimplemented:
-    the stage-boundary audit/hydrate/stop handoff pattern in plan-grill's carved-item
-    entry rule)
-  obra/superpowers - Jesse Vincent     (MIT)
-  vercel-labs/skills - Vercel            (MIT)
-  vercel-labs/agent-browser - Vercel            (MIT)
-  garrytan/gstack - Garry Tan         (MIT) (also: review specialists/lens patterns,
-    plan-review persona rubrics, cso false-positive machinery, investigate scope-lock
-    and circuit-breaker, learnings provenance schema, host-config shape, post-deploy
-    verify/watch phases - reimplemented; the vendored dirs are gone, and the pattern set that
-    remains is named in the section above)
-  loperanger7/gstack-auto - loperanger7 (no license; ideas only, nothing copied:
-    accept-or-rebut tables, 3-strike hypothesis rule, regression-test-first protocol,
-    machine-readable verdict trailers, blast-radius wrong-layer read, anchored scoring
-    rubric, AI-slop tell list, bounded follow-up-question budget - all reimplemented)
-  Steve Krug - the "trunk test" usability heuristic (concept, reimplemented as guidance)
-  orrgal1/claude-plugins - orrgal1           (MIT)
-  nousresearch/hermes-agent - Nous Research     (MIT)
-  DietrichGebert/ponytail - DietrichGebert    (MIT)
-  addyosmani/agent-skills - Addy Osmani       (MIT)
-  davidondrej/skills - David Ondrej      (MIT)
-  Leonxlnx/taste-skill - Leonxlnx          (MIT)
-  ruvnet/ruflo - ruvnet            (MIT)
-  asgeirtj/system_prompts_leaks - asgeirtj  (CC0-1.0; see caveat below)
-  "Getting started with loops" - delba_oliveira / ClaudeDevs (X article, ideas)
-  Self-improving agent system in 14 steps - @0xCodez (Codez) (X article, ideas)
-  Fable-extraction playbooks - @EXM7777 (Machina), @alex_prompter (X articles, ideas)
-  Eight-category edge-case pass - @nurijanian (George, prodmgmt.world) (X article; the
-    pass is reimplemented, but the eight category names and their published order are
-    reproduced as-is in skills/plan-grill/done-contract.md)
-  Human-simulating e2e QA - James Goldbach (@agentic.james) (IG reel, ideas)
-  Fable-to-Opus skill capture - Ethan Stopperich (IG reel, ideas)
-  Archive228/loopkit - Archive228        (MIT)
-  shadcn/improve - shadcn            (MIT)
-  "Master Claude With Fable 5: 6 Rules" - @0xMoysei (Moysei) (X article, ideas)
-  "Como crear Loops en Fable 5" - @angeldot_ (angel) (X article, ideas)
-  Model-routing CLAUDE.md section - @theo (Theo) (X thread, ideas)
-  "Verbalized Sampling" - Zhang, Yu, Chong, Sicilia, Tomz, Manning, Shi
-    (arXiv 2510.01171) (research paper; method reimplemented as guidance, cited)
-  pbakaus/impeccable - Paul Bakaus     (Apache-2.0; register split, two-altitude slop
-    test, token lock, identity lock/family pass, degraded-disclosure - all reimplemented)
-  orrgal1/claude-plugins pdd - orrgal1 (MIT; gate-cadence, gap-stop, negative-control,
-    fork-typing mechanics reimplemented; also credited above for forge/devloop)
-  garrytan/gstack document-release (MIT; diff-driven docs sweep, act-vs-ask split,
-    debt-in-PR-body, discoverability rule - reimplemented; also credited above)
-  "/brief-to-problem" - @nurijanian (George, prodmgmt.world) (X article, ideas;
-    decode mechanics reimplemented in skills/brief-to-problem/SKILL.md, which superseded and replaced
-    plan-grill's brief-decode.md sibling on 2026-08-17 - also credited above for the edge-case pass)
-  Fable 5 advisor/orchestrator patterns + advisor-tool doc - ClaudeDevs / Anthropic
-    (X thread + official docs, ideas; consult-direction bounds reimplemented)
-  Three-tier delegation + same-agent fixes - @pablostanley (Pablo Stanley) (X post, ideas)
-  Condensed Fable 5 prompting preamble - @dr_cintas (Alvaro Cintas) (X post, ideas;
-    reasoning-exposure footgun independently verified against official docs)
-  Ownership post (end-to-end + post-merge tail) - Thorsten Ball (Slack screenshot via
-    @curlysaarthak; ideas only, reimplemented)
-  Product-design token cheatsheet FORM - @_heyrico (rico, acedesign.io) (X post; the
-    slot-shape reimplemented, his values deliberately not shipped)
-  "Claude Code + SKILL.md" guide - @nyk_builderz (Nyk) (X article, ideas;
-    least-privilege allowed-tools + shown-format rules reimplemented)
-  emilkowalski/skills - Emil Kowalski (MIT; frequency-budget motion rule, motion tell
-    set, reduced-motion criterion nuance - reimplemented; where text was kept, it is named in
-    the verbatim section above)
-  Amp handoff pattern - Sourcegraph (ideas only; the handoff artifact that moves a
-    half-finished item between machines - reimplemented in worktree-branching's handoff
-    notes, with better-dev's own consent re-pin on pick-up)
-  ayghri/i-have-adhd - ayghri            (MIT; docs/comms-block.md KEEPS ITS WORDING per D31, not
-    only its rules: the opening reader statement, the persistence clause, the pre-send delete list
+  ayghri/i-have-adhd - ayghri (MIT). docs/comms-block.md KEEPS ITS WORDING per D31, not only
+    its rules: the opening reader statement, the persistence clause, the pre-send delete list
     and its first-line/last-line verify, the break-the-rules cases, and the phrasing of the
     lead-with-the-action, numbered-steps, restate-state, suppress-tangents, visible-wins,
-    matter-of-fact-errors and cap-at-five rules. Ours in that file: the length budget by question
-    class, the whole-argument rule, the message-is-its-own-summary rule, the glossing test, and the
-    report-versus-track carve-out. Written per repo by onboard and machine-wide by BOOTSTRAP's
-    install-time ask. Also ideas-only behind docs/TRAPS.md's revalidation ritual: the baseline
-    contamination bug from that repo's issue #52, credited in the file itself, plus its evals
-    README's model pin and its prefer-an-isolation-flag-over-remove-and-restore posture)
-  Papercuts CLI - Steve Ruiz (@steveruizok, tldraw) (X post, ideas; the agent-facing
-    friction-log channel reimplemented as the friction lessons this library records in the
-    harness's own memory store. It began as a queue of its own, which that store replaced)
-  Matt Shumer - "How to Run a Gauntlet Loop" (somethingbig.ai) and the Claude-of-Duty
-    prompt (github.com/mshumer/Claude-of-Duty), plus "How I Prompt Fable" (shumer.dev)
-    (method reimplemented in the gauntlet skill: goal-not-steps, a concrete inspectable
-    bar, builder/critic separation with fresh critics, no fixed final round; our own words)
-  Understand-Anything - Egonex-AI (MIT, (c) Yuxiang Lin / Infinite Universe Inc, originally
-    Lum1104; pipeline hygiene and dashboard patterns studied for the 2026-08-05
-    observatory-viz harvest, ideas adapted - no prose copied)
-  graphify - Graphify-Labs (the wrapped CLI tool; courtesy-credited for the export surfaces
-    the removed graphify-wrapper practices surfaced. Nothing of that wrapper ships now)
-  Dual-delivery artifact shape + flow-highlighting pattern - @franpradas (X thread,
-    ideas only; no shipped text)
-  PostHog StampHog - PostHog (MIT Expat; ideas only in skills/pr-and-verify/: the gate-chain
-    ordering, the tighten-but-never-loosen invariant, the substantive-line size axis and the
-    familiarity-based escalation routing from tools/pr-approval-agent/ and .stamphog/, plus
-    the per-state UI capture matrix from that repo's qa-frontend skill - reimplemented, no
-    wording reused, and their per-repo numbers deliberately not carried, plus that same
-    qa-frontend skill's PASS-oracle rule - an expectation sourced outside the change rather than
-    read off the diff the check just made - reimplemented in
-    skills/pr-and-verify/verify-runtime.md. Also credited above for the two reviewer-brief
-    mechanics)
-  jamonholmgren - X thread (no licence; ideas only). Item 14: a periodic audit for tests that
-    do not test what you think they test, named as a distinct practice. skills/test-audit/'s
-    body - the mutation spine, the lenses, the revert protocol, the NOT REACHED verdict - is
-    ours, and the fix-them-too half is deliberately not absorbed. Item 15: the split between a
-    comparison tool's diff and an agent's own visual review. That half no longer ships: the
-    skill it sat behind was removed when the harness's own browser tool replaced it, with his
-    commit-the-baselines half refused on a stated cost. Item 18: the end-of-shift full
-    validation, reduced to the one clause that survives pricing - the repo's own recorded verify
-    key runs once at the loop's first green (skills/autonomous-loop/SKILL.md) - with
-    "performance, agent reviews, sweeps, everything" refused as unbounded.
+    matter-of-fact-errors and cap-at-five rules. Ours in that file: the length budget by
+    question class, the whole-argument rule, the message-is-its-own-summary rule, the glossing
+    test, and the report-versus-track carve-out. That body is written into an entry file per
+    repo by onboard and machine-wide by BOOTSTRAP's install-time ask, so the kept wording
+    travels with every install.
+  Eight-category edge-case pass - @nurijanian (George, prodmgmt.world) (X article, no licence;
+    quotation with attribution is permitted, lifting prose is not). The eight category names
+    and their published order are reproduced as-is in skills/plan-grill/done-contract.md; the
+    pass around them is reimplemented.
+
+── Pattern inspiration (courtesy credit, not legally required) ──
   lopopolo/harness-engineering - Ryan Lopopolo, tag v1.0.0. Licence: CC BY 4.0 for
     repository-authored prose, editorial organization and diagrams; sources/raw/acp/ and
     sources/raw/images/ are Apache 2.0 from the Agent Client Protocol project and are NOT
@@ -321,12 +215,6 @@ we actually copied verbatim/substantially, which MIT requires us to attribute, a
     skills/guardrails-install/SKILL.md's recorded-command probe; and the artichoke ledger's
     pure-evidence discipline behind the worked-example recommendation recorded in D41. Neither
     Apache carve-out was used.
-  haacked/dotfiles - haacked (no LICENSE and no terms named in the README, so ideas only,
-    nothing copied): ai/skills/babysit-prs/SKILL.md's handled-only comment-cursor advance and its
-    merge-queue push suspension, both reimplemented in skills/pr-and-verify/watch.md in this
-    library's voice, with the fail-closed reason (an idle queue reads the same as no queue, and
-    the push cannot be undone) rewritten rather than quoted. Its cross-session state file, its
-    multi-PR sweep, and its comment-count requeue budget were examined and refused.
 
 ── NOT copied - inspiration only, NOT redistributable ──
   Andrej Karpathy - LOOPS.md v060726 ("personal use permitted"). Concepts reimplemented
