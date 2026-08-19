@@ -185,12 +185,43 @@ extract_field() {
 }
 
 # Resolve symlinks and .. without coreutils realpath (the leaf may not exist yet).
+#
+# THE X SENTINEL, on all three captures, and it is the root fix for a class four rounds of this patch
+# walked past: command substitution strips ALL trailing newlines, so every `$(...)` here silently
+# EDITS the value it is supposed to be resolving. The bytes it strips belong to a model-chosen path.
+#
+# Measured, with a spotless boundary on `sand/` and a sibling directory named `sand<LF>`: a write to
+# `sand<LF>/x.txt` - a different directory, outside the boundary - was ALLOWED, because `dirname` handed
+# back `sand<LF>` and the capture deleted the byte before `cd` ever ran. That needs no `scope` call and
+# puts no control character in the state file, so neither the producer's refusal nor scope_wellformed
+# can see it: the guard denied a path it had already rewritten into a different one.
+#
+# `printf X` after the command, then strip the X and exactly ONE trailing newline - the one the command
+# itself terminates its output with. Every byte before that belongs to the argument and survives to the
+# boundary comparison, which then denies, as `sand<LF>/x.txt` should have all along. The fallback branch
+# prints its own newline for the same reason: without it, the strip would eat a REAL byte off a path
+# that could not be entered.
+#
+# dirname and basename stay as subprocesses rather than becoming `${1%/*}` and `${1##*/}`. The
+# parameter expansions look like a free win - three fewer forks per hook call - but they diverge on
+# trailing slashes, on a bare `/`, and on a path with no slash at all, and this is not the file to
+# trade a measured semantic for a speed guess in.
 normalize() {
   local d b
-  d="$(dirname "$1")"; b="$(basename "$1")"
-  d="$(cd "$d" 2>/dev/null && pwd -P || printf '%s' "$d")"
+  d="$(dirname "$1"; printf X)"; d="${d%X}"; d="${d%$'\n'}"
+  b="$(basename "$1"; printf X)"; b="${b%X}"; b="${b%$'\n'}"
+  d="$( { cd "$d" 2>/dev/null && pwd -P || printf '%s\n' "$d"; }; printf X)"; d="${d%X}"; d="${d%$'\n'}"
   printf '%s/%s' "$d" "$b"
 }
+
+# The remaining `$(... pwd -P)` captures in this script - here, grants_file, pending_file, bd_dir, and
+# the git-dir resolution in scope_cmd - were swept for the same defect and do NOT need the sentinel,
+# for a reason worth writing down so nobody re-derives it. Each captures a path whose LAST component is
+# fixed by construction (`.git`, `.git/worktrees/<name>`, or a `/bd-scope` suffix appended after the
+# capture), so no trailing byte of theirs is ever model-chosen. Measured for the one component that
+# looked model-chosen: `git worktree add` REWRITES a newline in a worktree name to `-`, so a git dir
+# path cannot end with one. That last defence belongs to git rather than to this script, which is why
+# it is recorded here rather than trusted silently - if it ever changes, this comment is the tripwire.
 
 # The boundary state file for the repo the session is in (per-worktree by construction).
 state_file() {
@@ -865,7 +896,14 @@ scope_cmd() {
   # field exactly what it claims to be, and the echo below prints it because it is digits.
   case "$ttl" in ''|*[!0-9]*) die "--ttl takes whole hours as digits (0 = no expiry)" ;; esac
   [ -d "$dir" ] || die "not a directory: $dir"
-  dir="$(cd "$dir" && pwd -P)"
+  # The X sentinel, for the reason normalize() carries in full: without it this capture DELETES a
+  # trailing newline off the resolved path, and the refusal below then passes a name whose offending
+  # byte its own producer already removed. Measured at c636fd2: `scope sandH<LF>` beside a sibling
+  # `sandH` exited 0, stored `sandH`, and check_edit enforced a directory nobody had scoped while the
+  # one that WAS scoped went unguarded. The refusal cannot be the load-bearing defence while the value
+  # it reads is not the value that reaches disk.
+  dir="$(cd "$dir" && pwd -P && printf X)"
+  dir="${dir%X}"; dir="${dir%$'\n'}"
   # THE REFUSAL, and it is the root fix three rounds of per-sink neutralisation walked past. The state
   # file is a two-line record written with `printf '%s\n%s\n'` and read positionally, so a NEWLINE in
   # the boundary name relocates the tail of that name onto line 2. Measured, both directions off that
@@ -896,7 +934,13 @@ scope_cmd() {
   g="$(cd "$g" && pwd -P)"
   expiry=0
   [ "$ttl" != 0 ] && expiry=$(( $(date +%s) + ttl * 3600 ))
-  printf '%s\n%s\n' "$dir" "$expiry" > "$g/bd-scope"
+  # write_atomic, not a plain redirect, and this round is what made the difference load-bearing. A
+  # truncating `>` leaves a window where a reader sees an EMPTY file, and now that scope_wellformed
+  # fails CLOSED that window reads as CORRUPT and denies every non-bookkeeping write for its duration,
+  # where it used to read a stale boundary. It is also the one state file in this script that skipped
+  # the helper every other one goes through.
+  write_atomic "$g/bd-scope" "$dir"$'\n'"$expiry"$'\n' \
+    || die "could not write the boundary state file $g/bd-scope, so the boundary is NOT set"
   # The boundary is echoed back to whoever ran this, and under an agent host that is an agent - the
   # same instruction channel a decision reason is. So the echo gets the same fold-then-neutralise,
   # and the STATE FILE above keeps the exact bytes, because they are what every path match is made
@@ -1036,7 +1080,7 @@ selftest() {
   jbash() { printf '{"tool_input":{"command":"%s"}}' "$1"; }
   jedit() { printf '{"tool_input":{"file_path":"%s"}}' "$1"; }
   local d repo wt out sfile base gfile glog pfile tbash tedit tstage arg gcmd c reason want guarddir
-  local vtok hostile first probe
+  local vtok hostile first probe nlb
   # The state-file sweep's own names: the REPO's boundary file (sfile above is the worktree's), the
   # record-shape fields it reads back, and the forged token/key a hostile subject tries to plant.
   local rsfile forge nlines ftok fkey pexp rtok rkey rexp rsub gkey gexp grest logts logverb logsub logrest
@@ -1641,12 +1685,97 @@ selftest() {
       rm -rf "$par"; rm -f "$rsfile"
       fail "the ancestor case for $label wrote the state file before refusing it"
     fi
+    # ...and the same ancestor, reached by a RELATIVE argument that carries no byte of its own. This is
+    # the case that actually pins "checked AFTER pwd -P": the probe above passes `$par/clean`, whose
+    # ARGUMENT spells the byte outright, so a refusal placed on argv instead of on the resolved path
+    # passes it too. Measured as a negative control on this very round: moving the refusal above the
+    # capture left the whole suite GREEN, because nothing here judged a spotless argument that only
+    # becomes hostile once resolved. `scope .` from inside the byte-named parent is that argument.
+    if out="$( ( cd "$par/clean" && "$SELF" scope . --ttl 0 ) 2>&1 )"; then
+      rm -rf "$par"
+      fail "scope ACCEPTED a spotless RELATIVE argument ('.') whose resolved path carried $label, so the refusal is reading argv rather than the path it is about to store: $out"
+    fi
+    if [ -f "$rsfile" ]; then
+      rm -rf "$par"; rm -f "$rsfile"
+      fail "the relative-ancestor case for $label wrote the state file before refusing it"
+    fi
     rm -rf "$par"
+    # ...and the byte in TERMINAL position, which is the one position the producer's own capture
+    # DELETES before the refusal above can see it. `dir="$(cd "$dir" && pwd -P)"` is a command
+    # substitution and command substitution strips ALL trailing newlines, so a directory whose name
+    # ENDS with one arrived at the `[[:cntrl:]]` test already clean: the check passed, and the record
+    # stored a DIFFERENT directory - the same-named sibling - which check_edit then enforced against
+    # instead. Measured at c636fd2: `scope sandH<LF>` exited 0, echoed and stored `sandH`, and a write
+    # into `sandH/` that nobody had scoped was ALLOWED. scope_wellformed cannot catch it and never
+    # could, because the record IS well formed; only the producer can.
+    #
+    # Every case above places the byte MID-name, which is why three rounds shipped green over this.
+    # That is the same irony the sentinel comment at the top of this function already documents: the
+    # trick was applied to the test harness and never to the code under test.
+    #
+    # The SIBLING is load-bearing and this case was measured wrong without it, twice over in one file:
+    # with only the newline-named directory present, the stripped path names something that does not
+    # exist, so scope dies on `is not inside a git repo` and the `ACCEPTED` assertion below never
+    # fires - a PASS, against the exact code it was written to catch. The bypass needs the sibling for
+    # the allow to land on something real, so the fixture builds what the attack needs rather than what
+    # reads tidiest. Anti-vacuity is asserted directly: the refusal must name the CONTROL CHARACTER,
+    # not some downstream accident.
+    rm -f "$rsfile"
+    hostile="$repo/sandT9$byte"
+    mkdir -p "$hostile" "$repo/sandT9"
+    [ -d "$hostile" ] || fail "the terminal-$label fixture could not create its directory, so it measures nothing"
+    if out="$( ( cd "$repo" && "$SELF" scope "$hostile" --ttl 0 ) 2>&1 )"; then
+      rm -rf "$hostile" "$repo/sandT9"
+      fail "scope ACCEPTED a boundary directory whose name ENDS with $label, so what it stored is the sibling nobody scoped and check_edit now enforces the wrong directory: $out"
+    fi
+    case "$out" in
+      *"control character"*) ;;
+      *) rm -rf "$hostile" "$repo/sandT9"
+         fail "the terminal-$label case was refused for some reason OTHER than its control character, so it passes without measuring the refusal: $out" ;;
+    esac
+    if [ -f "$rsfile" ]; then
+      rm -rf "$hostile" "$repo/sandT9"; rm -f "$rsfile"
+      fail "the terminal-$label case wrote the state file before refusing it"
+    fi
+    [ "$(ntoks "$out")" = 0 ] \
+      || { rm -rf "$hostile" "$repo/sandT9"; fail "the refusal for a terminal $label printed a runnable invocation to stderr: $out"; }
+    rm -rf "$hostile" "$repo/sandT9"
   }
   scope_ctl 'a newline' '\n'
   scope_ctl 'a tab' '\t'
   scope_ctl '0x01 SOH' '\001'
   scope_ctl '0x1f US' '\037'
+
+  # The SAME transform, in the CONSUMER, and this half needs no `scope` call at all - only a
+  # model-chosen edit path. normalize() splits its argument with `dirname` and `basename` and resolves
+  # the directory with `cd ... && pwd -P`, all three through command substitution, so a target inside a
+  # directory whose name ends with a newline is normalised onto its newline-LESS sibling. Where that
+  # sibling is the live boundary, the write is allowed into a directory outside it. Measured at c636fd2
+  # against a spotless boundary on `sand/`: a write to `sand<LF>/x.txt` returned {} where `other/x.txt`
+  # denied. The reachability is strictly wider than the producer half above: no directory needs scoping
+  # and no control character ever reaches the state file.
+  #
+  # The path arrives as a JSON escape, per the fixture trap this file learned the hard way: a raw
+  # control byte in the hook JSON fails the parse, returns {}, and measures nothing.
+  rm -f "$rsfile"
+  nlb="$(printf '%bX' '\n')"; nlb="${nlb%X}"
+  [ -n "$nlb" ] || fail "the normalize fixture resolved to no byte at all, so it measures nothing"
+  mkdir -p "$repo/sandN" "$repo/sandN$nlb"
+  [ -d "$repo/sandN$nlb" ] || fail "the normalize fixture could not create its newline-named sibling"
+  ( cd "$repo" && "$SELF" scope "$repo/sandN" --ttl 0 ) >/dev/null 2>&1 \
+    || fail "the spotless boundary the normalize case is measured against could not be scoped"
+  # The pair is the anti-vacuity guard: the byte-free twin must be ALLOWED, so a deny below is
+  # attributable to the byte rather than to a boundary that denies everything.
+  out="$(cd "$repo" && jedit "$repo/sandN/ok.txt" | "$SELF" check-edit)"
+  [ "$out" = '{}' ] \
+    || fail "a write INSIDE the spotless boundary was not allowed, so the normalize case below would pass for the wrong reason: $out"
+  out="$(cd "$repo" && jedit "$repo/sandN\\n/x.txt" | "$SELF" check-edit)"
+  printf '%s' "$out" | grep -q '"permissionDecision":"deny"' \
+    || fail "a write into a SIBLING directory whose name ends with a newline was judged against the boundary's newline-less name instead of denied: $out"
+  printf '%s' "$out" | python3 -c 'import sys,json; json.load(sys.stdin)' 2>/dev/null \
+    || fail "the deny for a newline-terminated directory is not valid JSON, so the host reads no decision at all: $out"
+  rm -rf "$repo/sandN" "$repo/sandN$nlb"
+  rm -f "$rsfile"
 
   # bd-pending fields 1-4, bd-grants fields 1-2, grants.log fields 1-3: measured on ONE hostile subject
   # carrying both separators those three formats use - a newline, which is the record separator in

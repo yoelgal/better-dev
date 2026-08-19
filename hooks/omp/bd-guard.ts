@@ -915,6 +915,58 @@ async function selftest(): Promise<void> {
     );
     rmSync(ctlDir, { recursive: true, force: true });
 
+    // ...and the same refusal with the byte in TERMINAL position, which is the ONE position the
+    // script's own capture deleted before the refusal could see it: `dir="$(cd "$dir" && pwd -P)"`
+    // strips trailing newlines, so `scope sandT<LF>` used to exit 0 and record the sibling `sandT`,
+    // and the boundary then guarded a directory nobody had scoped. The case above places its byte
+    // MID-name and is green against that defect, which is how it shipped three times. The SIBLING is
+    // load-bearing: without it the stripped path names nothing, scope dies on `not inside a git repo`,
+    // and the assertion passes for a reason that has nothing to do with the refusal.
+    const ctlTail = join(fx.repo, "sandT\n");
+    const ctlSibling = join(fx.repo, "sandT");
+    mkdirSync(ctlTail, { recursive: true });
+    mkdirSync(ctlSibling, { recursive: true });
+    writeFileSync(scopeState, liveScope);
+    const tailScoped = spawnSync("bash", [join(fx.clone, GUARD), "scope", ctlTail, "--ttl", "0"], { cwd: fx.repo, encoding: "utf8" });
+    check(
+      tailScoped.status !== 0,
+      `scope accepted a boundary directory whose name ENDS with a newline, so it recorded the sibling nobody scoped: ${String(tailScoped.stdout)}`,
+    );
+    check(
+      `${tailScoped.stdout ?? ""}${tailScoped.stderr ?? ""}`.includes("control character"),
+      `the terminal-newline scope was refused for some reason OTHER than its control character, so this case measures nothing: ${String(tailScoped.stderr)}`,
+    );
+    check(
+      readFileSync(scopeState, "utf8") === liveScope,
+      "the refused terminal-newline scope overwrote the live boundary record",
+    );
+    rmSync(ctlTail, { recursive: true, force: true });
+    rmSync(ctlSibling, { recursive: true, force: true });
+
+    // ...and the CONSUMER half of the same transform, on the surface that ships the deny. This one
+    // needs no `scope` call and puts no control character in the state file: with the live boundary on
+    // src/, a write into the SIBLING directory `src<LF>/` is outside it, but normalize() captured
+    // `$(dirname ...)` and `$(cd ... && pwd -P)` and both stripped the trailing byte, so the write was
+    // judged against `src/` and ALLOWED. Reachability here is wider than the producer half above, which
+    // is why it is pinned on this surface too rather than only in the script's own suite.
+    //
+    // JSON.stringify carries the raw byte to the script as a proper \n escape, so this case needs no
+    // hand-written escape - which is the trap the script's own fixture has to work around.
+    //
+    // The boundary is re-pinned first, and that is not belt-and-braces: a FAILING case above can leave
+    // the record moved, and this case would then block for the boring reason that everything is outside
+    // the wrong boundary - a green on the run where it matters most. Measured: it masked its own red.
+    writeFileSync(scopeState, liveScope);
+    const ctlDirSibling = `${fx.inside}\n`;
+    mkdirSync(ctlDirSibling, { recursive: true });
+    r = await called(handler(fx.wrapper), { toolName: "write", input: { path: join(ctlDirSibling, "x.ts") } }, { cwd: fx.repo });
+    check(!r.threw, `a write into a newline-named sibling of the boundary threw: ${String(r.threw)}`);
+    check(
+      r.value?.block === true,
+      "a write into a sibling directory whose name ends with a newline was judged against the boundary's newline-LESS name and allowed",
+    );
+    rmSync(ctlDirSibling, { recursive: true, force: true });
+
     // ...and a batch whose budget runs out mid-way ALLOWS the tail rather than refusing the call.
     // Refusing was TRIED AND REVERTED: an ordinary 85-path edit blocked at 5003ms having already
     // judged 75 paths clean, with no prompt and no override, and it fired in un-onboarded repos
