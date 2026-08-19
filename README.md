@@ -135,7 +135,7 @@ Skills you later mint with `/self-extension` are **repo-scoped** by default - co
 | Path | What |
 |------|------|
 | `skills/` | the practices, one dir per skill - the roster here is the count of record (agentskills.io: `name` + `description`, progressive disclosure) |
-| `scripts/` | the four helpers no host ships: `bd-package-check` (the release gate), `bd-uninstall`, `bd-skill-stage` (stage, lint and promote a freshly authored skill), `bd-review-package` (pack one diff for a separated reviewer) |
+| `scripts/` | the three helpers no host ships, all of them maintainer tools run from this clone rather than from a repo that uses better-dev: `bd-package-check` (the release gate), `bd-uninstall`, `bd-skill-stage` (stage, lint and promote a freshly authored skill) |
 | `install.sh` · `BOOTSTRAP.md` · `.claude-plugin/` | installer · one-paste bootstrap · version stamp (`plugin.json`) |
 | `friction/` | the first-run harness: four throwaway repos, a simulated developer, and a review that files what a new user got stuck on |
 | [`docs/`](docs/) · [`NOTICE`](NOTICE) | design plan + decisions · attribution |
