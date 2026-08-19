@@ -227,99 +227,6 @@ host_verify() {
   if [ "$vbad" = 0 ]; then echo "  ok $display: all skills resolve"; else verify_fail=1; fi
 }
 
-# BEGIN pre-cutover-migration - names below are deleted on purpose; bd-package-check skips this region
-# One-time migration for the cutover that removed better-dev's hooks. Until this release the
-# installer wrote a SessionStart and SubagentStart pair into Claude Code's settings, a module stub
-# into omp's agent hooks dir, and permission allowances for CLIs that shipped in scripts/. All of
-# those are deleted from the clone, which is exactly why this function has to name them: nothing
-# else in the shipped tree remembers they existed, so nothing else can clean them up.
-#
-# Why it cannot be left to self-heal. A hook is registered by ABSOLUTE path into the clone. After a
-# pull the target is missing, so Claude Code fails the hook on every session start and omp logs a
-# module load error on every session, forever, and the code that wrote those entries is gone with
-# the pull. Skill links are different and need no help: host_apply already prunes an ours-link whose
-# skill stopped shipping, so the removed skills disappear on the same re-run.
-#
-# Delete this function once the release it bridges is old enough that no install predates it. It is
-# the one place in the tree where naming a deleted path is correct, and bd-package-check exempts it
-# by name for that reason.
-prune_legacy_footprint() {
-  dry="$1"; hit=0
-
-  # omp: a stub whose only content is a re-export of a module in this clone. Matched by better-dev's
-  # own marker or by this clone's path, never by filename alone, so a same-named foreign hook stays.
-  for stub in "$HOME"/.omp/agent/hooks/pre/bd-*.ts "$HOME"/.omp/agent/hooks/bd-*.ts; do
-    [ -f "$stub" ] || continue
-    grep -q 'better-dev-omp-hook' "$stub" 2>/dev/null || grep -q -- "$SRC" "$stub" 2>/dev/null || continue
-    hit=1
-    if [ "$dry" = 1 ]; then echo "  would remove stale omp hook stub: $stub"
-    else rm -f "$stub" && echo "  removed stale omp hook stub: $stub"; fi
-  done
-
-  cs="$HOME/.claude/settings.json"
-  [ -f "$cs" ] || return 0
-
-  # A missing jq is reported, never skipped silently: leaving a broken hook registered while printing
-  # nothing is the failure mode this whole migration exists to prevent.
-  if ! command -v jq >/dev/null 2>&1; then
-    echo "  ! jq not on PATH, so stale Claude Code entries were NOT removed. Remove by hand from $cs:"
-    echo "      any hooks entry whose command contains $SRC/hooks/"
-    echo "      any permissions.allow entry naming .better-dev/bin"
-    return 0
-  fi
-
-  # Matched by better-dev's OWN hook basenames as well as by this clone's path, and deliberately not
-  # by path alone. A registration records the ABSOLUTE path of the clone that wrote it, so a clone
-  # that has since moved - which every clone did at 0.13.0, when the repo was renamed and flattened -
-  # carries a path that no longer matches $SRC, and a path-only filter would leave those entries
-  # registered and broken forever. The three names are better-dev's and appear nowhere else.
-  bd_hooks='/hooks/bd-(session-start|subagent-start|graphify-refresh-stale)'
-  stale_hooks="$(jq -r --arg src "$SRC" --arg names "$bd_hooks" '[(.hooks // {}) | to_entries[] | .value[]?
-      | (.hooks // [])[] | select(((.command // "") | contains($src + "/hooks/"))
-                               or ((.command // "") | test($names)))] | length' "$cs" 2>/dev/null)"
-  stale_perms="$(jq -r '[(.permissions.allow // [])[]
-      | select(test("[.]better-dev/bin"))] | length' "$cs" 2>/dev/null)"
-  [ -n "$stale_hooks" ] || stale_hooks=0
-  [ -n "$stale_perms" ] || stale_perms=0
-  [ "$stale_hooks" = 0 ] && [ "$stale_perms" = 0 ] && return $hit
-
-  hit=1
-  if [ "$dry" = 1 ]; then
-    echo "  would remove $stale_hooks stale hook registration(s) and $stale_perms stale permission(s) from $cs"
-    return 0
-  fi
-
-  # Filter by this clone's hooks path and by better-dev's own CLI paths only. An event that still
-  # holds a foreign hook keeps the event; an event left empty is dropped so the file does not grow
-  # husks. Written through a temp file next to the original, then renamed, so a reader never sees a
-  # half-written settings file.
-  bak="$cs.bak-$(date +%Y%m%d%H%M%S)"
-  cp "$cs" "$bak" || { echo "  ! could not back up $cs - nothing changed" >&2; return 1; }
-  tmp="$cs.tmp.$$"
-  if jq --arg src "$SRC" --arg names "$bd_hooks" '
-        (if .hooks then .hooks |= (
-            with_entries(.value |= (
-                map(.hooks |= map(select((((.command // "") | contains($src + "/hooks/"))
-                                       or ((.command // "") | test($names))) | not)))
-              | map(select(((.hooks // []) | length) > 0))))
-          | with_entries(select((.value | length) > 0)))
-         else . end)
-      | (if .permissions.allow
-         then .permissions.allow |= map(select(test("[.]better-dev/bin") | not))
-         else . end)
-     ' "$cs" > "$tmp" 2>/dev/null && [ -s "$tmp" ] && jq -e . "$tmp" >/dev/null 2>&1; then
-    mv -f "$tmp" "$cs"
-    echo "  removed $stale_hooks stale hook registration(s) and $stale_perms stale permission(s) from $cs"
-    echo "    backup: $bak"
-  else
-    rm -f "$tmp"
-    echo "  ! rewriting $cs failed, so it is unchanged (backup at $bak). Remove the entries by hand." >&2
-    return 1
-  fi
-  return 0
-}
-# END pre-cutover-migration
-
 installed=0
 declined=0
 verify_fail=0
@@ -342,23 +249,6 @@ for h in $hosts; do
     *)      host_apply 0 ;;
   esac
 done
-
-# Runs regardless of whether any host linked: the stale entries live outside the skills dirs, so a
-# machine whose hosts all declined still needs them gone. Reports under its own heading only when it
-# actually found something, so a clean machine stays quiet.
-case "$MODE" in
-  list)   : ;;
-  verify) if prune_legacy_footprint 1 | grep -q .; then
-            echo "  x stale pre-cutover hook or permission entries are still registered (run install to clear)"
-            verify_fail=1
-          else
-            echo "  ok no stale pre-cutover entries"
-          fi ;;
-  dryrun) legacy_out="$(prune_legacy_footprint 1)"
-          [ -n "$legacy_out" ] && { echo; echo "Pre-cutover cleanup:"; printf '%s\n' "$legacy_out"; } ;;
-  *)      legacy_out="$(prune_legacy_footprint 0)"
-          [ -n "$legacy_out" ] && { echo; echo "Pre-cutover cleanup:"; printf '%s\n' "$legacy_out"; } ;;
-esac
 
 if [ "$MODE" = list ]; then exit 0; fi
 

@@ -754,21 +754,11 @@ gone="$gone|bd-omp-runtime-check|bd-awareness|[.]better-dev/bin|hooks/hooks[.]js
 gone="$gone|hosts/(claude|codex|hermes|omp)|better-dev/hooks|graphify|browse/src|learnings[.]jsonl"
 gone="$gone|orchestrating-agents/tiers[.]md|/bootstrap-hooks|/codebase-map|/browser-capability"
 gone_hits=""
-unclosed=""
-# A file may carry ONE sentinel-delimited migration region whose whole job is to name what it removes.
-# Only that region is exempt, so a stray reference anywhere else in the same file still fails. An
-# opened-but-never-closed sentinel would silence the rest of the file, so it is its own red check
-# rather than a quiet pass.
 for f in $(find skills scripts friction .github docs/skills -type f 2>/dev/null; ls install.sh README.md CLAUDE.md BOOTSTRAP.md docs/comms-block.md .claude-plugin/plugin.json 2>/dev/null); do
   [ "$f" = scripts/bd-package-check ] && continue
-  b="$(LC_ALL=C grep -c '^# BEGIN pre-cutover-migration' "$f" 2>/dev/null || true)"
-  e="$(LC_ALL=C grep -c '^# END pre-cutover-migration' "$f" 2>/dev/null || true)"
-  [ "$b" = "$e" ] || { unclosed="$unclosed $f"; continue; }
-  LC_ALL=C awk '/^# BEGIN pre-cutover-migration/{skip=1} !skip; /^# END pre-cutover-migration/{skip=0}' "$f" 2>/dev/null \
-    | LC_ALL=C grep -Eq "$gone" && gone_hits="$gone_hits $f"
+  LC_ALL=C grep -Eq "$gone" "$f" 2>/dev/null && gone_hits="$gone_hits $f"
 done
-[ -z "$unclosed" ] && ok "every migration region is sentinel-closed" || bad "unbalanced pre-cutover-migration sentinels in:$unclosed - an unclosed BEGIN hides the rest of the file from this sweep"
-[ -z "$gone_hits" ] && ok "no shipped file names a script or directory this release deleted (outside a sentinel-closed migration region)" || bad "deleted path named in:$gone_hits - each one has a native replacement, and a reader following the old name spends a turn finding out it is gone"
+[ -z "$gone_hits" ] && ok "no shipped file names a script or directory this release deleted" || bad "deleted path named in:$gone_hits - each one has a native replacement, and a reader following the old name spends a turn finding out it is gone"
 
 echo
 [ $fail = 0 ] && echo "package-check: PASS ($(ls skills/ | wc -l | tr -d ' ') skills)" || { echo "package-check: FAIL"; exit 1; }
