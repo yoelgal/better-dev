@@ -9,9 +9,8 @@ mechanics, this file carries the overlay.
 ## Mechanics: the host first, the package as fallback
 
 Where the host ships a PR-review skill, run it - it knows how to read the PR, thread comments, and
-post a review. Where none ships, `.better-dev/bin/bd-review-package <pr-base> <pr-head>` builds the
-same package the main skill reviews from, on any two refs; judge it with `reviewer-brief.md` and the
-severity ladder as usual.
+post a review. Where none ships, pack the PR's two refs with git exactly as the main skill's step 1
+does; judge the result with `reviewer-brief.md` and the severity ladder as usual.
 Either checkout runs the PR's own git hooks, so any checkout here - `gh pr checkout` included - carries
 the hooks-disabling prefix from `reviewer-brief.md`. An inbound PR is the one review path where the code
 being read was written by someone outside the loop.
@@ -23,8 +22,8 @@ finding.
 
 ## The overlay: this repo's recorded policy
 
-One recall arms it: `.better-dev/bin/bd-mem recall "safety"` returns the denylist, the gated classes,
-and the scope number; `.better-dev/overrides.md` wins where they disagree.
+One read arms it: `.better-dev/rules.md` carries the denylist, the gated classes, and the scope
+number; `.better-dev/overrides.md` wins where they disagree.
 
 - **Denylist paths, flagged by name.** A diff touching a recorded high-consequence path - secrets,
   migrations, auth, payments, infra, lockfiles - gets its own line in the review naming the path and

@@ -19,6 +19,13 @@ the way of everything else you've installed:
 > **idea → scope it into an observable contract → isolate it → drive a loop to *proven* done → ship** - and
 > when you're missing a tool, go source it.
 
+The whole library is text plus three files. The practices are skills your host already knows how to
+load. A wired repo gains `.better-dev/overrides.md` (your standing corrections, which beat any
+default), `.better-dev/rules.md` (what this repo records about itself), and a committed
+`.omp/config.yml` (which shell commands need your approval). There is no daemon, no memory service, no
+hook, and no wrapper CLI: your harness already ships discovery, dispatch, structural search, memory
+and command approval, so better-dev states the method and lets the harness run it.
+
 > **Status:** built and self-verified (`bd-package-check` green), reimplemented from ~100 sources and audited
 > against forge/devloop and loop-engineering. Not yet battle-tested in live multi-harness runs. Design notes:
 > [`docs/PLAN.md`](docs/PLAN.md) · [`docs/DECISIONS.md`](docs/DECISIONS.md).
@@ -41,26 +48,20 @@ run /onboard to wire this repo. Ask me only if something is genuinely ambiguous.
 
 ```
 Set up better-dev in this repo. It's a portable set of dev practices packaged as skills, in two layers: the
-TOOL (skills + bd-* scripts + hooks) installs GLOBALLY once per machine and every repo shares it; a repo's
-.better-dev/ holds that repo's DATA only.
+TOOL (the skills) installs GLOBALLY once per machine and every repo shares it; a repo's .better-dev/ holds
+that repo's DATA only.
 
 1. Detect which coding agent I'm in (Claude Code ~/.claude, Codex ~/.codex, or other) - that decides the
-   install command and the global skills directory.
-2. Install the tool globally, once per machine. If it's already installed (a better-dev entry in the host's
-   global skills dir, or an existing clone), run `git pull` in the clone and skip to step 4. Otherwise:
-   `git clone https://github.com/yoelgal/better-dev ~/better-dev && ~/better-dev/install.sh`, which links the
-   tool into the host's global skills dir. Update later with /update - a `git pull` in the clone
+   global skills directory the tool links into.
+2. Install the tool globally, once per machine. If it's already installed (a better-dev skill in the host's
+   global skills dir, or an existing clone), run `git pull` in the clone and skip to step 3. Otherwise:
+   `git clone https://github.com/yoelgal/better-dev ~/better-dev && ~/better-dev/install.sh`, which links
+   every skill into the host's global skills dir. Update later with /update - a `git pull` in the clone
    underneath.
-3. Offer, once, to allow better-dev's own memory scripts (bd-mem, bd-guard) to run without prompting on
-   every repo this machine wires - without it the operator is prompted by better-dev's own memory spine on
-   nearly every step, forever. On yes, add the two allow rules to the host's global settings.json
-   (operator-run, since a permissions-file write is a settings-class mutation); on no, write nothing -
-   /onboard still offers the repo-local grant.
-4. Run /onboard in this repo to wire it: create .better-dev/ for DATA only (rules.md, overrides.md,
-   learnings.jsonl committed; ledger/ gitignored), create .better-dev/bin as a per-machine symlink to the
-   global install's scripts so .better-dev/bin/bd-mem resolves here, and write a discovery block into
-   the entry file (CLAUDE.md / AGENTS.md), plus a comms-style block unless this machine already
-   carries one globally.
+3. Run /onboard in this repo to wire it: create .better-dev/ for DATA only (rules.md and overrides.md
+   committed; ledger/ gitignored), write a discovery block into the entry file (CLAUDE.md / AGENTS.md), and
+   write a committed .omp/config.yml naming the shell commands that need my approval, plus a comms-style
+   block. Everything better-dev sets up lands in this repo; it writes nothing outside it.
 
 Adapt to whatever conventions already exist; ask me only on genuine ambiguity.
 ```
@@ -94,35 +95,37 @@ Start a project **from scratch**, or land a feature or fix in an **existing code
 5. **Missing a tool?** `/tool-sourcing` finds an existing skill first; `/self-extension` writes one only as a
    fallback (staged, tested, then promoted).
 
-Durable rules, lessons, and loop state live in a per-project memory + ledger (`bd-mem`) shared across
-worktrees. Override any practice in flow and it persists to `.better-dev/overrides.md` and *wins* - the
-shared skills are never rewritten to encode your preference.
+Loop state for each work-item lives in `.better-dev/ledger/<slug>/` as plain files, so it survives a
+session ending and every worktree reads the same copy. Lessons go to your harness's own memory store.
+Override any practice in flow and it persists to `.better-dev/overrides.md` and *wins* - the shared
+skills are never rewritten to encode your preference.
 
 ## The skills
 
 | Group | Skills |
 |---|---|
 | **Enter & set up** | `onboard` · `groundwork` · `guardrails-install` · `deploy-capability` (creates the deploy surface) · `observability-install` (prod visibility) |
-| **Scope a work-item** | `plan-grill` (feature) · `diagnose` (fix) · `codebase-audit` (no item yet) · `design-brief` (UI direction) · `gauntlet` (one loop prompt for a fresh session) |
-| **Isolate & drive** | `worktree-branching` · `autonomous-loop` · `orchestrating-agents` · `review` · `security-pass` |
+| **Scope a work-item** | `plan-grill` (feature) · `diagnose` (fix) · `codebase-audit` (no item yet) · `brief-to-problem` (somebody else's feedback) · `design-brief` (UI direction) · `gauntlet` (one loop prompt for a fresh session) |
+| **Isolate & drive** | `worktree-branching` · `autonomous-loop` · `orchestrating-agents` · `review` · `security-pass` · `prototype` (settle a choice by building it) |
 | **Ship** | `pr-and-verify` · `release-promotion` |
-| **Self-improve** | `tool-sourcing` · `self-extension` · `source-harvest` (raw material -> library improvements) |
-| **Sourced capabilities** | `codebase-map` (structural orientation) · `graphify-wrapper-{setup,map,index,sync,query,status}` (knowledge-graph indexing over the graphify CLI, ported from orrgal1 - see `NOTICE`) · `browser-capability` (UI proof, owned daemon in `browse/`) · `ios-capability` (on-device proof, daemon in `ios-qa/`) |
-| **Foundations** | `writing-skills` · `packaging` · `bootstrap-hooks` · `overrides` · `wait-what` (re-pitch a message that didn't land) · `update` · `uninstall` |
+| **Check the work** | `test-audit` (is the green suite defending anything) · `human-review` (land markup on a rendered artifact) · `deep-research` (a sourced answer, changes nothing) |
+| **Self-improve** | `tool-sourcing` · `self-extension` · `session-review` (route what a session learned) · `source-harvest` (raw material -> library improvements) |
+| **Sourced capabilities** | `ios-capability` (on-device proof; fetches the QA tool from upstream on demand) · `pick-ui-library` (settle the dependency question before building a component) |
+| **Foundations** | `writing-skills` · `packaging` · `overrides` · `vision` · `wait-what` (re-pitch a message that didn't land) · `update` · `uninstall` |
 
 ## How it installs
 
 Two layers, so the tool updates once and your data travels with the repo:
 
-- **The tool - global, once per machine.** The skills, `bd-*` scripts, and hooks live in one clone and link
-  into your host's global skills dir, one symlink per skill (`~/.claude/skills/<skill>`,
-  `~/.codex/skills/<skill>`, …), so every repo shares one copy. Update with
-  `/update` - it pulls the clone, has you re-run `./install.sh` only when a release added or removed a
-  skill, and tops up a repo's wiring when a release changed it ([`docs/RELEASES.md`](docs/RELEASES.md)
-  flags each release; the session-start hook nags when you're behind).
-- **The repo - data only.** `/onboard` creates `.better-dev/` for *this repo's data* (`rules.md`,
-  `overrides.md`, `learnings.jsonl` committed; loop `ledger/` gitignored) plus `.better-dev/bin`, a
-  per-machine symlink to the global tool. No practices are ever copied into the repo.
+- **The tool - global, once per machine.** The skills live in one clone and link into your host's global
+  skills dir, one symlink per skill (`~/.claude/skills/<skill>`, `~/.codex/skills/<skill>`, …), so every
+  repo shares one copy. Update with `/update` - it pulls the clone, has you re-run `./install.sh` only
+  when a release added or removed a skill, and tops up a repo's wiring when a release changed it
+  ([`docs/RELEASES.md`](docs/RELEASES.md) flags each release).
+- **The repo - data only.** `/onboard` creates `.better-dev/` for *this repo's data* (`rules.md` and
+  `overrides.md` committed; loop `ledger/` gitignored), writes the discovery block your host reads on
+  every session, and commits `.omp/config.yml` so the approval policy travels with the repo. No
+  practices are ever copied into the repo.
 
 Skills you later mint with `/self-extension` are **repo-scoped** by default - committed to the repo's own
 `.claude/skills/<name>`, seen only there. A tool update never touches them.
@@ -132,13 +135,11 @@ Skills you later mint with `/self-extension` are **repo-scoped** by default - co
 | Path | What |
 |------|------|
 | `skills/` | the practices, one dir per skill - the roster here is the count of record (agentskills.io: `name` + `description`, progressive disclosure) |
-| `scripts/` | the `bd-*` spine - `bd-mem` (memory + ledger), `bd-block`, `bd-dispatch`, `bd-guard` (enforced guardrails), `bd-worktree-guard`, `bd-review-package`, `bd-skill-stage`, `bd-link`, `bd-package-check`, `bd-uninstall`, `bd-gfx` (shared graphify helpers) |
-| `hooks/` · `hosts/` | session awareness + PreToolUse guard hooks · per-host install adapters (declarative, enumerated) |
-| `better-dev/hooks/` | three legacy-path shims, and nothing else. A host installed before the 0.13 flatten has an absolute hook command pointing here; without them its session hooks die silently. See D34 |
-| `browse/` · `ios-qa/` | vendored daemons (gstack, MIT - see `NOTICE`): headless-browser QA · on-device iOS QA; compiled on first need, never in CI |
-| `install.sh` · `BOOTSTRAP.md` · `.claude-plugin/` | installer · one-paste bootstrap · version stamp (`plugin.json`) read by the session-start hook |
+| `scripts/` | the four helpers no host ships: `bd-package-check` (the release gate), `bd-uninstall`, `bd-skill-stage` (stage, lint and promote a freshly authored skill), `bd-review-package` (pack one diff for a separated reviewer) |
+| `install.sh` · `BOOTSTRAP.md` · `.claude-plugin/` | installer · one-paste bootstrap · version stamp (`plugin.json`) |
+| `friction/` | the first-run harness: four throwaway repos, a simulated developer, and a review that files what a new user got stuck on |
 | [`docs/`](docs/) · [`NOTICE`](NOTICE) | design plan + decisions · attribution |
 
 ---
 
-<p align="center"><sub>MIT · built by reimplementing patterns from ~100 sources (see <a href="NOTICE">NOTICE</a>); one exception by design: the optional <code>browse/</code> and <code>ios-qa/</code> daemons vendor gstack's MIT code, attributed in NOTICE</sub></p>
+<p align="center"><sub>MIT · built by reimplementing patterns from ~100 sources (see <a href="NOTICE">NOTICE</a>); nothing is vendored</sub></p>

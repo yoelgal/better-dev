@@ -27,10 +27,10 @@ Four observable lookups, cheapest first:
 - **The component layer** - a `components/ui/` tree, a primitives module the app re-exports, a design
   system package in the workspace. A component already wrapped there is this project's answer, with
   its own styling contract attached.
-- **The recorded pick** - `.better-dev/bin/bd-mem recall "ui-library"` and `.better-dev/overrides.md`.
-  Per-project trusted lists live there, set by the operator; this skill ships none. A curated list of
-  packages is one author's taste with a shelf life, and a list pinned inside a skill goes stale
-  without anyone editing it.
+- **The recorded pick** - read `.better-dev/overrides.md`, plus `memory://root/learned.md` for a lesson
+  keyed to a UI library. Per-project trusted lists live there, set by the operator; this skill ships
+  none. A curated list of packages is one author's taste with a shelf life, and a list pinned inside a
+  skill goes stale without anyone editing it.
 - **The recorded design system** - `/design-brief` records the named system and the token source. A
   system that already owns this component owns it; extend it rather than installing beside it.
 
@@ -131,8 +131,7 @@ hand-roll:   no - one live region and keyboard dismissal are the work, not the s
 criteria:    a screen reader announces each toast once; Escape dismisses the focused toast
 ```
 
-Close out by making the pick the project's rather than this run's:
-`.better-dev/bin/bd-mem persist-override "<class>: <package> - <one-line reason>"`, so the next
-feature inherits it at step 1 instead of re-deciding. If the vetting taught something durable about a
-source, record it (`.better-dev/bin/bd-mem learn "<lesson>" <0..1> "ui-library"`); otherwise write one
-line saying there was no durable lesson.
+Close out by making the pick the project's rather than this run's: `edit` one line into
+`.better-dev/overrides.md` - `<class>: <package> - <one-line reason>` - so the next feature inherits it
+at step 1 instead of re-deciding. If the vetting taught something durable about a source, record it
+with the `learn` tool; otherwise write one line saying there was no durable lesson.

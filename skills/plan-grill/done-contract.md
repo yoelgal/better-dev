@@ -65,7 +65,7 @@ a predicate observes, it never mutates. Name the symbol or path, not "cleaned up
 
 An **operational-job** criterion's completion observable lives only in production - "every row
 backfilled" has no local seam. It attaches to the recorded ops-runner surface
-(`.better-dev/bin/bd-mem recall "ops-runner"` - recorded by `/guardrails-install`; when absent the
+(the `ops-runner` line in `.better-dev/rules.md` - recorded by `/guardrails-install`; when absent the
 criterion is a `NEEDS_INPUT` naming the recorder, not a guess). Pair it with a fixture-level
 rehearsal criterion the loop can drive red-to-green; the operational criterion's own box flips
 only on the execution receipt - the command as run on the recorded runner, the completion
@@ -127,15 +127,15 @@ its goal still takes one shape from the list above, usually an end-state or a re
 parts:
 
 - **Baseline verify stays green** - the repo's recorded verify commands
-  (`.better-dev/bin/bd-mem recall "verify"`) green before the change and green after, on unchanged
+  (the `verify` line in `.better-dev/rules.md`) green before the change and green after, on unchanged
   assertions. For a refactor this is the behavior-preserving check; where the touched area has no
   coverage, a characterization test pinning current behavior lands first, as part of the chore.
 - **The chore's own observable** - one runnable check, red now, green when the chore lands: a
   dependency upgrade's lockfile resolving the target version with the audit gate exiting 0; a
   removal's negated grep (the rule above); the named test or doc existing where it didn't.
 - **Scope line** - the forbidden path set and N, exactly as the scope tripwire defines.
-- **Merge line** - the same seal question as any contract, `merge: auto | hold`; `bd-mem ledger
-  approve` refuses a contract without it.
+- **Merge line** - the same seal question as any contract, `merge: auto | hold`; omitted, it leaves
+  `/pr-and-verify`'s merge gate nothing to read, so the gate holds.
 
 The failure-behavior walk and the threat-surface pass run only when the chore crosses a trust
 boundary - a major bump of an auth or crypto dependency does. Approval pinning, the planned-at
@@ -274,18 +274,18 @@ user said auto for this item at seal; hold otherwise, including when no policy i
 gated paths: <recorded safety-gate paths this item is expected to touch, AND any write target outside
 this work-item's worktree (the primary checkout, global config, another repo), each with the
 operator's answer - or "none expected">
-The **merge** line is mechanically unskippable: `.better-dev/bin/bd-mem ledger approve` refuses a
-contract without a `merge: auto` or `merge: hold` line, so a seal that skipped the question cannot
-pin. The **gated-paths** line has no such mechanical check - `ledger approve` does not read it - so
-the pre-seal checklist below is the only thing that catches its absence. Say so rather than letting
-its position next to an enforced line imply an enforcement it does not have.
+Neither line is mechanically enforced - nothing refuses a contract that omits one. The **merge** line
+omitted leaves `/pr-and-verify`'s merge gate with nothing to read, so it holds; the **gated-paths**
+line omitted is simply silent, and the pre-seal checklist below is the only thing that catches it. Say
+that rather than letting either line's position imply an enforcement it does not have.
 
 The gated-paths line carries two kinds of entry, both asked at the only moment they can still change
 anything: a known human gate, and a write this item will have to make outside its own worktree. The
-second is there because `/autonomous-loop`'s edit boundary stops on an out-of-boundary target unless
+second is there because `/autonomous-loop` stops on a write target outside its own worktree unless
 the contract named it - so a target named and answered here is the difference between the loop writing
-it and the loop handing the operator a command to run. Recall the repo's gates while writing this section (`.better-dev/bin/bd-mem recall
-"safety"`, then the overrides layer, which wins) and check them against the surface this plan already
+it and the loop handing the operator a command to run. Read the repo's gates while writing this section
+(`.better-dev/rules.md`, then the overrides layer, which wins) and check them against the surface this
+plan already
 says it will touch. Where they intersect, name the intersection and put the gate to the user here,
 in the same breath as the merge question they are answering anyway. A gate first raised after the
 work is built collects a rubber stamp: at that point the only options are approve or discard ninety
@@ -299,6 +299,10 @@ for it, so the merge-time gate stands and fires on any gated path this line did 
 cannot buy its way out of a gate by mis-predicting its own reach, and the loop's mid-run escalation
 (`/autonomous-loop`'s human-gate classes) is unaffected - the log of what was consented at seal is
 exactly the list of what does not stop twice.
+
+## Approval
+approved: <date> - "<the operator's own words>" - <who said it>
+planned-at: <short SHA>
 
 ## Ground truth
 Verdict from the baseline check + link to ground-truth.md.
@@ -331,22 +335,22 @@ The right-size self-check (would removing a criterion miss a property the goal c
 predict-the-next-three-questions check already ran; this is the last read before the gate, not a re-run
 of them.
 
-## Approval is pinned to the contract's content
+## Approval is written into the contract
 
-At the same confirmation, settle the Merge line. Where the repo records
-`merge-policy: auto-on-green` (`.better-dev/bin/bd-mem recall "merge-policy"`), ask one question
+At the same confirmation, settle the Merge line. Where `.better-dev/rules.md` records
+`merge-policy: auto-on-green`, ask one question
 beside the contract confirm: when the loop settles DONE and every gate passes - independent review,
 CI, the driven done-criteria - merge into the integration branch automatically, or hold the green PR
 for your look? Record the answer as the contract's `merge:` line. Where the policy is `human`, skip the question and
 write `merge: hold` with the reason - the standing allowance is `/guardrails-install`'s to grant,
 never this seal's to improvise.
 
-Nothing recorded splits in two, and the split is load-bearing. Recall it
-(`.better-dev/bin/bd-mem recall "pending-decision"`): where a parked `pending-decision` names the merge
+Nothing recorded splits in two, and the split is load-bearing. Read `.better-dev/rules.md`: where a
+parked `pending-decision` names the merge
 policy - what a greenfield `/onboard` writes, having deferred the question because the repo then had no
 PR to merge - **this seal is the collector**. There is a PR to merge now, so ask the standing question
-here, once, and write the answer through its owner (`/guardrails-install`'s
-`remember "merge-policy: <auto-on-green | human>"`), then clear the parked line and settle the `merge:`
+here, once, and write the answer through its owner (`/guardrails-install` records
+`merge-policy: <auto-on-green | human>`), then clear the parked line and settle the `merge:`
 line from it. A park is a deferral with a named collector; a collector that quietly writes `hold`
 instead of asking converts it into a decision the operator never made, and the repo then carries a
 policy nobody chose - the outcome parking exists to prevent.
@@ -354,22 +358,19 @@ policy nobody chose - the outcome parking exists to prevent.
 Where nothing is recorded and nothing was parked, the policy is genuinely unset: write `merge: hold`
 with the reason, and name the `/guardrails-install` run that would record one.
 
-When the user confirms the contract, pin the approval to its bytes with
-`.better-dev/bin/bd-mem ledger approve <work-item>` - it records a content hash of `contract.md` beside
-the ledger entry. The approval attaches to *that text*, not to the bare fact that an approval once
-happened. Before it drives, the loop runs `.better-dev/bin/bd-mem ledger check-approval <work-item>`
-(exit 0 = still approved). If the contract was later edited - a criterion reworded, a goal added, a seam
-moved - the hash no longer matches, the check fails, and the approval gate re-opens: the loop reads the
-plan as un-agreed again and waits for a fresh confirmation. The re-opened gate prints the diff since the
-approved snapshot, so the re-confirm is a judgment on the delta, not a re-read of the whole contract. So
-it never advances on a silently-changed, stale sign-off.
+When the user confirms the contract, fill the `## Approval` block in `contract.md` itself: the date,
+their yes quoted in their own words, and who said it. The quote is what carries the provenance - a
+line the agent wrote for itself authorizes nothing. Nothing checks it mechanically, so the loop reads
+the block and applies one test: an approval older than the contract's last amendment is an approval of
+text that no longer exists. Amending a contract therefore means clearing that line and asking again,
+and the loop refuses to drive a contract whose approval is missing or stale rather than advancing on a
+silently-changed sign-off. Present the delta when you re-ask - a re-confirm is a judgment on what
+changed, not a re-read of the whole contract.
 
-Stamp the **planned-at** short SHA in the ledger beside that content hash at approval - the commit the
-plan was written against. The content hash guards the contract text; the planned-at SHA guards the code
-under it. At loop entry `/autonomous-loop` drift-checks the touched area against this SHA and
-re-baselines before building if the code moved since the contract was sealed, rather than building on a
-stale premise. The contract stays prose-only: the SHA lives in the ledger, not as inlined code excerpts
-here.
+The **planned-at** short SHA rides the same block: the commit the plan was written against. The
+approval line guards the contract's text, the SHA guards the code under it. At loop entry
+`/autonomous-loop` drift-checks the touched area against this SHA and re-baselines before building if
+the code moved since the contract was sealed, rather than building on a stale premise.
 
 ## Optional: hand to a slice breakdown
 

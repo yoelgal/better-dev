@@ -67,10 +67,10 @@ own record. Two unpinned runs are two different questions, and their turn counts
 
 `seen.md` carries every finding a review has ever filed, and the status it was given. The review
 reads it first and does not file what is already there, whatever the status says - `review.md` owns
-that rule and the routing that follows it. Confirmed friction goes to the papercut queue the operator
-already triages (`.better-dev/bin/bd-mem papercut list`). The ledger is the harness's memory, not a
-second queue: a standing harness that re-reports what was declined last time trains its reader to
-skip the whole report.
+that rule and the routing that follows it. Confirmed friction is recorded as a lesson in the host's
+own memory store, where the next recall of that area surfaces it. The ledger is the harness's memory,
+not a second queue: a standing harness that re-reports what was declined last time trains its reader
+to skip the whole report.
 
 ## Permission profiles
 
@@ -106,15 +106,16 @@ Step 4 asserts the first two actually took: it asks a probe session to list anyt
 and warns if the list is not empty. The remaining `CLAUDE.md` leak shapes prose, not decisions, and is
 recorded in `facts.md` so a reviewer can discount a finding that smells like it.
 
-One caveat: `--settings` **merges** hooks rather than replacing them, so `--hooks` (which adds
-better-dev's own SessionStart/PreToolUse hooks) necessarily drags your personal hooks back in. There
-is no third option. Default is no hooks at all, which is also the harsher discovery test.
+`--settings` **merges** hooks rather than replacing them, so the override always sends an empty
+`hooks` object, which is the only value that clears yours. There is nothing of better-dev's to put
+back: the practices reach a session as skills and as the discovery block in the fixture repo's own
+CLAUDE.md, and the host loads both without a hook.
 
 ## No write access to what it audits
 
 Nothing this harness drives gets write access to what it is judging. A driven session touches only its
 own throwaway repo: no branch, no commit, no issue, no pull request anywhere else, and no edit to the
-library text under test. The reviewer writes exactly two records - a papercut and a row in `seen.md` -
+library text under test. The reviewer writes exactly two records - a lesson and a row in `seen.md` -
 and never the skill text it is forming findings about, because a reviewer that can edit what it judges
 is one rationalization away from doing so.
 

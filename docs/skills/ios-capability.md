@@ -19,22 +19,24 @@ Near neighbours:
 
 | Situation | Route |
 |---|---|
-| Same need, but the surface is a browser | `/browser-capability` |
+| Same need, but the surface is a browser | the native `browser` tool, driven straight from the loop |
 | No on-device check needed, code-level assertion is enough | stays with the loop, this skill doesn't fire |
 | Repo already pins its own device harness (XCUITest suite, device farm, `test:device` script) | honor `.better-dev/overrides.md`, skip straight to wiring the check |
 | No Mac host, a device farm requirement, or an Android sibling | `/tool-sourcing` picks up the gap |
 
 ## Where it fits
 
-The mobile sibling of `/browser-capability`: same prove-done-against-the-running-surface
-practice, invoked mid-loop by `/autonomous-loop` or `/diagnose` when a contract's done-criteria
-name an on-device check, and consumed by `/pr-and-verify`'s surface table when grading whether
-that criterion actually closed.
+The on-device counterpart to driving a web UI with the `browser` tool: the same
+prove-done-against-the-running-surface practice, invoked mid-loop by `/autonomous-loop` or
+`/diagnose` when a contract's done-criteria name an on-device check, and consumed by
+`/pr-and-verify`'s surface table when grading whether that criterion actually closed.
 
 ## Prerequisites
 
 A device check needs macOS and Xcode to run at all; a hardware criterion additionally needs a
-paired USB iPhone. Wiring the vendored daemon (`ios-qa/`) follows `ios-qa/README.md`.
+paired USB iPhone. The device daemon is not vendored here - fetch it when a work item needs it from
+the `ios-qa/` subdirectory of https://github.com/garrytan/gstack (MIT, commit `11de390`) and wire it
+by its own README.
 
 ## Common questions
 

@@ -20,13 +20,13 @@ execution stages stand down; they judge harvested material, not feature requests
 The target is the repo the session is in, or the one the user names - never a
 remembered default from a previous harvest. Find its archive before the first write:
 
-1. Recall a recorded path: `.better-dev/bin/bd-mem recall "harvest-archive"` - a
-   project override in `.better-dev/overrides.md` wins over the recall.
+1. Read `.better-dev/rules.md` for a recorded `harvest-archive` path - a project
+   override in `.better-dev/overrides.md` wins over it.
 2. No record: detect an existing archive - a sources dir with a filing README
    (`raw/sources/` is the common shape).
 3. Neither: create `raw/sources/`, seed a conventions README (folder naming, the
-   source.md frontmatter, the manifest), and record the path:
-   `.better-dev/bin/bd-mem remember "harvest-archive: <path>"`. A new archive defaults
+   source.md frontmatter, the manifest), and record the path as a
+   `harvest-archive: <path>` line in `.better-dev/rules.md`. A new archive defaults
    to untracked - offer a gitignore entry, never force one; some repos gitignore
    `raw/`, others track it - check, don't assume.
 
@@ -154,8 +154,9 @@ Repos: shallow-clone to scratch, then one extraction agent per repo writing `sou
 + `extraction.md` into the archive. Enter `/orchestrating-agents` before this harvest's
 first dispatch - invoke it where the host has a skill mechanism, read its SKILL.md where
 it doesn't - and dispatch every fan-out in this skill (stage 1 extraction, the stage 2 audit gate,
-stage 2 dossiers and critic, stage 3 matrix workers) by its mechanics: bands resolved through the
-recorded tier-map into each dispatch's model parameter, its brief shape, its report
+stage 2 dossiers and critic, stage 3 matrix workers) by its mechanics: each stage's band chosen
+deliberately and pinned where the host reads it (`task.agentModelOverrides`, the agent's own
+frontmatter `model` list, or a role alias like `@smol` / `@slow`), its brief shape, its report
 trailer. The mentions of tiers in this file are routing, not a working summary - a
 harvest that dispatches from them alone improvises the mechanics, and every worker
 silently inherits the session's own model (observed: a harvest whose every fan-out ran

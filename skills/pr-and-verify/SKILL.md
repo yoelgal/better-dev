@@ -15,7 +15,7 @@ jobs.
 
 ## What it leans on
 
-- **The contract** - `.better-dev/bin/bd-mem ledger read <work-item> contract.md` holds the observable
+- **The contract** - `.better-dev/ledger/<work-item>/contract.md` holds the observable
   done-criteria and the red-capable signal the loop graded against. That is what "verified" means here,
   not "the unit tests are green."
 - **The verdict** - `/review` runs *inside the loop*, before DONE, from a fresh context that never sees
@@ -24,14 +24,9 @@ jobs.
 - **The fix loop** - review findings and red CI both go back to `/autonomous-loop`, which
   owns the implement-and-verify loop. This skill decides *when* the change is not yet green; it does not
   run a second fix loop of its own.
-- **The managed-block splice** - `.better-dev/bin/bd-block` writes the PR brief into a marker-bounded
-  region of the body idempotently, the same way it writes the discovery block into `CLAUDE.md`.
-- **Overrides first** - read them before applying any default (integration branch, whether merging is
-  gated to a release step, a protect-set of files a fix may never touch):
-
-```
-.better-dev/bin/bd-mem recall "integration branch merge policy protect" 2>/dev/null
-```
+- **Overrides first** - read `.better-dev/overrides.md` and `.better-dev/rules.md` before applying any
+  default here: the integration branch, whether merging is gated to a release step, the protect-set of
+  files a fix may never touch.
 
 The default integration branch is `staging` (else `main`); a project override wins.
 
@@ -41,7 +36,7 @@ A PR opens only after the change has already passed independent review inside th
 the loop recorded and confirm it is clean and current before touching the PR:
 
 ```
-.better-dev/bin/bd-mem ledger read <work-item> review.md
+.better-dev/ledger/<work-item>/review.md
 ```
 
 The record carries the reviewed HEAD sha and a clean result - clean means zero open findings of any
@@ -52,8 +47,8 @@ review-before-DONE gate over the current diff, and re-enter here once a clean ve
 record. Review is never run from here; this skill only checks that it happened. That is what keeps the PR
 stage to CI and end-to-end verification, and keeps an open PR from ever waiting on a review.
 
-One check rides beside the verdict: `.better-dev/bin/bd-mem ledger check-approval <work-item>` exits 0 - a
-PR never opens on a contract whose approval gate re-opened.
+One check rides beside the verdict: the contract's approval line is present and not older than the
+contract's last amendment - a PR never opens on a plan whose agreement has re-opened.
 
 ## 1. Open or refresh the PR
 
@@ -77,14 +72,14 @@ reads *why this, then what it touches* rather than a file-ordered dump. That rea
 the diff, never from the loop's session history. Before a security finding, a credential location, or a
 vulnerability description crosses into the brief on a public surface - a public PR body or a public issue -
 check the repo's visibility and get explicit confirmation first; a public PR publishes whatever the brief
-names. Splice it into a bounded region so re-running never
-clobbers the rest of the body and an unchanged brief writes nothing:
+names. Splice it into a region bounded by two HTML-comment markers - `<!-- BEGIN pr-brief -->` and
+`<!-- END pr-brief -->` - so re-running replaces the brief in place and never clobbers the rest of the
+body:
 
 ```
 gh pr view --json body -q .body > /tmp/pr-body
-printf '%s' "<brief>" | .better-dev/bin/bd-block /tmp/pr-body pr-brief
-# only when the file actually changed:
-gh pr edit --body-file /tmp/pr-body
+# replace the lines between the two markers, appending the marker pair if the body has none
+gh pr edit --body-file /tmp/pr-body   # only when the file actually changed
 ```
 
 Each region this skill splices opens with one line naming the writer - `_Written by an agent
@@ -124,7 +119,7 @@ grades the runtime probe only - docs currency was the loop's docs sweep, already
 verdict), never a re-run of the suite to fill the space. A criterion that genuinely can't be driven from here is unproven,
 and unproven is not green - it settles `NEEDS_INPUT`, naming what has to run, not a guess that it would pass.
 
-Where the repo records a preview surface (`.better-dev/bin/bd-mem recall "deploy-preview"`), the PR's
+Where `.better-dev/rules.md` records a `deploy-preview` surface, the PR's
 own preview deployment is the runtime surface of choice: it is the shipping artifact, carrying the env,
 build flags, and platform behavior the local tree cannot show. Resolve its URL mechanically per the
 recorded rule - prefer the platform's deployments API keyed to the PR's head sha; the platform bot's
@@ -134,8 +129,8 @@ expiry is a red signal with the deployment state quoted, never an indefinite pol
 skip - then drive the changed flows there per `verify-runtime.md`, at depth scaled to the diff, the same
 shape `/release-promotion`'s deploy-verify scales by: docs-only settles SKIP with the reason, config-only
 earns a smoke pass, UI and feature changes get their flows driven. One pre-gate runs before any flow
-is driven, red build or green: when the diff newly reads an env var, recall `"deploy-env"` (recorded
-by `/guardrails-install` - run it if absent) and confirm each newly required var exists in the
+is driven, red build or green: when the diff newly reads an env var, read the `deploy-env` rule
+(recorded by `/guardrails-install` - run it if absent) and confirm each newly required var exists in the
 preview environment; a missing var settles `NEEDS_INPUT` naming the var - no fix pass can close it.
 A failed or errored preview build is a red signal handed to step 4 exactly like red CI, with that
 same env read as its first triage note. A criterion drivable on the preview prefers the preview;
@@ -153,7 +148,7 @@ never prose standing in for a capture:
 
 ```
 gh pr view --json body -q .body > /tmp/pr-body
-printf '%s' "<rows>" | .better-dev/bin/bd-block /tmp/pr-body pr-evidence
+# replace the lines between `<!-- BEGIN pr-evidence -->` and `<!-- END pr-evidence -->`
 gh pr edit --body-file /tmp/pr-body
 ```
 
@@ -204,13 +199,13 @@ deterministic, so none needs a model to run:
 |---|---|---|
 | 1. State | step 2's signal is GREEN | RUNNING waits, RED goes back through step 4, GATED surfaces |
 | 2. Blast radius | `git diff --name-only <base>...HEAD` against the recorded `safety-denylist` globs and the contract's gated-paths line, minus the paths that line pre-authorized at seal | `NEEDS_INPUT`, PR left green and mergeable |
-| 3. Size | files and substantive lines both under the recorded ceiling (`.better-dev/bin/bd-mem recall "safety-scope"`) | `NEEDS_INPUT` naming the split below |
+| 3. Size | files and substantive lines both under the recorded ceiling (the `safety-scope` line in `.better-dev/rules.md`) | `NEEDS_INPUT` naming the split below |
 | 4. Policy | the contract's `merge:` line reads `auto`, the recorded merge-policy reads `auto-on-green`, and nothing else gates: branch protection on the base, an override gating merges to a release step, or a `deploy-order:` line (the cross-repo coordination line `/orchestrating-agents` defines) whose provider deploy is not yet observed live, since a consumer merged first ships calls into an interface that is not there yet | the hold the `DONE` bullet below reports |
 
 Judgment runs last, and it runs one way: it may withhold a merge every gate allowed, and it may never
 merge one a gate refused. That asymmetry is the whole safety of a self-merging agent - a model reading its
 own diff can always find the reason the auth file it touched is "only a comment", and the gate is the part
-that does not negotiate. A gate whose input will not read - a recall that returns nothing, a diff that
+that does not negotiate. A gate whose input will not read - a rule the file does not carry, a diff that
 will not list - counts as a refusal rather than a pass, because the gate that failed to run is the one
 most likely to have been the one that mattered.
 
@@ -222,8 +217,8 @@ split rather than a longer look: an ordered stack, each PR under the ceiling and
 each carrying its own tests and its own command-plus-expected-output so that layer can be watched working,
 merged bottom up so a layer only ever builds on behavior already observed. A diff too big to observe end
 to end is a decomposition that never happened, and no amount of verification at this end substitutes for
-it. Where the recall carries a file count and no line ceiling, gate on the files and name the missing line
-ceiling once as a `/guardrails-install` re-run pointer.
+it. Where the recorded rule carries a file count and no line ceiling, gate on the files and name the
+missing line ceiling once as a `/guardrails-install` re-run pointer.
 
 A refusal that holds for a human - gates 2 through 4 - names who should look, resolved from a signal
 rather than guessed: the CODEOWNERS entry for the paths that tripped where the repo has one, else the
@@ -243,7 +238,7 @@ diff the offending range (`git diff --name-only <range>`) against the recorded m
 out (its `migrations.md` carries the down-migration discipline): settle `NEEDS_INPUT` naming it; a
 clean diff reverts without ceremony. Pause new merges onto the branch;
 revert the offending change so the branch is green again for everyone building on it; record the incident
-with `.better-dev/bin/bd-mem learn "<what got through and why>"` so the lesson outlives the session; and
+with the `learn` tool - "<what got through and why>" - so the lesson outlives the session; and
 tighten the thing that let it through - a missing done-criterion in the contract, a gap in the verify
 step, a class the reviewer wasn't looking for - before any restart. Only then does the work re-enter the
 loop against the tightened contract.
@@ -317,28 +312,29 @@ bound's expiry or an unhealthy state, announce anyway with the deployment state 
 unhealthy merged deploy to the containment path above ("When a bad change lands anyway") - never an
 indefinite wait, a silent omission, or an improvised platform command.
 
-Record the outcome to the ledger so a later session sees how the PR settled and does not re-open work
-that already landed:
+Record the outcome in the work-item's ledger so a later session sees how the PR settled and does not
+re-open work that already landed - one line appended to
+`.better-dev/ledger/<work-item>/pr.md`:
 
 ```
-.better-dev/bin/bd-mem ledger put <work-item> pr.md - <<<'PR #<n> → <state>: <one line>'
+PR #<n> → <state>: <one line>
 ```
 
 On merge or close, run the close-out - six lines, each written explicitly. The negative form is a line,
 never an omission; a close-out with a line missing is unfinished:
 
-- **Lesson** - the one keyed lesson this PR's verification taught (`.better-dev/bin/bd-mem learn
-  "<lesson>" <0..1> "<key>"`), or `no durable lesson: <why>` - an event of this run ("PR merged
-  cleanly") is a receipt, not a lesson. Promote to a rule (`bd-mem remember`) only per the confidence
-  law in `bd-mem`. That law is a test you apply, never a question you put to the operator: a fact
-  verified once this run is a `learn` (scored, reversible), one you have now watched hold more than
-  once is a `remember`, and neither needs a click. Offering the write instead of doing it spends a
+- **Lesson** - the one keyed lesson this PR's verification taught, written with the `learn` tool, or
+  `no durable lesson: <why>` - an event of this run ("PR merged
+  cleanly") is a receipt, not a lesson. Graduate it to a rule in `.better-dev/rules.md` only on the
+  same confidence test, which you apply rather than put to the operator: a fact
+  verified once this run is a lesson (scored, reversible), one you have now watched hold more than
+  once is a rule, and neither needs a click. Offering the write instead of doing it spends a
   turn to collect a yes that no policy asked for. When the merge also ends the session, run
   `/session-review` afterwards for what this one line does not cover: the run's friction, its
   trap-worthy gaps, and any instruction that pointed it the wrong way.
 - **Shared-behavior change** - if the diff renamed a pattern, altered a default others rely on, or added
-  a step every future change in this area must take, record the convention as a rule
-  (`.better-dev/bin/bd-mem remember "<rule>"`) and add one heads-up line to the PR body's brief naming
+  a step every future change in this area must take, record the convention as a line in
+  `.better-dev/rules.md` and add one heads-up line to the PR body's brief naming
   the behavior that changed - the rule reaches the next session, the PR line reaches the colleague. When
   the merged diff changes a practice that other machines consume by linked install (a skill library like
   better-dev itself), name the propagation step in that line too: consuming clones pull, sessions restart
@@ -353,10 +349,10 @@ never an omission; a close-out with a line missing is unfinished:
   `filed: #<n>`, `handed to operator: <line>`, or `dropped: <one-line reason>`. A contract with none
   parked writes `no parked follow-ups`.
 - **Worktree disposition** - on merge, tear down or keep via `/worktree-branching` (its finish menu and
-  guard own the mechanics, including which dispositions still need the operator), and record which one
+  ownership checks own the mechanics, including which dispositions still need the operator), and record which one
   you took. Not tearing down is a line, never an omission.
-- **Release** - read the recorded cadence (`.better-dev/bin/bd-mem recall "release-cadence"`; nothing
-  recorded resolves to `on-demand`). On `per-merge`, continue into `/release-promotion` in this same
+- **Release** - read the recorded `release-cadence` line in `.better-dev/rules.md`; nothing recorded
+  resolves to `on-demand`. On `per-merge`, continue into `/release-promotion` in this same
   turn and record what it settled - `promoted: <tag>`, or the gate that held it, since that skill fails
   closed on its own checks and a held promote is a normal outcome. On `on-demand`, record `release:
   owed - <why>` and leave the promote to the operator, or `not owed - <why>`. Naming the next skill in

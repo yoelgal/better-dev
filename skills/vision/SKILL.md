@@ -1,6 +1,6 @@
 ---
 name: vision
-description: Use when an existing project's intent has to be recovered from its own evidence and written down as an acceptance policy - "what is this project actually for", "write a VISION.md", "we keep re-arguing the same scope question", a repo whose non-goals live only in one person's head - or when better-dev is being adopted in a repo that already has history. Also when a recorded vision needs checking against what has shipped since (drift), or rewriting rather than patching. For a project that does not exist yet, /groundwork settles intent forward; for structural orientation (callers, dependents, blast radius) /codebase-map; for one feature's plan, /plan-grill.
+description: Use when an existing project's intent has to be recovered from its own evidence and written down as an acceptance policy - "what is this project actually for", "write a VISION.md", "we keep re-arguing the same scope question", a repo whose non-goals live only in one person's head - or when better-dev is being adopted in a repo that already has history. Also when a recorded vision needs checking against what has shipped since (drift), or rewriting rather than patching. For a project that does not exist yet, /groundwork settles intent forward; for one feature's plan, /plan-grill.
 argument-hint: "[repo path or area, optional]"
 ---
 
@@ -21,13 +21,13 @@ matter as much as what it is:
 
 | Not this | Where that lives |
 |---|---|
-| A roadmap or feature list | The issue tracker and the ledger (`bd-mem ledger status`) |
+| A roadmap or feature list | The issue tracker and the ledger files under `.better-dev/ledger/` |
 | Coding standards or an agent guide | `AGENTS.md` / `CLAUDE.md`, and `.better-dev/overrides.md` for recorded per-repo rules |
 | The domain or business-logic model - how the world works | A domain doc or glossary; a vision explaining entity relationships has absorbed it |
 | One feature's plan | `/plan-grill`'s done-contract |
 
-Read `.better-dev/overrides.md` first (`.better-dev/bin/bd-mem read overrides`). A project may pin
-where this artifact lives or that it is maintained by hand; that wins over anything below.
+Read `.better-dev/overrides.md` first. A project may pin where this artifact lives or that it is
+maintained by hand; that wins over anything below.
 
 ## 1. Pick the mode before drafting a line
 
@@ -38,9 +38,9 @@ from evidence newer than it, and never write a competing document beside it. If 
 
 ## 2. Mine the evidence - this is the whole value
 
-Read backward through what the project already did. `/codebase-map` answers how the code is wired;
-this pass answers what its history reveals about intent, so run it over the record, not the call
-graph:
+Read backward through what the project already did. The `lsp` tool and `grep` answer how the code is
+wired; this pass answers what its history reveals about intent, so run it over the record, not the
+call graph:
 
 - **Identity claims** - the README, the docs front page, any existing `AGENTS.md`: what the project
   says it is, and any non-goal it already states.
@@ -138,15 +138,15 @@ back to batched questions, which are sufficient.
 
 ## 5. Land it and make it findable
 
-Write `VISION.md` (or the override's path) and `VISION-evidence.md` beside it, then record the
-pointer so a later session finds the policy instead of re-deriving it:
+Write `VISION.md` (or the override's path) and `VISION-evidence.md` beside it, then record the pointer
+as a line in `.better-dev/rules.md` so a later session finds the policy instead of re-deriving it:
 
-```bash
-.better-dev/bin/bd-mem remember "vision: VISION.md is this repo's acceptance policy; drift-checked <date>"
+```markdown
+vision: VISION.md is this repo's acceptance policy; drift-checked <date>
 ```
 
-That one rule is what makes `recall "vision"` answer for `/plan-grill` and `/review`. Without it the
-file is a document nobody opens.
+That one line is what answers for `/plan-grill` and `/review` when they read the rules file. Without
+it the vision is a document nobody opens.
 
 ## 6. The drift check - the reason the file stays honest
 
@@ -190,14 +190,13 @@ A rewrite re-runs sections 2 through 4 and keeps the old file's text in the evid
 end date, so what the project used to believe stays readable. A vision that turns out wrong is not a
 failure of the practice - it is the practice working, one release later than the code.
 
-Close out with the single durable lesson this pass earned
-(`.better-dev/bin/bd-mem learn "<lesson>" <0..1> "<key>"`), or an explicit `no durable lesson` line
-saying why. The vision's content is not the lesson; what the mining pass revealed about this repo is.
+Close out with the single durable lesson this pass earned, recorded with the `learn` tool, or an
+explicit `no durable lesson` line saying why. The vision's content is not the lesson; what the mining
+pass revealed about this repo is.
 
 ## Composability
 
 This adds an artifact and never disables anything. `/groundwork` writes intent forward for something
 that does not exist yet, and pins its one differentiating idea inside one epic; this recovers intent
-backward for something that does, at repo level, from evidence. `/codebase-map` answers how the code
-is wired, which is the other half of an orientation. `/plan-grill` and `/review` consume the artifact;
-neither maintains it. When revising this skill, follow `/writing-skills`.
+backward for something that does, at repo level, from evidence. `/plan-grill` and `/review` consume
+the artifact; neither maintains it. When revising this skill, follow `/writing-skills`.

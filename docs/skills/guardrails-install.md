@@ -31,7 +31,7 @@ generated script traced statically, probeable end states stay block-by-block.
 ## Where it fits
 
 It sits underneath the whole chain rather than on it: `/onboard` invokes it once at setup, and the
-loop, `/review`, `/pr-and-verify`, and `/release-promotion` all recall what it records - verify
+loop, `/review`, `/pr-and-verify`, and `/release-promotion` all read what it records - verify
 commands, the blast-radius policy, deploy and observability state - instead of re-detecting any of it.
 A greenfield repo with no stack yet gets only the stack-agnostic secret scan, with everything else
 deferred to a re-run once `/groundwork` lands a stack.
@@ -39,7 +39,7 @@ deferred to a re-run once `/groundwork` lands a stack.
 ## Prerequisites
 
 A repo with `.better-dev/` already scaffolded (the `/onboard` baseline) - the recording half of this
-skill writes through `.better-dev/bin/bd-mem`, so a repo that has never been onboarded has nowhere to
+skill writes into `.better-dev/rules.md`, so a repo that has never been onboarded has nowhere to
 record to.
 
 ## Common questions

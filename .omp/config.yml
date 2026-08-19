@@ -1,0 +1,54 @@
+# Project-local omp policy. Committed deliberately: it travels with the repo, which is the one
+# property the removed scripts/bd-guard had that a machine-global setting would lose.
+#
+# This replaces bd-guard's check-bash entirely. Every pattern below is recovered from that script's
+# own warn classifier, and `prompt` is the same disposition it used (`ask`).
+#
+# Why the native policy is stronger than what it replaces: `deny` and `prompt` rules fire when the
+# glob matches the whole command OR ANY SINGLE SEGMENT of a compound line - split on &&, ||, ;, |, a
+# single &, subshells and newlines - so `cd /tmp && rm -rf build` is caught without counting
+# occurrences by hand. `allow` rules must match the entire command and never apply to a compound
+# line, so a narrow allow can never vouch for `git status && rm -rf /`. bd-guard hand-rolled both
+# halves and got the second one wrong repeatedly.
+#
+# `bash.patterns` is a TOP-LEVEL key, a sibling of `tools:`, not nested under it. Rules are ordered
+# and the first match wins, so specific gates must precede any broad allow. There is deliberately no
+# trailing `match: "*"` rule here: omitting it leaves omp's own approval mode in charge of everything
+# these rules do not name, rather than this file silently vouching for it.
+#
+# KNOWN GAP, recorded rather than hidden: bd-guard also gated EDITS by path (.env*, **/secrets/**,
+# *.pem, *.key). `tools.approval` keys on tool name only and omp has no path-based write policy, so
+# that half has no native equivalent and is deliberately dropped. It was advisory, not a boundary -
+# and on the omp path it was mechanically inert anyway, because the confirm it opened was invisible
+# to the operator. Secrets stay protected by not being committed, and by omp's own secret
+# redaction. Re-add a real gate here only if a path-based policy lands upstream.
+bash:
+  patterns:
+    # recursive delete
+    - match: "rm -r*"
+      approval: prompt
+    - match: "rm --recursive*"
+      approval: prompt
+    # history and worktree destruction
+    - match: "git push *--force*"
+      approval: prompt
+    - match: "git push *-f *"
+      approval: prompt
+    - match: "git reset --hard*"
+      approval: prompt
+    - match: "git clean -f*"
+      approval: prompt
+    # infrastructure
+    - match: "kubectl delete*"
+      approval: prompt
+    - match: "docker rm -f*"
+      approval: prompt
+    - match: "docker system prune*"
+      approval: prompt
+    # SQL object destruction, which arrives inside a quoted -e argument
+    - match: "*DROP TABLE*"
+      approval: prompt
+    - match: "*DROP DATABASE*"
+      approval: prompt
+    - match: "*TRUNCATE TABLE*"
+      approval: prompt

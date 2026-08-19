@@ -27,9 +27,9 @@ the file on disk does not count as presenting it.
 It is the feature front-end of the chain: it hands its sealed, approved contract to
 `/autonomous-loop`, which drives the done-criteria red to green and then hands off to
 `/pr-and-verify`. Along the way it composes `/source-harvest` (when the brief points at an
-external source), `/codebase-map` (baseline check), `/design-brief` (when the feature has UI
-surface), and `/orchestrating-agents` (cross-repo work-items, background fact lookups during the
-grill). `/groundwork` hands it carved work-items from an epic; a red dependency audit from
+external source), `/design-brief` (when the feature has UI surface), and `/orchestrating-agents`
+(cross-repo work-items, background fact lookups during the grill). `/groundwork` hands it carved
+work-items from an epic; a red dependency audit from
 `/guardrails-install` arrives here as a chore.
 
 ## Prerequisites
@@ -77,20 +77,18 @@ evidence, rather than producing a contract for something that doesn't need build
 as assumed.
 
 **Why do I have to reconfirm the contract after a small edit?**
-Your approval is pinned to the contract's exact content hash, not to the bare fact that you once
-said yes. Any later edit - a reworded criterion, an added goal - changes the hash, and the loop's
-pre-drive check reads that mismatch as "un-agreed again" rather than advancing on a stale
-sign-off. The re-opened gate shows the diff since your last approved version, so re-confirming is
-a judgment on what changed, not a re-read of the whole thing.
+Your yes is recorded against the contract as it read when you gave it, not against the bare fact
+that you once said yes. Any later edit - a reworded criterion, an added goal - means the recorded
+approval no longer covers what the loop would drive, so the gate re-opens showing the diff since the
+version you approved. Re-confirming is a judgment on what changed, not a re-read of the whole thing.
 
 **Is the contract's `gated paths:` line - the record of which safety-gated paths and
-out-of-worktree writes this item expects to touch - mechanically enforced?** No. `bd-mem
-ledger approve` refuses to seal a contract missing its `merge:` line, but it does not check for
-`gated paths:` at all; only the pre-seal checklist, read by whoever is sealing the contract,
-catches its absence. A rushed seal can skip straight past it. The merge-time gate is the backstop
-that still stops on any gated path the seal never named, so a missed line costs a later halt, not
-a silent bypass - but the checklist stays the only thing standing between a rushed seal and a
-missing line today.
+out-of-worktree writes this item expects to touch - mechanically enforced?** No. Nothing checks that
+the line is there; only the pre-seal checklist, read by whoever is sealing the contract, catches its
+absence, and a rushed seal can skip straight past it. The merge-time gate is the backstop that still
+stops on any gated path the seal never named, so a missed line costs a later halt, not a silent
+bypass - but the checklist stays the only thing standing between a rushed seal and a missing line
+today.
 
 ## It's working if
 

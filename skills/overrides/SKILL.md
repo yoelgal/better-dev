@@ -10,8 +10,8 @@ someone corrects a default in the middle of the work, that correction is the aut
 skill that suggested otherwise. One job: honor the correction now, and offer to make it the standing
 default, without ever rewriting the shared skill that carried the default.
 
-The overrides live in `.better-dev/overrides.md`, a managed block the host agent already ingests. They
-are read first by every skill and beat anything a default would have done.
+The overrides live in `.better-dev/overrides.md`, a managed block in a plain file. Every skill reads it
+first, and it beats anything a default would have done.
 
 ## When the user pushes back
 
@@ -37,24 +37,19 @@ correction meant for this moment stays a one-off; you don't persist it, and you 
 
 ## Persisting an accepted override
 
-On a yes, write it as a single durable line through the memory contract:
+On a yes, add it to `.better-dev/overrides.md` with `edit`, as one durable line inside the managed block:
 
-```bash
-.better-dev/bin/bd-mem persist-override "review fixes push to the PR, no new worktree"
-# rewriting what one key records, in one call:
-.better-dev/bin/bd-mem persist-override --replace "integration branch" "integration branch = main"
+```
+- review fixes push to the PR, no new worktree
 ```
 
-That lands the line inside the managed block in `.better-dev/overrides.md`. It is idempotent - the same
-override twice changes nothing - so re-persisting is always safe. When the new line *supersedes* what the
-record already says, pass `--replace <key>`: it drops every managed-block line starting with that key,
-then appends the new one, so two contradictory lines can never both sit in the file. The key is matched
-literally and the caller names it, because a caller rewriting a record rarely knows the old line's exact
-bytes; an absent key drops nothing and simply appends. Never hand-edit `overrides.md` to do this - a
-rewrite outside `bd-mem` skips the lock, the managed-block boundary, and both write gates. Phrase the line as a standing rule the
-next session can act on cold ("integration branch is `develop`"), not as a note about this conversation
-("user said develop just now"). A keyed line records the stable option key, not the display label a
-question happened to use - phrasings shown to the user change between sessions, and the recorded
+Read the block before adding a line: an override already recorded needs no second copy, and a duplicate
+is the cheapest way to make the file untrustworthy. When the new line *supersedes* what the record
+already says, replace that line in place rather than appending beside it - two contradictory lines both
+sit in force, and the next reader has no way to tell which is current. Phrase the line as a standing rule
+the next session can act on cold ("integration branch is `develop`"), not as a note about this
+conversation ("user said develop just now"). A keyed line records the stable option key, not the display
+label a question happened to use - phrasings shown to the user change between sessions, and the recorded
 preference has to survive the rewording.
 
 ## When the override waives a safety gate
@@ -74,12 +69,14 @@ never should. Only an explicit yes to the *standing* change writes anything, and
 the loop and PR brief already recall, so the exception sits beside the baseline it bends and carries the
 operator's own words as its provenance:
 
-```bash
-.better-dev/bin/bd-mem persist-override 'safety-gate: payments waived (was human-gated) [operator: "yes, stop gating payments" 2026-08-05]'
+```
+- safety-gate: payments waived (was human-gated) [operator: "yes, stop gating payments" 2026-08-05]
 ```
 
 The `[operator: "<their words>" <date>]` marker is the difference between a waiver the operator granted
-and one a session granted itself, so `persist-override` refuses a safety-class line that lacks it.
+and one a session granted itself. Nothing mechanically refuses a safety-class line that lacks it, so the
+discipline sits on both sides of the file: never write one without the marker, and the read-first test
+below treats a markerless safety line as absent.
 
 `/guardrails-install` writes the baseline (`safety-gate:` / `safety-scope:` / `safety-denylist:`); a waiver
 writes a matching keyed line here; the loop reads this overrides layer first. Watch the pressure tell: a
@@ -99,12 +96,8 @@ baseline, still quoted in reviews, and dead on paper for weeks.
 
 ## The read-first side
 
-Every skill reads the overrides before it applies a default, so an accepted override quietly wins from
-then on:
-
-```bash
-.better-dev/bin/bd-mem read overrides 2>/dev/null
-```
+Every skill reads `.better-dev/overrides.md` before it applies a default, so an accepted override quietly
+wins from then on.
 
 That is why encoding a project preference by editing a shared `SKILL.md` is the wrong move - a skill is
 the same across every project, and a preference belongs to this one. The overrides layer exists so the
@@ -115,9 +108,9 @@ something a specific skill owns - a branch prefix for `/worktree-branching`, a r
 A recorded line that git or file reality contradicts - an integration branch the record names that
 `git branch` no longer lists, a command that no longer exists - is a stale premise, not an
 instruction. Re-verify against reality, apply what is real now, and offer the one-line rewrite of the
-record (the same light confirm this skill already owns). On a yes, that rewrite is one
-`persist-override --replace <key> "<new line>"` call - the stale line goes and the true one lands in a
-single write, never an append that leaves both on the record. Obeying the stale line, or stopping
+record (the same light confirm this skill already owns). On a yes, that rewrite replaces the stale line
+in place - the true value lands and the stale one goes in the same edit, never an append that leaves
+both on the record. Obeying the stale line, or stopping
 without offering the rewrite, both leave the next session to hit it again.
 
 One class does not win on sight. A `safety-gate:` / `safety-scope:` / `safety-denylist:` line without
@@ -137,9 +130,9 @@ Route it instead. The test is the sealed contract, read now rather than remember
 three dispositions:
 
 - **It contradicts a line the contract pins** - a done-criterion, a pinned decision, the scope. That is
-  a contract amendment: amend `contract.md`, which re-opens the approval pin
-  (`.better-dev/bin/bd-mem ledger check-approval` now fails), and the re-confirm judges the printed
-  delta - `/plan-grill`'s seal owns the mechanics. Driving resumes only against the re-pinned contract;
+  a contract amendment: amend `contract.md`, which invalidates the operator's approval of it - the
+  amended contract needs a fresh explicit yes, and the re-confirm judges the printed delta;
+  `/plan-grill`'s seal owns the mechanics. Driving resumes only against the re-approved contract;
   changing the code first leaves the contract asserting a decision the operator already reversed.
 - **It names a deliverable no criterion covers** - not a change to this item but a second item. That is
   a new work-item with its own worktree and contract (`/worktree-branching`), never a rider smuggled
@@ -155,5 +148,6 @@ rewrites a pinned decision.
 ## What counts as an override versus a lesson
 
 An override is a *preference*: a way this project wants the work done, standing until changed. Something
-the work *taught* you - a flaky test, a build quirk, a fact about the codebase - is a lesson, and belongs
-in `bd-mem remember`/`learn`, not here. If you're unsure, ask which one the user means before persisting.
+the work *taught* you - a flaky test, a build quirk, a fact about the codebase - is a lesson for the
+`learn` tool, or a durable project rule for `.better-dev/rules.md`, not an override. If you're unsure,
+ask which one the user means before persisting.

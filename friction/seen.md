@@ -4,15 +4,15 @@ The harness's memory. Every finding a friction review ever filed has a row here,
 about it. `review.md` reads this file before it writes a finding, and a finding already here is not
 filed again.
 
-This is not a backlog. Nothing here is waiting to be worked: an accepted finding's work lives in the
-papercut queue (`.better-dev/bin/bd-mem papercut list`), and this table only records that the harness
-has seen the thing, so the next run stops re-reporting it.
+This is not a backlog. Nothing here is waiting to be worked: an accepted finding is recorded as a
+lesson in the host's own memory store with the `learn` tool, and this table only records that the
+harness has seen the thing, so the next run stops re-reporting it.
 
 ## Status vocabulary
 
 | status | what it means | what a recurrence is |
 |---|---|---|
-| `ACCEPTED` | routed to the papercut queue; the `papercut` column carries its id | already queued, not a new finding |
+| `ACCEPTED` | recorded as a lesson; the `lesson` column carries its recall key | already recorded, not a new finding |
 | `DECLINED` | adjudicated and not worth fixing | still declined, whatever a later run's transcript looks like |
 | `FIXED` | the text or script that caused it was changed - in the library, or in this directory for a `HARNESS` finding | a regression: file it fresh, and cite this row's id in the new row's title |
 
@@ -25,14 +25,14 @@ One row per finding, appended at the end, ids ascending. The title is the findin
 `review.md`, unchanged, so the two surfaces can be matched by eye:
 
 ```
-| id | date | status | title | where | papercut |
+| id | date | status | title | where | lesson |
 |---|---|---|---|---|---|
-| F-001 | 2026-08-02 | ACCEPTED | onboard reports success while leaving the checkout on the wrong branch | `skills/onboard/SKILL.md:212` | 481223907 |
+| F-001 | 2026-08-02 | ACCEPTED | onboard reports success while leaving the checkout on the wrong branch | `skills/onboard/SKILL.md:212` | onboard-branch-report |
 ```
 
 ## Findings
 
-| id | date | status | title | where | papercut |
+| id | date | status | title | where | lesson |
 |---|---|---|---|---|---|
 
 No rows yet. The first review to run against this harness fills them.

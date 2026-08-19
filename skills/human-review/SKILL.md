@@ -124,11 +124,10 @@ carries a human's markup on the rendered result into the source.
 
 ## When no review surface is wired
 
-Hand the gap to `/tool-sourcing` - discover, vet, try, adopt - the same way `/browser-capability`
-sources a browser, and record the adoption once so a later run reuses it. Four vetting criteria come
-from this contract: the surface writes the batch to disk before the agent reads it, keeps the two
-channels separate in what it emits, anchors a comment by quote-plus-context rather than a DOM path or
-a line number, and stays single-operator and local (loopback plus a token). No hosting, no
-multiplayer, and no accounts is a scope choice worth keeping rather than a gap to fill. One real gap
-to state up front instead of discovering it in use: these surfaces are contenteditable plus a comment
-rail, and they ship no accessibility story.
+Hand the gap to `/tool-sourcing` - discover, vet, try, adopt - and record the adoption once so a later
+run reuses it. Four vetting criteria come from this contract: the surface writes the batch to disk
+before the agent reads it, keeps the two channels separate in what it emits, anchors a comment by
+quote-plus-context rather than a DOM path or a line number, and stays single-operator and local
+(loopback plus a token). No hosting, no multiplayer, and no accounts is a scope choice worth keeping
+rather than a gap to fill. One real gap to state up front instead of discovering it in use: these
+surfaces are contenteditable plus a comment rail, and they ship no accessibility story.

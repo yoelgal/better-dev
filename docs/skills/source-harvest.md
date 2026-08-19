@@ -37,8 +37,8 @@ in the dump hands its captured brief onward to `/plan-grill`.
 
 ## Prerequisites
 
-- A source archive for the target repo - discovered, or created and recorded via
-  `bd-mem` on first use; never assumed from a prior harvest's target.
+- A source archive for the target repo - discovered, or created and recorded in
+  `.better-dev/rules.md` on first use; never assumed from a prior harvest's target.
 - For any authenticated or social page read (X threads, gated articles, Instagram),
   an operator-exported browser cookie jar. Exporting it is an operator-run step the skill
   hands back as a paste-ready command each batch - it is never something an agent can pull

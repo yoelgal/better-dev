@@ -1,6 +1,6 @@
 ---
 name: ios-capability
-description: Use when a work item's done-criteria need a real iOS device or simulator - verify a screen renders on hardware, drive a flow by touch, capture an on-device screenshot - and no on-device check is wired yet. The mobile sibling of /browser-capability: the same prove-done-against-the-running-surface practice.
+description: Use when a work item's done-criteria need a real iOS device or simulator - verify a screen renders on hardware, drive a flow by touch, capture an on-device screenshot - and no on-device check is wired yet. Sources the device harness on the gap, then proves done against the running app rather than against a green build.
 ---
 
 # Wiring an iOS device so "done" is proven on the running app
@@ -24,20 +24,20 @@ time, not rounded at verify time.
 
 ## 2. Wire the tool
 
-For a real device, the tool is `ios-qa/` in the better-dev install (better-dev's vendored cut of
-gstack's MIT ios-qa; provenance in `ios-qa/UPSTREAM`) - a Mac-side daemon
-that bridges USB to a Debug-only bridge compiled into the app's own build, exposing screenshot,
-element-tree, state-snapshot, and touch endpoints. Wire it per `ios-qa/README.md`. Two facts
-shape the adoption: it needs macOS, Xcode, and a paired USB iPhone to run at all; and its bridge
-compiles into the app source, which creates the release-build obligation in step 4.
+For a real device, the tool is gstack's MIT-licensed `ios-qa` - a Mac-side daemon that bridges USB to a
+Debug-only bridge compiled into the app's own build, exposing screenshot, element-tree, state-snapshot,
+and touch endpoints. It is not vendored here; fetch it when a criterion needs it, from
+`https://github.com/garrytan/gstack` subdirectory `ios-qa/` (MIT, verified at commit `11de390`), and wire
+it per its own `README.md`. Two facts shape the adoption: it needs macOS, Xcode, and a paired USB iPhone
+to run at all; and its bridge compiles into the app source, which creates the release-build obligation in
+step 4.
 
-For a simulator-only criterion, `xcrun simctl` plus the host's screenshot or computer-use path
-is often enough - reach for the daemon only when the contract says hardware.
+For a simulator-only criterion, `xcrun simctl` plus the host's screenshot path is often enough - reach for
+the daemon only when the contract says hardware.
 
-If the vendored daemon can't fill the gap (non-Mac host, a device farm requirement, an
-Android sibling), hand the step-1 gap line to `/tool-sourcing` and let it run its course;
-sourcing owns the vetting judgment and the safety gate, and records the adopted tool in memory
-so it stays swappable.
+If that daemon can't fill the gap (non-Mac host, a device farm requirement, an Android sibling), hand the
+step-1 gap line to `/tool-sourcing` and let it run its course; sourcing owns the vetting judgment and the
+safety gate, and records the adopted tool so it stays swappable.
 
 ## 3. Wiring discipline
 

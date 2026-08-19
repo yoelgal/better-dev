@@ -1,6 +1,6 @@
 ---
 name: codebase-audit
-description: Use when someone points at an existing codebase, or one area of it, and wants to know what is worth doing before any single item is chosen - "audit this repo", "where's the leverage here", "what should we improve", "what's worth doing in this code". It ranks findings by leverage, hands the human one item, and builds nothing itself. For a chosen feature go to /plan-grill, for a reported symptom /diagnose, for structural orientation alone /codebase-map.
+description: Use when someone points at an existing codebase, or one area of it, and wants to know what is worth doing before any single item is chosen - "audit this repo", "where's the leverage here", "what should we improve", "what's worth doing in this code". It ranks findings by leverage, hands the human one item, and builds nothing itself. For a chosen feature go to /plan-grill, for a reported symptom /diagnose.
 allowed-tools:
   - Bash
   - Read
@@ -27,34 +27,28 @@ severity language, a "we never audit vendored code" rule) wins over anything her
 
 ## 1. Orient before you judge
 
-Get structure first: compose `/codebase-map` for callers, dependents, the real schema, and the blast
-radius of the areas you will look at. An audit that guesses at structure surfaces findings at the wrong
-seam.
+Get structure first, inline: the `lsp` tool (`references`, `definition`, `symbols`) for the callers,
+dependents, and blast radius of the areas you will look at, with `grep` and `glob` for what carries no
+symbol - a config key, a route string, a schema file - and for any language no server covers. An audit
+that guesses at structure surfaces findings at the wrong seam.
 
-Ask the leverage question structurally before reading anything: `/graphify-wrapper-query <name>
---hubs` lists the most-connected nodes, which is this skill's own "where is the leverage" rendered
-from the graph rather than from a sweep. A hub with weak tests, no error handling, or three
-responsibilities is a higher-ranked finding than the same defect in a leaf, and the ranking is
-otherwise a judgement call made blind. The index builds itself on first use, so a never-indexed repo
-is not a reason to skip this.
-
-Read that list as an ordering of leads. A rank position is not a citable fact: it is a degree
-ranking over one build, ties fall in the graph's own node order, and cluster IDs shift between
-builds because the clustering is not reproducible across runs (upstream's verdict: "real bug, no
-clean in-code fix yet"). On a prose-heavy repo the top ranks are markdown headings measuring which
-document has the most sections - a `docs/TRAPS.md` heading ranked first here - so a hub whose file
-is documentation is noise, and step 3's `file:line` still decides every finding.
+Ask the leverage question structurally before reading anything: take the symbols the area exposes and
+order them by how many callers `lsp` `references` returns. A defect in a symbol forty callers depend on
+outranks the same defect in a leaf, and that ordering is otherwise a judgement call made blind. Read the
+counts as leads, never as a citable fact - they are one language server's view of one revision, blind to
+a caller that arrives dynamically, through a template, or from another language, and step 3's
+`file:line` still decides every finding.
 
 Then read the repo's own decision and intent docs - an ADR, a `DESIGN.md`, a `CONTEXT.md`, the README's
 rationale. A tradeoff the team already settled and wrote down is not a finding; surfacing it as one
 wastes their attention and reads as an audit that didn't do its homework. Carry those decided tradeoffs
 forward - they scope what the sweep is allowed to report.
 
-The repo's own record of what already went wrong is evidence too, and it costs one command rather
-than a sweep: `.better-dev/bin/bd-mem recall "<area>"` for the lessons a prior run paid for, and
-`.better-dev/bin/bd-mem papercut list` for the friction someone hit and logged. Read both as leads,
-never as findings - a papercut names a symptom and no location, so it points the sweep at a file and
-step 3 still has to open it.
+The repo's own record of what already went wrong is evidence too, and it costs one read rather than a
+sweep: `memory://root/learned.md` carries the lessons a prior run paid for, friction included, and
+`memory://root` carries the compact project summary. Read both with the `read` tool, as leads and never
+as findings - a lesson names a cause and no location, so it points the sweep at a file and step 3 still
+has to open it.
 
 Close step 1 by writing the purpose sentence: one sentence naming the single job the audited area exists
 to do - the area's job, not this skill's. One job, not three. Every finding is graded against it, and a
@@ -223,7 +217,7 @@ improvement) or `/diagnose` (for a confirmed bug). You stop there.
 
 ## Composability
 
-Codebase-audit adds; it sequences `/codebase-map` (structure), `/orchestrating-agents` (the sweep), and
-`/security-pass` (the content and secret rules) rather than reimplementing them. Downstream it feeds
-`/plan-grill` and `/diagnose`, which is where a chosen item becomes a contract and enters the loop. When
-revising this skill, follow `/writing-skills`.
+Codebase-audit adds; it sequences `/orchestrating-agents` (the sweep) and `/security-pass` (the content
+and secret rules) rather than reimplementing them. Downstream it feeds `/plan-grill` and `/diagnose`,
+which is where a chosen item becomes a contract and enters the loop. When revising this skill, follow
+`/writing-skills`.

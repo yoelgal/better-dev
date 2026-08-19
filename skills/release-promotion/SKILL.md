@@ -4,6 +4,8 @@ description: Use when the integration branch looks ready to ship and someone wan
 allowed-tools:
   - Bash
   - Read
+  - Write
+  - Edit
 ---
 
 # Release promotion
@@ -18,12 +20,12 @@ closed: every check comes back green from git and CI directly, and an *unknown* 
 
 Four shapes ship and two facts pick one, neither of them assumed. The branch names are defaults, not
 a mandate - a project may integrate on `develop`, release from `master`, or prefix hotfixes `hf/` -
-so start from what the repo records and let it win:
+so start from what the repo records and let it win. Read `.better-dev/overrides.md` and
+`.better-dev/rules.md` with the `read` tool - the rules file is where `branch-model`,
+`version-surface`, and `release-automation` are recorded - plus `memory://root/learned.md` for what
+an earlier release paid to learn, then name both ends from what they say:
 
 ```bash
-.better-dev/bin/bd-mem read overrides 2>/dev/null
-.better-dev/bin/bd-mem recall "release integration branch tag hotfix" 2>/dev/null
-.better-dev/bin/bd-mem recall "branch-model version-surface release-automation" 2>/dev/null
 integration="staging"   # honor an override (e.g. develop)
 release="main"          # honor an override (e.g. master)
 ```
@@ -95,11 +97,11 @@ Every gate has to hold:
   head and the tag.
 - **No open blockers.** No open issue or PR marked as a release blocker for this cut. If the project
   has no blocker convention, say so and let the operator confirm rather than assuming zero.
-- **It has soaked - staged paths only.** Read the soak window from overrides
-  (`bd-mem recall "soak window"`); with none set, default to 24h since the last merge, or one full
-  green CI cycle where the repo runs no time-based window. "Stable" means a named verify-receipt in
-  the ledger recorded against *this* head - `bd-mem ledger read` the work-item that last shipped in
-  and confirm the receipt names this sha. No receipt on the head is a `NEEDS_INPUT`, not a pass; one
+- **It has soaked - staged paths only.** Read the soak window from the overrides and rules read
+  above; with none set, default to 24h since the last merge, or one full green CI cycle where the
+  repo runs no time-based window. "Stable" means a named verify-receipt recorded against *this*
+  head - read `.better-dev/ledger/<work-item>/` for the item that last shipped in and confirm a
+  receipt there names this sha. No receipt on the head is a `NEEDS_INPUT`, not a pass; one
   on an older sha with merges since hasn't soaked here. A trunk path has no window to wait out -
   `/pr-and-verify`'s merge into the trunk *is* the release - but the receipt half binds all the same.
 - **Release contains everything already released - staged paths only.** `main` must be an ancestor
@@ -120,8 +122,8 @@ Every gate has to hold:
   settles `NEEDS_INPUT` naming that recorder rather than passing on an empty grep). On a hit, run the
   migration gate in `migrations.md` first: it fixes the apply order relative to the deploy and
   snapshots before anything destructive, and new code over an un-migrated schema fails only *after*
-  the tag. Where the range newly reads an env var, recall `"deploy-env"` and confirm each exists in
-  production; a missing one settles `NEEDS_INPUT` naming the var, green build or not.
+  the tag. Where the range newly reads an env var, read the recorded `deploy-env` rule and confirm
+  each exists in production; a missing one settles `NEEDS_INPUT` naming the var, green build or not.
 
 A gate that is red or unanswerable is a `BLOCKED` (hard failure) or a `NEEDS_INPUT` (a convention the
 operator has to name) - report which gate and stop, never relax one to get past it.
@@ -149,9 +151,9 @@ That order is the by-hand one. **Where an automation is wired it owns the order*
 shaped tool bumps and tags *after* the release branch moves, which is what the path table's automation
 rows say - so there the job is to drive it and read the result back, not to re-impose this sequence.
 
-**Where the version lives is recorded, not guessed.** The `version-surface` rule from the recall
-above names the file and the field (`version-surface: .claude-plugin/plugin.json at $.version`). With
-nothing recorded, sweep for candidates (`package.json`, `pyproject.toml`, `Cargo.toml`, a plugin
+**Where the version lives is recorded, not guessed.** The `version-surface` rule read above names the
+file and the field (`version-surface: .claude-plugin/plugin.json at $.version`). With nothing
+recorded, sweep for candidates (`package.json`, `pyproject.toml`, `Cargo.toml`, a plugin
 manifest, a `VERSION` file): exactly one found is proposed by name and recorded through
 `/guardrails-install` before use; none or several is a `NEEDS_INPUT` naming that recorder. Tag
 succession alone is not the scheme while a version-bearing file exists - each tag cut over a stale
@@ -184,19 +186,17 @@ The ledger is not a changelog and is never generated. Derive the flags, evidence
 ```bash
 R="$prev_tag..$released_head"
 git diff --diff-filter=ADR --name-only $R -- 'skills/*/SKILL.md'      # install, half 1
-git diff --name-only $R -- install.sh scripts/bd-hook-wire hooks/     # install, half 2
-git diff --name-only $R -- skills/onboard/ scripts/ hooks/            # reonboard candidates
+git diff --name-only $R -- install.sh                                 # install, half 2
+git diff --name-only $R -- skills/onboard/ scripts/                   # reonboard candidates
 ```
 
 - `install` - **either half**. Half 1 is mechanical: a skill dir added, removed, or renamed, where a
-  hit is the flag. Half 2 is `install.sh` itself changing what a *run* of it does - hook wiring, link
-  layout - and a hit there forces a stated judgement about whether an already-installed machine owes a
-  re-run. Half 2 is not optional padding: 0.11.0 added zero skill dirs and correctly shipped
-  `install,reonboard`, because `install.sh` had learned to wire the session hooks, and on half 1 alone
-  no wired machine would ever have re-run it. `/update` re-derives half 1 from that identical diff at
+  hit is the flag. Half 2 is `install.sh` itself changing what a *run* of it does - the link layout,
+  which links a re-run prunes - and a hit there forces a stated judgement about whether an
+  already-installed machine owes a re-run. `/update` re-derives half 1 from that identical diff at
   its own step 2, so this flag exists for what that diff cannot see.
 - `reonboard` - a repo surface changed: anything `/onboard` writes into a wired repo (the discovery
-  block, the `.better-dev` scaffold, the bin bridge). The third diff lists *candidates* only, and
+  block, the `.better-dev` scaffold). The third diff lists *candidates* only, and
   each hit forces a stated judgement about whether a wired repo has anything to re-run - a prose-only
   edit under `skills/onboard/` changes no repo surface, and a nudge that fires for nothing is ignored.
 - `offer` - judgement, with no mechanical signal behind it: the release added something opt-in. An
@@ -302,40 +302,42 @@ git pull --ff-only
 git status -sb         # the authority: names the branch AND its ahead/behind, which git log -1 can't
 ```
 
-Record what shipped, once the next section settles its `deploy:` and `health:` verdict:
+Record what shipped, once the next section settles its `deploy:` and `health:` verdict. Write the
+receipt with the `write` tool to `.better-dev/ledger/release-<version>/release.md`, dots in the slug
+written as dashes to match the entries already there:
 
-```bash
-printf 'released: %s\ntag: %s\nhead: %s\ndeploy: %s\nhealth: %s\n' \
-  "$version" "$tag" "$(git rev-parse --short "$release")" "$deploy_verdict" "$health_summary" \
-  | .better-dev/bin/bd-mem ledger put "release-$version" release.md -
-# deploy: VERIFIED | DEGRADED | UNVERIFIED | REVERTED | NO_SURFACE  (typed marker, one of five)
-# health: per-page "path: <load-ms>ms, <n> console errors", or "-"  (the next release's baseline)
+```
+released: 0.13.0
+tag: v0.13.0
+head: 4f2a91c
+deploy: VERIFIED     # VERIFIED | DEGRADED | UNVERIFIED | REVERTED | NO_SURFACE (typed, one of five)
+health: /: 420ms, 0 console errors    # or "-" - this line is the next release's baseline
 ```
 
-The receipt is not the settle: `ledger put` creates the entry dir on its own, so one that only ever
-receives `release.md` has no `progress.md` and reads `in-flight` forever. Close it with the one verb
-that records a terminal state, keyed to the receipt's own verdict:
+The receipt is not the settle: an entry holding only `release.md` records no terminal state, so it
+reads in-flight forever. Write the terminal line into `progress.md` beside it, keyed to the receipt's
+own verdict:
 
-```bash
-.better-dev/bin/bd-mem ledger settle "release-$version" DONE "tagged at $(git rev-parse --short "$release"), deploy $deploy_verdict"
+```
+DONE - tagged v0.13.0 at 4f2a91c, deploy VERIFIED
 ```
 
 `DONE` only when the deploy verdict settled `VERIFIED` or `NO_SURFACE`; `UNVERIFIED` or `DEGRADED`
-settles the state its own section names (`NEEDS_INPUT`), so ledger and receipt never disagree about
+settles the state its own section names (`NEEDS_INPUT`), so the two files never disagree about
 whether the release finished. Never `--force`, never `--no-verify`: a protected branch that rejects
-your push is reporting a failed gate, not inviting you through it. A pre-execution guard hook stops
-most of this where one is wired - and a host without one, which is every host `/guardrails-install`
-writes no hook into by design, has only you: before any force-push, history rewrite, branch delete,
-tag move, or `rm -rf` across the release surface, state exactly what you are about to run and why and
-take confirmation for **that specific action** - a yes to one destructive step never carries to the
-next. If you realize you have pushed a wrong sha or lost data, say so at once rather than quietly
-repairing it.
+your push is reporting a failed gate, not inviting you through it. The repo's committed
+`.omp/config.yml` prompts before a force-push, a hard reset, or a recursive delete; it names no
+branch delete and no tag move, so those two are on you alone: before any force-push, history
+rewrite, branch delete, tag move, or `rm -rf` across the release surface, state exactly what you are
+about to run and why and take confirmation for **that specific action** - a yes to one destructive
+step never carries to the next. If you realize you have pushed a wrong sha or lost data, say so at
+once rather than quietly repairing it.
 
 ## After the tag: verify the deploy
 
 A pushed tag starts the release; users have it only when the deploy lands and the deployed thing
-runs. Recall the recorded deploy surface (`.better-dev/bin/bd-mem recall "deploy"`). Three recorded
-answers, three paths:
+runs. Read the `deploy-*` rules in `.better-dev/rules.md` for the recorded deploy surface. Three
+recorded answers, three paths:
 
 - `deploy-surface: none` - nothing runs anywhere (a library, a CLI). Record `deploy: NO_SURFACE` and
   the release is done at the tag. Where the library ships by linked install (better-dev itself) or a
@@ -355,8 +357,8 @@ never loop states; `post-deploy.md` maps them to the terminal states.
 ## Distill the loop's memory
 
 A release is where a cycle's lessons get consolidated rather than letting `rules.md` only ever grow.
-That whole pass - reconcile verbs, library-defect fork, the one sanctioned `bd-mem prune` - is in
-`distill.md`; read it once the release has settled.
+That whole pass - the reconcile verbs and the library-defect fork - is in `distill.md`; read it once
+the release has settled.
 
 ## If a release goes bad
 

@@ -2,10 +2,9 @@
 # friction/run.sh - the friction harness: onboard four throwaway repos with a simulated developer at
 # the keyboard, and capture everything for an adversarial review of where a new user gets stuck.
 #
-#   ./run.sh                              # all fixtures, open permissions, no hooks
+#   ./run.sh                              # all fixtures, open permissions
 #   ./run.sh --fixture node-clean         # one fixture (repeatable)
 #   ./run.sh --perm typical               # realistic new-user allowlist - surfaces permission prompts
-#   ./run.sh --hooks                      # add better-dev's hooks (your personal hooks leak in too)
 #   ./run.sh --turns 16                   # cap the human<->agent exchange (default 12)
 #   ./run.sh --ask 41                     # pin the drawn corpus ask instead of sampling (repeatable)
 #   ./run.sh --model sonnet               # model for the sandbox sessions (default: CLI default)
@@ -42,7 +41,6 @@ ALL_FIXTURES="greenfield node-clean messy polyglot"
 
 FIXTURES=""
 PERM="open"
-HOOKS=0
 TURNS=12
 MODEL=""
 KEEP_GOING=0
@@ -56,7 +54,6 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --fixture) FIXTURES="$FIXTURES ${2:?}"; shift 2 ;;
     --perm) PERM="${2:?}"; shift 2 ;;
-    --hooks) HOOKS=1; shift ;;
     --turns) TURNS="${2:?}"; shift 2 ;;
     --ask) ASK_PINS="${ASK_PINS:+$ASK_PINS }${2:?}"; shift 2 ;;
     --model) MODEL="${2:?}"; shift 2 ;;
@@ -130,16 +127,10 @@ else
   PERMS='{"allow":["Read","Glob","Grep","TodoWrite","Bash(git status:*)","Bash(git log:*)","Bash(git diff:*)","Bash(git branch:*)","Bash(ls:*)","Bash(cat:*)","Bash(npm test:*)"],"deny":[]}'
 fi
 
-# Hooks in --settings MERGE with your user settings, they do not replace them. Only an EMPTY hooks
-# object clears yours. So there are exactly two honest choices, and no third:
-#   none (default) - no hooks at all. Clean signal, but no better-dev SessionStart nudge either.
-#   bd             - better-dev's hooks, AND whatever personal hooks you have, riding along.
-HOOKS_JSON='{}'
-if [ "$HOOKS" = 1 ] && [ -f "$GLOBAL_CLONE/hooks/hooks.json" ]; then
-  HOOKS_JSON="$(sed "s|\${CLAUDE_PLUGIN_ROOT}|$GLOBAL_CLONE|g" "$GLOBAL_CLONE/hooks/hooks.json" | jq '.hooks')"
-  warn "--hooks bd: your personal hooks merge in too (--settings cannot clear them selectively).
-   Anything a personal SessionStart hook injects will show up in the findings."
-fi
+# Hooks in --settings MERGE with your user settings, they do not replace them, and only an EMPTY hooks
+# object clears yours - so the override always sends `{}`. There is nothing of better-dev's to add
+# back: the practices reach a session as skills and as the discovery block in the repo's own
+# CLAUDE.md, both of which the host loads without a hook.
 # Clearing `hooks` alone is not enough: your installed PLUGINS carry their own SessionStart hooks, and
 # those inject persona and style directives that would be measured as better-dev's behaviour. Turning
 # every plugin off in the override kills both the plugin hooks and the plugin skills.
@@ -148,8 +139,8 @@ fi
 PLUGINS_OFF="$(jq -c '(.enabledPlugins // {}) | map_values(false)' "$HOME/.claude/settings.json" 2>/dev/null || echo '{}')"
 
 SESSION_SETTINGS="$RUN/session-settings.json"
-jq -n --argjson perms "$PERMS" --argjson hooks "$HOOKS_JSON" --argjson plugins "$PLUGINS_OFF" \
-  '{permissions:$perms, hooks:$hooks, enabledPlugins:$plugins}' > "$SESSION_SETTINGS"
+jq -n --argjson perms "$PERMS" --argjson plugins "$PLUGINS_OFF" \
+  '{permissions:$perms, hooks:{}, enabledPlugins:$plugins}' > "$SESSION_SETTINGS"
 
 # The persona is a plain human: no hooks, no plugins, no tools, no agent behaviour of its own.
 PERSONA_SETTINGS="$RUN/persona-settings.json"
@@ -284,8 +275,8 @@ say "summarising"
   printf '# Friction run %s\n\n' "$STAMP"
   printf -- '- better-dev under test: `%s` (%s @ %s)\n' "$GLOBAL_CLONE" "$GLOBAL_BRANCH" "$GLOBAL_REF"
   [ "$GLOBAL_CLONE" = "$CLONE" ] || printf -- '- **WARNING**: not this checkout (`%s`)\n' "$CLONE"
-  printf -- '- permission profile: `%s`\n- hooks: `%s`\n- turn cap: %s\n- model: `%s`\n' \
-    "$PERM" "$([ "$HOOKS" = 1 ] && echo "bd + yours" || echo none)" "$TURNS" "${MODEL:-default}"
+  printf -- '- permission profile: `%s`\n- turn cap: %s\n- model: `%s`\n' \
+    "$PERM" "$TURNS" "${MODEL:-default}"
   printf -- '- probe (skill visible / ponytail leaked): `%s`\n' "$(head -1 "$RUN/probe.txt")"
   printf -- '- ask corpus: %s drawable line(s) in `%s`, snapshot at `%s`\n' \
     "$CORPUS_N" "$ROOT/fixtures/asks.txt" "$CORPUS"

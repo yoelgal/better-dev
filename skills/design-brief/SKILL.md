@@ -71,10 +71,10 @@ Either state leaves the component-level picks open - a toast, a command palette,
 virtualized list - and those are a dependency decision rather than a direction one: enter
 `/pick-ui-library` when the design calls for one and the repo has not already solved it.
 
-Either way, record the choice so the next feature inherits it instead of reinventing it: the token set
-and the named direction go into `.better-dev/overrides.md` (via `.better-dev/bin/bd-mem
-persist-override "<line>"`). This is the frozen shared interface `/groundwork` pins for a UI product - a
-design decided per-feature is two worktrees styling the same button differently.
+Either way, record the choice so the next feature inherits it instead of reinventing it: `edit` the
+token set and the named direction into `.better-dev/overrides.md`. This is the frozen shared interface
+`/groundwork` pins for a UI product - a design decided per-feature is two worktrees styling the same
+button differently.
 
 The recorded token set names one token source in the repo - CSS custom properties, a Tailwind theme, a
 tokens module - and that file is the visual contract. The loop inherits one deviation criterion from
@@ -107,9 +107,8 @@ misalignment - the fix differs by class, and the class rides with the finding.
 Read `.better-dev/overrides.md` first - a repo often already settles taste. A host may ship
 `/frontend-design` for direction or `/web-design-guidelines` for the accessibility and UX audit, or pin
 its own design skill. Name-check what is wired at runtime and use it. If nothing is, hand the gap to
-`/tool-sourcing` - discover, vet, try, adopt - and record the choice so it stays swappable, exactly as
-`/browser-capability` sources a browser tool. Never hardcode a stack, framework, or aesthetic here; this
-skill ships the practice, not a taste.
+`/tool-sourcing` - discover, vet, try, adopt - and record the choice so it stays swappable. Never
+hardcode a stack, framework, or aesthetic here; this skill ships the practice, not a taste.
 
 The capability to look for is graded, and which grade is wired decides how much of the audit the host
 carries. A candidate that states a value per property - a duration, a stroke width, a ratio - names an
@@ -132,8 +131,8 @@ the contract as first-class done-criteria (`/plan-grill` step 4).
 
 "Looks polished" is not a criterion, and "it looks good to me" is a self-report, not a check. A
 screenshot is the artifact, not the verdict - a captured PNG nobody audited is not a pass. A visual
-criterion is proven the same way any end-to-end criterion is: the render is driven and audited via
-`/browser-capability`, never asserted from the author's eye.
+criterion is proven the same way any end-to-end criterion is: the render is driven and audited with the
+`browser` tool, never asserted from the author's eye.
 
 Four method rules travel to any aesthetic, and each enters the contract as a checkable criterion,
 not advice:

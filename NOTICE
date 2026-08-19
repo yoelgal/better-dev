@@ -8,18 +8,19 @@ we actually copied verbatim/substantially, which MIT requires us to attribute, a
 (b) credits, as a courtesy, the projects whose patterns informed better-dev.
 
 ── Copied verbatim / substantially (attribution required) ──
-  browse/ - vendored from garrytan/gstack browse/ (MIT, (c) 2026 Garry Tan), upstream
-    commit pinned in browse/UPSTREAM, upstream license in browse/LICENSE-upstream.
-    Cut down per the 2026-07-07 harvest ruling R1; kept files substantially verbatim.
-  ios-qa/ - vendored from garrytan/gstack ios-qa/ (MIT, (c) 2026 Garry Tan), upstream
-    commit pinned in ios-qa/UPSTREAM, upstream license in ios-qa/LICENSE-upstream.
-    Kept files byte-identical per the 2026-07-07 harvest ruling R2.
-  scripts/bd-guard - destructive-command pattern set and safe-rm allowlist adapted
-    from garrytan/gstack careful/ (MIT); script structure and everything else ours.
-  skills/graphify-wrapper-*, scripts/bd-gfx, hooks/bd-graphify-* - ported from
-    orrgal1/claude-plugins graphify-wrapper v1.2.0 (MIT, (c) 2026 orrgal1); mechanics
-    kept substantially verbatim, prose adapted to house rules (dash-free, Use-when
-    descriptions, bridge-resolved lib path).
+  .omp/config.yml - destructive-command pattern set adapted from garrytan/gstack careful/
+    (MIT, (c) 2026 Garry Tan); the patterns are theirs, the approval policy around them
+    is the harness's own. It reached this file through scripts/bd-guard, which carried the
+    same set until the harness's native command-approval policy replaced it.
+  Nothing else is vendored. The browse/ and ios-qa/ daemon trees were vendored from
+    garrytan/gstack (MIT, (c) 2026 Garry Tan) until they were removed: the browser half is
+    the harness's own tool now, and skills/ios-capability fetches the on-device QA tool from
+    upstream on demand (github.com/garrytan/gstack, subdir ios-qa/, MIT, commit 11de390)
+    rather than carrying a copy. Fetched code stays under its own upstream license, which
+    travels with it; no copied expression ships here.
+    The skills/graphify-wrapper-* practices were ported substantially verbatim from
+    orrgal1/claude-plugins graphify-wrapper v1.2.0 (MIT, (c) 2026 orrgal1) until they were
+    removed too; nothing of that port ships now.
   mattpocock/skills - Matt Pocock (MIT, (c) 2026 Matt Pocock). Under D31 this library
     keeps that repo's wording wherever the wording is what carries the value, so the
     files below hold passages in their author's expression and not only reimplemented
@@ -156,14 +157,6 @@ we actually copied verbatim/substantially, which MIT requires us to attribute, a
     quotation with attribution is permitted, lifting prose is not). skills/test-audit/SKILL.md
     quotes one sentence - "Don't accept an argument that the code works when you can watch it
     work" - attributed in-line at the point of use; its application to a passing test is ours.
-  graphify - Graphify-Labs (MIT, dual-filed LICENSE / LICENSE-MIT).
-    skills/graphify-wrapper-sync/graph-trust.md quotes one CLI output line verbatim ("No
-    code-graph topology changes detected; outputs left untouched"), the phrase "structural
-    clarity, not compression" from docs/how-it-works.md, and source-path citations.
-    skills/graphify-wrapper-query/SKILL.md and skills/codebase-audit/SKILL.md carry the
-    maintainer's nine-word verdict from graphify issue #1667 ("real bug, no clean in-code fix
-    yet") as attributed quotation of a GitHub comment, not as licensed reuse. The
-    ripple-coverage check those files describe is better-dev's own.
   jakubkrehel/skills - Jakub Krehel (MIT, (c) 2026 Jakub Krehel), commit
     ba35986bcf433fdca78ea571b0a3dc329cea89ba. Credited by FILE per D31, which keeps the wording
     where the wording is what carries the value.
@@ -215,7 +208,8 @@ we actually copied verbatim/substantially, which MIT requires us to attribute, a
   garrytan/gstack - Garry Tan         (MIT) (also: review specialists/lens patterns,
     plan-review persona rubrics, cso false-positive machinery, investigate scope-lock
     and circuit-breaker, learnings provenance schema, host-config shape, post-deploy
-    verify/watch phases - reimplemented; see verbatim section for the vendored dirs)
+    verify/watch phases - reimplemented; the vendored dirs are gone, and the pattern set that
+    remains is named in the section above)
   loperanger7/gstack-auto - loperanger7 (no license; ideas only, nothing copied:
     accept-or-rebut tables, 3-strike hypothesis rule, regression-test-first protocol,
     machine-readable verdict trailers, blast-radius wrong-layer read, anchored scoring
@@ -281,8 +275,8 @@ we actually copied verbatim/substantially, which MIT requires us to attribute, a
     contamination bug from that repo's issue #52, credited in the file itself, plus its evals
     README's model pin and its prefer-an-isolation-flag-over-remove-and-restore posture)
   Papercuts CLI - Steve Ruiz (@steveruizok, tldraw) (X post, ideas; the agent-facing
-    friction-log channel reimplemented as bd-mem's papercut command and its session-start
-    surfacing)
+    friction-log channel reimplemented as the friction lessons this library records in the
+    harness's own memory store. It began as a queue of its own, which that store replaced)
   Matt Shumer - "How to Run a Gauntlet Loop" (somethingbig.ai) and the Claude-of-Duty
     prompt (github.com/mshumer/Claude-of-Duty), plus "How I Prompt Fable" (shumer.dev)
     (method reimplemented in the gauntlet skill: goal-not-steps, a concrete inspectable
@@ -290,9 +284,8 @@ we actually copied verbatim/substantially, which MIT requires us to attribute, a
   Understand-Anything - Egonex-AI (MIT, (c) Yuxiang Lin / Infinite Universe Inc, originally
     Lum1104; pipeline hygiene and dashboard patterns studied for the 2026-08-05
     observatory-viz harvest, ideas adapted - no prose copied)
-  graphify - Graphify-Labs (the wrapped CLI tool itself, distinct from the orrgal1
-    graphify-wrapper credited above as verbatim-ported; courtesy-credited for the
-    export surfaces - callflow-html, wiki, svg - that the wrapper surfaces)
+  graphify - Graphify-Labs (the wrapped CLI tool; courtesy-credited for the export surfaces
+    the removed graphify-wrapper practices surfaced. Nothing of that wrapper ships now)
   Dual-delivery artifact shape + flow-highlighting pattern - @franpradas (X thread,
     ideas only; no shipped text)
   PostHog StampHog - PostHog (MIT Expat; ideas only in skills/pr-and-verify/: the gate-chain
@@ -308,8 +301,8 @@ we actually copied verbatim/substantially, which MIT requires us to attribute, a
     do not test what you think they test, named as a distinct practice. skills/test-audit/'s
     body - the mutation spine, the lenses, the revert protocol, the NOT REACHED verdict - is
     ours, and the fix-them-too half is deliberately not absorbed. Item 15: the split between a
-    comparison tool's diff and an agent's own visual review, behind
-    skills/browser-capability/SKILL.md's screenshot-harness paragraph, with his
+    comparison tool's diff and an agent's own visual review. That half no longer ships: the
+    skill it sat behind was removed when the harness's own browser tool replaced it, with his
     commit-the-baselines half refused on a stated cost. Item 18: the end-of-shift full
     validation, reduced to the one clause that survives pricing - the repo's own recorded verify
     key runs once at the loop's first green (skills/autonomous-loop/SKILL.md) - with

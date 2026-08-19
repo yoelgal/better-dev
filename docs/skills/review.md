@@ -31,7 +31,7 @@ verdict is what lets `/pr-and-verify` open or advance a PR without re-running re
 (`/pr-and-verify` checks the recorded verdict as an entry precondition and never re-derives it). Any
 finding routes to the loop's fix worker and comes back for re-review. It composes
 `/orchestrating-agents` for every worker it dispatches, `/security-pass` (or the host's own security
-skill) as its Security channel, and `/graphify-wrapper-query` for ripple analysis. `reception.md`
+skill) as its Security channel, and the `lsp` tool for ripple analysis. `reception.md`
 carries the author's side of acting on a verdict; `inbound.md` carries the colleague-PR path.
 
 ## Prerequisites
@@ -64,12 +64,6 @@ verdict, and gets re-dispatched rather than trusted.
 the test code in the diff, not a run of it. A new test is presumed vacuous until something shows it
 can fail (a recorded red, or a negative control); absent that, it's an Important finding naming the
 test, not a pass.
-
-**What's the one known sharp edge in review's own mechanics?** The ripple check
-(`/graphify-wrapper-query --affected`) reads the graph as of its last build - a stale or never-built
-graph can miss a ripple silently. The stopgap is that any hit is confirmed at `file:line` before it's
-reported, so a graph result is a lead to verify, never a finding on its own; this is a stopgap, not a
-promise the graph is current.
 
 ## It's working if
 

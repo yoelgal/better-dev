@@ -12,16 +12,16 @@ better-dev is a **portable set of dev PRACTICES packaged as skills (`SKILL.md`)*
 coding agent you already use - Claude Code, Codex, hermes, pi - to make it do software development well.
 
 It is **NOT**: an agent or runtime · a framework you install *instead of* your tools · a model/provider
-router (**no provider spine** - model choice is the host's; we may *advise* tiering, never *route*, and we
-do **not** copy forge's `frugal`) · a cross-project brain (**no GBrain** - gstack's memory daemon deleted
+router (**no provider spine** - model choice is the host's and the host's own routing config owns it; we
+never *route*, and we do **not** copy forge's `frugal`) · a cross-project brain (**no GBrain** - gstack's memory daemon deleted
 users' working trees; project-scoped only).
 
-The practices are the product; they are still skills, not a framework. Two optional daemons ride along as
-**sourced capabilities, not the spine** - `browse/` (headless-browser QA) and `ios-qa/` (on-device iOS QA),
-vendored from gstack under MIT and compiled only on first need (D14). A repo that never runs a browser or
-device check never touches them, and the skill layer degrades to the `/tool-sourcing` path when they are
-absent - so "not a framework" holds: the daemons are tools the practices reach for, never a runtime you
-install instead of your own.
+The practices are the product; they are still skills, not a framework. Where a practice has to drive a
+real surface it uses what the host already ships - the `browser` tool for web QA, the `lsp` tool for
+structural orientation - and sources an outside tool only on a genuine gap, through `/tool-sourcing`.
+On-device iOS QA is the worked example: the daemon is fetched from upstream when a work item needs it,
+never vendored here. So "not a framework" holds - every tool a practice reaches for is one you could
+run yourself, and none of them is a runtime installed in place of your own.
 
 ## 2. Principles
 
@@ -54,31 +54,32 @@ Feedback: sourced capability feeds the loop; lessons + overrides persist to per-
 → merges to both. Flow: worktree off staging → loop → PR → grill/review → merge staging → soak → promote
 main. (Prefix naming is a per-project override - e.g. papers.town uses `feat/`.)
 
-## 5. Memory - bring-your-own, files by default
+## 5. Memory - the host's store plus per-repo files
 
-No memory engine. Skills call the **contract** via `scripts/bd-mem`:
-`init · remember <rule> · learn <lesson> [conf] · recall <query> · persist-override [--replace <key>] <line> · papercut add|list|resolve · read rules|overrides|learnings|papercuts|ledger`.
-Backend via `BETTER_DEV_MEMORY`: `files` (default) · `cmd:<command>` · `mcp:<server>`.
-**Files layout** under `.better-dev/`: `rules.md` (promoted, human-readable) · `learnings.jsonl`
-(append-only, confidence-scored) · `papercuts.jsonl` (friction queue, resolve-to-drop) ·
-`overrides.md` (managed block, principle #7) · `ledger/<feature>/`
-(loop state: `contract.md`, progress, receipts). It's just repo files the host agent already ingests -
-composes with standard memory by *being part of it*. `bd-mem` exists and passes `bd-mem selftest`.
+No memory engine of ours. Lessons live in the host's memory store: the `memory.backend` setting picks
+`local` or `mnemopi`, the `learn` tool writes one keyed lesson at a time, and what earlier sessions
+learned reads back at `memory://root/learned.md`, with the compact project summary the host injects at
+startup at `memory://root`. Friction is a lesson like any other - there is no separate queue to triage.
+
+**Files layout** under `.better-dev/`: `rules.md` (promoted, human-readable) · `overrides.md` (managed
+block, principle #7) · `ledger/<work-item>/` (loop state: `contract.md`, progress, receipts). Plain
+files, read with `read` and written with `write`, which is what makes them compose with the host's own
+memory - they are part of what it already ingests.
 
 ## 5-loop. The autonomous loop (the differentiated core) - four layers + a fresh spine
 
-- **OUTER (orchestration):** reimplement superpowers' subagent-driven-development - read plan+constraints → per task dispatch a **fresh isolated-context worker** (agent-agnostic dispatch verb, `scripts/bd-dispatch`, single-session role-switch fallback) with a file brief → generate a diff/review package → **independent reviewer that distrusts the report** (spec + quality verdict) → fix worker for Critical/Important (the implementing worker itself while its session lives - independence binds the re-reviewer, never the fixer; fresh on dead session or defended defect - D15) → append ledger line → next → broad final review → hand off to PR-into-staging. File handoffs; never grade own work.
+- **OUTER (orchestration):** reimplement superpowers' subagent-driven-development - read plan+constraints → per task dispatch a **fresh isolated-context worker** (the host's `task` tool, single-session role-switch fallback) with a file brief → generate a diff/review package → **independent reviewer that distrusts the report** (spec + quality verdict) → fix worker for Critical/Important (the implementing worker itself while its session lives - independence binds the re-reviewer, never the fixer; fresh on dead session or defended defect - D15) → append ledger line → next → broad final review → hand off to PR-into-staging. File handoffs; never grade own work.
 - **INNER (drive-to-green):** reimplement devloop `grind` (verify→pick→implement-one-step→re-verify→log→commit, budget, protect-set) + `stuck-check` (rabbit-hole detector → halt-STUCK); precondition from mp `diagnosing-bugs`: name one **already-run red-capable command** before hypothesizing; per-slice from mp `tdd` (one test→one impl at agreed seams).
 - **INVARIANTS (legitimacy):** from loop-library `loopy` + forge - observable done-criteria (no "until happy"), **never error/exhausted = success**, no-progress stop (don't invent limits), ask-don't-invent, verify separate from signal, independent evaluator, "done means proven not asserted", pre-loop ground-truth gate.
-- **SPINE (fresh, ours):** ONE canonical terminal-state taxonomy = `DONE · DONE_WITH_CONCERNS · BLOCKED · NEEDS_INPUT · EXHAUSTED · NO_PROGRESS` (every source's verdicts map onto it); ONE durable ledger (SDD progress + grind scratchpad + loopy receipt merged, via bd-mem) - in the **primary checkout's** `.better-dev/ledger/<feature>/`, shared across worktrees (tracer-bullet finding); **restart-from-contract** (on `NO_PROGRESS` confirmed by stuck-check → reset worktree off staging, replay `contract.md`, human only if the contract is wrong - karpathy §V reimplemented, never quoted); the dispatch verb + contract front-end + worktree/PR glue.
+- **SPINE (fresh, ours):** ONE canonical terminal-state taxonomy = `DONE · DONE_WITH_CONCERNS · BLOCKED · NEEDS_INPUT · EXHAUSTED · NO_PROGRESS` (every source's verdicts map onto it); ONE durable ledger (SDD progress + grind scratchpad + loopy receipt merged) as plain files in the **primary checkout's** `.better-dev/ledger/<feature>/`, shared across worktrees (tracer-bullet finding); **restart-from-contract** (on `NO_PROGRESS` confirmed by stuck-check → reset worktree off staging, replay `contract.md`, human only if the contract is wrong - karpathy §V reimplemented, never quoted); dispatch + contract front-end + worktree/PR glue.
 
 ## 6. Onboarding - the entry skill `onboard`
 
-Idempotent; greenfield **or** existing codebase. **Detect** (harness; installed skills/MCP; existing
-memory system; git + branching; `CLAUDE.md`/`AGENTS.md`) → **adapt, don't impose** (respect existing
-conventions as overrides - never force main/staging or a prefix; scaffold minimum base only where absent;
-never disable installed skills) → **wire memory** (bd-mem to detected backend or files) → **self-describe**
-(write a managed block into the entry file + `.better-dev/` scaffold) → **grill + light-confirm** before
+Idempotent; greenfield **or** existing codebase. **Detect** (harness; installed skills/MCP; git +
+branching; `CLAUDE.md`/`AGENTS.md`) → **adapt, don't impose** (respect existing conventions as
+overrides - never force main/staging or a prefix; scaffold minimum base only where absent; never
+disable installed skills) → **self-describe** (write a managed block into the entry file +
+`.better-dev/` scaffold) → **grill + light-confirm** before
 writing. Detection is a *premise* - verify at file:line before scaffolding on it (never guess a command;
 unmapped capability = a gap, not an invention). Reimplement shape from orrgal1 `welcome` (idempotent
 detect→report→ask→act, `argument-hint` resume) + mp `setup` (present-one-decision-at-a-time; entry-file
@@ -110,10 +111,11 @@ Build by **reimplementing patterns from understanding**. Ideas/methods/designs a
 reimplemented components are original work, **owe no attribution**. Order of preference: **reimplement >
 adapt > verbatim**; minimize verbatim. Rewriting someone's file with an AI = a derivative work - reimplement
 from the *idea*, not by paraphrasing their file. `NOTICE` credits **only** expression actually copied.
-**One exception on record (2026-07-07, user-ratified, D14):** the `browse/` and `ios-qa/` daemons vendor
-gstack's MIT code substantially verbatim - infrastructure too large to reimplement without losing
-fidelity; attributed in `NOTICE`, upstream license and commit pin ride in each dir; the reimplement-first
-default is unchanged for everything else. **Never redistribute** `karpathy:LOOPS.md` (personal-use).
+**The one exception on record (2026-07-07, user-ratified, D14) is closed:** the `browse/` and `ios-qa/`
+daemons vendored gstack's MIT code substantially verbatim, being infrastructure too large to reimplement
+without losing fidelity. The 2026-08 harness-native cutover removed both - the browser surface is the
+host's own tool now, and the iOS daemon is fetched from upstream on demand - so nothing here is vendored
+verbatim today and reimplement-first applies everywhere. **Never redistribute** `karpathy:LOOPS.md` (personal-use).
 **Never copy** superpowers' "MUST/STOP" tone. See `NOTICE`, `LICENSE` (MIT, © 2026 Yoel Gal).
 
 ## 10. Components → reimplement from (condensed; full detail in the harvest manifest, §14)
@@ -125,7 +127,6 @@ deeply, then reimplement** (§12) - capture the actual mechanism, don't approxim
 | Component | Reimplement from (understanding) |
 |---|---|
 | **writing-skills** ✅ | authoring standard - DONE |
-| **memory-contract** ✅ | `scripts/bd-mem` - DONE (selftest passes) |
 | **onboard** | orrgal1 `welcome` (idempotent phases), mp `setup` (entry-file rule), forge `forge-setup`/`forge-ground` (never-guess, premise-verify) |
 | **plan-grill** | mp `grilling` (one-Q-at-a-time + confirm gate), `to-prd`; forge `forge-ground` |
 | **diagnose** (fix front-end) | mp `diagnosing-bugs` (red-first, minimise-repro, falsifiable), devloop `/root-cause` `/trace` `/pepper`, forge premise-verify, loop-library error-sweep |
@@ -135,41 +136,46 @@ deeply, then reimplement** (§12) - capture the actual mechanism, don't approxim
 | **review** | mp `code-review` (Standards+Spec, no self-grade), superpowers `task-reviewer` (distrust-report, diff-only) |
 | **tool-sourcing** | find-skills CLI (ride it) + wrapped discovery (§7) |
 | **self-extension** | hermes `/learn` (prompt-authored) + read-before-write + gstack `skillify` test-before-promote (§7) |
-| **bootstrap-hooks** | superpowers SessionStart + ponytail SubagentStart re-inject (bash-light, always-on-when-installed) |
 | **packaging-distribution** | `.claude-plugin/plugin.json`, symlink+copy-fallback install; delegate long-tail to `npx skills add` |
 | **overrides** (own component) | `.better-dev/overrides.md` managed block, read-first, confirm gate |
 | **release/promotion** | staging→main soak/promote, tags, hotfix double-merge (owned; no source) |
 | **guardrails-install** | onboard *installs* pre-commit/lint/CI, not just detects |
 | **pr-and-verify** | `gh pr create` into staging + end-to-end verify (drive the flow, not just tests) |
 | **feature-ideation** | COVERED BY plan-grill step 2 (per-option assumption surfacing) - not a separate skill (D12) |
-| **browser-capability** | wire agent-browser as a sourced capability (web QA / iOS-sim) |
 
 ## 11. Build order & status
 
-- **Phase 0 - foundations:** `writing-skills` ✅ · `memory-contract` (bd-mem) ✅ · `onboard` ✅ (+ `bd-block`) · **tracer-bullet ✅ PASSED**.
-- **Phase 1 - core loop: ✅ built + integration-tested** - `worktree-branching`, `plan-grill`, `diagnose`, `orchestrating-agents`, `autonomous-loop`, `review` (fanned out via Workflow, each reimplemented from real opensrc source). Spine unified: `bd-mem` now resolves the primary checkout and owns the ledger (`bd-mem ledger dir|init|resume|put|read`); helpers normalized to the `bd-*` namespace (`bd-mem`, `bd-block`, `bd-dispatch`, `bd-worktree-guard`, `bd-review-package`), all self-tests + a cross-skill worktree integration test green.
-- **Phase 2 - self-improvement: ✅** `tool-sourcing` (rides find-skills CLI) + `self-extension` (hermes /learn fallback, `bd-skill-stage` test-before-promote).
-- **Phase 3 - ship: ✅** `bootstrap-hooks`, `pr-and-verify`, `release-promotion`, `guardrails-install`, `overrides`, `browser-capability`, and `packaging` (`install.sh` vendored install + `.claude-plugin/plugin.json` + `bd-package-check` release gate).
+Built and shipping. The roster in `skills/` is the count of record - stale numbers here have burned us
+twice. Phases 0-3 landed in order (foundations, core loop, self-improvement, ship), each component
+reimplemented from real opensrc source and integration-tested. The 2026-07-07 synthesis wave then drove a
+14-branch quality rewrite over them: reward-hack invariants + rationalizations table + learning-law in
+the loop; claim-blind effort-graduated review; review-verdict-gates-the-PR (D11) + `verify-runtime.md`;
+failure-behavior + threat-surface passes in plan-grill; parallel-baseline hardening in groundwork;
+concurrent-actor + rollback discipline in worktree/release; the utterance routing table in onboard's
+managed block; three new skills (D12: security-pass, design-brief, uninstall); disposition menu + proving
+bar in writing-skills; `docs/TRAPS.md`.
 
-**2026-07-07 synthesis wave landed:** a 17-dossier gap analysis over the July source corpus (see
-`raw/synthesis/master-plan.md`) drove a 14-branch rewrite: reward-hack invariants + rationalizations
-table + learning-law in the loop; claim-blind effort-graduated review; review-verdict-gates-the-PR
-(D11) + `verify-runtime.md`; failure-behavior + threat-surface passes in plan-grill; parallel-baseline
-hardening in groundwork; concurrent-actor + rollback discipline in worktree/release; keyed+locked
-`bd-mem`; utterance routing table in onboard's managed block; `bd-uninstall` + install reconcile;
-three new skills (D12: security-pass, design-brief, uninstall); disposition menu + proving bar in
-writing-skills; `docs/TRAPS.md`. `bd-package-check` green.
+**Install model (D10):** the tool installs **globally per host** from a clone (`install.sh`); a repo's
+`.better-dev/` is **data only**; repo-authored skills stay repo-local; one-paste `BOOTSTRAP.md` is the
+front door.
 
-**Build complete + quality-upgraded + install reworked.** 24 skills (the roster in `skills/` is the count of record - stale numbers here have burned us twice) + the `bd-*` script spine + hooks; `bd-package-check` green. **Install model (D10):** the tool installs **globally per host** (`install.sh` + `hosts/` adapters + `bd-link`) from a clone; a repo's `.better-dev/` is **data only** + a per-machine `bin` symlink; repo-authored skills stay repo-local; one-paste `BOOTSTRAP.md` is the front door. **In flight:** `groundwork` (idea→foundation→parallelization front-end) and a loop-engineering audit. A forge+devloop audit (175 mechanisms; 59 already-covered, 15 skipped as plumbing) drove a quality pass - proof-realism (test-body-realizes-criterion), adversarial refutation for non-runnable claims, diff-fingerprint review scrutiny, red-triage (flake/infra/genuine), deslop-on-green, bounded wait-for, content-pinned contract approval (`bd-mem ledger approve`/`check-approval`) - plus `codebase-map` (sourced structural orientation, sibling to `browser-capability`). Remaining is human-only (see §13): real-remote branch protection, live multi-harness runs.
+**2026-08 harness-native cutover:** everything in the library that duplicated a capability the host
+harness already ships was deleted - the `bd-*` script spine, the hook and host-adapter layer, the
+vendored browser daemon, and the code-graph wrapper skills. The practices call host tools directly now:
+`task` for dispatch, `browser` for web QA, `lsp` for structure, `learn` plus `memory://` for lessons,
+`todo` and plain ledger files for loop state, and a committed `.omp/config.yml` for bash approval
+policy. One removed capability had no native equivalent and is gone rather than replaced: path-based
+gating of edits to `.env*`, `**/secrets/**`, `*.pem`, and `*.key`.
+
+Remaining work is human-only (see §13): real-remote branch protection, live multi-harness runs.
 
 **Tracer-bullet gate (after Phase 0): ✅ PASSED** - ran `onboard` + one feature slice → staging on the
-papers.town clone, locally, no push. onboard adapted (didn't impose), wrote an idempotent non-clobbering
-discovery block, wired files-memory; the slice went worktree-off-staging → verify GREEN → merge-to-staging
-→ DONE. **Six findings now bind Phase 1 (see `DECISIONS.md` → Tracer-bullet findings):** helpers live in
-`.better-dev/bin/` (not a bare `scripts/`, which collides); the ledger lives in the *primary* checkout's
-`.better-dev/ledger/<feature>/` (shared across worktrees); detection is premise-verified at the git level;
-the primary checkout tracks the integration branch while features are worktrees off it; done = a real check
-going GREEN.
+papers.town clone, locally, no push. onboard adapted (didn't impose) and wrote an idempotent
+non-clobbering discovery block; the slice went worktree-off-staging → verify GREEN → merge-to-staging
+→ DONE. **Its findings still bind (see `DECISIONS.md` → Tracer-bullet findings):** the ledger lives in
+the *primary* checkout's `.better-dev/ledger/<feature>/` (shared across worktrees); detection is
+premise-verified at the git level; the primary checkout tracks the integration branch while features are
+worktrees off it; done = a real check going GREEN.
 
 ## 12. Build method
 
@@ -195,7 +201,7 @@ agent, worktree-isolated when writing files); **every build-agent prompt points 
 source repos + this PLAN and tells it to opensrc the real files before writing.** Then a verify/synthesis
 pass. Commit clean per component (Co-Authored-By trailer). Repo layout (flat at the repo root again
 since the 2026-08-14 extraction; it sat under `better-dev/` from the 2026-07-30 monorepo move until
-then): `skills/<name>/SKILL.md`, `scripts/`, `hooks/`, `.claude-plugin/plugin.json`,
+then): `skills/<name>/SKILL.md`, `scripts/`, `.claude-plugin/plugin.json`,
 `NOTICE README.md LICENSE install.sh`, all at the root.
 
 ## 13. What still needs the human (can't do autonomously)

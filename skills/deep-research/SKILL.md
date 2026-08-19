@@ -1,6 +1,6 @@
 ---
 name: deep-research
-description: Use when a question has to be answered from sources outside this repo and the answer has to be checkable - prior art on a problem or symptom (who hit it, how they solved it), a product or market question, whether a vendor's or a paper's number survives its own limitations, or a design decision that turns on an outside fact nobody here can supply. Also when sources disagree and the disagreement itself is what needs settling, or when a research answer arrived with no provenance and its chain has to be rebuilt. Not for reading this codebase (`/codebase-map`), not for finding a tool or skill to install (`/tool-sourcing`), and not for one API signature or config key a documentation lookup answers directly.
+description: Use when a question has to be answered from sources outside this repo and the answer has to be checkable - prior art on a problem or symptom (who hit it, how they solved it), a product or market question, whether a vendor's or a paper's number survives its own limitations, or a design decision that turns on an outside fact nobody here can supply. Also when sources disagree and the disagreement itself is what needs settling, or when a research answer arrived with no provenance and its chain has to be rebuilt. Not for reading this codebase (the `lsp` tool plus `grep` answer that directly), not for finding a tool or skill to install (`/tool-sourcing`), and not for one API signature or config key a documentation lookup answers directly.
 ---
 
 # Research a question against the world
@@ -159,10 +159,9 @@ section 1 is what proves or refutes it.
 
 ## Close out
 
-At the end of a run, record the one durable line (`.better-dev/bin/bd-mem learn "<lesson>" <0..1>
-"<key>"`) - a source worth trusting or distrusting, a query shape that worked, a settled outside
-fact - or write `no durable lesson` with the reason. A finding about this run's topic is a lesson; a
-receipt of having researched it is not.
+At the end of a run, record the one durable line with the `learn` tool - a source worth trusting or
+distrusting, a query shape that worked, a settled outside fact - or write `no durable lesson` with the
+reason. A finding about this run's topic is a lesson; a receipt of having researched it is not.
 
 ## What it feeds
 

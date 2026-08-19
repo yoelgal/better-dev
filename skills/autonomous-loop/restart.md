@@ -11,13 +11,9 @@ Both read the same ledger. They differ only in whether the branch's implementati
 
 ## Resume - the work stands
 
-Read the recovery map and continue from where it left off:
-
-```
-.better-dev/bin/bd-mem ledger resume <work-item>
-```
-
-That prints `contract.md`, the tail of `progress.md`, and the last receipt. Progress is written to
+Read the recovery map and continue from where it left off: `contract.md`, the tail of `progress.md`,
+and the last entry in `receipts.md`, all three in the primary checkout's
+`.better-dev/ledger/<work-item>/`. Progress is written to
 disk precisely because a context window can't be trusted after a compaction - a missing entry is data
 (that step didn't settle), not an error. Compute the earliest step the contract still calls unmet, and
 carry on from there. Trust the ledger and `git log` over anything you think you remember; the commits
@@ -51,10 +47,10 @@ The steps:
 
 1. **Keep the map.** `contract.md`, `progress.md`, and `receipts.md` stay - they live in the primary
    checkout, untouched by anything that happens in the feature worktree. Read what the stalled attempt
-   learned. Fold any durable lesson into `contract.md` and record it (`.better-dev/bin/bd-mem learn
-   "<lesson>" <0..1> "<signature-key>"`) so the rebuild doesn't re-enter the same dead end; a
-   failure diagnosed but not yet fixed goes in as a low-confidence open lesson under its signature key,
-   so the next session's recall surfaces it as unfinished rather than as settled fact. Append a line to
+   learned. Fold any durable lesson into `contract.md` and write it with the `learn` tool, so the
+   rebuild doesn't re-enter the same dead end; a failure diagnosed but not yet fixed goes in at low
+   confidence under its signature key, so the next session's read surfaces it as unfinished rather
+   than as settled fact. Append a line to
    `progress.md` naming the restart and why.
 
 2. **Reset the feature worktree off the integration branch.** Before discarding, tag the stalled work
@@ -78,7 +74,7 @@ The steps:
    `wrong-assumption`, or when each fix surfaced a new failure somewhere else (a wrong-layer tell, not
    bad luck). In that case the replay detours through `/diagnose` re-diagnosis with the stalled
    attempt's receipts as evidence: re-derive or re-confirm the root cause and amend `contract.md` -
-   which re-opens the approval pin, so the amended contract is re-confirmed before driving - then
+   which re-opens the approval, so the amended contract is re-confirmed before driving - then
    rebuild. Replaying an unquestioned wrong root cause rebuilds the same stall.
 
 ## When to stop restarting

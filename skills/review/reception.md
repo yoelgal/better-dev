@@ -64,8 +64,8 @@ fix. Track each one as **new** (first raised this cycle), **addressed** (fixed a
 closed, a later change broke it). A regressed or reopened finding names the change that caused it - a fix
 doesn't come undone silently. And a finding can't slide from *addressed* back to *new*: once it's marked
 fixed it either stays gone or returns as regressed/reopened with its cause. A finding that simply vanishes
-between cycles is a bookkeeping failure, not a pass. Carry this per-cycle status through the memory
-contract (`.better-dev/bin/bd-mem`) so the next cycle and the end-of-branch pass both see it.
+between cycles is a bookkeeping failure, not a pass. Carry this per-cycle status in the work-item's
+`review.md`, so the next cycle and the end-of-branch pass both read it from the same place.
 
 Read the statuses across cycles for one shape in particular: two consecutive rounds that each **address** a
 Critical in one seam and each raise a **new** Critical in that same seam. That is not progress, it is the
@@ -77,9 +77,8 @@ finding too.
 
 When reception overturns a grading, that is a calibration event, not just a fix: a finding the reviewer
 demoted to `⚠️` or Minor that proves out as a real Critical or Important, or a `REBUTTED` row later shown
-right. Record the corrected pattern -
-`.better-dev/bin/bd-mem learn "<pattern> - graded low at review, confirmed real" <confidence 0..1>
-"<recall key>"` - so the next review grades it on sight instead of relearning the doubt.
+right. Record the corrected pattern with the `learn` tool - "<pattern> - graded low at review, confirmed
+real", keyed so the next review grades it on sight instead of relearning the doubt.
 
 ## Documented deviations, judged on merit
 

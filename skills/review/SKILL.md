@@ -29,17 +29,27 @@ the fix straight to the PR, no worktree", a repo severity convention) before app
 A review needs a known-good point to diff against. Default BASE is the merge-base with the integration
 branch (`staging`, else `main`); the caller can name any commit, branch, or tag.
 
-Build the package with `.better-dev/bin/bd-review-package [BASE] [HEAD]`. It writes the commit list, the
-stat summary, and the net diff with wide context into one file under `.better-dev/review/` and prints that
-path. A bad ref or an empty diff fails here - before any worker is dispatched, so the failure is visible.
+Pack it with git - the commit list, the stat summary, and the net diff with wide context, in one file:
+
+```bash
+base=$(git merge-base staging HEAD 2>/dev/null || git merge-base origin/main HEAD)   # or the caller's ref
+head=HEAD
+mkdir -p .better-dev/review; p=".better-dev/review/$(git rev-parse --short "$head").diff"
+{ git log --oneline "$base..$head"; echo; git diff --stat "$base" "$head"; echo; \
+  git diff -U15 "$base" "$head"; } > "$p"
+```
+
+A bad ref fails here, and an empty diff is a review with nothing to read - settle both before any worker
+is dispatched, so the failure is visible rather than delegated.
 The package is the reviewer's whole view of the change; the orchestrator hands over the *path*, never the
 diff text, and never pastes its own session history into a brief.
 
 Two policy questions get answered from the package before any model reads it. Its file list decides
 whether the diff touches a recorded high-consequence path and whether it crosses the recorded scope
-number (`.better-dev/bin/bd-mem recall "safety"`); hand that one-line result to every channel as the
+number (both in `.better-dev/rules.md`, with `.better-dev/overrides.md` winning where they disagree);
+hand that one-line result to every channel as the
 **gate line**. A channel may raise what the gate matched and never clear it - the match rests on the
-recall, not on a reading - and the sign-off check `reviewer-brief.md` defines is the channel's half.
+recorded policy, not on a reading - and the sign-off check `reviewer-brief.md` defines is the channel's half.
 And a diff that edits the reviewer's own instructions (`reviewer-brief.md`, `lenses.md`,
 `standards-baseline.md`, anything under `.better-dev/`) would otherwise be judged by channels running
 that diff's new text, so the reviewer grades its own edit: dispatch those channels against the base
@@ -48,7 +58,7 @@ and put the edit itself on step 2's shortlist as at least Important.
 
 A PR whose diff is exactly the union of changes that each already carry a recorded clean verdict is a
 **promotion PR** - reviewed content needs no fresh verdict. Confirm the recorded verdicts cover the range
-(`.better-dev/bin/bd-mem ledger read <item> review.md` per constituent work-item): a constituent is
+(each constituent work-item's `.better-dev/ledger/<item>/review.md`): a constituent is
 covered when its recorded sha is contained in the range, or - where the host squash-merges, so the
 reviewed sha is never an ancestor - when the content matches (`git diff <recorded-sha> <squash-commit>`
 empty on the item's paths, or a clean `git range-diff`). A constituent that matches neither way is
@@ -68,16 +78,16 @@ Each unit gets a line: what changed, and the one thing in it worth a careful sec
 change, an edge case, an error path, anything hard to reverse like a migration or a deletion.
 
 The ripple is the part a diff cannot show you: a diff lists what changed, never what depended on it.
-Ask that structurally rather than grepping for the symbol name -
-`/graphify-wrapper-query <name> --affected "<changed symbol>"` is reverse traversal, so it returns
-callers the diff never touched and a name-grep would miss on an aliased import or a re-export. Run it
+Ask that structurally rather than grepping for the symbol name - the `lsp` tool's `references` action is
+reverse traversal, so it returns callers the diff never touched and a name-grep would miss on an aliased
+import or a re-export. Run it
 for each exported or cross-module symbol the diff changes or deletes; unreviewed ripple is where the
 regressions this gate exists to catch actually live. The same result filtered to test paths answers
 which tests the change reaches - a changed symbol whose filtered set is empty has no test in front of
-it, which is itself a finding. The index builds on first use, and a graph reflects
-its last build, so confirm each hit at `file:line` before it becomes a finding. Where the work-item fans
+it, which is itself a finding. A language server answers from what it last indexed, so confirm each hit
+at `file:line` before it becomes a finding. Where the work-item fans
 out from a `/groundwork` epic, that record already names the frozen shared surface
-(`.better-dev/bin/bd-mem ledger read <epic> groundwork.md`): a new `--affected` edge into a do-not-modify
+(`.better-dev/ledger/<epic>/groundwork.md`): a new caller edge into a do-not-modify
 interface is architecture drift, and lands on the shortlist as at least Important.
 
 Close the walkthrough with a ranked **scrutiny shortlist**: the 3-5 spots likeliest to be wrong, each a
@@ -126,8 +136,8 @@ the report, and a Critical stays a Critical at every effort.
 
 Each channel runs as its own fresh worker. Enter `/orchestrating-agents` before dispatching the first
 channel - invoke it where the host has a skill mechanism, read its SKILL.md where it doesn't - and
-dispatch by its mechanics: the host subagent verb (else its in-session role-switch with a context
-reset), bands resolved through the recorded tier-map into the host's per-worker model parameter, and
+dispatch by its mechanics: the `task` tool (else its in-session role-switch with a context reset), the
+model each channel is worth resolved through the host's own routing, and
 its report trailer. A dispatch made from this file's mentions alone improvises those mechanics, every
 channel silently inheriting the session's own model.
 Running them apart is the point: neither pollutes the other's context,
@@ -307,16 +317,17 @@ stop reached with findings outstanding is a terminal report, never a clean verdi
 non-clean counts block, add `CONVERGENCE: <converged|ceiling>` beside it, and hand the standing
 findings up as `EXHAUSTED`.
 
-Persist reviewer-accepted `REBUTTED` rows and unresolved ⚠️ items through the memory contract
-(`.better-dev/bin/bd-mem remember "<finding>"`) so the end-of-branch pass sees them - fixed findings
+Carry reviewer-accepted `REBUTTED` rows and unresolved ⚠️ items in the work-item's `review.md` beside
+the verdict, so the end-of-branch pass reads them there - fixed findings
 need no carry. The whole-branch review
 before a PR into staging runs this same skill once more over the full range.
 
 When the verdict is clean - zero open findings of any tier - record it to the work-item's ledger so the PR stage
-can confirm the change was reviewed without re-running the review:
+can confirm the change was reviewed without re-running the review - one line in
+`.better-dev/ledger/<work-item>/review.md`:
 
 ```
-.better-dev/bin/bd-mem ledger put <work-item> review.md - <<<"$(git rev-parse HEAD) clean: <one-line verdict> | reviewer=$(cat .better-dev/wired-version) effort=deep rounds=2 raised=7 nits=1 rebutted-accepted=1"
+<sha> clean: <one-line verdict> | reviewer=<version> effort=deep rounds=2 raised=7 nits=1 rebutted-accepted=1
 ```
 
 Key it to the reviewed HEAD. A later fix that changes the code doesn't inherit an older verdict - the PR

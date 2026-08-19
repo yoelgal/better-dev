@@ -12,25 +12,15 @@ jobs:
           # prove-new diffs this ref against its base, and a default checkout is fetch-depth 1 -
           # the base commit simply is not in the clone, so the mode would have nothing to compare.
           fetch-depth: 0
-      # The package gate and the selftest step below both run TypeScript hook modules under bun, and
-      # ubuntu-latest ships none. Without this the gate prints "bun is not on PATH, so <hook>
-      # selftest was NOT run" and stays GREEN, so a suite reports coverage the merge gate never had -
-      # which is how hooks/omp/*.ts sat unexecuted in CI while carrying the branch's two
-      # highest-consequence assertions.
-      - uses: oven-sh/setup-bun@v2
       - name: git identity for selftests that commit in fixtures
         run: |
           git config --global user.email ci@better-dev.local
           git config --global user.name better-dev-ci
           git config --global init.defaultBranch main
-      # The package gate below already validates every manifest. This step exists for one thing the
-      # gate does not cover: CLAUDE.md is outside bd-package-check's dash sweep.
-      - name: repo root surface
-        run: |
-          dash="$(printf '\342\200\223\|\342\200\224')"
-          if LC_ALL=C grep -n "$dash" README.md CLAUDE.md; then
-            echo "em/en dash in a root doc - use a spaced hyphen" >&2; exit 1
-          fi
+      # One step, because the gate is the whole suite: it lints every skill, runs every shipped
+      # script's selftest, parses every shipped script, and validates the manifest. It fails rather
+      # than reporting a pass when a sweep matches nothing - a green that covered zero files is how
+      # this job once certified a suite it never executed.
       - name: package gate
         run: scripts/bd-package-check
       # A check that is green before the thing it guards exists proves nothing and reads exactly
@@ -42,25 +32,3 @@ jobs:
           base="$BASE_SHA"
           [ -n "$base" ] || base="$(git rev-parse HEAD~1)"
           scripts/bd-package-check --prove-new "$base"
-      - name: script and hook selftests
-        run: |
-          matched=0
-          # hooks/*/bd-* alongside hooks/bd-*: a host's own hooks live one level down, so the bare
-          # hooks/bd-* glob never matched hooks/omp/bd-guard.ts and its suite ran nowhere in CI.
-          for s in scripts/bd-* hooks/bd-* hooks/*/bd-*; do
-            [ -e "$s" ] || { echo "selftest glob matched nothing: $s" >&2; exit 1; }
-            # A .ts hook is checked FIRST and on its own terms: it carries no shebang, is not
-            # executable, and its selftest entry is `if (import.meta.main)` rather than a shell
-            # `selftest)` case - so the shell-shaped grep below rejects it and the whole suite was
-            # silently skipped. It runs under bun, the runtime the host itself loads it with.
-            case "$s" in
-              *.ts)
-                grep -q 'selftest' "$s" || continue
-                matched=1
-                echo "== $s selftest (bun)"; bun "$s" selftest; continue ;;
-            esac
-            grep -q '"selftest"' "$s" || grep -q "selftest)" "$s" || continue
-            matched=1
-            echo "== $s selftest"; "$s" selftest
-          done
-          [ "$matched" = 1 ] || { echo "no selftest-bearing scripts found" >&2; exit 1; }

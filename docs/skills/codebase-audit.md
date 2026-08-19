@@ -19,14 +19,14 @@ near neighbours:
 |---|---|
 | A feature or improvement is already chosen | `/plan-grill` |
 | A symptom is already reported ("X is broken/slow") | `/diagnose` |
-| Structural orientation alone, no ranked findings wanted | `/codebase-map` |
+| Structural orientation alone, no ranked findings wanted | the `lsp` tool, plus `grep` and `glob` |
 | A greenfield project with no existing code to sweep | `/groundwork` |
 
 ## Where it fits
 
 Sits above the loop, not inside it: it is one of the entry front-ends, alongside `/plan-grill` and
 `/diagnose`, but it never itself feeds a work-item forward - the human reads its report and chooses
-which downstream front-end to enter. It composes `/codebase-map` for structure,
+which downstream front-end to enter. It reaches for the `lsp` tool for structure,
 `/orchestrating-agents` to fan the sweep out across areas, and `/security-pass` for the content and
 secret-handling rules a worker's brief must carry.
 

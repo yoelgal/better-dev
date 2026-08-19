@@ -2,9 +2,10 @@
 # bd-package-check - validate the whole better-dev package before install or release.
 #
 # Lints every skill (frontmatter minimal + name==folder + "Use when" description + no @-links + calm
-# voice), runs every helper's selftest, validates the JSON manifests, and checks that backtick-wrapped
-# /skill references resolve (to a shipped skill or a known host-optional builtin). Non-zero exit on any
-# failure - a release / CI gate, and what `/self-extension` runs before promoting a freshly authored skill.
+# voice), runs every helper's selftest, parses every shipped script, validates the plugin manifest,
+# asserts CLAUDE.md still carries the managed discovery block, and fails on any shipped file that
+# still names a path this release deleted. Non-zero exit on any failure - a release / CI gate, and
+# what `/self-extension` runs before promoting a freshly authored skill.
 set -uo pipefail
 
 # Package root = the dir holding skills/ + scripts/ (run from anywhere in the dev repo).
@@ -342,6 +343,10 @@ for f in skills/*/SKILL.md; do
 done
 
 echo "== helper scripts (selftest) =="
+# Every bd-* script but this one ships a selftest, and a sweep that matches none of them would
+# otherwise print a pass over zero suites - which is how this gate once certified a suite it never
+# executed. So the run count is asserted, not assumed.
+st_ran=0
 for s in scripts/bd-*; do
   [ "$(basename "$s")" = "bd-package-check" ] && continue
   b="$(basename "$s")"
@@ -349,6 +354,7 @@ for s in scripts/bd-*; do
   # Same reason as the hooks loop below: keep the failing run's output so a red selftest names the
   # assertion that broke, not merely the file. Both loops, or the gap just moves.
   st_out=""
+  st_ran=$((st_ran + 1))
   if st_out="$("$s" selftest 2>&1)"; then
     ok "$b" # prove-new: regression-guard every shipped selftest passes at base and still does; this loop's check and label are unchanged, only the failure OUTPUT was added, so there is no new assertion to come back red
   else
@@ -356,159 +362,63 @@ for s in scripts/bd-*; do
     printf '%s\n' "$st_out" | tail -5 | sed 's/^/      /'
   fi
 done
+[ "$st_ran" -gt 0 ] && ok "the selftest sweep ran $st_ran suite(s)" || bad "no selftest-bearing script under scripts/ - the sweep matched nothing, so a pass here would cover zero suites" # prove-new: regression-guard the sweep matches every shipped bd-* script at base and still does; this catches the later change that empties it, which is the one failure a green selftest loop cannot report
 
 echo "== shell parses (bash -n) =="
 # A selftest is not a parse check. `<script> selftest` returns before bash ever reads the rest of the
-# file, so a syntax error in the MAIN path runs green through the selftest runner below - which is
-# exactly how an unparseable hook reached a commit here, caught only by the repo's pre-commit hook.
+# file, so a syntax error in the MAIN path runs green through the selftest loop above - which is
+# exactly how an unparseable script reached a commit here, caught only by the repo's pre-commit hook.
 # CI and a --no-verify commit both skip that hook, so the gate has to parse every shipped script
 # itself.
 #
-# `bash -n`, not `sh -n`: every file here declares an interpreter and 13 of the 15 declare bash, so
-# the parser has to be the one they name. macOS /bin/sh IS bash 3.2, which hid this - on the only
-# machine that gates a merge (runs-on: ubuntu-latest) /bin/sh is dash, and `dash -n scripts/bd-mem`
-# rejects a herestring at PARSE time, turning CI red on untouched, correct code. Measured with the
-# real dash, not reasoned.
-#
-# The glob is the whole of each shipped tree, not `bd-*` within it, so the label is true rather than
-# true by accident: hosts/ is shipped shell that install.sh SOURCES (a broken adapter is a broken
-# installer) and carries no shebang, and any future helper not named bd-* would otherwise ship
-# unparsed under a label claiming it was checked.
+# `bash -n`, not `sh -n`: every shipped script declares bash or sh and the parser has to be the one
+# they name. macOS /bin/sh IS bash 3.2, which hid this - on the only machine that gates a merge
+# (runs-on: ubuntu-latest) /bin/sh is dash, and dash rejects a herestring at PARSE time, turning CI
+# red on untouched, correct code. Measured with the real dash, not reasoned.
 unparseable=""
-unchecked_ts=""
-# better-dev/hooks/* is in the sweep for the same reason the rest of it is: those are the legacy-path
-# shims a pre-flatten host actually executes, and an unparseable one there is a hook that dies exactly
-# where nothing else can report it - the failure mode the shims exist to end.
-# hooks/*/* is swept alongside hooks/*: the glob `hooks/*` yields a host DIRECTORY (hooks/omp today),
-# and the `-f` guard below then drops it - so every file inside it shipped unparsed under a label
-# claiming the whole of hooks/ was checked. The pattern names the SHAPE, not the one host that has
-# it today, so the next hooks/<host>/ dir is swept the day it lands rather than reintroducing this.
-for s in scripts/* hooks/* hooks/*/* hosts/* better-dev/hooks/* install.sh; do
+parsed=0
+for s in scripts/* install.sh; do
   [ -f "$s" ] || continue
-  case "$s" in *.json) continue ;; esac
-  # TypeScript is not shell: `bash -n` rejects a type annotation as a syntax error that is not one.
-  # `bun build --no-bundle` transpiles a single file without resolving its imports and writes nothing,
-  # which is exactly a parse check. bun is the host's own runtime for these files, not a new build
-  # dependency of this repo - so a machine without it is named as unchecked, never failed and never
-  # counted as passed.
-  case "$s" in
-    *.ts)
-      if command -v bun >/dev/null 2>&1; then
-        bun build --no-bundle "$s" >/dev/null 2>&1 || unparseable="$unparseable $s"
-      else
-        unchecked_ts="$unchecked_ts $s"
-      fi
-      continue ;;
-  esac
-  # Parse each script with the language its shebang declares - bd-hook-wire is python,
-  # and `bash -n` on python rejects the first class statement, not a real defect.
-  # ast.parse, not py_compile: a parse check must not write __pycache__ into the tree.
-  if head -1 "$s" | grep -q python; then
-    python3 -c 'import ast,sys; ast.parse(open(sys.argv[1]).read())' "$s" 2>/dev/null || unparseable="$unparseable $s"
-  else
-    bash -n "$s" 2>/dev/null || unparseable="$unparseable $s"
-  fi
+  bash -n "$s" 2>/dev/null || unparseable="$unparseable $s"
+  parsed=$((parsed + 1))
 done
-[ -z "$unchecked_ts" ] || printf '  \033[33m•\033[0m bun is not on PATH, so these shipped TypeScript files were NOT parsed:%s\n' "$unchecked_ts"
-[ -z "$unparseable" ] && ok "every shipped script under scripts/, hooks/ (including hooks/<host>/*.ts through bun), hosts/, better-dev/hooks/ and install.sh parses (bash -n, ast.parse, or bun build per shebang and extension)" || bad "syntax error in:$unparseable - a selftest cannot see this, it exits before the parse" # prove-new: regression-guard every shipped script parses at base, as it does after any change that did not break one; this catches the later edit that does, which the selftest runner structurally cannot see
-
-echo "== hook scripts (selftest) =="
-# hooks/*/bd-* alongside hooks/bd-*, for the reason the parse sweep above takes hooks/*/*: a host's
-# own hooks live one level down, `hooks/bd-*` never matches them, and the omp bridge - whose 200-line
-# selftest is the only proof of note delivery, the worker note, the totality guard and the time bound
-# - was therefore parse-checked and never RUN by this gate. The shape, not the host that has it today.
-for s in hooks/bd-* hooks/*/bd-*; do
-  [ -f "$s" ] || continue
-  # Path under hooks/, not basename: two hosts may ship the same hook name, and a bare basename would
-  # print one label for both.
-  b="${s#hooks/}"
-  # HOW to run it is per-file. A .ts hook carries no shebang and is not executable; bun is the
-  # runtime omp itself loads it with, so bun is the runtime its selftest has to run under. A machine
-  # without bun is told the selftest did NOT run - never counted as passed, the same posture the
-  # parse sweep takes with unchecked_ts.
-  runner=""
-  case "$s" in
-    *.ts)
-      command -v bun >/dev/null 2>&1 || {
-        printf '  \033[33m•\033[0m bun is not on PATH, so %s selftest was NOT run\n' "$b"; continue; }
-      runner=bun ;;
-  esac
-  # Keep the failing run's output. Discarding it (`>/dev/null 2>&1`) makes a red selftest report only
-  # THAT it failed, never which assertion - a reviewer spent a full pass unable to pin one, because
-  # every selftest here prints its reason and this loop threw it away.
-  st_out=""
-  if { [ -n "$runner" ] || [ -x "$s" ]; } && st_out="$($runner "$s" selftest 2>&1)"; then
-    ok "$b selftest passes" # prove-new: regression-guard every shipped hook selftest passes at base and still does; what this pass changed is the loop's REACH, and hooks/omp/bd-awareness.ts is a genuinely new assertion here - never run by this gate before, and red when the bridge breaks (mutation-proven)
-  else
-    bad "$b selftest FAILED"
-    printf '%s\n' "$st_out" | tail -5 | sed 's/^/      /'
-  fi
-done
+[ "$parsed" -gt 0 ] || bad "the parse sweep matched no shipped script, so a pass here would cover zero files"
+[ -z "$unparseable" ] && ok "every shipped script under scripts/ and install.sh parses ($parsed file(s), bash -n)" || bad "syntax error in:$unparseable - a selftest cannot see this, it exits before the parse" # prove-new: regression-guard every shipped script parses at base, as it does after any change that did not break one; this catches the later edit that does, which the selftest runner structurally cannot see
 
 echo "== manifests (valid JSON) =="
-for j in .claude-plugin/plugin.json hooks/hooks.json; do
+# One manifest ships. A manifest a host cannot parse - or one naming a file the package does not
+# carry - fails at load on a user machine, so it is checked here instead. The path half is the
+# deleted-paths sweep below, which reads this file too.
+for j in .claude-plugin/plugin.json; do
   [ -f "$j" ] || { bad "$j missing"; continue; }
   jq -e . "$j" >/dev/null 2>&1 && ok "$j" || bad "$j invalid JSON"
 done
 
-echo "== awareness hooks: declaration vs wiring =="
-# The awareness hook set is written down twice: hooks/hooks.json declares what the tool ships, and
-# bd-hook-wire's WANT table is what actually gets merged into a host's machine-global config at
-# install time. Only the table runs, so a hook added to the declaration alone is a hook no install
-# ever registers - the hookless-install failure of 0.10.1, invisible because the two lists agreed
-# only in prose. They agree here now: every awareness hook hooks.json declares must also appear in
-# bd-hook-wire's WANT table, and vice versa.
-# bd-guard's PreToolUse entries are deliberately out of scope - those are /guardrails-install's
-# per-repo enforcement, not a machine-global install - so compare only the two awareness events.
-# Known limit, deliberately not widened here: this compares NAME SETS. It is an allowlist of two
-# events, so an awareness hook declared under a third one is invisible to it, and it drops the event
-# and matcher, so the two sides can disagree about WHERE a hook fires and still pass. Both predate
-# the flatten. Strengthening it to event|matcher|name tuples is its own work-item; until then this
-# check says the two lists name the same hooks, and does not claim more.
-# One code path, no outer existence guard: a missing file has to reach the SAME bad, or the check
-# skips at base instead of failing there and proves nothing (prove-new mode enforces exactly this).
-json_hooks="$(jq -r '.hooks | to_entries[] | select(.key == "SessionStart" or .key == "SubagentStart")
-                     | .value[].hooks[].command' hooks/hooks.json 2>/dev/null \
-              | sed -E 's#.*/hooks/([a-z-]+).*#\1#' | sort -u || true)"
-wire_hooks="$(sed -n '/^WANT = {/,/^}/p' scripts/bd-hook-wire 2>/dev/null \
-              | grep -oE '"bd-[a-z-]+"' | tr -d '"' | sort -u || true)"
-if [ -n "$json_hooks" ] && [ "$json_hooks" = "$wire_hooks" ]; then
-  ok "hooks.json and bd-hook-wire's WANT table name the same awareness hooks"
+echo "== host table =="
+# The host list is written down twice by necessity: install.sh links skills per host, bd-uninstall
+# removes them per host, and neither can source the other because install.sh acts when it is read.
+# So the two copies are compared here. A host added to one alone is either an install nothing can
+# undo, or an uninstall reaching a host nothing ever installed for.
+_host_table() { sed -n "/^BD_HOST_TABLE='/,/'\$/p" "$1"; }
+_host_rows() { printf '%s\n' "$1" | sed "s/^BD_HOST_TABLE='//; s/'\$//"; }
+it="$(_host_table install.sh)"
+ut="$(_host_table scripts/bd-uninstall)"
+if [ -n "$it" ] && [ "$it" = "$ut" ]; then
+  ok "install.sh and bd-uninstall carry the same host table"
 else
-  bad "awareness hook drift: hooks/hooks.json declares a different set of hook NAMES than bd-hook-wire's WANT table wires - reconcile the WANT table against hooks.json so an install registers the hooks the tool ships. Check the event and matcher by hand: this compares names only"
+  bad "the host table has drifted between install.sh and scripts/bd-uninstall, or one of them no longer declares BD_HOST_TABLE - a host only the installer knows keeps its links forever"
 fi
-
-# Every host adapter declares its hook-config stance explicitly. An adapter that simply omits
-# bd_host_hook_settings is indistinguishable from one whose author forgot, and the failure is silent:
-# skills install, no hook is ever registered, and the operator sees a successful install.
-for a in hosts/*; do
-  [ -f "$a" ] || continue
-  h="$(basename "$a")"
-  grep -q '^bd_host_hook_settings=' "$a" \
-    && ok "hosts/$h declares a hook-config stance" \
-    || bad "host adapter declares no hook-config stance: hosts/$h needs a bd_host_hook_settings line - the verified path, or an empty value to decline explicitly"
-done
-
-echo "== host adapters =="
-# hosts/ is the single host registry (install.sh and bd-uninstall enumerate it), so a broken adapter
-# ships breakage to a user machine unless it fails here: source-clean, required fields, name equals
-# filename, skills dir under HOME, no two hosts claiming one dir, dir-policy in its enum.
-seen_dirs=""
-for a in hosts/*; do
-  [ -f "$a" ] || continue
-  h="$(basename "$a")"
-  bd_host_name=""; bd_host_display=""; bd_host_cli=""; bd_host_skills_dir=""; bd_host_dir_policy=""
-  if ! . "./$a" 2>/dev/null; then bad "hosts/$h does not source cleanly"; continue; fi
-  errs=""
-  [ "$bd_host_name" = "$h" ]         || errs="$errs name!=filename($bd_host_name)"
-  [ -n "$bd_host_display" ]          || errs="$errs no-display"
-  [ -n "$bd_host_cli" ]              || errs="$errs no-cli"
-  case "$bd_host_skills_dir" in "$HOME"/*) ;; *) errs="$errs skills-dir-not-under-HOME" ;; esac
-  case "$bd_host_dir_policy" in ""|create|require-existing) ;; *) errs="$errs bad-dir-policy($bd_host_dir_policy)" ;; esac
-  case " $seen_dirs " in *" $bd_host_skills_dir "*) errs="$errs duplicate-skills-dir" ;; esac
-  seen_dirs="$seen_dirs $bd_host_skills_dir"
-  [ -z "$errs" ] && ok "hosts/$h" || bad "hosts/$h:$errs"
-done
+# Every row has to be usable by both: four fields, a skills dir relative to HOME (an absolute one
+# would write outside the operator's own config), a policy in the enum, and no two hosts claiming
+# one dir - two hosts on one dir means uninstalling either strips the other.
+row_errs="$(_host_rows "$it" | awk -F'|' '
+  $0 == "" { next }
+  { if (NF != 4) { printf " %s(fields=%d)", $1, NF; next }
+    if ($3 ~ /^\// || $3 ~ /^~/) printf " %s(skills-dir-not-relative)", $1
+    if ($4 != "create" && $4 != "require-existing") printf " %s(bad-dir-policy=%s)", $1, $4
+    if ($3 in seen) printf " %s(duplicate-skills-dir)", $1
+    seen[$3] = 1 }')"
+[ -z "$row_errs" ] && ok "every host row: four fields, a HOME-relative skills dir, a known dir policy, no shared dir" || bad "malformed host row(s):$row_errs"
 
 echo "== link sites =="
 # Static invariant: every link site routes through _link_or_copy (install.sh) / link_or_copy (bd-link),
@@ -519,7 +429,7 @@ for f in install.sh scripts/*; do
   [ "$(basename "$f")" = "bd-package-check" ] && continue   # this file names the pattern it greps for
   n="$(grep -c 'ln -s' "$f" 2>/dev/null || true)"
   allowed=0
-  case "$f" in install.sh|scripts/bd-link) allowed=1 ;; esac   # exactly the helper body's one call
+  case "$f" in install.sh) allowed=1 ;; esac   # exactly the helper body's one call
   [ "${n:-0}" -gt "$allowed" ] && raw="$raw $f"
 done
 [ -z "$raw" ] && ok "every link site routes through the symlink-or-copy helper" \
@@ -539,14 +449,11 @@ done
 
 echo "== em/en dash gate =="
 # Standing repo rule: no em (U+2014) or en (U+2013) dashes in shipped text. Match the raw UTF-8 bytes
-# under LC_ALL=C so this holds on BSD grep (no -P) as well as GNU. Covers the shipped surfaces.
+# under LC_ALL=C so this holds on BSD grep (no -P) as well as GNU. Covers the shipped surfaces,
+# CLAUDE.md included - it is the discovery block's only home, and nothing else scans it.
 em="$(printf '\342\200\224')"; en="$(printf '\342\200\223')"
 dash_hits=""
-# The authored files inside the vendored daemon trees are under the no-dash rule too; the upstream .ts
-# sources are not (their comments legitimately carry dashes), so scan only what we wrote. Each `ls` is
-# its own existence guard - absent on a consumer install that did not vendor them.
-vendored_authored="browse/README.md browse/UPSTREAM browse/scripts/check-upstream.sh ios-qa/README.md ios-qa/UPSTREAM ios-qa/scripts/check-upstream.sh"
-for f in $(find skills scripts docs hooks hosts better-dev -type f 2>/dev/null; ls install.sh README.md BOOTSTRAP.md $vendored_authored 2>/dev/null); do
+for f in $(find skills scripts docs friction -type f 2>/dev/null; ls install.sh README.md BOOTSTRAP.md CLAUDE.md 2>/dev/null); do
   LC_ALL=C grep -lq -e "$em" -e "$en" "$f" 2>/dev/null && dash_hits="$dash_hits $f"
 done
 [ -z "$dash_hits" ] && ok "no em/en dashes in shipped text" || bad "em/en dash in:$dash_hits"
@@ -572,7 +479,7 @@ slop="$slop|what if I told you|stands as a testament|marks a pivotal moment|play
 slop="$slop|underscores its significance|experts agree|at the end of the day|in today'?s world"
 slop="$slop|let'?s dive in|is not just|isn'?t just|the question isn'?t|in conclusion"
 slop_hits=""
-for f in $(find skills docs hosts -type f -name '*.md' 2>/dev/null; ls README.md BOOTSTRAP.md CLAUDE.md 2>/dev/null); do
+for f in $(find skills docs -type f -name '*.md' 2>/dev/null; ls README.md BOOTSTRAP.md CLAUDE.md 2>/dev/null); do
   case "$f" in
     # Three files must name a pattern in order to forbid it, so they are exempt by construction rather
     # than by exception: the shipped block itself, the decision record that quotes the ruling, and any
@@ -596,7 +503,7 @@ echo "== zsh path-variable trap =="
 # they are sourced INTO that zsh. Executed scripts declare bash/sh in a shebang and are exempt.
 # Convention: idx_path / wt_path / <thing>_path - never the bare name.
 path_hits=""
-for f in $(find skills -name SKILL.md 2>/dev/null; ls scripts/bd-gfx 2>/dev/null); do
+for f in $(find skills -name SKILL.md 2>/dev/null); do
   # Two forms, both fatal under zsh:
   #   1. an assignment at a statement boundary (line start, or after ; & | ( or `do`/`then`)
   #   2. a bare `path` in a `local`/`typeset`/`declare` name list - this one is worse, because it
@@ -612,14 +519,6 @@ path_hits="$(printf '%s\n' $path_hits | sed '/^[[:space:]]*$/d' | sort -u | tr '
 [ -z "$path_hits" ] && ok "no bare 'path' variable in skill blocks or sourced helpers" \
   || bad "zsh path-trap: a bare 'path' variable clobbers PATH in:$path_hits (use idx_path/wt_path)"
 
-# A prescribed `bd-mem learn "<x>" <confidence>` teaches the call that corrupts the store: `learn`
-# takes a number in 0..1, and a word there used to write a line jq rejects - stored-looking, scored
-# 0.00, printed as a guess forever. Six skills shipped the bare placeholder at once, which is why
-# this is a gate and not a review note: it drifted back into three more files than anyone counted.
-conf_hits="$(grep -rl '<confidence>' skills/ 2>/dev/null | tr '\n' ' ')"
-[ -z "$conf_hits" ] && ok "no bare '<confidence>' placeholder - prescribed learn calls say <0..1>" \
-  || bad "bare '<confidence>' placeholder in:$conf_hits - write <0..1>, or the prescribed call writes a line jq rejects"
-
 # A falsified host observation shipped as background fact outlives the run that disproved it: this
 # one claimed remote branch deletion was classifier-gated, was contradicted on every run from
 # 2026-07-24, and survived only because a house rule in one repo cancelled it - which no adopter can
@@ -631,22 +530,6 @@ if ! grep -q 'observed: both `git push --delete`' skills/pr-and-verify/SKILL.md 
 else
   bad "pr-and-verify carries the falsified 'remote deletion is classifier-gated' observation - disproved since 2026-07-24"
 fi
-
-echo "== vendored daemons (lint-shape only) =="
-# The vendored daemon trees (browse/, ios-qa/) are NOT behaviorally CI-gated here: this lints their dir
-# shape only. Each must carry its provenance (UPSTREAM), license (LICENSE-upstream), and README.md, and
-# must commit no build output (node_modules/ or dist/ - git-tracked, not just on disk). A consumer install
-# may not vendor these dirs, so skip silently when absent.
-for vd in browse ios-qa; do
-  [ -d "$vd" ] || continue
-  errs=""
-  for req in UPSTREAM LICENSE-upstream README.md; do
-    [ -f "$vd/$req" ] || errs="$errs missing-$req"
-  done
-  git ls-files "$vd" 2>/dev/null | grep -qE '(^|/)(node_modules|dist)/' && errs="$errs committed-build-output"
-  [ -z "$errs" ] && ok "$vd/ vendored shape ok (lint-shape only, not behaviorally CI-gated)" \
-    || bad "$vd/:$errs"
-done
 
 echo "== manifest version =="
 v="$(jq -r '.version // empty' .claude-plugin/plugin.json 2>/dev/null)"
@@ -744,16 +627,14 @@ for f in $(find skills docs -name '*.md' 2>/dev/null); do
 done
 [ -z "$count_drift" ] && ok "enumerated counts match the list that follows" || bad "enumerated count drift: $count_drift" # prove-new: regression-guard a skill announcing "six lines" above six bullets is correct at base; this catches the later edit that adds a seventh and leaves the count reading six
 
-echo "== install/uninstall roundtrip (every adapter) =="
-# Prove the two lifecycle deliverables stay honest for every registered host: a clean HOME installs,
-# links resolve, a planted foreign skill is left alone, and bd-uninstall removes only ours. Pre-creating
-# the skills dir satisfies require-existing hosts, so the same loop covers both dir policies.
-for a in hosts/*; do
-  [ -f "$a" ] || continue
-  h="$(basename "$a")"
-  rt="$(mktemp -d)"
-  hd="$(HOME="$rt" bash -c 'source "$1" && printf %s "$bd_host_skills_dir"' _ "$a" 2>/dev/null)"
-  if [ -z "$hd" ]; then bad "roundtrip $h: adapter yields no skills dir"; rm -rf "$rt"; continue; fi
+echo "== install/uninstall roundtrip (every host) =="
+# Prove the two lifecycle deliverables stay honest for every host in the table: a clean HOME
+# installs, links resolve, a planted foreign skill is left alone, and bd-uninstall removes only
+# ours. Pre-creating the skills dir satisfies the require-existing hosts, so one loop covers both
+# dir policies.
+for row in $(_host_rows "$it" | awk -F'|' 'NF == 4 { print $1 "@" $3 }'); do
+  h="${row%@*}"; rel="${row#*@}"
+  rt="$(mktemp -d)"; hd="$rt/$rel"
   mkdir -p "$hd/review"; printf 'not ours\n' > "$hd/review/SKILL.md"
   if HOME="$rt" "$ROOT/install.sh" --host "$h" >/dev/null 2>&1 \
      && [ -L "$hd/packaging" ] \
@@ -771,23 +652,14 @@ for a in hosts/*; do
 done
 
 echo "== require-existing decline (skills dir absent) =="
-# The roundtrip above pre-creates every skills dir, so require-existing's DECLINE branch never runs there.
-# Cover it directly: for one require-existing host with its skills dir ABSENT, install must decline without
-# creating the dir and without linking anything. (Known install.sh defect, owned by another worker: the
-# decline branch still does installed++, so a declined host is miscounted as installed - asserted on the
-# observable dir side here, not the counter.)
-re_host=""; re_adapter=""
-for a in hosts/*; do
-  [ -f "$a" ] || continue
-  pol="$(HOME=/nonexistent bash -c 'source "$1" && printf %s "${bd_host_dir_policy:-require-existing}"' _ "$a" 2>/dev/null)"
-  [ "$pol" = "require-existing" ] && { re_host="$(basename "$a")"; re_adapter="$a"; break; }
-done
-if [ -z "$re_host" ]; then
+# The roundtrip above pre-creates every skills dir, so the DECLINE branch never runs there. Cover it
+# directly: for one require-existing host with its skills dir ABSENT, install must decline without
+# creating the dir and without linking anything.
+re_row="$(_host_rows "$it" | awk -F'|' '$4 == "require-existing" { print $1 "@" $3; exit }')"
+if [ -z "$re_row" ]; then
   ok "no require-existing host registered (decline path N/A)"
 else
-  rt="$(mktemp -d)"
-  hd="$(HOME="$rt" bash -c 'source "$1" && printf %s "$bd_host_skills_dir"' _ "$re_adapter" 2>/dev/null)"
-  rm -rf "$hd"   # ensure the skills dir is absent
+  re_host="${re_row%@*}"; rt="$(mktemp -d)"; hd="$rt/${re_row#*@}"
   HOME="$rt" "$ROOT/install.sh" --host "$re_host" >/dev/null 2>&1
   if [ ! -d "$hd" ] && [ ! -f "$hd/.better-dev-install" ]; then
     ok "require-existing $re_host: install declined, skills dir not created, nothing linked"
@@ -797,180 +669,9 @@ else
   rm -rf "$rt"
 fi
 
-echo "== moved clone (pre-flatten host) =="
-# The flatten deleted <clone>/better-dev/, and a host installed before it holds ABSOLUTE paths into
-# that directory: every skill link, and the three hook commands install.sh wrote into the host's
-# machine-global config. Those hook commands are the load-bearing half - a dead one exits 127, so no
-# hook code runs and no nudge can reach the operator, however correct the nudge is. The legacy-path
-# shims exist for exactly that, and this proves the whole chain end to end on a throwaway HOME:
-# the pre-flatten hook path still executes, what it prints names the repair, and running that repair
-# repoints the links and the hook entries with nothing stale left beside them. Asserting the hook
-# entries through bd-hook-wire's `plan`, never a grep for one hook name - `install.sh --verify`
-# drifted from the WANT table doing precisely that, and plan compares whole entries against it.
-# pwd -P at creation, not the bare mktemp path: install.sh derives its SRC with `pwd -P`, and on macOS
-# /var is a symlink to /private/var, so the two spellings of the same directory would never compare
-# equal and every path assertion below would fail on a healthy repair. Linux CI would not have shown it.
-mc="$(cd "$(mktemp -d)" && pwd -P)"
-mc_hd="$(HOME="$mc" bash -c 'source "$1" && printf %s "$bd_host_skills_dir"' _ hosts/claude 2>/dev/null)"
-mc_settings="$(HOME="$mc" bash -c 'source "$1" && printf %s "$bd_host_hook_settings"' _ hosts/claude 2>/dev/null)"
-# One check, not two: an adapter that yields no paths reports through the same bad below rather than
-# earning a label of its own. A second label here would be one that never RUNS at base, which
-# --prove-new reads as a silent skip and refuses - correctly, since a check that cannot fail at base
-# proves nothing about the diff that added it.
-mc_ok=0
-# The clone under test is a throwaway made of symlinks into $ROOT, NOT $ROOT itself. Two reasons, both
-# load-bearing. It is not a git checkout, so update_nudge stops at its `rev-parse --git-dir` guard
-# instead of running its bounded `git fetch` - a gate must not make a network call, and must never
-# write FETCH_HEAD into the very checkout it is grading. And it puts the clone at a path that is not
-# the repo root, which is what a real install looks like. `cd` is logical, so the shim's `../..`
-# collapses textually before `pwd -P` and still lands on $mc/clone.
-mc_clone="$mc/clone"
-mkdir -p "$mc_clone/better-dev"
-for d in skills scripts hooks hosts docs .claude-plugin; do ln -sfn "$ROOT/$d" "$mc_clone/$d"; done
-ln -sfn "$ROOT/better-dev/hooks" "$mc_clone/better-dev/hooks"
-ln -sfn "$ROOT/install.sh" "$mc_clone/install.sh"
-if [ -n "$mc_hd" ] && [ -n "$mc_settings" ]; then
-  mkdir -p "$mc_hd" "$(dirname "$mc_settings")"
-  # A host wired on the 0.7.0 layout: link target and hook commands both one level down.
-  ln -sfn "$mc_clone/better-dev/skills/onboard" "$mc_hd/onboard"
-  printf '{}' > "$mc_settings"
-  python3 "$ROOT/scripts/bd-hook-wire" wire "$mc_clone/better-dev" "$mc_settings" >/dev/null 2>&1
-  # cd into the throwaway HOME, not the repo: an unwired cwd is the honest case (the operator's own
-  # project), and it keeps this repo's .better-dev out of the hook's walk-up.
-  # Capture the exit status, do not discard it. The criterion is that the legacy path still RUNS -
-  # a shim that printed the right words and exited non-zero would satisfy every other conjunct here,
-  # and a `|| true` would let it through. 127 (the dead-path case) is caught twice over this way.
-  mc_rc=0
-  mc_out="$(cd "$mc" && HOME="$mc" CLAUDE_PLUGIN_ROOT= bash "$mc_clone/better-dev/hooks/bd-session-start" 2>/dev/null)" || mc_rc=$?
-  # The stale-entry assertion above matches the FULL legacy prefix with -F, not the bare substring
-  # `better-dev/hooks/`. The install one-liner this repo ships clones to ~/better-dev, and CI checks
-  # the renamed repo out at .../better-dev/better-dev, so a correctly repaired entry legitimately
-  # contains that substring and the bare form fails a healthy host. Third instance of "the clone path
-  # is not a pattern" on this branch; the other two were grep -q where -qF was meant.
-  # Assert on systemMessage, not additionalContext: install.sh writes the host's machine-global
-  # config, so the repair is the operator's to run and a mark only the agent can see does not deliver
-  # it. Both marks, because the two losses are independent - skills and hooks.
-  mc_msg="$(printf '%s' "$mc_out" | jq -r '.systemMessage' 2>/dev/null || true)"
-  if [ "$mc_rc" = 0 ] \
-     && printf '%s' "$mc_msg" | grep -q 'skill links missing, run install.sh' \
-     && printf '%s' "$mc_msg" | grep -q 'awareness hooks missing, run install.sh' \
-     && HOME="$mc" "$mc_clone/install.sh" --host claude >/dev/null 2>&1 \
-     && [ -e "$mc_hd/onboard/SKILL.md" ] \
-     && [ "$(readlink "$mc_hd/onboard")" = "$mc_clone/skills/onboard" ] \
-     && ! grep -qF "$mc_clone/better-dev/hooks/" "$mc_settings" \
-     && [ "$(python3 "$ROOT/scripts/bd-hook-wire" plan "$mc_clone" "$mc_settings" 2>/dev/null)" = current ]; then
-    mc_ok=1
-  fi
-fi
-[ "$mc_ok" = 1 ] \
-  && ok "moved clone: the pre-flatten hook path still runs and names install.sh, and that run repoints every link and hook entry with no stale entry beside them" \
-  || bad "moved clone: a host wired on the pre-flatten layout is not reached or does not repair - the legacy hook path is dead (nothing can nudge the operator), its output does not name install.sh, the repair left a link or hook entry pointing into the deleted better-dev/ directory, or hosts/claude yields no skills dir"
-rm -rf "$mc"
-
-# /update resolves the clone with its OWN standalone bash - it has to run before it knows where the
-# tool is, so it cannot call normalize_clone. That makes it a second copy of the same three-way
-# resolution, and the copy silently stepped down only: post-flatten it reported "no better-dev clone
-# found" and never reached its link reconcile, on the sanctioned update path. Assert both directions
-# and the string read - following the link with `cd` fails on the dangling one, which is the whole
-# case. Text-level, because the block is prose in a skill, not a shipped script.
-upd="skills/update/SKILL.md"
-if grep -q 'clone="$clone/better-dev"' "$upd" \
-   && grep -q 'clone="${clone%/\*}"' "$upd" \
-   && grep -q 'clone="${t%/skills/onboard}"' "$upd"; then
-  ok "/update's clone resolver normalizes in both directions and reads the link as a string, so a moved clone still resolves"
-else
-  bad "/update's clone resolver does not handle a moved clone: it steps only down (or follows the link with cd, which fails on the dangling link a moved clone leaves), so the sanctioned update path reports no clone found on exactly the install that needs updating"
-fi
-
-# --- self-repair independence: the resolver reads THIS REPO's bridge before any $HOME guess.
-# /update's job is to reconcile a stale install, and its first act used to be a guess about the host's
-# dir shape ($HOME globs). A wrong guess (omp declares its skills dir two levels down) left /update
-# unable to resolve anything on an omp-only machine - and /update is the verb that would have shipped
-# the fix for the guess. A mechanism whose repair path runs through the thing it repairs cannot reach
-# the installs that need it most. `.better-dev/bin` is a symlink to <clone>/scripts, so it names the
-# clone exactly with no host shape assumed, and it must be tried first.
-#
-# ORDER is the property, so this runs the SHIPPED block rather than grepping for the bridge string:
-# a fixture where all three sources resolve to a DIFFERENT valid checkout can only answer cloneA if
-# the bridge was read first. Grepping presence would pass with the read appended after the globs.
-ro="$(mktemp -d)"
-for ro_c in A B C; do mkdir -p "$ro/clone$ro_c/skills/onboard" "$ro/clone$ro_c/scripts"; git -C "$ro/clone$ro_c" init -q 2>/dev/null; done
-mkdir -p "$ro/home/.claude/skills" "$ro/repo/.better-dev"
-ln -snf "$ro/cloneB/skills/onboard" "$ro/home/.claude/skills/onboard"   # what the $HOME globs answer
-ln -snf "$ro/cloneA/scripts" "$ro/repo/.better-dev/bin"                # what this repo's bridge answers
-ro_block="$(awk '/^## 1\. Locate the clone/{f=1} f&&/^```bash/{b=1;next} b&&/^```/{exit} b{print}' "$upd")"
-ro_got="$(cd "$ro/repo" && HOME="$ro/home" CLAUDE_PLUGIN_ROOT="$ro/cloneC" \
-  bash -c "$ro_block"'
-printf %s "$clone"' 2>/dev/null)"
-[ -n "$ro_block" ] && [ "$ro_got" = "$ro/cloneA" ] \
-  && ok "/update resolves the clone from this repo's .better-dev/bin bridge before \$CLAUDE_PLUGIN_ROOT or any \$HOME glob, so a host whose dir shape the globs miss can still update itself" \
-  || bad "/update's clone resolver reaches a \$HOME guess (or the plugin root) before this repo's own bridge - resolved '${ro_got:-<nothing>}', wanted the bridge's clone - so a machine the globs cannot match is unreachable by the very verb that would fix the glob"
-rm -rf "$ro"
-
-# --- the declared-vs-hardcoded class, closed mechanically. hosts/<h> DECLARES bd_host_skills_dir;
-# the resolver globs in /update and /onboard have to FIND that dir before the clone (and therefore
-# hosts/*) is readable at all, so they cannot consult the declaration and instead carry a glob shape
-# that can silently contradict it. It did: omp declares $HOME/.omp/agent/skills - two levels - while
-# every resolver globbed one, so /update resolved nothing on an omp-only machine and resolved through
-# some other host's link by luck on a mixed one. Both sides are DERIVED here, never restated: the
-# dirs come from sourcing each adapter, the patterns come from grepping the skill files, and the
-# match is a real glob against a fixture HOME holding every declared dir. Per FILE, not pooled - one
-# site broadened while a sibling stays one-level is the exact half-fix this has to catch. A future
-# host nesting three levels down fails here rather than shipping.
-hr_home="$(mktemp -d)"
-hr_dirs=""
-for hr_a in hosts/*; do
-  [ -f "$hr_a" ] || continue
-  hr_d="$(HOME="$hr_home" bash -c 'source "$1" && printf %s "${bd_host_skills_dir-}"' _ "$hr_a" 2>/dev/null)"
-  [ -n "$hr_d" ] || continue
-  mkdir -p "$hr_d"
-  hr_dirs="$hr_dirs $hr_d"
-done
-hr_errs=""
-[ -n "$hr_dirs" ] || hr_errs=" no-adapter-declared-a-skills-dir"
-for hr_f in skills/update/SKILL.md skills/onboard/SKILL.md; do
-  # Every "$HOME"-rooted host-skills-dir glob the file runs, reduced to its dir (drop the leaf the
-  # site looks for - onboard/ for the clone link, .better-dev-install for the marker).
-  hr_pats="$(grep -ho '"\$HOME"/[^ ;"]*/skills/[^ ;"]*' "$hr_f" 2>/dev/null | sed 's:/skills/[^/]*$:/skills:' | sort -u)"
-  if [ -z "$hr_pats" ]; then hr_errs="$hr_errs ${hr_f%/SKILL.md}:no-host-skills-glob-left"; continue; fi
-  hr_reached=""
-  while IFS= read -r hr_pat; do
-    [ -n "$hr_pat" ] || continue
-    hr_reached="$hr_reached $(compgen -G "$hr_home${hr_pat#'"$HOME"'}" 2>/dev/null | tr '\n' ' ')"
-  done <<<"$hr_pats"
-  for hr_d in $hr_dirs; do
-    case " $hr_reached " in
-      *" $hr_d "*) ;;
-      *) hr_errs="$hr_errs ${hr_f%/SKILL.md}:unreachable(${hr_d#"$hr_home"/})" ;;
-    esac
-  done
-done
-rm -rf "$hr_home"
-if [ -z "$hr_errs" ]; then
-  ok "every host adapter's declared skills dir is reachable by the resolver globs each of /update and /onboard actually runs"
-else
-  bad "a declared host skills dir is unreachable by a resolver glob, so that host cannot resolve its own clone:$hr_errs"
-fi
-
-# The legacy-plugin decision, landed in one direction everywhere. The failure that matters is a skill
-# DECLINING to wire the guard because it believes a plugin already did - a repo left with no
-# enforcement and a record saying it has some. Assert the write-nothing branches are gone rather than
-# asserting new prose. Each site is pinned by ABSENCE of the old instruction - the /update conjunct
-# needs both halves, because a positive grep for the new sentence stays green if the old one is simply
-# restored beside it. Known limit, stated rather than overclaimed: absence-of-one-sentence does not
-# catch a reworded reintroduction of the same idea, only a verbatim one.
-if ! grep -q 'nothing to do; enforcement is already always-on' skills/guardrails-install/SKILL.md \
-   && ! grep -q 'write nothing' skills/guardrails-install/stacks.md \
-   && ! grep -q 'that channel working as designed' skills/update/SKILL.md \
-   && grep -q 'not a supported install' skills/update/SKILL.md; then
-  ok "a legacy plugin install is settled as unsupported: no branch tells /guardrails-install to skip the wiring, and /update names the migration rather than calling a refused pull normal"
-else
-  bad "the legacy-plugin decision is not landed in all three places - /guardrails-install still declines to wire the guard on the belief a plugin delivered it (leaving a repo unenforced while recording that it is enforced), or /update still describes a plugin checkout as a normal state to leave alone"
-fi
-
 echo "== comms-style block =="
-# The block ships from exactly one file. onboard writes it per repo and BOOTSTRAP offers it globally;
-# two copies of the body would drift, and the drift only shows up on a user machine. Also gate the
+# The block ships from exactly one file, and /onboard writes it into each repo it wires; two copies of
+# the body would drift, and the drift only shows up on a user machine. Also gate the
 # 85-line cap the block is deliberately held to - it is a per-turn tax in every session that loads it.
 # Cap history, because the shape of the mistake matters more than the number: 24 originally, 30 when the
 # block gained its first device that acts on a reply, 60 when the operator ruled the upstream wording be
@@ -991,7 +692,7 @@ else
   # NOT the git index: an uncommitted second copy is exactly the drift this gate exists to catch, and
   # `git ls-files` cannot see one. raw/ is the gitignored source archive and stays out of scope.
   probe="The reader has ADHD"
-  homes="$(find skills scripts docs hooks hosts better-dev -type f 2>/dev/null; ls install.sh README.md BOOTSTRAP.md 2>/dev/null)"
+  homes="$(find skills scripts docs -type f 2>/dev/null; ls install.sh README.md BOOTSTRAP.md 2>/dev/null)"
   homes="$(printf '%s\n' "$homes" \
     | while read -r f; do [ -f "$f" ] && grep -lqF "$probe" "$f" 2>/dev/null && printf '%s\n' "$f"; done \
     | grep -v 'scripts/bd-package-check' || true)"
@@ -1006,170 +707,13 @@ else
   fi
 fi
 
-# Every adapter declares where this host keeps its global entry file. Empty is a legitimate answer
-# (the host has no verified path, so the global option declines rather than inventing one); what is
-# not legitimate is the field being absent, which reads identically to "declines" while meaning
-# "nobody has thought about it yet".
-for a in hosts/*; do
-  [ -f "$a" ] || continue
-  h="$(basename "$a")"
-  grep -q '^bd_host_global_entry=' "$a" \
-    || { bad "hosts/$h: no bd_host_global_entry (set it, or set it empty to decline the global option)"; continue; }
-  ge="$(HOME=/nonexistent bash -c 'source "$1" && printf %s "${bd_host_global_entry:-}"' _ "$a" 2>/dev/null)"
-  case "$ge" in
-    "") ok "hosts/$h: declines the global comms block (no verified entry file)" ;;
-    /nonexistent/*) ok "hosts/$h: global entry under HOME" ;;
-    *) bad "hosts/$h: bd_host_global_entry not under HOME ($ge)" ;;
-  esac
-  # Same assertion, the adapter's other machine-touching path. bd_host_hook_settings is where
-  # install.sh registers this host's awareness hooks; a value outside HOME writes hook config into
-  # somebody else's tree on every install, and empty is the declining answer codex and hermes give.
-  hs="$(HOME=/nonexistent bash -c 'source "$1" && printf %s "${bd_host_hook_settings:-}"' _ "$a" 2>/dev/null)"
-  case "$hs" in
-    "") ok "hosts/$h: declines hook wiring (no verified machine-global hook config)" ;; # prove-new: regression-guard codex and hermes already decline at base; the branch exists so a declining adapter reads as decided rather than as unexamined
-    /nonexistent/*) ok "hosts/$h: hook settings under HOME" ;; # prove-new: regression-guard hosts/claude's hook settings already sit under HOME at base, as every adapter's must; this catches the later adapter that points install.sh's hook registration outside the operator's own config
-    *) bad "hosts/$h: bd_host_hook_settings not under HOME ($hs) - installing this host would register hooks outside the operator's own config" ;;
-  esac
-  # Which wiring script install.sh runs for this host. install.sh interpolates the value straight into
-  # "$SRC/scripts/$value", so it has to be a bare basename: a slash or a .. walks out of scripts/.
-  # And a name that resolves to nothing is worse than no name at all - the installer reports a skipped
-  # hook step forever while the adapter claims the host is supported.
-  hw="$(HOME=/nonexistent bash -c 'source "$1" && printf %s "${bd_host_hook_wire:-}"' _ "$a" 2>/dev/null)"
-  case "$hw" in
-    "") ok "hosts/$h: takes the default hook wiring script" ;; # prove-new: regression-guard no adapter overrides the wiring script at base, so every one takes the default; this catches the later adapter that names a path where a basename belongs
-    */*|*..*) bad "hosts/$h: bd_host_hook_wire is a path, not a basename ($hw) - install.sh interpolates it into \$SRC/scripts/, so this escapes the scripts dir" ;;
-    *)
-      if [ -x "scripts/$hw" ]; then
-        ok "hosts/$h: wires hooks through scripts/$hw" # prove-new: regression-guard no adapter names a wiring script at base, so none can be missing yet; this catches the later adapter naming a script that does not ship, whose hook step then skips on every install while the host reads as supported
-      else
-        bad "hosts/$h: bd_host_hook_wire names scripts/$hw, which is missing or not executable - installing this host skips hook wiring forever while reporting the host supported"
-      fi ;;
-  esac
-done
-
-echo "== host bridges (exported paths vs adapter) =="
-# A host whose hook mechanism is a MODULE rather than a config ships a bridge under hooks/<host>/,
-# and that bridge is what hands the awareness hooks their host-scoped env: BD_HOST_SKILLS_DIR and
-# BD_HOST_HOOK_SETTINGS. Both values are the ADAPTER's - install.sh writes the target from
-# bd_host_hook_settings - and a bridge that restates them in its own literals is a second copy
-# nothing compares. Its own selftest cannot: it builds the expected value from the same literals as
-# the code under test. So rename the target in hosts/<host> and every selftest and --verify stays
-# green while the installer writes one path and the bridge exports another, which is the permanently
-# silent hook nudge this branch already had to fix once.
-#
-# Compare the two SOURCES here, where every adapter is already sourced under a scratch HOME. RUN the
-# bridge for its side: it resolves its clone from its own module path and then EXECUTES
-# <clone>/hooks/bd-session-start, so a two-line recorder standing in for that hook reports the env
-# the bridge really hands a child. Grepping the bridge for the literal would be a third copy of it,
-# which is the defect, not the fix. Keyed on shape - a *.ts hook module beside hosts/<host> - so the
-# next host with a bridge is covered without naming it.
-for a in hosts/*; do
-  [ -f "$a" ] || continue
-  h="$(basename "$a")"
-  # The bridge is the module the adapter DECLARES, never every .ts sitting beside it: install.sh
-  # writes bd_host_hook_settings, so that is the one file whose exported env has to agree with it.
-  # A sibling the bridge COMPOSES - the enforcement half, hooks/omp/bd-guard.ts - has no default
-  # export and never claimed to be a bridge, so driving it as one fails by construction and says
-  # nothing about the adapter.
-  br="hooks/$h/$(basename "$(bash -c 'source "$1" && printf %s "${bd_host_hook_settings-}"' _ "$a" 2>/dev/null)")"
-  # A host HAS a module bridge when hooks/<host>/ holds any .ts. Given one, a declared basename that
-  # resolves to no file is precisely the drift this check exists for - the installer would write a
-  # path nothing maintains - so it reports RED. Gating the whole block on `[ -f "$br" ]` alone made
-  # the check VANISH under exactly its own named mutation (rename the declared target and there was
-  # no ok, no bad, not even the not-compared note), which is worse than the check it replaced.
-  mods=""
-  for cand in "hooks/$h"/*.ts; do [ -f "$cand" ] && mods="$mods $cand"; done
-  if [ -n "$mods" ] && [ ! -f "$br" ]; then
-    bad "hosts/$h declares a hook target whose module is absent from hooks/$h/ (looked for '$br', found:$mods) - install.sh would write that path while no module maintains it, so the hook nudge plans against a file nothing exports" # prove-new: regression-guard at base hosts/omp declares bd-awareness.ts and that module is present, so this branch cannot fire there; it is the red-capability the same pass removed by gating on [ -f "$br" ], and it fires on the rename mutation the ok line's own claim rests on (mutation-proven)
-  elif [ -f "$br" ]; then
-    bb="${br#hooks/}"
-    # Same posture as the parse sweep and the hook-selftest loop: bun is the runtime the host itself
-    # loads these modules with, so a machine without it is told the comparison did NOT run.
-    command -v bun >/dev/null 2>&1 || {
-      printf '  \033[33m•\033[0m bun is not on PATH, so %s exported paths were NOT compared with hosts/%s\n' "$bb" "$h"; continue; }
-    bd="$(cd "$(mktemp -d)" && pwd -P)"
-    mkdir -p "$bd/home" "$bd/proj" "$bd/clone/hooks/$h"
-    # The whole host dir, not the bridge alone: a bridge may import a sibling module from it, and a
-    # one-file copy leaves that import unresolvable - which reads as a bridge exporting nothing
-    # rather than as a fixture that never loaded it.
-    cp "hooks/$h"/*.ts "$bd/clone/hooks/$h/"
-    printf '#!/usr/bin/env bash\nprintf "%%s\\n%%s\\n" "${BD_HOST_SKILLS_DIR-}" "${BD_HOST_HOOK_SETTINGS-}" > "$BD_BRIDGE_ENV"\nprintf "{}\\n"\n' \
-      > "$bd/clone/hooks/bd-session-start"
-    chmod +x "$bd/clone/hooks/bd-session-start"
-    # The bridge registers handlers on the host's hook api and only builds the env when one fires,
-    # so the driver plays the host: a recording api, then the session_start handler. A bridge that
-    # registers nothing records nothing and reports below as a mismatch, never as a pass.
-    printf '%s\n' \
-      'import { readFileSync } from "node:fs";' \
-      'const [bridge, cwd] = process.argv.slice(2);' \
-      'const mod = await import(bridge);' \
-      'const handlers = new Map();' \
-      'mod.default({ on: (e, f) => handlers.set(e, f), sendMessage: () => {} });' \
-      'const h = handlers.get("session_start");' \
-      'if (!h) { console.error("bridge registered no session_start handler"); process.exit(1); }' \
-      'h({}, { cwd });' \
-      'process.stdout.write(readFileSync(process.env.BD_BRIDGE_ENV, "utf8"));' > "$bd/drv.mjs"
-    got="$(cd "$bd" && HOME="$bd/home" BD_BRIDGE_ENV="$bd/env.txt" \
-      bun "$bd/drv.mjs" "$bd/clone/hooks/$h/$(basename "$br")" "$bd/proj" 2>/dev/null)"
-    want_sk="$(HOME="$bd/home" bash -c 'source "$1" && printf %s "${bd_host_skills_dir-}"' _ "$a" 2>/dev/null)"
-    want_hs="$(HOME="$bd/home" bash -c 'source "$1" && printf %s "${bd_host_hook_settings-}"' _ "$a" 2>/dev/null)"
-    got_sk="$(printf '%s\n' "$got" | sed -n 1p)"
-    got_hs="$(printf '%s\n' "$got" | sed -n 2p)"
-    berrs=""
-    [ "$got_sk" = "$want_sk" ] || berrs="$berrs skills-dir(exports '$got_sk', hosts/$h declares '$want_sk')"
-    [ "$got_hs" = "$want_hs" ] || berrs="$berrs hook-target(exports '$got_hs', hosts/$h declares '$want_hs')"
-    if [ -z "$berrs" ]; then
-      ok "$bb exports the skills dir and hook target hosts/$h declares" # prove-new: regression-guard no host bridge exists at base, so this cannot come back red there; it holds today and catches the later adapter edit that moves a path the bridge restates. Mutation-proven in two directions, which is why the sibling `bad` above exists: editing the path the bridge exports reddens THIS line, while renaming the target hosts/omp declares reddens the missing-module branch instead - before that branch was added the rename made the whole comparison vanish
-    else
-      bad "$bb and hosts/$h disagree:$berrs - install.sh writes the adapter's path while the bridge tells the awareness hooks another, so the hook nudge plans against a file nothing maintains"
-    fi
-    rm -rf "$bd"
-  fi
-done
-
-# The five status words ARE the caller-facing contract of a wiring script: install.sh and
-# hooks/bd-session-start branch on the printed word, never on an exit code. A second wiring script
-# that renames one reports success in a vocabulary no caller reads. Grep-level is enough - each
-# script's own selftest proves the behavior, this only holds the words still.
-for w in scripts/bd-*hook-wire; do
-  [ -f "$w" ] || continue
-  wb="$(basename "$w")"
-  missing=""
-  for word in wired would-wire current unwired unreadable; do
-    grep -qF -- "$word" "$w" || missing="$missing $word"
-  done
-  if [ -z "$missing" ]; then
-    ok "$wb speaks the whole wiring status vocabulary" # prove-new: regression-guard bd-hook-wire carries all five words at base, being the only wiring script there; this catches the second wiring script that renames one, leaving each caller able to read only one of them
-  else
-    bad "$wb never mentions:$missing - the wiring status vocabulary has drifted, so a caller branching on one script's words is silently blind to the other's"
-  fi
-done
-
-# A machine carrying the global block styles every transcript on it, trap transcripts included. Trap
-# grading is a human read (docs/TRAPS.md says so itself), so the ritual has to name the clearance or
-# the reader silently grades a contaminated run. Upstream shipped exactly this bug in its own evals.
-# Scoped to the ritual's own section: TRAPS.md names better-dev-comms elsewhere (the trap about a
-# re-run mangling the block), so a whole-file grep would pass without the ritual ever saying it.
-ritual="$(awk '/^## Revalidation ritual/{f=1} f&&/^---/{exit} f{print}' docs/TRAPS.md 2>/dev/null)"
-printf '%s' "$ritual" | grep -q 'better-dev-comms' \
-  && ok "TRAPS revalidation names clearing the global comms block" \
-  || bad "docs/TRAPS.md revalidation ritual does not name clearing the global comms block before grading"
-
-echo "== release offer tier =="
-# An opt-in capability reaches a NEW install through its own front door (BOOTSTRAP), but an already
-# wired machine only ever hears what the update path tells it. The `offer` flag is that channel;
-# these three gates keep it from silently rotting the way the comms option nearly did.
+echo "== release ledger =="
+# An opt-in capability reaches a new install through BOOTSTRAP, but an already wired machine only
+# ever hears what /update tells it. The `offer` flag is that channel, and these two gates keep the
+# ledger able to carry it.
 grep -q '`offer`' docs/RELEASES.md \
   && ok "RELEASES.md documents the offer tier" \
   || bad "docs/RELEASES.md does not document the \`offer\` flag - opt-in capabilities have no announce channel"
-
-# offer is machine-scoped but delivered by a session sitting in a repo, and the only nudge that fires
-# is the reonboard one (bd-session-start is a safety-gated hooks/** surface we do not edit here). So
-# an offer that is not also a reonboard is an offer nobody is ever nudged to collect.
-lonely="$(awk '$2 ~ /(^|,)offer(,|$)/ && $2 !~ /(^|,)reonboard(,|$)/ {print $1}' docs/RELEASES.md 2>/dev/null)"
-[ -z "$lonely" ] \
-  && ok "every offer release also carries reonboard (so the session-start nudge reaches it)" \
-  || bad "offer without reonboard in RELEASES.md:$(printf ' %s' $lonely) - no nudge fires, nobody is asked"
 
 # RELEASES.md's own contract: "flags are never empty". A version line whose second field is the `-`
 # separator declares a release while naming no tier, so /update collects nothing from it and the line
@@ -1178,223 +722,53 @@ lonely="$(awk '$2 ~ /(^|,)offer(,|$)/ && $2 !~ /(^|,)reonboard(,|$)/ {print $1}'
 flagless="$(awk '$1 ~ /^[0-9]+\.[0-9]+\.[0-9]+$/ && $2 == "-" {print $1}' docs/RELEASES.md 2>/dev/null)"
 [ -z "$flagless" ] && ok "every RELEASES.md version line carries a non-empty flag set" || bad "flagless RELEASES.md line(s):$(printf ' %s' $flagless) - give it a tier, or drop the line (absent = pull-only)" # prove-new: regression-guard RELEASES.md is correct at base, as it is after any release that got its flags right; this catches the later edit that announces a version while naming no tier, which /update then collects nothing from
 
-offer_step="$(awk '/^## 4\. Top up this repo only/{f=1} f&&/^## 5\./{exit} f{print}' skills/update/SKILL.md 2>/dev/null)"
-printf '%s' "$offer_step" | grep -q 'offer' \
-  && ok "update's top-up step acts on pending offer flags" \
-  || bad "skills/update step 4 never acts on the offer flag - pending offers are collected and dropped"
-
-# The ledger sweep only works if it is unconditional and if it actually applies. /update is the one
-# verb an operator re-runs in an already-wired repo, so a sweep gated behind a pending flag would
-# never fire in the common case (a pull-only release), and a sweep that only previews leaves the rows
-# exactly as stale as before while reporting that it looked. Both regressions read like a working step.
-sweep_step="$(awk '/^## 5\. Sweep this repo/{f=1} f&&/^## 6\./{exit} f{print}' skills/update/SKILL.md 2>/dev/null)"
-if printf '%s' "$sweep_step" | grep -q 'ledger reap --apply' \
-   && printf '%s' "$sweep_step" | grep -qi 'every run' \
-   && printf '%s' "$sweep_step" | grep -qi 'not gated on the pull'; then
-  ok "update sweeps stale ledger rows every run, applies rather than only previewing, and is not gated on the pull"
-else
-  bad "skills/update step 5 no longer sweeps the ledger unconditionally - a pull-only run (the common case) then leaves settled work reading in-flight forever, which is the failure /update was given this step to end"
+echo "== discovery block =="
+# CLAUDE.md's managed block is the whole of discovery: nothing announces the practices to a fresh
+# session but this text. So it has to be present, sentinel-closed, and to name where a session finds
+# the two files that override a default and record this repo's rules - a block that says the
+# practices exist but not where their overrides live sends the reader to guess one.
+CM="CLAUDE.md"
+db_errs=""
+[ -f "$CM" ] || db_errs=" missing-file"
+if [ -f "$CM" ]; then
+  grep -qxF '<!-- BEGIN better-dev -->' "$CM" || db_errs="$db_errs no-begin-sentinel"
+  grep -qxF '<!-- END better-dev -->' "$CM" || db_errs="$db_errs no-end-sentinel"
+  db_block="$(awk '/^<!-- BEGIN better-dev -->$/{f=1} f{print} /^<!-- END better-dev -->$/{exit}' "$CM")"
+  printf '%s' "$db_block" | grep -qF '.better-dev/overrides.md' || db_errs="$db_errs no-overrides-pointer"
+  printf '%s' "$db_block" | grep -qF '.better-dev/rules.md' || db_errs="$db_errs no-rules-pointer"
 fi
+[ -z "$db_errs" ] && ok "CLAUDE.md carries the managed block, closed, naming where overrides and rules live" || bad "CLAUDE.md managed block:$db_errs - this block is the only thing that tells a fresh session the practices are here"
 
-# End to end in a throwaway HOME: the adapter's path, the shipped body, and bd-block together put the
-# block where a session will actually read it. Hermetic - never touches the operator's real HOME.
-if [ -f "$CB" ]; then
-  gt="$(mktemp -d)"
-  ge="$(HOME="$gt" bash -c 'source "$1" && printf %s "${bd_host_global_entry:-}"' _ hosts/claude 2>/dev/null)"
-  if [ -z "$ge" ]; then
-    ok "global comms install: hosts/claude declines (nothing to assert)"
-  else
-    # Run BOOTSTRAP's documented sequence verbatim, including its mkdir, against a HOME where the host
-    # config dir does NOT exist - the never-run-this-host case. Pre-creating the dir here would test a
-    # command nobody documented and hide a failure on exactly that machine.
-    [ -d "$(dirname "$ge")" ] && bad "global comms install: fixture HOME already has $(dirname "$ge"), the absent-dir case is not being tested"
-    ( mkdir -p "$(dirname "$ge")" && "$ROOT/scripts/bd-block" "$ge" better-dev-comms < "$CB" ) >/dev/null 2>&1
-    printf 'my own notes\n' >> "$ge"         # operator content added after, must survive a re-write
-    before="$(cat "$ge")"
-    ( mkdir -p "$(dirname "$ge")" && "$ROOT/scripts/bd-block" "$ge" better-dev-comms < "$CB" ) >/dev/null 2>&1
-    if grep -qxF '<!-- BEGIN better-dev-comms -->' "$ge" 2>/dev/null \
-       && grep -qF 'my own notes' "$ge" 2>/dev/null \
-       && [ "$before" = "$(cat "$ge")" ]; then
-      ok "global comms install: BOOTSTRAP's sequence works on a never-run host, idempotently"
-    else
-      bad "global comms install: BOOTSTRAP's documented sequence failed against $ge (absent config dir, operator text, or re-run)"
-    fi
-  fi
-  rm -rf "$gt"
-fi
-
-echo "== graphify integration =="
-
-# The operator-gate policy has to be written down and obeyed by both consumers. Graphify's setup
-# makes machine-global changes; onboard forbids silent ones. Before D26 neither DECISIONS.md nor
-# TRAPS.md mentioned graphify at all, so the contradiction survived by nobody having decided it.
-# The entry's safety clauses are asserted individually: a heading plus two adjectives would pass
-# while the clauses that bound the exception - the closed command list, the undo, the recap
-# requirement - were quietly dropped, which is the failure mode a policy gate exists to catch.
-# Anchor the range on "the next decision heading", not on D27 by name: D26 is currently last, so a
-# name anchor runs to EOF today and would swallow a later D28 added without a D27.
-# One distinctive literal per authorized write on both sides, because three loose words ('machine-global',
-# 'graphifyy', 'registry') stayed satisfied with half the Report's bullets deleted - including the one
-# for the highest-consequence write. The floor's VALUE is asserted in the skill, not just its `>=` shape
-# and not just D26's prose: `grep -qF 'graphifyy>='` stayed green with the skill's floor lowered to
-# 0.0.1, so it certified a bound that was gone. The index pin is deliberately NOT asserted - it is
-# best-effort (`--default-index` is uv's lowest-priority index, `UV_INDEX` wins), so gating on it would
-# lock in a closure the command does not enforce. The ok label names D26's three writes and no more:
-# three literals cannot see a fourth write that shipped with no bullet, and claiming they can is the same
-# defect - a label asserting what its checks do not establish - that the checks themselves catch.
-# The reversibility clause is matched by its whole capitalised phrase: bare 'reversible' also matches
-# the lowercase "no reversible undo erases" caveat, so the clause could be deleted with the gate green.
-d26=$(awk '/^## D26 /{f=1} /^## D[0-9]/ && !/^## D26 /{f=0} f' docs/DECISIONS.md)
-# Anchor setup's Report on its NAME, not its step number: deleting the never-commit guard renumbered
-# the steps under it, and a stale number anchor matches nothing. The POSITIVE rep_has calls below
-# would then fail red, which is loud and survivable; the two NEGATIVE ones (`! rep_has 'global
-# gitignore:'`) stay vacuously TRUE over an empty range, so the clauses certifying that the retired
-# write really is gone would pass on a Report the anchor never found.
-setup_report=$(awk '/^## [0-9]+\. Report/,0' skills/graphify-wrapper-setup/SKILL.md)
-d26_has() { printf '%s' "$d26" | grep -qF -- "$1"; }
-rep_has() { printf '%s' "$setup_report" | grep -qF -- "$1"; }
-if [ -n "$d26" ] && d26_has '## D26 - a named list' \
-   && d26_has '**Reversible** (one command undoes it)' \
-   && d26_has 'non-secret' && d26_has 'specific named commands' \
-   && d26_has 'undo:' && d26_has 'recap' \
-   && d26_has "uv tool install 'graphifyy>=0.9.18'" \
-   && d26_has 'uv tool upgrade graphifyy' && d26_has '~/.claude/graphify/' \
-   && grep -q 'D26' skills/onboard/SKILL.md \
-   && grep -qF 'floor=0.9.18;' skills/graphify-wrapper-setup/SKILL.md \
-   && grep -qF 'graphifyy>=$floor' skills/graphify-wrapper-setup/SKILL.md \
-   && rep_has 'machine-global' && rep_has 'uv tool uninstall graphifyy' \
-   && rep_has "uv tool install 'graphifyy==" && rep_has 'registry: CREATED' \
-   && ! d26_has 'core.excludesfile' \
-   && ! rep_has 'global gitignore:'; then
-  ok "graphify machine-global write policy is decided (D26), the 0.9.18 floor is pinned in the skill, and each of D26's three writes has its announce bullet"
-else
-  bad "graphify machine-global write policy: D26 missing a safety clause, the skill's install missing the 0.9.18 floor, setup's Report missing an announce bullet, or the deleted never-commit guard's authorization still standing"
-fi
-
-# The out-of-tree invariant, and the whole reason this relocation exists: graphify's default writes
-# graphify-out/ INSIDE the tree it indexes, which is why a never-commit guard had to exist at all.
-# That guard produced a live CRITICAL in three consecutive review passes, the third introduced by the
-# second's hardening, defending a placement whose only justification was four words in a comment.
-# Assert the invariant at its source: one helper derives every output path, and no site reconstructs
-# an in-tree one behind its back. A relocation that leaves one hardcoded `$dst/graphify-out` writes
-# into the repo on exactly the path that skipped the helper. EVERY site that carries a graph path is
-# named here, not just bd-gfx and -sync: the refresh hook, -status and -query each resolve one too,
-# and with three of the five unwatched a full in-tree regression passed this gate green (measured).
-# The files are listed and required to exist, because a grep over a path that is gone is silently "no
-# match", which reads identically to "clean". The pattern is `/graphify-out` rather than a blanket
-# `graphify-out`, so bd-gfx's own selftest assertion (`find -name graphify-out`) still names the
-# string it has to look for. -query carries no such path at all: its retrieval dirs hang off the
-# resolved graph, so what is asserted there is that derivation.
-gfx_sites="scripts/bd-gfx hooks/bd-graphify-refresh-stale skills/graphify-wrapper-sync/SKILL.md \
-skills/graphify-wrapper-status/SKILL.md skills/graphify-wrapper-query/SKILL.md"
-gfx_missing=""
-for f in $gfx_sites; do [ -f "$f" ] || gfx_missing="$gfx_missing $f"; done
-if [ -z "$gfx_missing" ] && grep -q '^gfx_out_dir()' scripts/bd-gfx \
-   && ! grep -q '/graphify-out' $gfx_sites \
-   && grep -qF 'memory-dir "$(dirname "$graph")/memory"' skills/graphify-wrapper-query/SKILL.md \
-   && ! grep -qE '^#+ .*[Nn]ever-commit guard' skills/graphify-wrapper-setup/SKILL.md \
-   && ! grep -q 'core.excludesfile' skills/graphify-wrapper-setup/SKILL.md; then
-  ok "every graphify graph path derives from one out-of-tree helper (gfx_out_dir), across bd-gfx, the refresh hook and the sync/status/query skills, and the never-commit guard is gone with its global-gitignore write"
-else
-  bad "a graphify site resolves an in-tree output path (or was renamed out from under this check), or the never-commit guard survives under some heading - the relocation is incomplete and a build can still write inside a repo:$gfx_missing"
-fi
-
-# Prose stating an invariant is not the invariant. The two ways a build lands back inside a repo are
-# a home that IS the repo (a dotfiles checkout at $HOME, CI with HOME=workspace) and a graph left
-# behind by a previous worktree at the same path, which parses and so passes every torn-graph check.
-# Both are code, so both are gated as code: gfx_out_dir refuses a contained home rather than writing
-# into it, and nothing is served without provenance - in the query path and in the background hook,
-# which is where a silent failure is least visible.
-if grep -q 'is inside the tree it indexes' scripts/bd-gfx \
-   && grep -q '^gfx_graph_state()' scripts/bd-gfx \
-   && grep -qF 'gfx_graph_state "$graph" "$idx_path"' scripts/bd-gfx \
-   && grep -q 'gfx_graph_state' hooks/bd-graphify-refresh-stale \
-   && grep -q 'gfx_graph_state' skills/graphify-wrapper-sync/SKILL.md \
-   && grep -q '^gfx_discard_graph()' scripts/bd-gfx \
-   && grep -q 'gfx_discard_graph' hooks/bd-graphify-refresh-stale \
-   && grep -q 'gfx_discard_graph' skills/graphify-wrapper-sync/SKILL.md \
-   && ! grep -q 'rm -rf "\$out"' hooks/bd-graphify-refresh-stale \
-   && ! grep -q 'rm -rf "\$out"' skills/graphify-wrapper-sync/SKILL.md; then
-  ok "the out-of-tree invariant is enforced, not just stated: a home inside the indexed tree is refused, a graph another tree built is rebuilt rather than served, and all three discard sites route through the one helper that keeps retrieval memory"
-else
-  bad "bd-gfx states the out-of-tree invariant without enforcing it - gfx_out_dir does not refuse a home inside the indexed tree, a graph is served without checking which tree built it, or a discard site bypasses gfx_discard_graph and rm -rf's retrieval memory with the graph"
-fi
-
-# The seed hook existed only to copy a multi-file output dir BETWEEN worktrees, which is the whole
-# torn-graph temp+mv dance. Under one central home per worktree there is no cross-tree copy to make.
-# Assert that over hooks/ AS A WHOLE and over what hooks.json registers, never over the retired
-# file's own name: `grep -q 'cp -R' hooks/bd-graphify-seed-worktree` went permanently green the
-# moment that file was deleted (grep exits 2 on a missing path, and the `!` turns that into a pass),
-# so it could never go red again, and a copy reintroduced under another name or another verb - cp -a,
-# cp -r, rsync, tar - walked straight past it.
-if [ -d hooks ] && [ -f hooks/hooks.json ] \
-   && ! grep -rqE 'cp -[aRr]|rsync |tar -c' hooks/ \
-   && ! grep -q 'seed' hooks/hooks.json; then
-  ok "no hook copies graph output between worktrees, and hooks.json registers no seed hook"
-else
-  bad "a hook copies output tree-to-tree, or hooks.json still registers a seed hook - the machinery the relocation retires"
-fi
-
-# A chain that stops at -sync never reaches the only verb with user value. Both close-outs route on.
-map_tail=$(awk '/^## 5\./,0' skills/graphify-wrapper-map/SKILL.md)
-if printf '%s' "$setup_report" | grep -q 'graphify-wrapper-query' \
-   && printf '%s' "$map_tail" | grep -q 'graphify-wrapper-query'; then
-  ok "both graphify close-outs route on to /graphify-wrapper-query"
-else
-  bad "a graphify close-out does not route to /graphify-wrapper-query - the chain ends before the question"
-fi
-
-# The carve /graphify-wrapper-map recommends is checked against the built graph rather than asserted.
-# The check belongs where a build actually happens, so the skill that builds is the one that reports it
-# (DC5, amended 2026-08-02) - map registers domains and explicitly builds nothing. Assert the count
-# REACHES the operator, not that the identifier appears: with a bare `grep -q gfx_cross_edges`, the
-# echo, the Report clause, and map's pointer at it were each independently deletable, gate green.
-sync_report=$(awk '/^## Report/,0' skills/graphify-wrapper-sync/SKILL.md)
-if grep -qF 'cross=$(gfx_cross_edges' skills/graphify-wrapper-sync/SKILL.md \
-   && grep -q 'gfx_cross_edges.*&&.*echo.*cross' skills/graphify-wrapper-sync/SKILL.md \
-   && printf '%s' "$sync_report" | grep -q 'cross-subtree edge count' \
-   && grep -q 'cross-subtree edge count' skills/graphify-wrapper-map/SKILL.md; then
-  ok "the built graph's cross-subtree count is computed, printed, and reported where the build runs"
-else
-  bad "the carve check does not reach the operator - graphify-wrapper-sync must call gfx_cross_edges AND print it AND report it, and graphify-wrapper-map must point at that count"
-fi
-
-# /codebase-map already rebuts the never-indexed objection ("builds its index on first use").
-# A delegating skill that re-opens it with a "when one's installed" hedge undoes that rebuttal.
-# ok-branch first, matching every other check here: prove-new pairs an OK token with the BAD that
-# follows it, so a bad-first check splits into two orphans and its ok label reports UNPROVEN.
-# The -f guards keep a renamed file from passing this vacuously - a grep over a missing file is
-# silently "no match", which reads identically to "hedge removed".
-if [ -f skills/diagnose/SKILL.md ] && [ -f skills/plan-grill/SKILL.md ] \
-   && ! grep -q "when one's installed" skills/diagnose/SKILL.md \
-   && ! grep -q 'best structural map available' skills/plan-grill/SKILL.md; then
-  ok "no structural-consult escape hatch in /diagnose or /plan-grill"
-else
-  bad "structural-consult escape hatch still present in /diagnose or /plan-grill (or a delegating skill was renamed out from under this check)"
-fi
-
-# The CLI is the ONLY link in the chain nothing self-heals: gfx_ensure_graph writes a missing
-# registry, carves a missing domain and builds a missing graph, but returns 1 when the binary is
-# absent, and bd-graphify-refresh-stale exits 0 on the same test - silently, by design. install.sh
-# does not install it either. So the whole integration rests on /onboard actually running
-# /graphify-wrapper-setup, and until 0.12.0 that was one prose sentence with no command block, no
-# Phase 1 detection and no Phase 5 signal, while the DEFERRAL branch beside it got the executable
-# block. Every consumer (/codebase-map, /review's ripple, /autonomous-loop's triage) then degraded to
-# grep with nothing anywhere reporting a gap. Assert the delivery chain by its links, not by the word
-# "graphify" appearing: the probe, the imperative to run it, the signal that collects it, and the
-# retired claim that deferring is free (it was free only where the CLI happened to be installed).
-if [ -f skills/onboard/SKILL.md ] && [ -f skills/codebase-map/SKILL.md ] \
-   && grep -qF 'command -v graphify' skills/onboard/SKILL.md \
-   && grep -qF 'run `/graphify-wrapper-setup` now' skills/onboard/SKILL.md \
-   && grep -qF 'Structural graph reachable' skills/onboard/SKILL.md \
-   && grep -qF 'Six signals' skills/onboard/SKILL.md \
-   && grep -qF 'All six clear' skills/onboard/SKILL.md \
-   && grep -qF 'graphify CLI not installed - run /graphify-wrapper-setup' skills/codebase-map/SKILL.md \
-   && ! grep -qF 'Deferring costs nothing' skills/onboard/SKILL.md; then
-  ok "/onboard probes for the graphify CLI, runs the setup that installs it, and collects it as a loop-readiness signal - and /codebase-map names the one recoverable first-use failure"
-else
-  bad "the graphify CLI reaches no repo: /onboard is missing the probe, the run instruction or the 'Structural graph reachable' signal (count wording out of step with the list), or /codebase-map lets a CLI-absent query fall through to grep - the CLI is the one link no first question heals"
-fi
+echo "== deleted paths =="
+# The harness now provides what this library used to ship, and every shipped file has to point at the
+# native replacement. A file that still names a removed script or directory costs its reader a turn
+# discovering the command is not there, which is worse than saying nothing at all.
+#
+# The historical records are exempt by construction, not by exception: docs/DECISIONS.md,
+# docs/RELEASES.md, docs/TRAPS.md, docs/PLAN.md and NOTICE record what happened and are read as past
+# tense, so they are outside the swept set below rather than filtered out of it. This file is
+# exempted by name because it has to spell the patterns in order to forbid them.
+gone='bd-mem|bd-guard|bd-gfx|bd-dispatch|bd-block|bd-link|bd-browse|bd-worktree-guard|bd-hook-wire'
+gone="$gone|bd-session-start|bd-subagent-start|bd-graphify-refresh-stale|bd-migrate-branch-model"
+gone="$gone|bd-omp-runtime-check|bd-awareness|[.]better-dev/bin|hooks/hooks[.]json|hooks/bd-"
+gone="$gone|hosts/(claude|codex|hermes|omp)|better-dev/hooks|graphify|browse/src|learnings[.]jsonl"
+gone="$gone|orchestrating-agents/tiers[.]md|/bootstrap-hooks|/codebase-map|/browser-capability"
+gone_hits=""
+unclosed=""
+# A file may carry ONE sentinel-delimited migration region whose whole job is to name what it removes.
+# Only that region is exempt, so a stray reference anywhere else in the same file still fails. An
+# opened-but-never-closed sentinel would silence the rest of the file, so it is its own red check
+# rather than a quiet pass.
+for f in $(find skills scripts friction .github docs/skills -type f 2>/dev/null; ls install.sh README.md CLAUDE.md BOOTSTRAP.md docs/comms-block.md .claude-plugin/plugin.json 2>/dev/null); do
+  [ "$f" = scripts/bd-package-check ] && continue
+  b="$(LC_ALL=C grep -c '^# BEGIN pre-cutover-migration' "$f" 2>/dev/null || true)"
+  e="$(LC_ALL=C grep -c '^# END pre-cutover-migration' "$f" 2>/dev/null || true)"
+  [ "$b" = "$e" ] || { unclosed="$unclosed $f"; continue; }
+  LC_ALL=C awk '/^# BEGIN pre-cutover-migration/{skip=1} !skip; /^# END pre-cutover-migration/{skip=0}' "$f" 2>/dev/null \
+    | LC_ALL=C grep -Eq "$gone" && gone_hits="$gone_hits $f"
+done
+[ -z "$unclosed" ] && ok "every migration region is sentinel-closed" || bad "unbalanced pre-cutover-migration sentinels in:$unclosed - an unclosed BEGIN hides the rest of the file from this sweep"
+[ -z "$gone_hits" ] && ok "no shipped file names a script or directory this release deleted (outside a sentinel-closed migration region)" || bad "deleted path named in:$gone_hits - each one has a native replacement, and a reader following the old name spends a turn finding out it is gone"
 
 echo
 [ $fail = 0 ] && echo "package-check: PASS ($(ls skills/ | wc -l | tr -d ' ') skills)" || { echo "package-check: FAIL"; exit 1; }

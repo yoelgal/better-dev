@@ -24,9 +24,8 @@ One state word per unit, from exactly four:
 A page that reads `BUILDING` for an hour is indistinguishable from a dead run, which is the failure the
 word set exists to prevent.
 
-Where graphify is wired - or one AST-only sync on the artifact is cheap - the round block also carries
-the affected surface from `graphify-wrapper-query --affected`, so the round's blast radius is
-structural rather than recalled.
+The round block also carries the surface the round touched - the callers an `lsp` `references` query
+returns for each symbol it edited - so the round's blast radius is structural rather than recalled.
 
 ## The page renders, it never records
 
@@ -51,15 +50,6 @@ a series inside one run or one work-item, and it dies with that item. Nothing he
 items or charted across time; a store that outlives the work-item is a trend DB, which the library
 declines to keep.
 
-## The code-graph page is a different surface
-
-The RUN OBSERVATORY above renders a record that accumulates within one run. The CODE-GRAPH PAGE -
-graphify's own graph.html and callflow pages - is a pure function of the graph and its commit and
-holds no history: delete it and rebuild it losslessly. The two never share a store, a page, or the
-word "observatory." A fact about the run goes on the record; a fact about the code is recomputed from
-the graph. This is the deletion test that keeps rendered surfaces honest: if deleting a page loses a
-fact no query can recompute, that fact belonged on the run's record, not on the code-graph page.
-
 ## The critic fence
 
 The record and the page are surfaces the blind critic never reads. The critic receives the artifact and
@@ -68,9 +58,9 @@ its bar row, nothing else - a critic that can read the run's own account of itse
 ## What each composer supplies
 
 - `/gauntlet` - plain files in the run's own working directory (`gauntlet/RUN.md`, beside
-  `gauntlet/PROMPT.md`), deliberately never `bd-mem`: a gauntlet run is a fresh session on a repo that
-  may carry no better-dev wiring, so a `bd-mem` dependency would fail exactly where the record is
-  needed most. A fresh session resumes from prompt plus record.
+  `gauntlet/PROMPT.md`), deliberately nothing that assumes this library is installed: a gauntlet run is a
+  fresh session on a repo that may carry no better-dev wiring, so depending on its files would fail
+  exactly where the record is needed most. A fresh session resumes from prompt plus record.
 - `/autonomous-loop` - the ledger already is the record. `receipts.md` and `progress.md` carry the
   per-round facts, so a page for a long run is a renderer over them and nothing new gets recorded to
   put one up. Key it to the operator-set ceiling, since that is the number the page renders against.

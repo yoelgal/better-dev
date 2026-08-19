@@ -11,7 +11,7 @@ and to say what in the shipped text or scripts causes it.
 - `transcripts/<fixture>/` - `human-N.txt` and `agent-N.txt` are the conversation; `turn-N.jsonl` is
   the full event stream; `tools.tsv` and `denials.txt` are the reductions
 - `repos/<fixture>/` - the repo as the agent left it. Diff it against what the fixture script created.
-- the library itself: `skills/*/SKILL.md`, `install.sh`, `scripts/bd-*`, `hooks/`
+- the library itself: `skills/*/SKILL.md`, `install.sh`, `scripts/bd-*`
 - `seen.md` in this directory - every finding this harness has already filed
 
 ## The rule that matters
@@ -79,16 +79,16 @@ behaviour, in one sentence that would work as a failing test's name. "branch han
 
 ## Where a finding goes
 
-The class decides, and there is one queue:
+The class decides, and there is one store:
 
 | class | what happens |
 |---|---|
-| `FRICTION` | `.better-dev/bin/bd-mem papercut add "<title>" "friction <fixture> <where>"`, then a row in `seen.md` with status `ACCEPTED` and the papercut id it printed |
+| `FRICTION` | record it with the `learn` tool - one atomic line, a recall key on the front, `friction <fixture> <where>` as the source - then a row in `seen.md` with status `ACCEPTED` and that key |
 | `MODEL` | a row in `seen.md` with status `DECLINED` - the model missed text that already covers it, so nothing in the library changes |
 | `HARNESS` | fix it in `friction/` in this pass, then a row with status `FIXED` |
 
 Every finding gets a row, including the ones nothing is done about: that row is what stops the next
-run filing it again. Nothing else gets created - the papercut queue is where the operator already
-triages friction, and a second list would only split the attention that queue needs.
+run filing it again. Nothing else gets created - a recorded lesson surfaces on the next recall of that
+area, and a second list would only split the attention the store needs.
 
 End with one line: the single change that would most improve first-run experience.

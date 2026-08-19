@@ -54,7 +54,7 @@ to make with the evidence in front of them.
 
 Every verdict cites evidence - `file:line`, commands run and their output digest, the intent
 contract found. A verdict without receipts is invalid. When uncertain, say `EVIDENCE_LIMITED` rather
-than dress a guess as a finding. A `file:line` handed up by a recon worker or `/codebase-map` is a
+than dress a guess as a finding. A `file:line` handed up by a recon worker or the `lsp` tool is a
 lead, not a fact - re-read it yourself before it enters a verdict or the contract; a wrong excerpt
 becomes a wrong plan. Observe the cause if it surfaces, but change no code and draft no
 plan yet - that's later work.

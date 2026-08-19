@@ -11,8 +11,8 @@ list by the register on the direction card (a tool surface has no hero to flag).
 filtered to empty: a register with no applicable seed tells gets its register's failure test (step 1)
 as the audit question instead - a zero-item walk that declares slop-free is a vacuous audit, not a
 pass. Each tell is something a screenshot or the markup can answer. Motion tells are the exception:
-they are answered from the stylesheet or a repeated-trigger capture driven via
-`/browser-capability`, replayed at reduced speed - a static screenshot is motion-blind, a still that
+they are answered from the stylesheet or a repeated-trigger capture driven with the `browser` tool,
+replayed at reduced speed - a static screenshot is motion-blind, a still that
 "shows no motion problem" is a vacuous pass, the same species as the zero-item audit walk, and at
 full speed the wrong easing half and an overlong duration both read as fine. A filter or an addition
 recorded in overrides quotes the tell it means rather than its list number, which shifts as this

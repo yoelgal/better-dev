@@ -55,8 +55,8 @@ wait, not a defect.
 ## Record what landed
 
 Each provisioned service ends the way the main skill does: hand the observed values to
-`/guardrails-install` to record (the `deploy-env` location among them), and note the adoption in
-memory - `.better-dev/bin/bd-mem remember "provisioned <service> on <provider> - <where its config
-lives>"` - so a later session reuses the decision instead of re-provisioning. A service the operator
+`/guardrails-install` to record (the `deploy-env` location among them), and `edit` the adoption into
+`.better-dev/rules.md` as one line - `provisioned <service> on <provider>`, plus where its config
+lives - so a later session reuses the decision instead of re-provisioning. A service the operator
 declined or deferred is recorded as the explicit negative with its reason: a deferral someone chose
 beats a gap nobody noticed.

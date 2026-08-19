@@ -12,10 +12,10 @@ with the count and where it came from:
 
 The proposal changes nothing by itself. Consent stays what it is everywhere in this skill: a yes
 writes the standing line through its owning recorder - `merge-policy` here, a workflow preference
-through `/overrides`' persist - and silence or "not now" declines. Mark the offer
-(`.better-dev/bin/bd-mem remember "autonomy-offered: <gate>"`) so a later re-run that finds the line
-stays quiet; the operator who changes their mind reaches the same allowance through `/overrides`.
-This skill asks once, not per run.
+through `/overrides` - and silence or "not now" declines. Mark the offer with an
+`autonomy-offered: <gate>` line in `.better-dev/rules.md` so a later re-run that finds the line stays
+quiet; the operator who changes their mind reaches the same allowance through `/overrides`. This skill
+asks once, not per run.
 
 The safety exclusion in the main body binds here without exception: no gate in the safety class is
 ever proposed, whatever its streak.
