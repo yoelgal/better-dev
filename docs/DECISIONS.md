@@ -4,35 +4,16 @@ Opinionated defaults that resolve the spec's open design calls so skills are bui
 foundations. These are **my calls** (per principles #6 opinionated / #7 overridable) - flagged for review,
 not set in stone. Spec: `raw/better-dev-design-principles.md`. Build plan: `raw/sources/2026-07-03-harvest-manifest/`.
 
-**Read against the 2026-08-19 harness-native cutover.** Every entry below stands as the record of what
-was decided when. Where an entry settled a mechanism this library used to ship itself - the `bd-*`
-script spine, the hook and host-adapter layer, the vendored browser daemon, the graphify wrapper
-skills - that mechanism was deleted in the cutover and the host's own tool answers it now; the affected
-entries carry a marker saying so. A marked entry is history, never an instruction to run.
-
 ## D0 · Output layout
-**Superseded by the 2026-08-19 cutover:** the `bd-*` spine, `hosts/`, `hooks/`, and the
-`.better-dev/bin` bridge are all deleted - what remains at the root is `skills/`, four release-time
-helpers under `scripts/`, `docs/`, and the plugin manifest.
 
 Product lives at the **repo root**; `raw/` stays the research archive.
 ```
 skills/<name>/SKILL.md         # agentskills.io units (+ sibling .md refs, progressive disclosure)
-scripts/bd-*                   # the bd-* spine (mem+ledger, block, dispatch, worktree-guard, review-package, skill-stage, link, package-check)
-hosts/<host>                   # per-host install adapters (claude, codex, …) - each host's global skills dir
-hooks/                         # optional SessionStart / SubagentStart injection
 .claude-plugin/plugin.json     # Claude Code plugin manifest
 NOTICE  README.md  install.sh  BOOTSTRAP.md
 ```
-**Install model:** the TOOL installs **globally, per host** (never vendored per repo); a repo's `.better-dev/`
-holds **data only** plus a per-machine `.better-dev/bin` symlink to the global install, so skills keep the
-portable reference `.better-dev/bin/bd-mem`. Full model in **D10** (which revises the earlier per-repo /
-`.agents/` vendoring assumption).
 
 ## D10 · Install model - global per host; a repo carries data only (revises D0, 2026-07-04)
-**Partly superseded by the 2026-08-19 cutover:** the two-layer model stands (global tool clone, repo
-data only), but the `bin` bridge, `scripts/bd-link`, and the `hosts/` adapters are gone - the host
-resolves skills itself.
 
 Two layers (gstack-confirmed; per-repo skill-vendoring + a `.claude/skills` symlink-bridge is the deprecated
 model - dropped):
@@ -40,10 +21,8 @@ model - dropped):
   native global skills dir (`~/.claude/skills/better-dev`, `~/.codex/skills/better-dev`) through one
   symlink-or-copy helper (`scripts/bd-link`; Windows copy-fallback), with per-host adapters under `hosts/`.
   Claude Code alternative = the `.claude-plugin` plugin. Update = `git pull` in the clone. Never duplicated per repo.
-- **Repo `.better-dev/` = DATA only, committed** - `rules.md`, `overrides.md`, `learnings.jsonl` tracked;
-  `ledger/` and `bin/` gitignored. `.better-dev/bin` is a per-machine symlink → the global install's scripts,
-  so `.better-dev/bin/bd-mem` resolves everywhere (**Option-B reference model - zero skill churn**; skills
-  never hard-code `${CLAUDE_PLUGIN_ROOT}`).
+- **Repo `.better-dev/` = DATA only, committed** - `rules.md` and `overrides.md` tracked;
+  `ledger/` gitignored.
 - **Repo-authored skills (from `/self-extension`) are repo-scoped** - committed to the repo's own project
   skills dir (`.claude/skills/<name>` on Claude), discovered only there, never added to the global tool.
   `/self-extension` classifies scope: project-specific → **local** (`.claude/skills/<name>`, this repo only;
@@ -52,7 +31,7 @@ model - dropped):
   never touches it), and NOT packaged into better-dev or pushed upstream; genuinely unsure → **ask**. This is what makes a global tool
   safe: a repo-specific skill never clutters other repos.
 - **One-paste bootstrap** (`BOOTSTRAP.md` + a README block) is the front door: detect host → global-install →
-  `/onboard` wires the repo's data + the `bin` symlink + the discovery block.
+  `/onboard` wires the repo's data and the discovery block.
 
 ## D1 · Canonical terminal-state taxonomy
 One set every harvested vocabulary (loopy/grind/SDD/forge) maps onto. Hard rule: **never map an error or
@@ -66,16 +45,10 @@ exhausted budget to a success state.**
 | `EXHAUSTED` | budget/iterations hit | grind BUDGET_EXHAUSTED, loopy exhausted |
 | `NO_PROGRESS` | stagnated → triggers restart-from-contract | loopy stagnated, stuck-check confirmed |
 
-## D2 · Memory contract (4 ops) + files default
-**Superseded by the 2026-08-19 cutover:** the four ops and the resolver script are gone. Lessons live
-in the host's memory store (the `learn` tool, readable at `memory://root/learned.md`); the files below
-stay and are read and written directly.
+## D2 · Memory contract - files default
 
-Skills call: `remember(rule)` · `recall(query)→rules/lessons` · `persist(override)` · `read(state)`.
-Resolver script routes to a backend set by `BETTER_DEV_MEMORY` (default `files`; else `mcp:<server>` or `cmd:<...>`).
-**Files backend (default, zero infra):**
+**The files (zero infra):**
 - `.better-dev/rules.md` - human-readable promoted rules
-- `.better-dev/learnings.jsonl` - append-only, confidence-scored (gstack-style)
 - `.better-dev/overrides.md` - the #7 overrides layer (managed block; also mirrored to a CLAUDE.md block)
 - `.better-dev/ledger/<feature>/` - loop state (contract.md, progress ledger, per-iteration receipts)
 - **Typed-status amendment (2026-07-07, user-ratified, D13):** any record the model both reads and
@@ -89,27 +62,16 @@ On `NO_PROGRESS` confirmed by stuck-check → **reset the feature worktree off `
 Reimplemented in our own words (LOOPS.md §V is personal-use - inspiration only).
 
 ## D4 · Agent-agnostic dispatch verb (owned by `orchestrating-agents`, D9)
-**Superseded in its script half by the 2026-08-19 cutover:** dispatch is the host's `task` tool and the
-file-handoff bookkeeping is plain files under `.better-dev/ledger/<work-item>/`; the prose-dispatch
-ruling itself stands.
 
 **Dispatch itself is prose**, run through the host's fresh-context subagent primitive (Claude Code `Task`
 for one worker, `Workflow` for fan-out/pipeline; equivalents elsewhere) - a bash script cannot spawn the
 host's agent. Fallback when none exists: a single-session role-switch with an explicit context reset.
-`.better-dev/bin/bd-dispatch` owns only the **file-handoff + ledger bookkeeping** around a dispatch -
-`dir | brief <role> | record <role> <state> [note] | pending` - so a run survives compaction and resumes
-finished work instead of re-dispatching it (it defers ledger resolution to `bd-mem ledger`). Preserves
-planner / generator / evaluator separation on Codex / pi / hermes. We **advise** model-tiering in prose
-("least-capable model that works"); we never **route** (no provider spine - see spec out-of-scope).
+We **advise** model-tiering in prose ("least-capable model that works"); we never **route** (no
+provider spine - see spec out-of-scope).
 
 ## D5 · Overrides layer = its own component
 `.better-dev/overrides.md` (managed block), **read first by every skill**. The confirm gate
 (*"make this the default here?"*) lives in whatever skill would write it. Never rewrites a shared skill.
-
-## D6 · Scope additions (completeness critic - now in scope)
-`overrides` · `release/promotion` (staging→main soak, tags, hotfix double-merge) · `guardrails-install`
-(onboard installs pre-commit/lint/CI, not just detects) · `pr-and-verify` (gh PR into staging + end-to-end
-verify) · `feature-ideation` (propose options vs grill a plan) · `browser-capability` (wire agent-browser).
 
 ## D7 · Work items = feature OR fix (bug investigation + fixing IS in scope)
 The core loop is a **work-item loop**, not feature-only. A work item is a `feature/` or a `fix/`/`hotfix/`
@@ -161,7 +123,7 @@ before its commits push, so an open PR never waits on a reviewer.
   are /skill prose. Applied to the untrusted-output rule (security-pass), the runtime-observation rubric
   (pr-and-verify/verify-runtime.md), and the reward-hack clause (autonomous-loop's honesty invariants).
 - **Effort vocabulary**: review effort is `light / standard / deep`; tier guidance lives once in
-  `orchestrating-agents/tiers.md`, vendor-neutral, advise-never-route (D4 upheld).
+  orchestrating-agents, vendor-neutral, advise-never-route (D4 upheld).
 - **Eval scope**: prose + one shipped `docs/TRAPS.md` (behavioral trap scenarios) + writing-skills'
   three-check proving bar. No eval harness, no per-skill fixtures.
 - **Named non-goals**: stacked PRs (one work-item, one PR - devloop's /restack pattern deliberately not
@@ -190,24 +152,19 @@ Full rulings R1-R15 in `raw/synthesis/2026-07-07-gstack-harvest/master-plan.md`;
 - **Vendored daemons (licensing exception on record)**: `browse/` and `ios-qa/` vendor gstack's MIT code
   substantially verbatim (user-ratified over a separate repo) - upstream license + commit pin per dir,
   `check-upstream.sh` red on security-file drift, compiled on first need, never CI-gated. New thin skill
-  `ios-capability`; `browser-capability` runs a three-rung preference order (override > owned daemon >
-  sourced). The reimplement-first default is unchanged for everything else.
-- **Enforced guardrails**: `bd-guard` + two PreToolUse hook entries turn recorded safety policy into
-  enforcement where the host has hooks; `safety-enforcement: hook | prose` recorded by guardrails-install;
-  worktree-branching is the single boundary writer; `bd-guard off` is the escape hatch. The pre-commit
-  secret scan requires a value shape, case-insensitive (precision fix, user-approved).
+  `ios-capability`. The reimplement-first default is unchanged for everything else.
+- **Enforced guardrails**: recorded safety policy becomes enforcement where the host has hooks;
+  worktree-branching is the single boundary writer. The pre-commit secret scan requires a value
+  shape, case-insensitive (precision fix, user-approved).
 - **One report trailer** (`STATUS`/`VERIFY`/`COMMITS`/`BLOCKER`/`CONCERNS`/`QUESTIONS`, `STATUS` = D1
   states) owned by orchestrating-agents; review's severity counts are a "counts block", never a trailer.
 - **Blast radius = the fix-scope contract line** (dir / file list / repo-wide + reason, written after root
   cause); no rating enum; `safety-scope` stays the only recorded number.
 - **D2 amendments**: lessons carry `ts` + `source` (`observed | user-stated | inferred`); recall is
-  latest-wins-per-key with provenance; `bd-mem prune --apply` may rewrite `learnings.jsonl` only at a
-  release checkpoint, operator-confirmed, under lock. writing-skills owns the close-out disposition.
+  latest-wins-per-key with provenance. writing-skills owns the close-out disposition.
 - **Vocabulary**: soak (pre-promote) / deploy verify / post-deploy watch ("canary" retired); hyphenated
   `deploy-*` rules; a "lens" is a named perspective with a checkable question block; second-layer typed
   enums are record markers, never loop states.
-- **Host roster**: claude/codex/hermes shipped (premise-verified); adapters enumerated from `hosts/*`
-  with `bd_host_dir_policy`; the rest wait on verification (issue #9).
 - **Named non-goals (examined, rejected)**: tournament/best-of-N builds with self-scored winners; numeric
   1-10 confidence axes; per-project trend DBs and health-score dashboards; model overlays and any
   generated-skill pipeline; `WIP:` checkpoint commits; engineer-celebrity taste personas; cross-project
@@ -283,8 +240,8 @@ From the papers.town nim-inference retro. (1) Every review finding blocks, Minor
 pass answers all of them (fixed or rebutted per reception's table), and a clean verdict means zero
 open findings of any severity. `DONE_WITH_CONCERNS` narrows to residue no fix pass can retire -
 reviewer-accepted rebuttals, unresolved cannot-verify items, judgment-call doc concerns. Severity now
-sets fix order and review effort, never whether a finding gets addressed. (2) `bd-mem ledger approve`
-refuses a contract without a `merge: auto | hold` line, so D16's seal question cannot be skipped.
+sets fix order and review effort, never whether a finding gets addressed. (2) A sealed contract
+without a `merge: auto | hold` line is not sealed, so D16's seal question cannot be skipped.
 (3) `/pr-and-verify` never opens drafts - a hold is expressed by not merging, and a draft hides an
 earned green. (4) Settling `DONE`/`DONE_WITH_CONCERNS` requires a non-empty `receipts.md` - an
 unrecorded loop settles nothing. (5) Reviewer-brief calibration: an abuse vector that drains a finite
@@ -333,7 +290,7 @@ Covered, not re-filed (recorded so the next harvest does not re-litigate):
 Source: session d7ba7450 in ~/Developer/podcast-thing (onboard -> groundwork -> worktree ->
 plan-grill -> autonomous-loop, ends mid-loop), audited against the skills it composed. Two systemic
 themes: every human gate fired without rendering its artifact, and the loop ran soloist while its
-receipts narrated compliance in the loop's own vocabulary. Adopted (traps 89-98):
+receipts narrated compliance in the loop's own vocabulary. Adopted:
 - Native worktree tool owns placement; `.worktrees/` is the git fallback's default, never a native-tool argument; base honoring is the one legitimate hybrid.
 - "Present before approval" = full artifact rendered as message text; a question-prompt synopsis or a file on disk is not presentation; a user asking to see the artifact gets the artifact, never the same prompt again.
 - The loop's inline escape is a per-step conditions test (fully specified + live-verified), not a rationale a receipt can quote as a waiver; a whole work-item inline is a defect; can't-dispatch hosts run orchestrating-agents' degraded mode. (D18's "default, not ban" ruling stands - this pins the default's teeth.)
@@ -346,27 +303,18 @@ with a remote), planned-at-SHA drift check skipped (text already prescribes it),
 (step 6 already prescribes per-step commits).
 
 ## D20 - tier-map resolution at the dispatch call (2026-07-10; recurring flagship-inherit complaint)
-**Superseded by the 2026-08-19 cutover:** the recorded tier-map and `tiers.md` are gone; the mapping is
-the host's own routing config (`modelRoles`, `task.agentModelOverrides`, an agent's frontmatter `model`
-list). The ruling that a band decision must reach the dispatch parameter stands.
-
-Source: repeated operator observation (podcast-thing and prior sessions) that fan-out workers run on
-the session's frontier model despite tiers.md placing them mid/cheap. Root cause: D18 rightly rejected
-a vendor-named routing table in the library, but "the host owns model choice" left the host's actual
-choice mechanism - the per-dispatch model parameter - unaddressed, and an omitted parameter inherits
-the orchestrator's model. Ruling: the library stays vendor-free; the binding lands as a repo-recorded
-knob (`tier-map: top/mid/cheap -> host model names`, via bd-mem, recorded at the first fan-out if
-missing, overrides winning) plus the rule that a band decision must reach the dispatch parameter -
-silence at that parameter is a top-tier choice, not neutrality. Resume paths that drop per-dispatch
-pins get relaunch-with-pin-restated, generalizing the host-specific observation. (Trap 99. D18's
-no-router ruling stands - a recorded map the dispatcher reads is config, not a router.)
+The ruling that a band decision must reach the dispatch parameter stands: silence at that
+parameter is a top-tier choice, not neutrality, and a resume path that drops a per-dispatch pin
+relaunches with the pin restated. The library stays vendor-free - the mapping is the host's own
+routing config (`modelRoles`, `task.agentModelOverrides`, an agent's frontmatter `model` list),
+never a router recorded here. D18's no-router ruling stands.
 
 ## D21 - flow-atlas audit dispositions (2026-07-10)
-A 78-agent flow audit of the whole library raised 34 canonical gaps; every one carries an explicit
-disposition here. 24 confirmed and fixed in this change-set, 6 refuted as already covered, 4
+A 78-agent flow audit of the whole library raised 34 canonical gaps; the dispositions with a live
+subject are recorded here. 20 confirmed and fixed in this change-set, 6 refuted as already covered, 4
 re-affirmations of standing decisions, plus two audit blind-spots parked as named follow-ups.
 
-**24 confirmed - fixed in this change-set** (id -> landing site):
+**20 confirmed - fixed in this change-set** (id -> landing site):
 - Ship: **G02** promote-range migration gate + `release-promotion/migrations.md` (deploy-migrate
   vocabulary, snapshot-before-destructive-DDL, expand-before-deploy order); **G03** revert-range
   applied-schema check before any revert (release-promotion "goes bad" + pr-and-verify containment),
@@ -391,23 +339,19 @@ re-affirmations of standing decisions, plus two audit blind-spots parked as name
   release-promotion row, tie-break rule (CLAUDE.md + onboard block); **G21** mid-loop product
   corrections routed by /overrides' three-disposition test (amend / new item / in-scope one-off),
   loop carries the decision point.
-- Loop and lanes: **G06** model-fingerprint staleness nudge (bd-session-start compare-then-warn +
-  loop setup check + the TRAPS.md revalidation ritual); **G09** inbound-PR path `review/inbound.md`
+- Loop and lanes: **G09** inbound-PR path `review/inbound.md`
   (host mechanics + recorded-policy overlay); **G11** solo-adopter onboard mode (`adoption: solo`,
-  `.git/info/exclude`, local-only entry file, no shared-branch offer); **G20** `bd-mem ledger status`
-  + session-start in-flight clause; **G23** shared-datastore lanes (per-lane namespacing in
+  `.git/info/exclude`, local-only entry file, no shared-branch offer); **G23** shared-datastore lanes (per-lane namespacing in
   worktree-branching, data-disjointness in carving, `shared-runtime: serialize` recalled by both
-  live-lanes checks); **G26** `learnings.jsonl merge=union` on team adoption + the `mem: <work-item>`
-  close-out commit as propagation owner; **G27** `worktree-branching/handoff.md` (bundle on the
+  live-lanes checks); **G27** `worktree-branching/handoff.md` (bundle on the
   branch: contract bytes, consent hash, reviewed-HEAD verdict, receipts; consent re-pins on pickup);
   **G30** library-defect-candidate disposition (self-extension names it, release distill surfaces
-  it); **G32** promotion-independent distill anchor - `ledger init` nudges `bd-mem prune` past 200
-  lessons, `--apply` stays release-checkpoint-only.
+  it).
 
 **6 refuted - already covered** (id -> coverage): **G07** out-of-git changes - done-contract/lenses,
 pr-and-verify, and post-deploy already carry contract/verify/rollback for them; **G10** merge
 conflicts - sync-base-every-pass, BLOCKED-external, and the live-lanes check; **G17** bad-release /
-bad-merge recovery - containment + restart-from-contract + revert-forward/back-merge + TRAPS 42-44;
+bad-merge recovery - containment + restart-from-contract + revert-forward/back-merge;
 **G18** EXHAUSTED/NO_PROGRESS - ownership split ratified in D1/D3/D4, canonical next-moves in
 terminal-states.md and restart.md; **G19** capability-gap chain - protect-set discipline plus
 explicit NEEDS_INPUT exits in tool-sourcing and self-extension; **G28** decision rationale - the
@@ -465,35 +409,25 @@ Rejected-with-reasons (one row each):
 Covered, not re-filed (so the next harvest does not re-litigate):
 - Spec-first-then-AFK-agent (the post's core preference) - is the plan-grill -> autonomous-loop architecture; validation, not a gap.
 - Remote writes without consent (their #599) - operator-run/paste-ready + recorded-allowance policy (D16/D22) already holds this line.
-- Durable context diverging across concurrent worktrees (their #579) - the primary-checkout shared ledger is the standing answer (bd-mem resolution rule).
+- Durable context diverging across concurrent worktrees (their #579) - the primary-checkout shared ledger is the standing answer.
 - Prose router friction (their #591) - the CLAUDE.md routing table is already the deterministic form.
 - "design tree" -> "decision tree" rename - plan-grill already says decision tree.
 - New-map-per-epic, labels-over-segregation, spec-slicing-by-review Q&A - ledger keys per epic and the carve gate's granularity ask already carry these.
 - ADR ends in checkable invariants - D-entries already function as rulings with teeth.
 
 ## Tracer-bullet findings (2026-07-03, on the papers.town clone) - bind Phase 1
-**Finding 1 lost its subject in the 2026-08-19 cutover** - there are no helpers to place and no
-`.better-dev/bin`. Findings 2 to 6 still bind.
 
 Ran `onboard` + one feature slice → staging end-to-end on the real clone (locally, no push). Proven, plus:
-1. **Helpers → `.better-dev/bin/`** (bare `scripts/` collides with the project's own - see D0 install contract).
-2. **Ledger lives in the primary checkout's `.better-dev/ledger/<feature>/`, shared across worktrees** - not in
+1. **Ledger lives in the primary checkout's `.better-dev/ledger/<feature>/`, shared across worktrees** - not in
    the feature worktree (separate working tree). `autonomous-loop` + `worktree-branching` write there (forge keeps
    state in a shared `$FORGE_HOME` for the same reason).
-3. **Premise-verify earns its place:** `staging` was documented in `CLAUDE.md` but absent from `git` - onboard must
+2. **Premise-verify earns its place:** `staging` was documented in `CLAUDE.md` but absent from `git` - onboard must
    verify at the git level, never trust prose. Same rule for any detected capability.
-4. **Primary checkout tracks the integration branch (`staging`); features are worktrees off it** (papers.town
+3. **Primary checkout tracks the integration branch (`staging`); features are worktrees off it** (papers.town
    convention). `worktree-branching` detects and respects this rather than imposing a layout.
-5. **Entry-file rule holds:** `CLAUDE.md` `@`-imports `AGENTS.md` → block into `CLAUDE.md`, idempotent, no clobber
-   (verified against the real 2.6 KB file via `bd-block`).
-6. **Done = a real runnable check going GREEN**, recorded as the contract's observable done-criteria (not a claim).
-
-## Build order (phase-gated, verify each)
-0. authoring-standard → memory-contract (D2) → onboard  ← **foundations, built first**
-   ↳ then a tracer-bullet slice: onboard → one loop → PR-into-staging, run in a throwaway repo
-1. worktree-branching → plan-grill → autonomous-loop → review
-2. tool-sourcing → self-extension
-3. bootstrap-hooks → packaging → (release, guardrails, pr-and-verify, browser)
+4. **Entry-file rule holds:** `CLAUDE.md` `@`-imports `AGENTS.md` → block into `CLAUDE.md`, idempotent, no clobber
+   (verified against the real 2.6 KB file).
+5. **Done = a real runnable check going GREEN**, recorded as the contract's observable done-criteria (not a claim).
 
 ## Licensing & attribution - the clean path (owner-approved 2026-07-03)
 Build by **reimplementing patterns from understanding**. Ideas, methods, and system designs are
@@ -515,15 +449,15 @@ including both carve-outs below, still stands; read D31 before applying this lin
 ## D24 - agent-tools monorepo layout (revises D0, reverses the marketplace rejection; 2026-07-30)
 
 The repo is now the `agent-tools` monorepo (github.com/yoelgal/agent-tools): each top-level dir is one
-independently installable tool, and better-dev's entire D0 tree - `skills/`, `scripts/`, `hosts/`,
-`hooks/`, `.claude-plugin/plugin.json`, `NOTICE README.md install.sh BOOTSTRAP.md`, plus `docs/` and the
+independently installable tool, and better-dev's entire D0 tree - `skills/`, `scripts/`,
+`.claude-plugin/plugin.json`, `NOTICE README.md install.sh BOOTSTRAP.md`, plus `docs/` and the
 gitignored `raw/` archive - lives under `better-dev/`. D0's install model is unchanged; only the root
 moved. The monorepo root carries its own README, LICENSE, CLAUDE.md, shared CI, and
 `.claude-plugin/marketplace.json` listing each tool as a plugin - the multi-plugin marketplace is exactly
 the second-consumer case the earlier rejection named as its predicate, so that rejection is reversed, not
 overridden. Branch discipline stays repo-wide (feat/* off staging, promoted to main); version stamps and
 release ledgers stay per tool. Clone detection accepts both shapes (a pre-0.7.0 install resolves the old
-repo root; `normalize_clone` in bd-session-start and the /update snippet step down into `better-dev/`).
+repo root; the /update snippet steps down into `better-dev/`).
 - REVISED by D32 (2026-08-14): better-dev is extracted to its own repo and flattened back to the root,
   and the marketplace reversal recorded here is reversed with it; this entry describes 2026-07-30 to then.
 
@@ -547,15 +481,15 @@ close-out enumerated five lines and none of them was the release. Second occurre
 `gate-at-decision-point` lesson (the plugin.json version drift was the first). The enforcing line lives
 in the checklist or it does not exist. Close-out is now six lines.
 
-3. **`bd-mem`'s confidence law is a test, not a question.** Nothing in the library ever gated a memory
-write on operator consent; `scripts/bd-mem` gates `remember` on verification alone. A fact verified
-once this run is a `learn`, one watched hold more than once is a `remember`, and neither needs a click.
-Offering the write spends a turn collecting a yes no policy asked for.
+3. **The confidence law is a test, not a question.** Nothing in the library ever gated a memory
+write on operator consent. A fact verified once this run is a lesson, one watched hold more than
+once is a rule, and neither needs a click. Offering the write spends a turn collecting a yes no
+policy asked for.
 
 4. **A same-key override replaces the whole baseline entry.** The precedence itself is unchanged
 (overrides win over the recalled baseline). What was missing is that one key commonly carries several
-gates: this repo's general "agent merges its own green PR" override silently cancelled the path-scoped
-`hooks/**` gate under the same `safety-gate` key, and the gate survived for weeks only because agents
+gates: this repo's general "agent merges its own green PR" override silently cancelled a path-scoped
+gate under the same `safety-gate` key, and the gate survived for weeks only because agents
 read the baseline and skipped the precedence rule. An override meant to narrow rather than waive must
 name what survives it. `/overrides` says so at the line that creates the collision.
 
@@ -584,11 +518,6 @@ them for the operator to resolve (adds a stop, in the safety class). Deferred, n
 library-wide closed list of never-ask actions.
 
 ## D26 - a named list of machine-global writes is agent-run (2026-08-02; user-ratified)
-**Superseded by the 2026-08-19 cutover:** the three named commands were the graphify installs and the
-comms-block splice, all deleted with the wrappers and the `bd-*` spine. The consequence rule - a
-machine-global write is agent-run only when it is named, reversible, and non-secret - stands, with an
-empty list.
-
 A machine-global write **on the list below** is an agent write, and the running skill names it in
 its recap with its undo, so the change is visible rather than silent.
 **Reversible** (one command undoes it) and **non-secret** (it carries no credential) is what
@@ -600,38 +529,13 @@ classifier-blocked, observed 2026-07-16), not a consequence rule, and over-readi
 ban on machine-global writes is the misreading that produced the drift this entry ends.
 
 The exception authorizes **specific named commands**, never an open class: an open class would
-authorize arbitrary package installs under agent authority. Three carry it today, all made by
-`/graphify-wrapper-setup` except where the third says otherwise:
+authorize arbitrary package installs under agent authority. A command joins the list by being added
+here, not by resembling one that is. One carries it today:
 
-- `uv tool install 'graphifyy>=0.9.18' --default-index https://pypi.org/simple` (undo: `uv tool
-  uninstall graphifyy`). The version floor is pinned in the command itself, so no install lands
-  below it. The index pin is best-effort and bounds nothing: `--default-index` sets uv's
-  lowest-priority index, and `UV_INDEX` / `UV_EXTRA_INDEX_URL` are searched first (measured, uv
-  0.11.7), so this authorization does not bound whose build backend runs under the operator's
-  account.
-- `uv tool upgrade graphifyy` with the same `--default-index`, run only below the version floor
-  (undo: `uv tool install 'graphifyy==<the version the skill printed before upgrading>'`)
-- `mkdir -p ~/.claude/graphify/<repo key>/` and everything written inside it: this repo's
-  `registry.json` **and every graph built from any of its worktrees**, so what is authorized here
-  is unbounded in size rather than one small JSON file (undo: `rm -rf` that directory, which
-  discards every graph on this machine for this repo along with the registry; the next question
-  rebuilds them). Made by setup step 2, and by `gfx_ensure_graph` when `/graphify-wrapper-query`
-  heals a missing registry - the one write on this list a second skill makes, so that skill names
-  it too.
-
-Two costs no reversible undo erases. `uv tool uninstall` reverses the installed files, not the
-code the install already ran; the version floor bounds what may run, not that something ran. And
-the install is not a one-time execution: at every SessionStart `hooks/bd-graphify-refresh-stale`
-spawns a background child that runs `graphify update` on each registered domain whose graph is
-stale against HEAD and whose path the delta touched, so the package keeps running on that machine
-until the domains or the tool go.
-
-A fourth command joins by being added here, not by resembling these three. One did, on 2026-08-17:
-
-- `scripts/bd-block <host global entry> better-dev-comms < docs/comms-block.md`, which writes or
-  refreshes the marked communication-style block in the host's own global entry file (undo:
-  `scripts/bd-block remove <host global entry> better-dev-comms`). Made by `/update` step 2 when the
-  installed copy has drifted from the shipped body, and by `BOOTSTRAP.md` on a first global install.
+- Replacing the lines between the `BEGIN better-dev-comms` and `END better-dev-comms` markers in
+  the host's own global entry file with the body of `docs/comms-block.md` (undo: delete the marked
+  block, markers included). Made by `/update` step 2 when the installed copy has drifted from the
+  shipped body, and by `BOOTSTRAP.md` on a first global install.
   It qualifies on this list's own two tests: one command undoes it, and it carries no credential.
   It writes only between its own two markers, so operator text in that file is untouched either way.
 
@@ -644,24 +548,8 @@ A fourth command joins by being added here, not by resembling these three. One d
 
   D22 is not weakened by this. That entry keeps SETTINGS-class writes operator-run because agent writes
   to a host settings file are classifier-blocked, which is a capability limit rather than a consequence
-  rule. The global entry file is a memory file, not a settings file, and `bd-block` already writes it
-  during a normal install.
-
-The list carried a fourth on the day this entry landed: the never-commit guard, a global-gitignore
-write made by setup so in-tree graph output could never be committed. It was authorized
-**provisionally**, against the work-item that would relocate that output. The relocation shipped
-(2026-08-03): graphs are written to an absolute `GRAPHIFY_OUT` under `~/.claude/graphify/<repo
-key>/`, outside the tree they index, so nothing graphify writes can land in a repo and the guard
-has nothing left to guard. The write is gone, so its authorization is gone with it - retired with
-its cause, not revoked on its merits. The ruling above is untouched. Retiring a write does not
-reverse the one already made: every machine that ran setup before the relocation still carries it,
-so the 0.9.7 line in `docs/RELEASES.md` carries the undo as an `offer`, which is the only channel
-that reaches an already-wired machine.
-
-Evidence: `/graphify-wrapper-setup` has made these writes on every run since it shipped, while
-`/onboard` forbade silent global machine changes in the same phase that hands the operator a
-settings paste block; neither `docs/DECISIONS.md` nor `docs/TRAPS.md` carried a single graphify
-entry, so the contradiction survived by nobody having decided it (audit, 2026-08-02).
+  rule. The global entry file is a memory file, not a settings file, and a normal install already
+  writes it.
 
 ## D27 - gauntlet-for-software harvest rulings (2026-08-05; four calls operator-ratified)
 
@@ -669,21 +557,19 @@ Sources: the re-submitted gauntlet-loop article, mfishbein's software-factory th
 simoncorry/foundry and squidbay/factory, mattpocock/skills v1.2 delta plus the aihero wayfinder
 piece, steida's observatory thread, and three research sweeps - five dossiers, a completeness critic,
 and the master plan under `raw/synthesis/2026-08-05-gauntlet-software/`. Operator ratified four calls:
-best-of-N stays rejected; D23's doctrine lands as `/writing-skills` lines; the artifact set leverages
-graphify; scope covers features and PRs, not only a gauntlet run. Rulings, in the order they bind.
+best-of-N stays rejected; D23's doctrine lands as `/writing-skills` lines; the artifact set is two
+plain files with one writer; scope covers features and
+PRs, not only a gauntlet run. Rulings, in the order they bind.
 
 1. **The gauntlet run's artifact set is two plain files with one writer.** An append-only
 `gauntlet/RUN.md` in the run's own working directory, one block per round - round number, one state
 word per unit, the critic's named gap, spend against the ceiling - and the prompt saved beside it as
 `gauntlet/PROMPT.md` rather than only on a clipboard. The progress page is a **renderer** over that
 record, so a compaction costs markup and never history, and a fresh session resumes from prompt plus
-record. Plain files deliberately, never `bd-mem`: a gauntlet run is a fresh session on a repo that may
-carry no wiring, so a memory dependency would fail exactly where the record is needed most. Bar rows
-live inline in the skill's step 2 - no sidecar. **Critic fence:** the record and the page are surfaces
-the blind critic never reads; it receives the artifact and its bar row and nothing else. Where
-graphify is wired, or one AST-only sync is cheap, the round block carries
-`graphify-wrapper-query --affected`, so a round's blast radius is structural rather than recalled -
-a run note, not a prompt sentence.
+record. Plain files deliberately, never a memory store: a gauntlet run is a fresh session on a repo
+that may carry no wiring, so a memory dependency would fail exactly where the record is needed most.
+Bar rows live inline in the skill's step 2 - no sidecar. **Critic fence:** the record and the page are
+surfaces the blind critic never reads; it receives the artifact and its bar row and nothing else.
 
 2. **The observatory generalizes past `/gauntlet`, and the D14/G31 boundary is ruled once here.**
 One owner, `skills/orchestrating-agents/observatory.md`, carries the emission contract: the
@@ -731,7 +617,7 @@ type) is recorded as **examined prior art**: its per-task-type dial is exactly t
 in one line an angle from outside the exclusion set (prior rounds' channel focuses and lens surfaces),
 dedupes candidates against everything seen - counts blocks plus `reception.md`'s disposition table,
 `REBUTTED` rows included - and closes `ROUND: <n> ANGLE: <one line> NEW: <count>`. Fix-confirm passes
-are exempt; trap 73 already ruled that scope. "Unrun round" retires as vocabulary. `/autonomous-loop`
+are exempt; `/review` already ruled that scope. "Unrun round" retires as vocabulary. `/autonomous-loop`
 carries the consequence sentence: a zero-finding round with no new angle is re-dispatched, never read
 as a verdict. **Accounting ruled:** a re-dispatched round counts toward neither cap, at most one
 re-dispatch per round, so bookkeeping can neither exhaust the ceiling nor unbound it. "The same seam"
@@ -753,10 +639,9 @@ per-work-item explain artifact (owner's manual, comprehension quiz) is a **named
 steered pipeline's operator reviewed every gate, so it would serve a bottleneck that pipeline does not
 have.
 
-9. **One prose rule gets script teeth; the other convenience read does not.** `bd-mem
-persist-override` refuses a `safety-*`-class line carrying no `[operator: "<their words>" <date>]`
-marker, and the reader-side rule lands beside the overrides-win text: an unmarked safety-class line
-reads as absent and the recalled baseline gate stands. This is consistent with D25 ruling 3 - that
+9. **One prose rule gets reader-side teeth.** An unmarked `safety-*`-class line - one carrying no
+`[operator: "<their words>" <date>]` marker - reads as absent, and the recalled baseline gate stands.
+This is consistent with D25 ruling 3 - that
 de-gated memory writes on consent, this demands provenance on one key class and asks nobody anything.
 `approvals.log` entries carry the operator's answer quoted in their own words; an entry without one is
 indistinguishable from a waiver the loop wrote for itself, so it authorizes no resume. The
@@ -799,11 +684,8 @@ from its success mode is not a check, and a red X on a nightly read-only job tra
 it); `/guardrails-install` gains the corroborating blast-radius line (a capability that CAN act
 autonomously is not thereby AUTHORIZED to); `/tool-sourcing` gains the SEO-mill caution (templated
 AI-generated comparison domains need a provenance sniff before a hit counts as found); `/review`'s
-drift check reads the groundwork record's do-not-modify list via `bd-mem ledger read` rather than a
-second recorded key; `--affected` filtered to test paths lands at its owning verb
-(`/graphify-wrapper-query`) and in `/review`'s ripple step - the loop's triage cites the verb and
-reads the filter from its doc; `/codebase-map`'s freshness hedge becomes the named
-`/graphify-wrapper-status` command with three dispositions; and gauntlet's bar rows carry the comp-plus-deltas form, the no-comp written behavior
+drift check reads the groundwork record's do-not-modify list rather than a
+second recorded key; and gauntlet's bar rows carry the comp-plus-deltas form, the no-comp written behavior
 list authored by an agent that will not implement that unit, `none, deliberate` for a declined axis,
 and the carve rule that every unit names at least one row.
 
@@ -827,118 +709,6 @@ Covered, not re-filed (so the next harvest does not re-litigate):
 - "A capability that can act autonomously is not thereby authorized to" - independent corroboration of `/guardrails-install`'s blast-radius framing, landed as one line there.
 - Issues #6 (Braintrust's eval-gated CI: the trace becomes a test fixture) and #7 (critic-harness slot knob; different-model-same-diff rotation axis via the D20 tier-map) - nudged by comment, deliberately not by skill change.
 - Glamorous Toolkit's verbatim ingest, the Sourcegraph/Amp split, Riftmap - promoted hops this batch did not fetch; recorded as next-batch inputs in the batch manifest rather than dropped.
-
-## D28 - observatory-viz harvest (2026-08-05; three calls operator-ratified)
-**Superseded by the 2026-08-19 cutover:** graphify, its wrapper skills, and `bd-atlas` are all deleted;
-structural orientation is the `lsp` tool. Ruling 3's two-surface firewall is the only part with a live
-subject.
-
-Sources: 4 dossiers, a completeness critic, and the master plan under
-`raw/synthesis/2026-08-05-observatory-viz/`, built against a live verification pass (graph built
-for this repo: 1929 nodes / 3184 edges / 162 communities at 9b27ee6; callflow and wiki exports
-tested working, svg export reproduced broken). Operator ratified three calls: (1) this work-item
-lands both the free path (text edits plus a setup fix) and the bd-atlas build in one pass, nothing
-else grows the scope; (2) a CDN stays acceptable for graphify's own rendered pages (callflow,
-graph.html) while the word "self-contained" is reserved for bd-atlas, which must open with the
-network disabled; (3) the flows panel and the answer overlay are bd-atlas features now, with a
-real path/affected export upstreamed to graphify itself recorded as an opportunity rather than
-built here. Rulings, in the order they bind.
-
-1. **Render ownership splits across three skills, no new skill.** Emission belongs to
-`/graphify-wrapper-sync`: after `graphify update` the report's first line is the human-openable
-page path, `graph.json` second; refusal (a semantic-only build, a zero-node or single-community
-callflow graph) is reported, never fatal. Freshness is one column on `/graphify-wrapper-status`,
-computed at read time from the page's mtime against `graph.json`'s `built_at_commit` - stored
-nowhere. The look-first practice belongs to `/codebase-map`: open the domain's rendered page
-before grepping, worded engine-agnostically. The query pointer is one line on
-`/graphify-wrapper-query` naming the page beside the graph.
-2. **Never pass `--output` on the callflow export.** The default filename lands on graphify's
-`*-callflow.html` auto-regeneration glob, so every later sync refreshes the page for free; a
-custom name is correct once and then silently stale forever. Stated in the sync skill with the
-failure mode, not just the rule.
-3. **Two surfaces, two names, one firewall sentence - and the deletion test decides which.** The
-run observatory (`observatory.md`) renders a record that accumulates within one run. The codebase
-atlas is a pure function of `graph.json` plus commit and holds no history: delete it and rebuild
-it losslessly, or it is not an atlas. "Observatory" is not shared vocabulary; the firewall
-sentence lands once, in `observatory.md`, and the atlas text cross-references it by name. Never
-commit a rendered page, never store a render history; the freshness column computes, it never
-accumulates.
-4. **Flows are computed, never invented.** A flow is a named pair of endpoints a human or skill
-declares in `flows.json` (`[{name, from, to}]`, config beside `graph.json`, not history); the
-steps are whatever the embedded graph traversal yields at render time, recomputed per render so
-they cannot go stale independently of the graph. bd-atlas checks every rendered flow against the
-graph's own edges before a byte is written - endpoints, every step's node id, and every consecutive
-pair as a real edge - so a fabricated path of real ids is refused by name, not just an unknown id.
-A model never authors a flow's steps.
-5. **Pedagogy is a sort order, not a narration.** bd-atlas orders what it shows (entry point
-first, then fan-in rank within layer/community) and never generates per-step prose - no LLM call
-in any render path, so the page can never drift from the graph.
-6. **The wiki export is the agent-readable offline surface.** One line in
-`/graphify-wrapper-query` names `graphify export wiki --graph "$graph"` (markdown articles,
-`index.md` as entry point, zero JS) as the answer to "give an agent the whole area without the
-graph tooling."
-7. **Setup fix.** `/graphify-wrapper-setup` installs with matplotlib so `export svg` works -
-reproduced broken (ImportError) on the harvesting machine. One line.
-8. **codebase-map stays engine-agnostic.** No wrapper function names hardwired in; the
-fallback-to-grep exit is tightened by condition (no structural tool installed and sourcing one
-declined), not by naming a tool.
-9. **bd-atlas is the build row.** One stdlib-only Python script (`better-dev/scripts/bd-atlas`)
-rendering `<domain>-atlas.html` beside `graph.json`: one file, no server, no external fetch, opens
-with the network disabled; data embedded in a JSON script tag and mirrored to `window.ATLAS_DATA`
-so agents and the console both read it. The renderer computes its own layered layout (no vendored
-JS, no CDN); drill-down goes community/layer cards to member nodes to a node card naming the next
-`/graphify-wrapper-query --explain` command - a front door to the library's verbs, not a rival
-surface. `--highlight "<a>[,<b>]"` re-emits the page with a precomputed highlight set, and the page
-also accepts `#highlight=<id-list>` at open time. Above roughly 3000 nodes the page embeds the
-community-aggregated graph plus per-community drill-down instead of every raw node in one SVG.
-10. **Pipeline-hygiene folds are surgical, not a rewrite (R9).** Two land here, both one edit each:
-`/graphify-wrapper-sync`'s torn-graph repair moves the unparsable `graph.json` into a timestamped
-`.trash-<epoch>/` instead of `rm -f`-ing it, because an `rm` on a just-created path trips
-destructive-action gates on hardened hosts and left the repair unable to run where it was needed
-most; and `orchestrating-agents/briefs-and-reviews.md` gains one sentence requiring an output
-naming contract to be stated together with its failure mode ("files not matching batch-N.json are
-silently dropped by the merge" binds a worker where "filenames must match" does not). The larger
-emission-contract upgrades that came with them in the dossier - arithmetic self-checks and ordered
-deterministic repair for `orchestrating-agents` - are recorded as an opportunity rather than ridden
-along: they change how every dispatch reports, so they earn their own grill and their own
-verification pass, not a slot in a visualization harvest.
-
-**Rulings 4, 5 and 9 are retired by D35 (2026-08-15):** `scripts/bd-atlas` is deleted as
-over-engineered, so those three rulings lose their subject (with the flows panel and `flows.json`
-that ruling 4 governed). graphify's own `graph.html` and callflow pages are the rendered surfaces
-that remain. Ruling 3's two-surface firewall and its deletion test stand, and now apply to those
-pages. This entry records what was decided on 2026-08-05 and is not rewritten.
-
-Rejected-with-reasons (one row each):
-- Attendance-style run knobs (per-run dials over what the observatory records, filed with ruling 3's
-  naming call) - what the run record holds is a ruling, not a per-run preference, and a dial over it
-  is the first step back toward a series compared across runs, which D27 already rejected.
-- Log overlay on the atlas - would make the atlas a run-fact surface and start the metrics-store
-  slide; a fenced permission is still a permission, and run facts stay on the run observatory's
-  record.
-- Served dashboards (Vite plus a token gate) - contradicts no-server discipline; the artifact
-  could no longer be shared as a file.
-- Vendoring a multi-phase LLM pipeline or a JS graph library - `/codebase-map`'s "mature ecosystem
-  territory" line stands; graphify already answers the schema; a vendored library is a
-  NOTICE-plus-maintenance bill the stdlib renderer avoids.
-- C4 as mandated notation - the atlas borrows the levels idea as drill-down without adopting the
-  notation; `/design-brief` owns visual language.
-- LLM-regenerates-the-page as the primary rendering path - that is what hallucinates components;
-  the atlas is deterministic. The source thread's value was the artifact shape and the
-  dual-delivery doctrine, both adopted; the regeneration method itself was not.
-- Committing rendered pages or the graph - stale with a git blessing.
-
-Covered, not re-filed (so the next harvest does not re-litigate): a persistent code-health
-observatory tracking complexity/coverage/duplication trends over time (already rejected, D27);
-shared "observatory" naming across the two surfaces (ruling 3).
-
-Recorded as opportunities, priced but unbuilt: a real path/affected visual export upstreamed to
-graphify itself (days, external review cycle; every graphify user would inherit it, and it could
-retire bd-atlas's overlay duty) (moot under D35); an emission-contract grill for
-`orchestrating-agents` (arithmetic self-checks, ordered deterministic repair); an install-surface
-security audit of `install.sh`; a bd-atlas tour mode surfacing ruling 5's sort order as a "read in
-this order" strip (moot under D35); watching graphify 0.9.33's hosted-platform early access for a
-future serve story.
 
 ## D29 - mattpocock v1.2 release harvest rulings (2026-08-05 evening; four calls operator-ratified)
 
@@ -1033,7 +803,7 @@ recommended pick, a one-way door is always its own round of one, and a blanket a
 gets the two most consequential picks reflected back before locking. Evidence on the reversal side:
 two live batched rounds in this repo's own sessions (2026-08-05 harvest scope round, 2026-08-06
 north-star round) produced considered answers including overrides of the recommendation - the
-observed failure did not reproduce under the guards. Traps 150-151 rig both guards.
+observed failure did not reproduce under the guards.
 2. **The D29 wait-what rejection is reopened by operator call: the corrective ships as a tiny
 model-invoked skill.** The rejection's ground (the comms block carries the preventive half) stands,
 but the corrective half had no home - the record's own "I just wanted 'here's what I'll build,
@@ -1043,7 +813,7 @@ disclosed at the PR, not silently ratified - so it fires on the natural signal (
 me"), not only by name: a corrective needed at the moment of frustration cannot depend on
 remembering a command, and the authoring standard reserves user-invocation for deliberate-command
 skills. The body stays a few lines by design; the authoring standard's fails-by-growing rule has
-its working example, and trap 152 rigs the growth ask.
+its working example.
 3. **The questionnaire unblock gains a front door.** The grill-the-send machinery (landed at D27)
 is reachable from any flow the moment the operator says a decision is someone else's - a routing
 row plus an arrival paragraph in plan-grill, trap 153. No new machinery: a name and a door.
@@ -1053,10 +823,10 @@ and guardrails-install point at it from their own operator steps. Still no vendo
 bash-light, reimplement-first.
 5. Two uncontested widenings ride along: the third-party logic prototype gains one tab per worked
 case (each spelled out in plain words, its clicks numbered, the state rewound on open); the
-writing-skills bar explicitly binds the sibling files a skill sends the agent off to read. Trap 155
-rigs that second one: the sweep that stops at the `SKILL.md` files is a miss this very branch came
-one review away from shipping, when ruling 1's repeal left `brief-decode.md` arguing from the
-repealed rhythm and the reviewer, not the sweep, was what caught it.
+writing-skills bar explicitly binds the sibling files a skill sends the agent off to read. The sweep
+that stops at the `SKILL.md` files is a miss this very branch came one review away from shipping,
+when ruling 1's repeal left `brief-decode.md` arguing from the repealed rhythm and the reviewer, not
+the sweep, was what caught it.
 
 Rejected-with-reasons:
 - Full upstream-shape frontier rounds (whole frontier at once, no guards) - the form-answering
@@ -1124,9 +894,7 @@ to today. The install one-liner is now
 rewrite would produce a history where the files always sat at the root, and it would invalidate every
 clone already on a machine. Truthful history wins over a uniform-looking one: the cost is that the log
 shows the files at the root, then under `better-dev/`, then at the root again, which is what actually
-happened. The `better-dev/` branches in `normalize_clone` (bd-session-start) and in the `/update`
-snippet stay for the same reason - they resolve an already-installed pre-flatten clone, not this
-repo's layout, so removing them would strand every host still pointing at one.
+happened.
 
 **The self-hosted marketplace is deleted, and D24's reversal is itself reversed.** D24 overturned D0's
 rejection of a single-plugin marketplace on one predicate: the monorepo supplied a second consumer, so
@@ -1135,67 +903,12 @@ stands again on its own terms rather than being re-argued. `.claude-plugin/marke
 and any instruction to `/plugin marketplace add` or `/plugin install better-dev@agent-tools` is removed
 rather than retargeted. better-dev is a clone-installed tool, full stop.
 
-**A structural finding independently condemns the plugin channel for this tool** - recorded here
-because it is the durable reason and must not be re-litigated. The Claude Code plugin cache is
-version-pinned, one directory per version, while `scripts/bd-link:47` bakes an absolute symlink
-`.better-dev/bin -> <scripts dir resolved at wiring time>`. So every plugin update would strand each
-wired repo on the previous version's scripts, and reaping an old version directory would dangle
-`.better-dev/bin/bd-mem`, which every skill calls through. Skills and hooks do survive the channel -
-`hooks/hooks.json` uses `${CLAUDE_PLUGIN_ROOT}`, expanded at runtime - but the scripts bridge does not,
-and the bridge is the part skills depend on. `install.sh:182` already recorded the other half: an agent
-told "install better-dev" cannot drive an interactive plugin installer and always takes the clone path,
-so the channel was carrying the rarer install while owing the same maintenance.
-
-`.claude-plugin/plugin.json` **stays.** `hooks/bd-session-start:250` reads it for the installed version
-stamp, so it is load-bearing independently of the plugin channel it was originally written for.
-
 ## D33 - a legacy plugin install is not a supported state (2026-08-15)
 
 D32 deleted the marketplace channel, but not the installs made through it. Item 1's docs sweep found
 three places still branching on one, disagreeing about what it means, and left the question open
 rather than deciding it inside a sweep. Deciding it: **an install made through the plugin channel is
-not supported.** It is not merely legacy, it is already broken - the plugin cache is version-pinned one
-directory per version, so `.better-dev/bin` cannot bridge into it, and every skill that calls through
-`.better-dev/bin/bd-mem` fails on that host today. The remedy is a clone install, not an update.
-
-The three sites now agree:
-
-- `/guardrails-install` (`SKILL.md`, `stacks.md`) had a branch reading "a plugin install already
-  carries the two `PreToolUse` entries - write nothing". Both are removed and the wiring is always
-  emitted. That branch was the harmful direction: a skill declining to install enforcement because it
-  believed a plugin had, leaving a repo unenforced while recording that it was enforced.
-- `/update` no longer calls a refused pull on a plugin checkout normal. It names the migration.
-- `hooks/hooks.json` **stays**, for the same reason `plugin.json` did under D32: its consumers are no
-  longer the plugin. `friction/run.sh` reads it to give its sandbox better-dev's hooks, and
-  `bd-package-check` compares it against `bd-hook-wire`'s `WANT` table so the shipped declaration and
-  the actual wiring cannot drift. It is a declaration, never evidence a host registered anything.
-
-One nudge is added rather than removed: `hook_nudge` still suppresses its install.sh advice on a plugin
-root (a duplicate hook registration is not idempotent, and that is the worse failure), but it now says
-the install is unsupported and names the migration. Silence is what let such an install sit forever.
-
-## D34 - three legacy-path hook shims live under `better-dev/`, deliberately (amends D32; 2026-08-15)
-**Superseded by the 2026-08-19 cutover:** there are no hooks left to shim, and `better-dev/hooks/` is
-deleted with the rest of the hook layer.
-
-D32 moved everything to the repo root. `better-dev/hooks/` is back, holding three files and nothing
-else. It is a compatibility shim, not a reversal, and it exists because of an asymmetry D32 created:
-
-`install.sh` writes an **absolute** command into each host's machine-global hook config
-(`bash "<clone>/better-dev/hooks/bd-session-start"`), and D32's flatten deleted the directory it
-points into. A host installed before the flatten therefore runs a command that exits 127 - so no hook
-code runs, and no nudge can reach that operator however correct the nudge is. Every other repair
-depends on a hook that is already dead. Teaching the resolvers to step up (this item does that too)
-reaches nobody in that state; only a file at the path their config already names can.
-
-So the three shims `exec` their root namesakes and do nothing else - silent, non-writing, exiting 0
-if the target is missing so a partial pull cannot break a session. Nothing else moves back.
-
-**They self-retire per host.** The nudges say run `install.sh`; that run rewrites the hook commands to
-the root paths, and the shim is never executed on that machine again. They carry no expiry in code
-because the installed-user count is not measurable; the collector is a `legacy-hook-shim-removal`
-follow-up against the `better-dev-extraction` epic. Until then `git grep "better-dev/"` will keep
-hitting this directory, and that is expected rather than drift.
+not supported.** The remedy is a clone install, not an update.
 
 ## D35 - the script surface was over-built; cut it and keep cutting (operator ruling, 2026-08-15)
 
@@ -1203,35 +916,6 @@ An audit of `scripts/` and `hooks/` found **8,006 lines of shell and python** fo
 product is markdown an agent reads. The operator's ruling, verbatim: *"I don't get why we need all
 these scripts. This thing should be able to be handled by the agent. I feel like making all these
 scripts just makes it brittle."*
-
-Three things were cut, and the pattern joining them is the finding.
-
-**`scripts/bd-atlas` (1,355 lines) is deleted.** A python generator turning a graphify graph into an
-offline HTML page. No automatic caller: no CI job, no hook, no installer referenced it, and the only
-mention inside the gate was a comment about its shebang. Five prose sites invited an operator to run
-it by hand. CI paid to run its selftest on every PR. graphify's own `graph.html` and callflow pages
-ride graphify's regen and were always the surfaces that mattered. D28's rulings 4, 5 and 9 lose their
-subject with it; ruling 3's two-surface firewall survives and now applies to those pages.
-
-**`scripts/bd-migrate-branch-model` goes from 491 logic lines to 173.** Its one job is retiring a
-staged integration branch. It carried a fifteen-precondition ladder, an incomplete-migration marker
-file with its own recovery and stale-detection logic, remote resolution by named mechanism, and
-post-write resolver assertions. All of it was defeated by **one grep**: the branch-model detector
-substring-matched `branch-model: trunk` across `rules.md` and `overrides.md`, so a recorded rule that
-merely *described* the trunk default made the tool report "already recorded as trunk - nothing to do"
-on a repo whose `overrides.md` said `integration branch = staging`. Reproduced live against this
-repo. That is the lesson: **defence in depth around a detector that reads prose is not defence.** The
-40-line machine-local marker block is replaced by 6 lines that read the pushed archive tag, which any
-clone can see.
-
-What survives is what prevents a witnessed loss, one comment line each naming the loss it prevents:
-refuse on a dirty tree, push the archive tag before any delete, refuse when release resolves equal to
-integration, assert the override rewrite before deleting, refuse without `--yes`, and fetch above
-every gate.
-
-**`bd-mem persist-override` gains `--replace`.** It only ever appended, which is why the migration
-hand-rolled a `grep -v` rewrite outside bd-mem's lock, not marker-aware and non-atomic. A missing
-verb had become a workaround in a caller; that is the same defect class as the other two.
 
 ### The rule this sets
 
@@ -1276,97 +960,8 @@ next `git pull` and a red gate reaches people rather than sitting behind a promo
 protection is `strict: true`, so every PR must be up to date with `main` before it merges - a
 day-to-day cost the staged model did not have.
 
-**Ordering that mattered.** The migration ran *after* the 0.13.0 release, not before. `origin/main`
-was four commits behind and still carried the pre-flatten layout (`better-dev/` subdir, no root
-`skills/`), so retiring `staging` first would have made a pre-D32 tree the trunk that every user
-clones. `bd-migrate-branch-model` deliberately never merges for you, so nothing would have caught it.
-
 The historical record is annotated, not rewritten: `docs/DECISIONS.md`, `docs/PLAN.md` and
 `docs/TRAPS.md` describe decisions that were really made about `staging`, and they still say so.
-
-## D37 - enforcement reaches omp through the bridge that already runs the awareness hooks (2026-08-17)
-**Superseded by the 2026-08-19 cutover:** `bd-guard` and the omp bridge are both deleted. Destructive
-commands are gated by a committed `.omp/config.yml` under `bash.patterns`, and the path-based edit
-gate has no native equivalent - it is gone rather than replaced.
-
-`bd-guard check-bash` and `check-edit` were registered as Claude Code `PreToolUse` entries only, so every
-destructive command and out-of-boundary edit in an omp session ran unchecked and an onboarded repo could
-only record `safety-enforcement: prose` - the fallback reserved for a host with **no** pre-execution hook.
-omp has one: a `tool_call` handler may return `{block, reason}`, and `ctx.ui.confirm` is a real prompt.
-
-**A second module in the clone, not a second installed hook.** The guard is its own module under
-`hooks/omp/`, and the awareness bridge omp already loads calls it. Nothing about the install changes: one
-stub, one target path, no wiring-script, `--verify` or uninstall edit, and no migration for a stub already
-on a machine. Its every path is total, because omp's runner converts a handler that throws or outruns its
-bound into a block itself - a non-total guard would deny every guarded tool call on the machine. The
-rejected alternative was a second install target so enforcement could be removed without losing
-awareness; it grows five surfaces to buy an on-off switch nobody asked for, and `bd-guard off` is not
-that switch - it lifts the scope boundary and leaves the destructive-command and denylist asks armed.
-
-**The bridge translates; the policy stays in `bd-guard`.** It maps the script's existing Claude-shaped
-envelope onto omp's result type and adds no pattern and no denylist of its own, so widening the recorded
-policy is still one `bd-mem remember`. The review round found the envelope's *encoding* broken rather
-than its shape, and that is the one change the script did earn: `emit_decision` escaped only backslash
-and double quote while embedding a model-chosen path in the reason, so a path carrying a newline emitted
-invalid JSON, a real refusal reached the reader as no decision at all, and allow-by-default performed the
-write. Reachable by naming the file, on every host, Claude Code included. Fixed at the PRODUCER, which
-is also where it fixes Claude Code: the reason is escaped losslessly, the script pins `LC_ALL=C` so a
-byte-level `tr`/`sed`/`grep` cannot abort into the fail-open trap, and the extractor passes surrogates
-through instead of returning empty.
-
-**The consumer stays a pure translator, and that is a reversal worth recording.** A second review round
-had the bridge refuse on an answer it could not decode - silence allows, garble blocks. Round 3 measured
-it: a `$BASH_ENV` or PATH shim printing without a trailing newline, or from an EXIT trap, made every
-bash, write, edit and ast_edit call block in every session on the machine, in every repo including
-un-onboarded ones, with `bd-guard off` unable to lift it. A consumer that invents refusal semantics its
-producer never had turns each producer hiccup into a machine-wide outage. The same reasoning retired a
-second invented refusal, a batch that exhausted the hook's bound with paths still unjudged, which
-refused an ordinary multi-file edit at around 45 paths under normal parallel load on paths already
-judged clean. Anything unclear ALLOWS, as `bd-guard`'s charter always said; the encoder is where the
-effort goes. Three hardening rounds each opened the next hole, which is the recorded signal to question
-the defended default rather than defend it again.
-
-**The command is submitted as written, and `env` is a named limit - tried, measured, reverted.** omp's
-`bash` input carries an `env` map, so `$X` with `env: {X: <destructive>}` does reach the shell fully
-formed while a bare-`command` submission sees nothing. Submitting the shell spelling `VAR=value
-command` looked like the faithful fix and was worse in both directions: any prefix perturbs
-`bd-guard`'s quote lexer, so a command that denies on its own is ALLOWED once spliced - even with the
-value correctly escaped - while ordinary prose in a value lands on the live side and draws an
-unpromptable deny on an everyday commit message. Judging values separately fails the other way: a
-value containing the word `eval` is refused. So the rendering is gone, `command` goes over as written,
-behaviour on that string is byte-identical to Claude Code's, and `env` joins the named limits.
-`bd-guard` stops accidents, not attacks - a plain `sed` already defeats it - so this was a requirement
-the tool never claimed. Recorded as tried-and-reverted in the code, so it is not re-attempted.
-
-**Two more producer defects surfaced with it, both pre-existing and both live on Claude Code.** A lone
-surrogate in a path or command was decoded, failed to re-encode on stdout, and the swallowed error left
-an EMPTY value - so `rm -rf /important # \ud800` was allowed where the same command asks, the surrogate
-sitting in a shell comment and changing nothing about what runs. And every byte-level `tr`, `sed` and
-`grep` in the deny path ran under the ambient locale, where an illegal byte sequence ABORTS the
-utility; with `set -euo pipefail` and a fail-open `ERR` trap, that abort is an allow. Both fixed in the
-script: the extractor pins its own streams and passes surrogates through, and the script pins `LC_ALL=C`
-for everything except that parse, which needs UTF-8 to accept a non-ASCII path at all.
-
-**An ask with no UI blocks.** Fail-open is the posture for *errors*; an ask is a decision, and a headless
-run has nobody to escalate to, so allowing it would self-approve the one class the policy escalates.
-
-**A URI-scheme write target is not judged as a path.** omp dispatches its internal devices as writes to
-`xd://<device>`, so reading that scheme as a filesystem path would deny every device call in every
-session; a device's real paths are judged under the device's own tool name instead.
-
-**Its coverage limits are named rather than papered over.** The `eval` tool is unjudged, because
-`bd-guard`'s pattern set is shell-shaped and matching python or JS source against it would be fake
-coverage that also mis-asks on ordinary prose. A `hub` start op is unjudged, because it launches a
-process outside the bash tool and its command never reaches `check-bash`. A hashline move destination is
-unjudged, because it is not among the paths omp derives for its own approval gate, and judging exactly
-that surface is the point - not a second, wider parser to keep in step. A target behind a URI scheme is
-unjudged, and the cost is real rather than zero: a scoped session can still put bytes outside its
-boundary through `local://`, `memory://`, `artifact://` or `ssh://`. Narrowing the rule to `xd:` alone
-was considered and rejected, because it would deny a `local://` handoff - a working orchestration path.
-A selector path (`db.sqlite:table:key`, `archive.zip:member`) is forwarded verbatim, so it satisfies the
-boundary prefix check while no denylist glob can match it. And `bash` is spawned from `PATH`, so whoever
-can write your `PATH` or the clone's `scripts/` disarms the guard - accepted, identical to what
-`hooks.json` already ships, and an attacker with that write owns the session anyway.
 
 ## D38 - links-batch harvest rulings: the block gains a device that acts on a reply (2026-08-17)
 
@@ -1376,56 +971,32 @@ can write your `PATH` or the clone's `scripts/` disarms the guard - accepted, id
 The operator re-submitted sources this archive already held, with two complaints: replies "too long and
 verbose and not pragmatic", and `/wait-what` invoked "too often". Neither was a capture failure. The
 26-row rule-by-rule diff against upstream grades our comms block STRONGER on two rows and narrower on
-one, so the rules were not the problem: **nothing applied them at the moment they would bind.** Four
+one, so the rules were not the problem: **nothing applied them at the moment they would bind.** Two
 independent absences, and one regression.
-
-Of 155 traps, exactly one graded a produced reply (127), and it grades UNDER-reporting. The trap corpus
-was asymmetric against the failure being reported.
 
 **What was wrong, with receipts.**
 
 - No device acted on a drafted reply. Every mechanism the library shipped acted on the *block*: one
-  writer per destination, a 24-line cap, a single-home gate, a duplicate-copy trap, an authoring size
-  trap.
+  writer per destination, a single-home gate, a duplicate-copy trap, an authoring size trap.
 - The installed copy had drifted from the shipped body. Two clauses in `docs/comms-block.md` had never
   reached `~/.claude/CLAUDE.md`; four installed clauses were reworded or dropped. Nothing reconciles
   them: the two writers (`BOOTSTRAP.md` globally, `/onboard` per repo) each run once, and
   `skills/update/SKILL.md` step 2 explicitly skipped content-only changes.
-- `hooks/bd-subagent-start` carried no output shaping at all, so every fan-out report the operator reads
-  was unstyled by construction. SessionStart context never reaches a subagent, which is why the gap was
-  invisible.
 - The exploration carve-out written to answer upstream `ayghri/i-have-adhd` issue #42 had **regressed
-  out** of `docs/comms-block.md` while trap 127 still called it "the whole reason the carve-out line
-  exists" and a work-item contract still pinned it.
+  out** of `docs/comms-block.md` while a work-item contract still pinned it.
 
 **Rulings.** Full text in the master plan; the load-bearing ones:
 
-1. The block gains the length budget, argument completeness, the connected-reasoning clause and a
-   pre-send cut list, and pays for them by compressing existing rules and rewrapping wider - **the
-   24-line cap stands** and is still CI-gated. Raising it was put to the operator, not taken.
-   Corrected after review: the first attempt at this compression **deleted** a rule rather than
-   compressing it (the wins-and-errors receipt, "what now works and the command that shows it"), and
-   an earlier draft of this entry recorded the trade as costing no rule. It did. The clause is
-   restored and the block sits at 23 of 24 lines. Two things make that worth recording rather than
-   quietly fixing: it was the only rule requiring a reported win to carry the command that proves it,
-   so it was a COMPLETENESS device deleted in the same edit that added three brevity devices, against
-   an operator complaint that is half about needing re-explanation; and ruling 6 ships the mechanism
-   that would have propagated the deletion to the operator's machine on the next `/update`. A
-   line-capped always-loaded block plus a propagation path means a compression error is a deletion
-   with a delivery mechanism, so a clause-by-clause diff of the base against the head is mandatory on
-   any edit to this file.
-2. Argument completeness lands in the block, never in `/wait-what`. A fact stated without its
+1. Argument completeness lands in the block, never in `/wait-what`. A fact stated without its
    consequence is the shape a reader answers with "wait, what?", so the fix belongs where it prevents
    the failure. `/wait-what` is untouched and stays its size: growing a corrective against volume fails
    the rule it teaches.
-3. `prose` and `i-have-adhd` genuinely conflict on form. Resolved by axis rather than by picking a
+2. `prose` and `i-have-adhd` genuinely conflict on form. Resolved by axis rather than by picking a
    winner: lists for parallel enumerable facts, prose where items join with because, so, or but.
    Neither source adopted whole.
-4. Brevity rules ship with their cheapest wrong obedience named. Shortness comes from cutting content,
+3. Brevity rules ship with their cheapest wrong obedience named. Shortness comes from cutting content,
    never from clipping sentences.
-5. Dispatched workers get two shaping rules inline, asserted by the hook's own selftest. A pointer
-   would not be followed by a worker that never loads the file.
-6. `/update` reconciles copies as well as links. The host-global write stays operator-run per D26.
+4. `/update` reconciles copies as well as links. The host-global write stays operator-run per D26.
 
 **The harvest skill's own defect, and its fix.** The operator also reported that harvest passes "gloss
 over some things". The depth ladder was enforced by prose, and this batch measured the result: seven of
@@ -1453,12 +1024,10 @@ artifact-and-typing model as its subject. "HITL" appears zero times in this file
 though the typing was captured verbatim in the first ingest and re-named in two more. Three ingests,
 zero dispositions. Carried to its own work-item rather than folded here (master plan H3).
 
-**Landed:** `docs/comms-block.md` (53 lines, cap 60; see the follow-up ruling below for why the cap
-moved twice in one session),
-`hooks/bd-subagent-start` plus its selftest,
+**Landed:** `docs/comms-block.md`,
 `skills/update/SKILL.md` step 2, `skills/source-harvest/SKILL.md` (ladder plus stage-2 audit gate),
 `skills/source-harvest/extraction-recipes.md` (single-browser batch reader after measuring 19 pages in
-82s against 4 in 10 minutes, silent-video keyframe recipe, fxtwitter fallback), traps 156 to 159.
+82s against 4 in 10 minutes, silent-video keyframe recipe, fxtwitter fallback).
 
 **Rejected, so it is not re-litigated:** paraphrase distillation (training-time, no prompt-level
 analogue); the `/effort` ladder as written (maps effort to job categories not judgment bands, and
@@ -1500,19 +1069,11 @@ form: the length budget by question class and the seven-paragraphs counter (from
 the whole-argument rule, the message-is-its-own-summary rule, the glossing test, and the
 report-versus-track carve-out with its diagnosing-or-exploring scope.
 
-**The cap moves 24 to 30 to 60**, gated at `scripts/bd-package-check`. The first move bought back a
-deleted rule and a stripped counter. The second is a consequence of the verbatim ruling: upstream ships
-roughly 140 lines always-on, so at 53 lines our block is already the compression, and a 30-line ceiling
-would have forced exactly the paraphrase the operator just overruled. Two mechanical notes for the next
-editor, both of which bit this session:
+One mechanical note for the next editor, which bit this session:
 
 - The gate's single-home detector greps for the block's opening sentence as its sentinel. Rewording the
   opening breaks the detector into reporting zero homes, which reads identically to a missing block.
   Both moved together this time; they have to.
-- What a cap is for is stopping unbounded drift, not making deletion the cheapest way to add a rule. At
-  24 it did the latter and a shipped rule went silently, which review caught rather than the gate. A cap
-  is doing its job while the marginal line is expensive and doing harm once the marginal line is
-  unaffordable.
 
 **Every message is its own summary.** Operator-stated, verbatim: "treat every message it sends as a
 tldr, but without saying 'tldr' explicitly at the start". Landed as its own clause:
@@ -1526,7 +1087,7 @@ subsumes two failures the pre-send cut list only catches after the fact, a recap
 wind-up at the start, by removing the structure that produces them.
 
 The installed global block on the operator's machine was repaired to match in the same session, which
-is the first exercise of ruling 6's new `/update` path.
+is the first exercise of ruling 4's new `/update` path.
 
 ## D39 - the batch lands as skills, not as patches (operator ruling, 2026-08-17)
 
@@ -1553,13 +1114,12 @@ of shipped description fields rather than assumed to fire.
 
 `/brief-to-problem` was authored and is **not wired and not adopted**: see the operator calls below.
 
-**Seven existing skills changed**, against the three operator asks this batch opened with. `/review`
+**Three existing skills changed**, against the three operator asks this batch opened with. `/review`
 gained a FIX/NIT/ESCALATE disposition beside severity, a convergence stop, channel independence stated
 as a property rather than a model choice, and a self-recording measurement suffix. `/security-pass`
 gained VISA's five-check evidence gate with its refusal clause and an anti-manipulation rule naming
 artifacts that address the reviewing agent instead of the code. `/pr-and-verify` gained a
-deterministic-gates-before-judgment chain and the monotonic invariant. The graphify wrappers gained a
-freshness contract, edge-tag trust rules, and honest benefit evidence.
+deterministic-gates-before-judgment chain and the monotonic invariant.
 
 **Three rulings the work forced, beyond the additions.**
 
@@ -1577,7 +1137,7 @@ freshness contract, edge-tag trust rules, and honest benefit evidence.
    paraphrase form `/writing-skills` bans and were repaired to enter-steps at placement. An author
    wiring its own skill writes the pointer it wishes existed; an integrator has to find the anchor.
 
-### Open operator calls, recorded so they are not lost
+### The open operator call, recorded so it is not lost
 
 - **`/brief-to-problem` is ADOPTED as a skill (operator ruling, 2026-08-17), reversing D15.** D15 had
   adopted the capability as `/plan-grill` step 0 plus that skill's `brief-decode.md` sibling and named
@@ -1592,23 +1152,11 @@ freshness contract, edge-tag trust rules, and honest benefit evidence.
   `skills/plan-grill/brief-decode.md` is deleted, so the six moves live in one place. `/plan-grill` step
   0 now enters the skill and returns with its artifact, its description hands the relayed-language case
   over instead of claiming it, `/diagnose` enters it at the symptom-only gate, and `/groundwork`'s lean
-  grill enters it for an epic that arrives as somebody else's words. Trap 63 moved with the capability
-  and gained the fail branch the move creates: a grill that decodes inline from memory of how step 0
-  used to work.
+  grill enters it for an epic that arrives as somebody else's words.
 
   Also corrected here, because the batch's own frontier read got it wrong: this was filed as an unlanded
   orphan. It was not. The worker reconstructed D15 from the record and logged a papercut against the
   brief that misled it, which is the sweep working rather than failing.
-- **Three of the six graphify wrapper skills are recommended for folding**, on measured evidence rather
-  than taste: upstream's own benefit number is +11.2 points on n=6 graded questions, and re-measured
-  ripple coverage on this repo is 38.1 percent against a 70 percent threshold. The same audit
-  recommends **not indexing this repository at all**, since 127 markdown files are the product and 76
-  percent of call-family edges are vendored daemons. Nothing was deleted: cutting a skill is a ruling.
-- **The graphify version floor stays 0.9.18.** A half-applied bump to 0.9.45 shipped in the skill text
-  and was reverted: the gate pins the same string in five other places, and raising it edits the command
-  D26 authorizes by name, which is an operator call rather than a wording change. The reason for wanting
-  it is recorded in the skill: below 0.9.45 an incremental rebuild can make every unchanged source look
-  deleted when the `.graphify_root` marker records a subfolder, and the refresh path hits that unattended.
 
 ### One ordering dependency
 
@@ -1630,7 +1178,7 @@ meant this repo followed the rules and every consumer did not, which is the oppo
 The override was removed rather than duplicated: a rule in two homes is the third-edit failure
 `/writing-skills` names, and the block is the canonical home.
 
-**What that costs, stated plainly.** The block goes from 58 lines to 80 and its cap from 60 to 85,
+**What that costs, stated plainly.** The block goes from 58 lines to 80, under a cap of 85,
 because a delete list has to name what it deletes and a pointer to a reference file does not load on the
 turn it binds. That is a real per-turn tax on every session, accepted deliberately: the operator asked
 for the rules to reach every user, and the only surface that reaches a user is this one. Upstream's own
@@ -1661,7 +1209,7 @@ line rewritten, because shipping a block that violates its own first rule in its
 than departing from an upstream phrase. The operator was told which line changed so it can be reverted
 in isolation.
 
-## D41 - the harvest's final sweep: six rulings, and the trap corpus gets a result field (2026-08-18)
+## D41 - the harvest's final sweep: four rulings (2026-08-18)
 
 Seven workers closed the 2026-08-17 harvest, reading `lopopolo/harness-engineering` at v1.0.0, the
 `jamonholmgren` setup thread, the UI-design skill cluster, `haacked/dotfiles`, `ayghri/i-have-adhd`,
@@ -1695,7 +1243,7 @@ Per worker, so the totals are checkable: landed 1 / 2 / 8 / 1 / 6 / 13 for Linea
 Playbooks, LoopHardening, VerifyEvidence and DesignCluster; already-held 5 / 8 / 11 / 5 / 13 / 11;
 rejected 4 / 4 / 14 / 0 / 8 / 13, with four of LoopHardening's five already-held items also carrying a
 rejected half. `EvalAndRecovery` edited no skill directory: its five lands are records, four of which
-land in `docs/TRAPS.md` in this same commit and the fifth of which is explicitly not taken (below). Its
+land in `docs/TRAPS.md` in this same commit and the fifth of which is explicitly not taken. Its
 already-held count is 6 and its rejected count is 5. The batch brief's own estimate was 31 / 48 / 44;
 the landed figure was right and the other two were low.
 
@@ -1725,9 +1273,7 @@ after the 2026-08-14 flatten (D32) moved the gate to the repo root, and `rules.m
 correction again for `verify lint:`. The recorded command's path moved, nothing re-probed it, and there
 was no route to replace it, so the record grew an explanation instead. Landed at
 `guardrails-install:224-235`: a probe per runnable key in the shape that key allows, `(CI-only)` named
-as the exemption, the re-run re-probing this one family rather than skipping it, and the correction path
-stated because `bd-mem remember` appends rather than replaces, so a corrected value otherwise leaves two
-rules in force and the retirement is an operator action in the close-out. The runtime half landed at
+as the exemption, and the re-run re-probing this one family rather than skipping it. The runtime half landed at
 `observability-install:73-77`, where `obs-alert-channel` is the one key whose rot is silence.
 
 ### 2. A design mechanic lands when it is a relation, a ban, or a presence check, and is rejected when it is a constant
@@ -1741,8 +1287,8 @@ thirteen were refused by it, including the three named cubic-beziers, the five-r
 the icon-animation values.
 
 **This is not a new axis.** It is the operational form of two rulings already on file: D15's design
-hardening at line 228 keeps token-set slots as form only, with values never shipped, and D18's rejection
-row at line 297 sends spring constants and platform animation formulas to the composed host skill. What
+hardening bullet keeps token-set slots as form only, with values never shipped, and D18's rejection
+row sends spring constants and platform animation formulas to the composed host skill. What
 the cluster added is the test that decides a candidate at the moment it arrives, and the reason the
 strong form of "skills carry criteria, not taste" is wrong: both upstream authors, when they sit down to
 write, do convert judgment into exactly the checkable form our bar demands.
@@ -1790,70 +1336,7 @@ edit whose without-arm already passes is a restatement, and the honest move is t
 measurement said so. The kept sentence is reported as not measurable by that instrument, since a
 stateless arm has the source already pasted in, which is the state the rule exists to produce.
 
-### 4. The trap corpus is 161 definitions and one observation
-
-`EvalAndRecovery`'s finding, and the two parts that make it actionable rather than a complaint.
-
-First, **our own authoring bar already requires the fix.** `skills/writing-skills/SKILL.md:210-213`:
-"Any file the model both reads and rewrites - a contract's done-criteria, a progress ledger, a pass/fail
-list - carries an explicit typed status field per item (a boolean or enum in a table or JSON shape), not
-a prose bullet. A model tidies prose and leaves `"passes": false` alone." `docs/TRAPS.md` is exactly
-that file, and it carried no typed status field on any of its 161 scenarios. So this is a shipped rule
-the library was not applying to its own corpus, which needs no external precedent to justify.
-
-Second, **`.better-dev/model-fingerprint` implies a validation that nothing evidences.** It holds the
-bare string `claude-fable-5`, with no date, no result and no scope, and trap 106 describes that file as
-the thing that "records the model that validated the trap suite and tier calibration". One line in 2,500
-records that a scenario was ever run against a model. Five weeks of a revalidation ritual asking a human
-to re-run three traps by hand had left the human nowhere to write the answer, which is the mechanical
-reason the count is one.
-
-**Rung 0 is taken in this commit.** One `Last run:` line under each of the 161 headings, plus a preamble
-sentence naming `never` as an unproven claim about the skill the trap targets rather than a neutral
-default. Trap 1 carries the one real value the file already held, and it is written as
-`2026-07-07 fail (model unrecorded)` rather than being attributed to the fingerprint's model, because
-the file records the date and not the model, and inventing the model would be the defect the field
-exists to expose. Trap 71's `2026-07-16` evidence line is an observation of a host classifier's
-behaviour rather than a grading of that trap, so it stays `never` and the observation stays in the
-scenario prose. About 162 added lines in an on-demand document, so no always-loaded cost.
-
-**Rung 1 is not taken: scoring traps 1, 4 and 5 under two conditions with three trials each, 18 runs.**
-All three settle on a string in the run's own output, so no judge is needed, and the ritual already pays
-a recurring human cost to re-run exactly those three. What stops it is that the fixtures do not exist:
-a failing test whose output reads like an instruction, a six-criterion contract with an implementer
-report and a `test_reconcile` asserting a hard-coded value, and a PR rendering a wrong growth percentage
-over green CI. **Revisit trigger:** the next time the fingerprint changes and the ritual fires, since
-that is the moment the 18 runs would be paid for anyway. A second trigger retires the no-script
-position: past roughly 30 runs per revalidation, blinding the condition and skipping completed rows are
-where a human eyeballing results makes mistakes, and a runner earns its line count there and not before.
-
-**Rung 2 is not taken: `ayghri`'s five-dimension weighted rubric plus its off-target corpus.** Its
-clause 2 is the thing we have no analogue for, because it gates release on a regression rather than a
-win: "Correctness and safety are each within 0.1 points of baseline or better." Its `cases.jsonl` is
-deliberately built from tasks the skill is not about, so a concision skill cannot win by deleting
-substance. Taking it needs a blind judge, a 14-case off-target corpus, and a second release gate beside
-`bd-package-check`, and D35 says name the collector before adding one. **Revisit trigger, quoted because
-its specificity is the point:** the first review or papercut recording that a better-dev skill made an
-unrelated run worse. Until that observation exists, an off-target corpus would be 14 invented cases,
-which is the same defect the authoring bar names about invented rationalizations. Wilson intervals are
-rejected outright: at three trials per condition an interval is decoration, and nobody will re-run ours.
-
-### 5. The scored-suite blind spot, which is the most important line in the sweep
-
-**Every trap in the corpus is a positive control for the skill it targets: the pass is the skill
-helping. No trap anywhere in the 161 fails when a skill makes an unrelated run worse.** So a scored trap
-suite can only ever confirm that the library helps where it aimed, and can never detect heaviness. That
-is not a gap in rung 1's execution; it is a property of the corpus, and rung 1 inherits it whole.
-
-**And that is precisely Miessler's critique, which means our measurement plan cannot answer the batch's
-own loudest objection.** The critique this batch spent a recovery attempt on is about skill libraries
-being too heavy. The measurement we can afford is blind to exactly that axis. Recorded in full and
-unsoftened, because the tempting version of this entry says rung 0 and rung 1 give the library a real
-measurement, and the true version says they give it an auditable record of where it helps while leaving
-its loudest criticism unmeasured. Rung 2's off-target corpus is the shape that would see cost, and its
-revisit trigger above is the honest price of not building it now.
-
-### 6. Pocock's reply is recovered, and it is an author's own ablation
+### 4. Pocock's reply is recovered, and it is an author's own ablation
 
 Recovered at `https://x.com/mattpocockuk/status/2081655893427450117` (2026-07-27) after four prior
 routes failed, by an authenticated headless read of the critique permalink at 14 scrolls plus a second
@@ -1892,15 +1375,6 @@ debt that outlives the refactor is preserved; and a contamination line, because 
 from this repo's history and committed into this repo cannot then be used as a trap. One work-item,
 never a growing collection.
 
-### Traps 162 to 167
-
-Six behavioural changes from this sweep are rigged, one per change that could regress rather than one
-per landing: the recorded-command probe (162), the relation-versus-constant design test (163), the
-brief-claim check (164), the loop's wider verify at first green (165), the verify oracle (166), and the
-merge-queue push suspension (167). Each carries the plausible wrong behaviour as its Fail branch, which
-is why the count is six against thirty-one landings: a landing whose regression could not be stated
-concretely got no trap.
-
 ### Rejected with reasons (one row each)
 
 - Notation-first colour, converting hex or rgb to a perceptual space - tried at scale by an expert and retracted in one merge (+547/-405) for "notation is not a defect"; our token source is representation-agnostic by construction, so adopting it would force a representation onto the visual contract.
@@ -1914,11 +1388,8 @@ concretely got no trap.
 - Committing the work-item ledger and tagging git to match it - the ledger is transient loop state and stays out of version control by decision (`onboard:324`); a bundle travels on the branch and the receiving side re-pins consent.
 - A periodic cross-work-item commit sweep, and an unattended march through a task queue - both are cadence work, refused by name at `autonomous-loop:13-15`. `/review`'s whole-branch pass and the witness-marker guard cover the within-branch case.
 - Escalating a precommit hook to a cheap model that rewrites source - the rewrite lands unreviewed inside the one step everybody trusts to be mechanical; `review:167-169` already forbids the inverse.
-- A seventh report-trailer key for cross-slice lessons - the trailer is the control-flow interface, validated by `bd-dispatch record`; widening it for an advisory payload weakens what it is.
 - Reading prior session transcripts as a run input - `/session-review` exists to compress a session into five lines and four keyed destinations precisely so the next run reads those instead.
 - A `tool-legibility` skill, and a lineage skill or file - neither has a trigger of its own; every moment they would fire is a moment the recorder, the adopter, or `/session-review` is already firing.
-- Blind judging and a five-dimension weighted rubric, now - no judge exists to blind at rung 1, and the rubric's prerequisites are named above with its trigger.
-- Wilson confidence intervals on trap results - decoration at three trials per condition.
 - Accessibility rule sets inside `/design-brief` (hit-target thresholds, `:focus-visible`, forced-colors, the eight escalation triggers) - out of scope by that skill's own frontmatter, and landing them would fork the host audit its step 3 composes.
 - A stable ID plus a Fail/Pass code pair per design tell - the real failure, that positional numbers shift, is fixed by one sentence requiring an override to quote the tell's text; cut-before-add decides between two working fixes.
 - The reproducibility retry and an `INTERMITTENT` coverage row - `verify-runtime.md:90-92` settles ambiguity toward FAIL on a stated cost asymmetry, and that row is the escape hatch the asymmetry exists to close.
@@ -1927,7 +1398,6 @@ concretely got no trap.
 
 - "Documents are for the model, not the human" (Pocock) - the sharpest reframe in the reply and a principle we hold implicitly; it is the deletion test's purpose from another angle, and the authoring bar is already 258 lines. A future bar revision may use it instead of a rule, never in addition to one.
 - "Test the gate itself once" as a standing rule for new gates - held in a stronger form at `guardrails-install:189-195`, three observations including staging a violation and seeing the gate refuse.
-- Measure your own harness rather than import benchmark defaults, and ship the source's own inspect-grade qualifier with any number - `tiers.md:131-132` and `deep-research:134-136`.
 - Clearing the always-on comms block from a baseline condition - `docs/TRAPS.md:25-32`, which already credits `ayghri` issue #52 by number. This sweep added the model pin and the isolation-flag preference beside it.
 - A privacy contract on read-back session logs - our version reads the repo's own memory store, so there is no third-party boundary to cross.
 
