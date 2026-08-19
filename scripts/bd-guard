@@ -902,6 +902,12 @@ scope_cmd() {
   # and the STATE FILE above keeps the exact bytes, because they are what every path match is made
   # against. Not marker-gated: the agent runs `scope` itself, so the bridge's marker is absent by
   # construction here and gating would make the rewrite dead code.
+  #
+  # Which half does the work, stated so nobody has to guess: after the refusal above, `$dir` carries no
+  # control character, so `fold_ctl` here is a no-op on every value that reaches it and the rewrite is
+  # what still closes the plain-space forgery. The fold stays because the contract is "neutralise over a
+  # fold, never over a raw subject" and a caller that keeps only the half it needs today is how the next
+  # round of this defect gets written.
   dir="$(neutralize_grant "$(fold_ctl "$dir")")"
   if [ "$expiry" = 0 ]; then
     printf 'scope boundary: %s (no expiry - state lives and dies with its worktree)\n' "$dir"
