@@ -256,8 +256,15 @@ prune_legacy_footprint() {
     return 0
   fi
 
-  stale_hooks="$(jq -r --arg src "$SRC" '[(.hooks // {}) | to_entries[] | .value[]?
-      | (.hooks // [])[] | select((.command // "") | contains($src + "/hooks/"))] | length' "$cs" 2>/dev/null)"
+  # Matched by better-dev's OWN hook basenames as well as by this clone's path, and deliberately not
+  # by path alone. A registration records the ABSOLUTE path of the clone that wrote it, so a clone
+  # that has since moved - which every clone did at 0.13.0, when the repo was renamed and flattened -
+  # carries a path that no longer matches $SRC, and a path-only filter would leave those entries
+  # registered and broken forever. The three names are better-dev's and appear nowhere else.
+  bd_hooks='/hooks/bd-(session-start|subagent-start|graphify-refresh-stale)'
+  stale_hooks="$(jq -r --arg src "$SRC" --arg names "$bd_hooks" '[(.hooks // {}) | to_entries[] | .value[]?
+      | (.hooks // [])[] | select(((.command // "") | contains($src + "/hooks/"))
+                               or ((.command // "") | test($names)))] | length' "$cs" 2>/dev/null)"
   stale_perms="$(jq -r '[(.permissions.allow // [])[]
       | select(test("[.]better-dev/bin"))] | length' "$cs" 2>/dev/null)"
   [ -n "$stale_hooks" ] || stale_hooks=0
@@ -277,10 +284,11 @@ prune_legacy_footprint() {
   bak="$cs.bak-$(date +%Y%m%d%H%M%S)"
   cp "$cs" "$bak" || { echo "  ! could not back up $cs - nothing changed" >&2; return 1; }
   tmp="$cs.tmp.$$"
-  if jq --arg src "$SRC" '
+  if jq --arg src "$SRC" --arg names "$bd_hooks" '
         (if .hooks then .hooks |= (
             with_entries(.value |= (
-                map(.hooks |= map(select((.command // "") | contains($src + "/hooks/") | not)))
+                map(.hooks |= map(select((((.command // "") | contains($src + "/hooks/"))
+                                       or ((.command // "") | test($names))) | not)))
               | map(select(((.hooks // []) | length) > 0))))
           | with_entries(select((.value | length) > 0)))
          else . end)
