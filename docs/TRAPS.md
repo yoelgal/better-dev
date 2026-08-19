@@ -1,22 +1,27 @@
-# Trap scenarios
+# Trap scenarios - observed failures, not a suite
 
-A trap is a rigged input a skill-less agent gets wrong and a skill-following agent catches. Loading a manual
-into an agent is not the same as the agent using it; a trap is the cheapest proof that a transplant took.
-Each scenario below targets one core skill at the exact decision point where a model under pressure declares
-victory early.
+A record of failures that actually happened here, each rigged as a scenario a skill-less agent gets wrong
+and a skill-following agent catches. **Nothing runs these.** There is no harness, no fixtures and no
+schedule; across the corpus's whole history exactly one scenario has a recorded run, and it failed.
+
+Their live job is a different one, and it is why the file survives at this size: five skills cite it as the
+evidence base that stops a rule being invented rather than observed - `/writing-skills`,
+`/self-extension`, `/session-review`, `/source-harvest` and `/test-audit`. So read it when you are about to
+write a rule, and add to it when a session finds a way the instructions as written let an agent fail. A
+scenario nobody hit is a hypothesis, not a trap.
 
 A trap whose correct answer is written down anywhere the agent can reach - a skill body it loads,
 `docs/PLAN.md`, a committed worked example - grades retrieval instead of judgment, so before rigging a
 scenario, grep the tree for its answer and rig a different one if you find it.
 
-## How to run one
+## Running one by hand, if you want the proof
 
 Point a fresh agent at the scenario with the target skill installed, and let it work. Then read the
 transcript behaviorally: grade what it *did* - the tool calls, the edits, the verdict it recorded - not what
 it narrated. Both a pass and a fail are observable in the trace, and each scenario names them. When the
 agent fails, the skill's body was too vague at that decision point: make the weak step procedural and re-run.
-These run by hand or by pointing an agent at one. There is no harness and no per-skill fixtures - the proof
-is a human (or a fresh agent) reading the transcript against the pass/fail line below.
+A red run is worth trusting only if it is red for the property the scenario names; red for a weaker reason
+is the failure mode that shipped three live defects behind green fixtures on 2026-08-19.
 
 Where a scenario grades a *shape* rather than a behaviour, the pass line names the property that must
 hold and not the phrasing we would have written: an equivalent structure that satisfies the property
