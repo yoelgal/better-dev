@@ -27,8 +27,8 @@ deterministic output shape, one obvious approach. If a subtask still needs "inve
 or "as appropriate," it isn't decomposed yet - that ambiguity is yours to resolve, not a worker's. Keep
 the judgment work in your own hands: decomposition, ambiguous design, user interaction, destructive
 actions, and the final synthesis. Workers get the bounded pieces. (When a judgment stage sits above your
-session's own band, "your own hands" means buying the bounded consult `tiers.md` defines - never making
-the top-band call at a lower tier.)
+session's own band, "your own hands" means buying the bounded consult below - never making the top-band
+call at a lower tier.)
 
 Fan out from a clean slate. Parallel work never starts over an unfinished background operation - a
 still-running worker, an unmerged lane, an unread report - because two actors over unknown state is how
@@ -47,9 +47,6 @@ and keeps the worker focused on its one task.
 - No subagent primitive at all? Fall back to a single-session role-switch with an explicit context
   reset - state that you are now a fresh worker holding only the brief, set prior reasoning aside, and
   produce the brief's output. The role separation is the point; the mechanism is whatever the host offers.
-- A bash script can't spawn the host's agent, so the dispatch itself is prose you execute. The dispatch
-  helper (`.better-dev/bin/bd-dispatch`) only prepares the brief file and records the receipt - the
-  bookkeeping around a dispatch, never the dispatch.
 
 ## Three shapes
 
@@ -57,7 +54,9 @@ A fan-out or a discovery loop can spawn dozens of workers and a large token bill
 something you pick deliberately, not a default the work infers for you: match the finder pool and the vote
 count to what the task asks for, and request that scale rather than assume it. Before committing a large
 run, pilot it - dispatch one worker over a small representative slice, read what it costs and returns, then
-scale the pattern that worked (`tiers.md`).
+scale the pattern that worked. A pilot that comes back wrong or expensive is a cheap correction; the same
+mistake multiplied across a large pool is not. Weigh what a worker *writes* over what it reads - output
+is the larger share of a run's cost, so a tight output spec moves the bill more than a trimmed brief does.
 
 1. **Single worker** (`Task`) - isolate one self-contained slice, or any task whose detail would bloat
    your coordination context.
@@ -66,7 +65,7 @@ scale the pattern that worked (`tiers.md`).
    mechanically before dispatching, not by recall: `git worktree list`, then per live branch
    `git diff --name-only <base>...<branch>` - a path two lanes both touch makes those lanes
    sequential, and discovering the overlap at PR time buys a conflict-resolution round instead. One
-   more read rides that check: `.better-dev/bin/bd-mem recall "shared-runtime"` - a recorded
+  more read rides that check: `.better-dev/rules.md` - a recorded
    `shared-runtime: serialize` (written by `/worktree-branching` where lanes share one mutable
    datastore with no per-lane split) makes writing lanes sequential even with zero file overlap,
    because they collide in data the file diff can't show. A
@@ -150,10 +149,10 @@ and is re-read every turn. Move artifacts as files instead:
   it can't re-derive, an explicit output spec, and - when the worker will write files - the repo's
   high-consequence denylist with the standing instruction to escalate rather than edit those paths (settle
   `NEEDS_INPUT`), so a fresh worker doesn't discover the rule only at review. Not your session history.
-  `.better-dev/bin/bd-dispatch brief <work-item> <role>` writes a skeleton into the shared ledger and prints its path.
+  Write it into the shared ledger as `.better-dev/ledger/<work-item>/brief-<role>.md` and hand the worker that path.
 - **The project's skill list** - a project can record the skills a dispatched worker should use
-  (`.better-dev/bin/bd-mem remember "dispatch-skills: <skill or capability> (<when it applies>), ..."`).
-  Resolve it once per run (`.better-dev/bin/bd-mem recall "dispatch-skills"`) and paste the entries
+  as a `dispatch-skills: <skill or capability> (<when it applies>), ...` line in `.better-dev/rules.md`.
+  Read that file once per run and paste the entries
   bearing on a slice into its brief as an imperative to load them before it starts, never a mention: a
   skill named in passing prose does not reliably load, and the worker then solves in its own ad-hoc way
   a problem this project already has a skill for. No record means no line and dispatch as today.
@@ -173,7 +172,8 @@ and is re-read every turn. Move artifacts as files instead:
   ```
 
   The trailer is the control-flow interface between worker and orchestrator: branch on `STATUS` exactly
-  as written and pass it to `bd-dispatch record` unedited - the script rejects anything off-vocabulary.
+  as written and copy it into the dispatch receipt unedited - the vocabulary is closed, and a paraphrase
+  there breaks the branch.
   The prose above the trailer is context, never the verdict; a status implied in a paragraph but absent
   from the trailer does not exist. A reply with no trailer is not a report - treat it as the
   worker-came-back-empty case and re-dispatch; don't reconstruct a status from the prose. A report
@@ -187,8 +187,8 @@ and is re-read every turn. Move artifacts as files instead:
   verify-runtime owns this disposition) - an unverified claim says so plainly.
 - **Review inputs** - the reviewer gets the same brief, the report file, a diff package, and the
   work-item slug, all as files or plain values, never the diff pasted into the prompt. The slug resolves
-  the shared ledger, so the reviewer can read the work-item's `approvals.log`
-  (`.better-dev/bin/bd-mem ledger read <work-item> approvals.log`) and tell an approved blast-radius edit
+  the shared ledger, so the reviewer can read the work-item's
+  `.better-dev/ledger/<work-item>/approvals.log` and tell an approved blast-radius edit
   from an unapproved one - hand over only the package and the reviewer can't confirm the gate at all.
 
 For the discipline of writing a clean brief and a clean reviewer prompt - and the anti-patterns that
@@ -233,23 +233,14 @@ report. `/review` runs this as its refuter channel.
 Give each subtask to the least-capable worker you're confident will one-shot it; unsure between two, take
 the higher. Under-resourcing is the expensive mistake - a failed cheap worker burns your costly
 coordination context on re-diagnosing and re-dispatching, far past what it saved. Only hand a subtask
-down when both hold: the spec is closed (zero judgment left to the worker) and a cheap mechanical check
-exists for the result. Two failures on a subtask means the spec is wrong, not the worker - pull it back
-and re-decompose rather than escalating the model a third time.
+down when both gates hold: the spec is **closed** (a draft brief still saying "investigate", "figure
+out", or "as appropriate" fails this) and a **cheap mechanical check** exists that the dispatching side
+can run without redoing the work - a test passes, a grep count matches, a schema validates. Unverifiable
+output never goes to a cheap tier. Two failures on a subtask means the spec is wrong, not the worker -
+pull it back and re-decompose rather than escalating the model a third time.
 
-The default tier is a starting point, not a ceiling. When a worker's output misses the bar, rerun it
-changed straight away - don't stop to ask permission to spend more, but don't reflex-escalate either:
-triage the miss per the terminal-state table (`briefs-and-reviews.md`) - a brief defect gets a corrected
-brief at the same tier, a genuine capability shortfall gets the higher tier. An escalation is your
-recorded decision, never a silent retry default: name the tier in the dispatch receipt's note, so the
-no-re-descend rule (`tiers.md`) has a memory to read. Pausing a run to approve a cost is itself a cost,
-and a mediocre result is the expensive outcome. Judge the output against the contract, not against what
-the worker cost. The two-failures rule above still bounds this, and `tiers.md`'s no-re-descend rule is
-its memory - once a class needs the higher tier, keep it there for the run.
-
-That rule sizes one worker for one subtask; a stage-to-tier band places whole stages. Name the bands by
-capability, never by vendor - "top tier" is the most capable model you have, which on a given day may be
-your only frontier tier:
+Name the bands by capability, never by vendor - "top tier" is the most capable model you have, which on a
+given day may be your only frontier tier:
 
 - **Top tier - judgment that cascades.** Planning and grilling a plan, the adversarial evaluator's
   verdict, root-cause diagnosis, and the final synthesis across many workers' output. A wrong call here
@@ -260,6 +251,20 @@ your only frontier tier:
 - **Cheap tier - mechanical and classifying.** Extraction, formatting, and a grader or classifier worker
   checking one artifact against one rubric. High-volume, low-stakes, independently checkable.
 
+Capability is not one ladder. How hard a problem a model handles unsupervised and its *taste* - the
+judgment visible in an interface, an API's shape, prose, code a maintainer wants to keep - pull apart, and
+the model that reasons hardest is not always the one with the better taste. Place a taste-graded stage,
+anything a user reads or a developer lives with, by taste even where its spec is closed. Where the two
+axes conflict on work that ships: correctness leads, taste second, cost last - cost breaks a tie, it never
+overrides a quality bar.
+
+The default band is a starting point, not a ceiling. When a worker's output misses the bar, rerun it
+changed straight away - don't stop to ask permission to spend more, but don't reflex-escalate either:
+triage the miss per the terminal-state table (`briefs-and-reviews.md`) - a brief defect gets a corrected
+brief at the same band, a genuine capability shortfall gets the higher one. Pausing a run to approve a
+cost is itself a cost, and a mediocre result is the expensive outcome. Judge the output against the
+contract, not against what the worker cost.
+
 A verifier is the exception to "more-capable-is-safer": what an independent grader buys is *independence*,
 not raw power. A worker grading its own output sees its own reasoning and favors the conclusion it already
 reached; a separate worker sees only the artifact and the criterion. So a cheap independent grader can
@@ -267,37 +272,87 @@ settle a deterministic check - a test passes, a score clears a threshold - even 
 keep "at or above the tier that did the work" for judgment-heavy verification, where capability itself is
 doing the work.
 
-The full stage table, the confidence-envelope routing question, the pilot-small-then-scale rule, and the
-no-re-descend and calibration rules for a tier that keeps missing a task class live in `tiers.md`.
+### Resolving a band at the dispatch call
 
-better-dev advises how to shape and place work; it doesn't route models - the host owns model choice, so
-wire no router. But owning the choice is not the same as making it: on a host whose dispatch call takes
-a per-worker model or tier parameter, omitting it is itself a choice - the worker silently inherits the
-orchestrator's own model, pricing every closed-spec slice at the top tier. A band decision that never
-reaches the dispatch parameter was never made; `tiers.md`'s "Resolving a band at the dispatch call"
-says how a band becomes a concrete parameter without the library naming models.
+A band is only real once it reaches the dispatch mechanism, and silence there is not neutrality: a
+dispatch that names no model inherits the orchestrator's own, so every worker of an unresolved fan-out
+runs at the dispatching session's tier - usually the top - and the economy above quietly vanishes.
+Omitting it is itself a placement decision, right only where the stage genuinely earned your own tier.
 
-Make the choice audible at the call: immediately before each dispatch, state the band, the parameter it
-resolved to, and the one-line basis ("mid - closed-spec classification against an attached rubric"), and
-let that same line be the dispatch receipt's note rather than a second artifact. The announcement forces
-the placement into the open where an omitted parameter would hide, and the receipt keeps it honest
-afterwards: announced band, passed parameter, and recorded note agree, and drift between any two is a
-reviewable defect.
+better-dev advises how to shape and place work; the host owns which model answers, so wire no router and
+hardcode no model name. Resolve a band through the host's own routing surfaces:
+
+- `modelRoles` binds a role to a concrete model once, after which the role aliases carry the band in
+  prose and at a call - `@smol` for the cheap band, `@slow` for the top - with no vendor name in the text.
+- `task.agentModelOverrides` places a whole agent type, and an agent's own frontmatter `model` list
+  places that agent wherever it is dispatched. Together they cover a standing placement, so a band that
+  holds for every run of a stage is configured once rather than restated per dispatch.
+- `tier.subagent` sets what a dispatched worker defaults to, which is the value an unnamed dispatch
+  inherits instead of your session's tier.
+
+Make the choice audible at the call: immediately before each dispatch, state the band, what it resolved
+to, and the one-line basis ("mid - closed-spec classification against an attached rubric"), and let that
+same line be the dispatch receipt's note rather than a second artifact. The announcement forces the
+placement into the open where an omitted parameter would hide, and the receipt keeps it honest afterwards:
+announced band, resolved model, and recorded note agree, and drift between any two is a reviewable defect.
+
+Separate from *which* model is *how much reasoning* you ask of it. The maximum is not the best: past a
+point, more reasoning second-guesses a sound answer into a worse one while costing more, and a run that
+finishes correctly but takes far longer than the task warranted is the tell that the knob sits too high
+for that class. Default it to the band - cheap-band mechanical work at low effort, the top of the knob
+reserved the way the top tier is - and reach for `prewalk` where a stage wants a cheap pass ahead of an
+expensive one. Tier and effort are separate axes: under a capped usage plan the effort knob is what
+stretches a fixed budget across the week, whichever tier answers. Three scales stay distinct here -
+`/review`'s light/standard/deep scales review *breadth*, the knob scales one worker's reasoning *depth*,
+and neither is a coverage quota.
+
+### Escalate up when the judgment outranks the session
+
+Tiering runs in two directions, and both bill most tokens at the cheap rate. Delegating down is
+everything above. The other direction: a cheaper session keeps the task and buys a bounded top-tier
+consult at a judgment point, then goes on executing itself - the consult returns a short plan, a verdict,
+or a named risk, never the deliverable. Reach for it when a top-band stage arrives in a session that is
+not the top tier; making that call at your own tier because "planning stays in my hands" is the failure
+this exists to prevent. Rerunning the whole task higher stays the move for a below-bar *deliverable* -
+the consult is for a judgment point inside a task that is otherwise going fine. Four bounds keep it
+cheap and checkable: it fires once after the orientation reads and before the first substantive write,
+once before settling done, and on a tripped stuck signal; the deliverable is already on disk before the
+settling-done consult, so a consult that outlives the session cannot take an unwritten result with it;
+the request names an explicit length bound, since the consult's output is its dominant cost; and its
+advice is followed unless a step fails empirically or a primary source contradicts a specific claim,
+where one more consult naming both sides ("found X, advised Y - which constraint breaks the tie") beats
+silently picking. A cost comparison between bands is valid only at the same verification standard: a
+cheaper run held to a lower bar is a different product, not a saving.
+
+### When a band keeps missing a class
+
+- **An environment failure is not capability evidence.** Three causes look exactly like a weak model from
+  outside and are answerable from the brief and receipt you already hold: the tool the task needed was
+  never available to that worker, the check its done-criterion names was not runnable there, or a path it
+  had to write sat outside its reach. Each is fixed at the same band. Name the cause in the receipt when
+  it holds, or a class gets routed up over an unwired tool and stays over-tiered for the rest of the run
+  on evidence that was never about capability.
+- **No re-descend.** Once a band fails a task *class* in this run, route similar tasks one band higher for
+  the rest of it, and read the receipts' `failed` and `partial` lines before classifying the next similar
+  task rather than re-deriving the same optimistic guess. That memory only exists if each receipt names
+  the band it ran at.
+- **Calibrate on the receipts.** More than about one dispatch in ten at a band coming back failed or
+  partial means the triage is too aggressive for this work - shift that class up a band.
 
 ## Track and resume
 
 Conversation memory doesn't survive compaction, and a controller that loses its place re-dispatches
 finished work - the most expensive failure there is.
 
-- Record each dispatch as a ledger receipt: `.better-dev/bin/bd-dispatch record <work-item> <role> <state> [note]`, where
-  `<state>` is the reply's trailer `STATUS`, passed through unedited. The ledger lives in the primary
-  checkout's `.better-dev/ledger/<work-item>/`, shared across worktrees; `bd-dispatch` pins it there so a
-  worker in a feature worktree records to the same place. After a compaction, `.better-dev/bin/bd-dispatch pending <work-item>` lists what isn't finished - resume those,
-  re-dispatch nothing already done.
+- Record each dispatch as a ledger receipt - one appended line carrying the role, the reply's trailer
+  `STATUS` unedited, and the band note. The ledger lives in the **primary checkout's**
+  `.better-dev/ledger/<work-item>/`, shared across worktrees, so a worker in a feature worktree writes
+  its receipt to that absolute path rather than to its own tree's copy. After a compaction, read the
+  receipts back: resume what has no terminal line, re-dispatch nothing already recorded done.
 - You own the progress surface; isolated workers can't touch your todo list. Flip a task to in-progress
   before you spawn, and to done only after the result is measured, not merely claimed: a trailer's
   `DONE` counts once you have run the brief's named check yourself - the same cheap mechanical check
-  that justified delegating (`tiers.md`) - or, for judgment-graded output, once its verdict lands.
+  that justified delegating - or, for judgment-graded output, once its verdict lands.
   Record the trailer's `STATUS` either way; counting is separate from recording. An unmeasured result
   never becomes another stage's brief - that is how one bad output poisons a pipeline. Exactly one
   in-progress at a time.
@@ -321,6 +376,7 @@ off to the PR-into-staging gate. A half-finished item moving to a colleague or a
 the handoff bundle `/worktree-branching`'s handoff notes define - consent re-pins on the receiving side,
 never imports. A work-item spanning two repositories has no shared ledger or PR to coordinate through -
 read `cross-repo.md` for the three contract lines that tie the two halves together. `/autonomous-loop` composes this skill as its outer layer: it reaches
-for the dispatch verb here rather than re-specifying it. Durable rules and lessons still go through the
-memory contract (`.better-dev/bin/bd-mem`), and any project override in `.better-dev/overrides.md` wins
-over these defaults - read it first. When you revise this skill, follow `/writing-skills`.
+for the dispatch verb here rather than re-specifying it. Lessons worth keeping go through the `learn`
+tool, durable project rules into `.better-dev/rules.md`, and any project override in
+`.better-dev/overrides.md` wins over these defaults - read it first. When you revise this skill, follow
+`/writing-skills`.

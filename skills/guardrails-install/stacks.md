@@ -159,56 +159,59 @@ Add it only when no workflow already runs these checks. An existing CI file is o
 install and the audit step are the supply-chain gate: a run resolves the committed tree, not a drifted one,
 and a known-vulnerable dependency fails the gate rather than shipping green.
 
-## Enforcement wiring for a clone install (Claude Code)
+## The committed bash policy
 
-Wire this for every install; there is no case that writes nothing. A plugin install is not a supported
-state, so the presence of `hooks/hooks.json` in a checkout is never a reason to skip the wiring - that
-file is the tool's own declaration, not evidence a host registered anything.
+Write this at the repo root as `.omp/config.yml` and commit it - the policy then travels with the repo,
+where a machine-global setting would guard only the machine that set it. `bash.patterns` is a
+**top-level** key, not nested under `tools:`, and one rule covers one destructive command class:
 
-A clone install needs the script wired into the repo's `.claude/settings.json` - the agent never
-edits that file itself; it emits the block below as a paste-ready operator-run step and the operator
-applies it on their own explicit yes. The destructive-pattern set, the safe rm-target allowlist, and
-the obfuscated-shell deny all live inside `bd-guard` - the settings carry only the wiring, never a
-pattern copy:
-
-```json
-{
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          { "type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR/.better-dev/bin/bd-guard\" check-bash", "timeout": 5 }
-        ]
-      },
-      {
-        "matcher": "Edit|Write|NotebookEdit",
-        "hooks": [
-          { "type": "command", "command": "bash \"$CLAUDE_PROJECT_DIR/.better-dev/bin/bd-guard\" check-edit", "timeout": 5 }
-        ]
-      }
-    ]
-  }
-}
+```yaml
+bash:
+  patterns:
+    # recursive delete
+    - match: "rm -r*"
+      approval: prompt
+    - match: "rm --recursive*"
+      approval: prompt
+    # history and worktree destruction
+    - match: "git push *--force*"
+      approval: prompt
+    - match: "git push *-f *"
+      approval: prompt
+    - match: "git reset --hard*"
+      approval: prompt
+    - match: "git clean -f*"
+      approval: prompt
+    # infrastructure
+    - match: "kubectl delete*"
+      approval: prompt
+    - match: "docker rm -f*"
+      approval: prompt
+    - match: "docker system prune*"
+      approval: prompt
+    # SQL object destruction, which arrives inside a quoted -e argument
+    - match: "*DROP TABLE*"
+      approval: prompt
+    - match: "*DROP DATABASE*"
+      approval: prompt
+    - match: "*TRUNCATE TABLE*"
+      approval: prompt
 ```
 
-Three rules make the write safe: **merge, never replace** - an existing `hooks.PreToolUse` array
-survives byte-for-byte, these entries append to it; **per-repo consent** - `.claude/settings.json` is
-machine config, so the operator applies the snippet once per repo on an explicit yes, and a re-run
-that finds the entries already present emits nothing; **verify the envelope** - `bd-guard` emits Claude Code's nested
-`hookSpecificOutput.permissionDecision` shape, and a wrong envelope fails silently (the same trap
-`bootstrap-hooks/porting.md` records for `SubagentStart`), so after wiring, run one destructive
-fixture through `check-bash` and confirm the host actually asks. By then the guard is live on your own
-shell calls: a pipe-shaped test construct hits its obfuscated-shell deny, and even a `printf` of the
-fixture trips the ask, because the destructive pattern sits in the raw command string. So create the
-fixture with the host's **file-edit tool** - `.better-dev/ledger/guard-probe.json` (transient,
-gitignored) containing `{"tool_input":{"command":"rm -rf src"}}` - then run only the redirect form
-from the shell:
+Three properties of the matcher shape every pattern you add. Rules are **ordered and the first match
+wins**, so a specific gate goes above any broader allow. A `deny` or `prompt` glob fires on the whole
+command **or on any single segment of a compound line** - split on `&&`, `||`, `;`, `|`, a single `&`,
+subshells and newlines - so `cd /tmp && rm -rf build` is caught without counting occurrences, and a
+leading `*` is needed only where the pattern must match mid-command, as the SQL shapes above do inside a
+quoted `-e` argument. An `allow` glob must match the entire command and never applies to a compound line,
+so an allow can never vouch for the second half of `git status && rm -rf /`.
 
-```bash
-bash .better-dev/bin/bd-guard check-bash < .better-dev/ledger/guard-probe.json   # expect permissionDecision "ask"
-rm -f .better-dev/ledger/guard-probe.json
-```
+Write no trailing `match: "*"` rule. Omitting it leaves the host's own approval mode in charge of
+everything these rules do not name, where a catch-all makes this file silently vouch for all of it.
 
-Other hosts express the same idea through their own pre-execution hook, or record
-`safety-enforcement: prose` and go without - `/worktree-branching` already isolates most of the risk.
+Merge, never replace: a repo that already has `.omp/config.yml` gets the missing patterns added under
+`bash.patterns` in place, and a re-run that finds them all present writes nothing.
+
+Prove it before reporting it installed - run a matching command and confirm the host asks, then a
+near-miss (`rm file`, `git push`) and confirm it does not. Nothing here gates a write by its path; the
+skill body states that coverage limit.

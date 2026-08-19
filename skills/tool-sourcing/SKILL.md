@@ -94,8 +94,8 @@ with `-a`). Inside an agent it auto-detects the harness and targets it non-inter
 ## 6. Record, or hand off
 
 If a tool was adopted, record it and the verdict so the choice survives compaction and a later run reuses it
-instead of re-sourcing: `.better-dev/bin/bd-mem remember "sourced <skill> for <capability> - <verdict>"`, and
-`.better-dev/bin/bd-mem learn "<lesson>"` for anything durable the vetting taught (a source to trust or avoid, a query that
+instead of re-sourcing: a `sourced <skill> for <capability> - <verdict>` line in `.better-dev/rules.md`,
+plus the `learn` tool for anything durable the vetting taught (a source to trust or avoid, a query that
 worked). A rejection is worth recording too - "looked for X, nothing adequate" saves the next run the search.
 
 If nothing adequate survived vetting and try-before-adopt, this is where sourcing ends and creation begins:

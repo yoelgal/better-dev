@@ -109,7 +109,7 @@ Never put `version`, `license`, or prose in frontmatter.
   sentences that define it and every later reader who half-remembers them. Coin only where no existing
   word carries the unit, and then define it once, in the skill that owns it.
 - Read the finished draft for its silences. Every decision a skill declines to make is not left neutral -
-  it is delegated to the executor's priors. Walk what the draft never says (output shape, scope boundary,
+  it is delegated to the executor's priors. Walk what the draft never says (output shape, scope,
   the failure path, who approves) and make each omission deliberate: fill it, or leave it open on purpose
   knowing which way the priors default.
 - Walk step one against the state that summons the skill. Name what a finished run leaves fixed, removed,
@@ -118,11 +118,12 @@ Never put `version`, `license`, or prose in frontmatter.
   `/update` reconciles a stale install and step one resolves the clone by globbing `$HOME` for a host
   skills dir, so a wrong glob strands the machine whose fix `/update` was carrying, and the silence reads
   like an install with nothing to pull. Grade it by putting the target in its worst *recorded* failure
-  state - `docs/TRAPS.md`, a papercut, a ledger receipt, never an imagined one - and running step one
-  against it for real. The remedy is rarely self-sufficiency, which usually cannot be built: name at that
-  step the route whose inputs come from outside the target - a structural handle that already carries the
-  answer (`bd-uninstall` reads its own `$0` through the `.better-dev/bin` symlink instead of guessing a
-  host layout), an operator-supplied value, or the one-paste front door that assumes nothing is installed.
+  state - `docs/TRAPS.md`, a recorded lesson, a ledger receipt, never an imagined one - and running step
+  one against it for real. The remedy is rarely self-sufficiency, which usually cannot be built: name at
+  that step the route whose inputs come from outside the target - a structural handle that already carries
+  the answer (an installed skill's symlink target names the clone, so `/uninstall` strips a suffix off it
+  instead of guessing a host layout), an operator-supplied value, or the one-paste front door that assumes
+  nothing is installed.
   Where no such route exists, say so at that step and name the manual escape, so a stranded machine reads
   a documented exit instead of silence. Where the lists share nothing - a planner, a reviewer, a map - add
   nothing: a robustness clause over an empty intersection is padding that pays its read cost every run.
@@ -163,8 +164,7 @@ list, reached by a prose pointer ("before settling a pass as done, read `rationa
 sibling travels with the folder, so it survives isolation too, and progressive disclosure keeps it out of
 context until a pass is about to declare done. Every row names an excuse that was actually produced,
 not one that could be, so go find them before writing any: `docs/TRAPS.md` records the scenarios a
-skill-less agent got wrong, a work-item's receipts and `reception.md` record what a run talked itself
-into, and `.better-dev/bin/bd-mem recall` carries the lessons a prior run paid for. Size the table to
+into, and `memory://root/learned.md` carries the lessons a prior run paid for. Size the table to
 what the hunt returned - a heavily-run skill earns six rows, and most skills earn two or three inline
 counters and no table at all - because an invented excuse teaches the executor a rationalization it had
 not thought of.
@@ -200,18 +200,18 @@ exact spot the excuse shows up.
 
 A skill whose run can settle something durable ends with a close-out at its terminal moment - `DONE`, a
 fresh diagnosis, an incident, an adoption - never mid-run. The close-out is one call or one sentence:
-record the single keyed lesson (`.better-dev/bin/bd-mem learn "<lesson>" <0..1> "<key>" [<source>]`)
-or write an explicit `no durable lesson` line saying why. Two tests gate the write, and failing either
+record the single keyed lesson with the `learn` tool, or write an explicit `no durable lesson` line saying
+why. Two tests gate the write, and failing either
 means the `no durable lesson` line is the correct output: the line names a cause, technique, or standing
 fact - an event of this run ("fixed the typo", "CI was slow today", "PR merged") is a ledger receipt, not
-a lesson; and it would save a future session more time than it costs every future recall it appears in.
-The negative-lesson filter binds here as everywhere: never a transient "X is broken". A lesson recalled
-and used during the run is cited in the receipt as
+a lesson; and it would save a future session more time than it costs every future read of the store it
+appears in. The negative-lesson filter binds here as everywhere: never a transient "X is broken". A lesson
+read and used during the run is cited in the receipt as
 `prior lesson applied: <key> (confidence <c>, from <date>)` so the operator can audit what the store
 contributed. Each skill inlines only its own one-line close-out at its exit point; this section is the
 full form it points to. `/session-review` is the trigger this section otherwise lacks: it fires at a
 session's terminal moment and enters here for these two tests before routing what the run learned to
-a keyed lesson, a papercut, or a trap.
+a keyed lesson or a trap.
 
 ## Composability & overrides
 
@@ -235,10 +235,10 @@ a keyed lesson, a papercut, or a trap.
   propagate. The failure is not the second copy, it is the third edit, which reaches two of the three
   and leaves the reader holding a current instruction and a stale one at the same time.
 - Read `.better-dev/overrides.md` first and honor any project override before applying a default.
-- Record durable rules and lessons through the memory contract (`.better-dev/bin/bd-mem`), never by
-  hand-writing state files. A lesson is one atomic insight with a recall key on the front, not a
-  paragraph of narrative - one insight per `learn` call. The long write-up belongs in the ledger
-  receipt; the reusable line belongs in `learnings.jsonl`, keyed so a future `recall` finds it.
+- Record a lesson through the `learn` tool and a durable project rule as a line in
+  `.better-dev/rules.md`. A lesson is one atomic insight with a recall key on the front, not a paragraph
+  of narrative - one insight per `learn` call. The long write-up belongs in the ledger receipt; the
+  reusable line belongs in the lesson store, keyed so a future read finds it.
 
 ## How this standard reaches skills
 

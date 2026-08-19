@@ -102,7 +102,7 @@ away.
 
 | What crosses | Where it lands |
 |---|---|
-| The verdict: the decision, which option won, and why | One line appended to the work-item's `decisions.md` (`.better-dev/bin/bd-mem ledger put <work-item> decisions.md`) |
+| The verdict: the decision, which option won, and why | One line appended to `.better-dev/ledger/<work-item>/decisions.md` with `write` |
 | The constraints and the discarded directions: each runner-up, what it did better, why it lost | The same record, under the verdict, so the next reader does not re-propose a direction already killed |
 | A decision-rich snippet - a type, a schema, a reducer, a state machine - only when it pins the decision more precisely than prose can | Inlined in the contract and marked as prototype-derived, trimmed to the decision (`/plan-grill` step 4's exception) |
 
@@ -143,6 +143,6 @@ stage and names which of the three is missing, rather than building on a decisio
 - **Surface the state.** After every action, and on every variant switch, render the full relevant
   state so the change is visible.
 
-Close out in one line: record the keyed lesson if the run taught one that outlives this decision
-(`.better-dev/bin/bd-mem learn "<lesson>" <0..1> "<key>"`), else say `no durable lesson` and why. The
-verdict itself is not the lesson; it already lives in `decisions.md`.
+Close out in one line: record the keyed lesson with the `learn` tool if the run taught one that
+outlives this decision, else say `no durable lesson` and why. The verdict itself is not the lesson; it
+already lives in `decisions.md`.

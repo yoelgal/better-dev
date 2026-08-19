@@ -5,8 +5,7 @@
 Gives a work-item exactly one isolated git worktree on its own branch off the integration branch,
 so parallel work never touches the primary checkout - and refuses to make a second worktree for a
 work-item that already has one. It detects the repo's own branch prefix, integration branch, and
-placement convention rather than imposing a house style, and it is the one place that sets the
-mechanical edit boundary for the tree it just created; nothing downstream re-sets it.
+placement convention rather than imposing a house style.
 
 ## When to reach for it
 
@@ -65,5 +64,5 @@ instead of silently racing them.
   of creating a second one.
 - A dev server or check started in the tree serves only that tree's code on its own port - the
   primary checkout's server keeps showing the old code until merge.
-- The next skill in the chain (`/plan-grill`, `/diagnose`, or `/autonomous-loop`) picks up already
-  scoped to the new tree, with no separate boundary-setting step of its own.
+- The next skill in the chain (`/plan-grill`, `/diagnose`, or `/autonomous-loop`) starts inside the
+  new tree, so its first commit lands on the work-item's branch rather than the integration branch.

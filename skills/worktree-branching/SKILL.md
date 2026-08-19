@@ -20,10 +20,9 @@ A project may already have opinions here - a different branch prefix (`feat/` no
 different integration branch (`develop` not `staging`), a different placement. Read them first and
 let them win:
 
-```bash
-.better-dev/bin/bd-mem read overrides 2>/dev/null
-.better-dev/bin/bd-mem recall "branch prefix integration worktree" 2>/dev/null
-```
+Read `.better-dev/overrides.md` and `.better-dev/rules.md` - two plain files, read with the `read`
+tool. Where `.better-dev/` is kept out of git, a linked worktree has no copy of its own: read them
+from the primary checkout, whose path Step 3 resolves.
 
 Detect the layout, don't impose one. What the repo already does is the default.
 
@@ -87,9 +86,9 @@ re-verified and rewritten (`/overrides`), never obeyed.
 
 Before opening a second parallel worktree, read the live lanes: `git worktree list`, then per live
 branch `git diff --name-only <base>...<branch>` - a path two lanes both touch makes the work
-sequential, not parallel. So does a recorded `shared-runtime: serialize`
-(`.better-dev/bin/bd-mem recall "shared-runtime"`): lanes coupled through one mutable datastore
-collide in data, not files - Step 2's datastore note records that key.
+sequential, not parallel. So does a `shared-runtime: serialize` line in `.better-dev/rules.md`:
+lanes coupled through one mutable datastore collide in data, not files - Step 2's datastore note
+records that line.
 
 ## Step 2 - create the worktree
 
@@ -109,8 +108,9 @@ git fetch origin "$base"
 git checkout -B "$branch" "origin/$base" 2>/dev/null || git checkout -B "$branch" "$base"
 ```
 
-Do not use `git reset --hard` here - `bd-guard` flags it as a working-tree discard, and it is the
-wrong tool anyway. `checkout -B` moves the branch pointer and re-checks-out the tree, and it
+Do not use `git reset --hard` here - the repo's committed `.omp/config.yml` prompts on it as a
+working-tree discard, and it is the wrong tool anyway. `checkout -B` moves the branch pointer and
+re-checks-out the tree, and it
 refuses rather than discards if the tree unexpectedly carries changes; a fresh worktree is clean,
 so that refusal never fires in the normal case - a safety property of the command, not a
 workaround for a problem this flow has. No host knob, no settings write, no
@@ -138,33 +138,23 @@ If `$wt_path` already exists or the branch is already checked out somewhere, thi
 at the existing worktree rather than forcing a duplicate. If `git worktree add` fails on a sandbox
 permission error, say so and work in place - `edge-cases.md` covers that fallback.
 
-A fresh worktree also has none of the primary checkout's gitignored local state, and it comes in two
-kinds that need different handling.
-
-**The `bin` bridge is re-linked, never copied.** Every skill downstream reaches its helpers by the
-repo-relative path `.better-dev/bin/bd-mem`, and that path does not exist in a new worktree - where
-`.better-dev/` is gitignored in full, the whole directory is absent. Re-link it at creation:
-
-```bash
-.better-dev/bin/bd-link link "$(cd "$wt_path" && pwd -P)"    # from the primary checkout
-```
-
-Copying it would freeze a stale snapshot of the global scripts, because the primary's `.better-dev/bin`
-is itself a symlink into the installed clone. The bridge is all the worktree needs: `bd-mem` resolves
-rules, overrides, and the ledger through `git rev-parse --git-common-dir` to the primary checkout, so
-one memory and one ledger serve every worktree.
+A fresh worktree also has none of the primary checkout's gitignored local state, and the two kinds
+it needs go opposite ways.
 
 **Runtime config is copied.** The `.env*` files and the like the app needs: copy that class from the
 primary checkout at creation - copy, never symlink here: build tools reject symlinks and a symlink
 turns teardown into a two-step dance - so the first dev-server run doesn't die mid-task on missing env.
-It is personal, gitignored state, so the copies never enter a PR. Both happen at creation, not lazily
-on first failure: a fresh worktree whose first `bd-mem` or dev-server call dies on missing gitignored
-state (a missing bin bridge, an absent `.env`) is the tell this step was skipped.
-Settings-class files - a `.claude/settings.local.json` allowlist, or the host's equivalent - are
-operator-owned and never copied here: the agent never writes them, so there is nothing of that
-class for this step to carry forward. Where a noisier fresh worktree keeps re-prompting on actions
-the operator already approved elsewhere, `/guardrails-install`'s grant step hands the operator a
-paste-ready copy command instead.
+It is personal, gitignored state, so the copies never enter a PR. Copy at creation, not lazily on
+first failure: a fresh worktree whose first dev-server run dies on an absent `.env` is the tell this
+step was skipped. Settings-class files - a `.claude/settings.local.json` allowlist, or the host's
+equivalent - are operator-owned and never copied here: the agent never writes them, so there is
+nothing of that class for this step to carry forward.
+
+**`.better-dev/` is read where it lives, never copied.** Where the repo keeps that directory out of
+git - a solo adoption does - the rules, the overrides, and the shared ledger exist only in the
+primary checkout, so read them there by absolute path. A copy forks the one set of rules every lane
+is meant to share, and the ledger in particular has to stay single or a resume reads a different
+state depending on which tree it runs in.
 
 That copied runtime config points every lane at the same mutable datastore - one `DATABASE_URL`, one
 Redis, one object store - so when `git worktree list` shows another live lane, this lane's dev server
@@ -172,7 +162,7 @@ and checks write the data that lane reads, even with zero file overlap between t
 stack supports it, namespace the copy per lane: suffix the schema or database name with the slug, or
 point the copy at a separate ephemeral store (a per-lane SQLite file, a second local database), so one
 lane's writes and resets never surface in another lane's verify. Where the stack offers no per-lane
-split, record the coupling once - `.better-dev/bin/bd-mem remember "shared-runtime: serialize"` - so
+split, record the coupling once as a `shared-runtime: serialize` line in `.better-dev/rules.md`, so
 `/orchestrating-agents`' live-lanes check treats data-coupled lanes as sequential rather than parallel;
 unrecorded, a failure born in another lane's data reads as flake, and no file diff explains it.
 
@@ -182,9 +172,9 @@ failure. Prefer the project's own named setup entry point (a documented setup or
 or task) over an ad-hoc install command composed here; a fixed, idempotent entry point is what a
 later session or a restart re-runs without guessing which command you used. If none exists, record
 it as a groundwork gap rather than papering over it with a one-off a future session can't find. The
-recorded `dev-run` key (`.better-dev/bin/bd-mem recall "dev-run"`) is the command that stands this
-tree's app up when a check needs it live - recorded once by `/guardrails-install`, recalled here
-instead of re-discovered per worktree. If
+`dev-run` line in `.better-dev/rules.md` is the command that stands this tree's app up when a check
+needs it live - recorded once by `/guardrails-install`, read here instead of re-discovered per
+worktree. If
 this skill hands off immediately (the interlock in Step 3), `/autonomous-loop`'s ground-truth gate
 covers the same baseline at the other end.
 
@@ -194,30 +184,18 @@ a review that re-runs the done-criteria in a fresh worktree does not flag it as 
 
 ## Step 3 - record it, then hand off
 
-Write the worktree's location into the ledger in the **primary checkout** (shared across worktrees,
-so a later session or a restart can find it):
+Write the worktree's location into the **primary checkout's** ledger directory, so a later session
+or a restart in any worktree can find it:
 
 ```bash
+primary=$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")
+mkdir -p "$primary/.better-dev/ledger/$slug"
 printf 'branch: %s\nbase: %s\nworktree: %s\n' "$branch" "$base" "$(cd "$wt_path" && pwd -P)" \
-  | .better-dev/bin/bd-mem ledger put "$slug" worktree.md -
-```
-`bd-mem` resolves the primary checkout's ledger for you (the same path from any worktree), so there's
-no hand-rolled `git-common-dir` math to get subtly wrong.
-
-Then set the mechanical edit boundary. This skill is the boundary's one writer - it scopes the new
-worktree at creation, and the loop only verifies the boundary is set, never re-sets it:
-
-```bash
-.better-dev/bin/bd-guard scope "$(cd "$wt_path" && pwd -P)" --ttl 0
+  > "$primary/.better-dev/ledger/$slug/worktree.md"
 ```
 
-The state lives in the worktree's own git dir (`.git/worktrees/<name>/bd-scope`), which is what makes
-the auto-activation survive the handoff interlock below: the boundary is per-target-worktree, not
-per-session, so the session that picks up the handoff starts already bounded to its own tree, and
-parallel worktrees never share a boundary. Where no enforcement hook is wired
-(`.better-dev/bin/bd-mem recall "safety-enforcement"` says prose) the state is inert - write it anyway,
-so a later hook install starts enforcing without a re-setup. If the boundary ever blocks legitimate
-work, `.better-dev/bin/bd-guard off` lifts it in one command.
+`git rev-parse --git-common-dir` resolves the primary checkout from any worktree, which is the whole
+trick: one ledger directory serves every lane, so there is no per-worktree copy to reconcile later.
 
 Now the interlock. When this skill **created** a new worktree, the work lives there. If the host
 can switch the session into it natively (the same worktree tool entering by path, or creation
@@ -244,9 +222,8 @@ port/URL are you looking at?") before any re-diagnosis.
 
 Bash cwd persists across tool calls, so a bare `cd` to the primary checkout silently re-points every
 git command that follows it, in this call and every later one. Reach primary-checkout state without
-moving: read and write it with `git -C "$primary" ...`, and run its tooling by absolute path
-(`"$primary"/.better-dev/bin/...`, because the `bin` bridge exists only in the primary checkout, so
-the relative path is simply a missing file from here).
+moving: read and write it with `git -C "$primary" ...`, and reach its files by absolute path
+(`"$primary"/.better-dev/...`, which from here is otherwise simply a missing file).
 Where a session does cd out anyway - the merge `/pr-and-verify` runs from the primary checkout - cd
 back to the worktree before any further git work, and re-read `git rev-parse --abbrev-ref HEAD` before
 trusting a diff. Getting this wrong does not raise an error; it reports a false green, an empty diff
@@ -258,9 +235,9 @@ Removing a worktree after its PR merges is a destructive operation with a strict
 fail-closed ownership check. Read `teardown.md` when the work-item is done - don't improvise a
 `git worktree remove --force` or `rm -rf` from memory.
 
-Handing a half-finished work-item to a colleague or another machine is its own procedure - the ledger's
-consent gates are per-machine and gitignored, so a bundle travels on the branch and the receiving side
-re-pins consent. Read `handoff.md` before handing one off or picking one up.
+Handing a half-finished work-item to a colleague or another machine is its own procedure - the ledger
+never travels with a push, so a bundle rides the branch and the receiving operator confirms the
+contract themselves. Read `handoff.md` before handing one off or picking one up.
 
 For the trickier detection cases - submodules, detached HEAD, native-tool phantom state, the sibling
 placement override, the trunk-based branch profile, sandbox denial - read `edge-cases.md`.

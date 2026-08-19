@@ -29,24 +29,20 @@ switch the local checkout to do the deletion. Merge without `--delete-branch` an
 own deletion - local branch delete after the worktree remove, then `git push origin --delete <branch>`
 as the remote step.
 
-The scope boundary state (`bd-scope`) lives in the worktree's own git dir, so `git worktree remove`
-deletes it with the tree - teardown never needs a separate unfreeze step.
-
 ## Then, the ownership proof
 
 Plain `git worktree remove` already refuses a dirty or unregistered tree - reach for it first and let
-git guard you. Only escalate to `--force` (or, worse, `rm -rf`) after the guard confirms the target is
-genuinely a linked worktree of *this* repo:
+git guard you. Only escalate to `--force` (or, worse, `rm -rf`) once two checks confirm the target is
+genuinely a linked worktree of *this* repo: the path holds a `.git` **file** (a linked worktree's
+gitdir pointer, never the primary's `.git` directory), and `git worktree list` names it here.
 
 ```bash
-.better-dev/bin/bd-worktree-guard guard "$path" && git worktree remove --force "$path"
+[ -f "$path/.git" ] && git worktree list --porcelain | grep -qxF "worktree $(cd "$path" && pwd -P)"
 ```
 
-The guard resolves the real path and refuses unless the target holds a `.git` *file* (a linked
-worktree's gitdir pointer, never the primary's `.git` directory) and appears in `git worktree list`
-for this repo. Any doubt refuses: a wrongly-refused removal costs a re-run, a wrongly-allowed one costs
-a working tree. Never remove a worktree this skill didn't create - a harness-owned or detached-HEAD
-workspace belongs to the platform; leave it and let a workspace-exit tool handle it.
+Any doubt refuses: a wrongly-refused removal costs a re-run, a wrongly-allowed one costs a working
+tree. Never remove a worktree this skill didn't create - a harness-owned or detached-HEAD workspace
+belongs to the platform; leave it and let a workspace-exit tool handle it.
 
 ## Confirm each destructive step on its own
 
@@ -62,14 +58,17 @@ operator recover from reflog or a backup while the trail is still warm.
 
 ## The finish menu
 
-One case is already settled and does not go to the menu. When the branch is merged into its base and
-its remote is gone, apply the test the destructive-step gate above states: nothing here fails
-"couldn't undo with a `git revert` or a re-clone", because every commit is in the base and the branch
-is recoverable from it. Take option 2's teardown, run it through the same guard and safe order, and
-report what you removed in one line. Asking here buys no scrutiny - the answer is not in doubt, and a
-question whose answer is not in doubt trains the operator to approve without reading, which is exactly
-what you need them not to do at option 4. Anything short of that state - unmerged commits, a live
-remote branch, a dirty tree, work you cannot prove landed - goes to the menu below.
+One case is already settled and does not go to the menu: the work landed. Prove that two ways, because
+either half alone lies - `git diff --stat <integration> <branch>` comes back empty, so the content is
+in the base however the forge merged it, and `gh pr view <n> --json state` reads `MERGED`. A squash
+merge leaves no ancestry for the first check to find by history, and a merged PR can still have
+follow-up commits sitting on the branch. With both, nothing here fails the destructive-step gate's own
+test - every commit is in the base, and the branch is recoverable from it. Take option 2's teardown,
+run it through the same checks and safe order, and report what you removed in one line. Asking here
+buys no scrutiny - the answer is not in doubt, and a question whose answer is not in doubt trains the
+operator to approve without reading, which is exactly what you need them not to do at option 4.
+Anything short of that state - unmerged commits, a live remote branch, a dirty tree, work you cannot
+prove landed - goes to the menu below.
 
 Otherwise, when the work-item is done and tests are green, offer the choice rather than assuming:
 
@@ -86,4 +85,4 @@ Otherwise, when the work-item is done and tests are green, offer the choice rath
 
 When the autonomous loop resets a stuck work-item, it removes and recreates the worktree off the base
 recorded in the ledger (`worktree.md`), then replays the contract. That reset routes through the same
-guard and the same safe order - it never force-removes a path it hasn't proven it owns.
+ownership checks and the same safe order - it never force-removes a path it hasn't proven it owns.

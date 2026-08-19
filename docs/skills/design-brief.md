@@ -22,8 +22,8 @@ or style-guideline rules is a host design-review skill (`/web-design-guidelines`
 A front-end that `/groundwork` and `/plan-grill` compose, not one invoked standalone against a
 finished build. It hands its output three ways: token set and named direction to
 `/groundwork`'s frozen foundation, visual done-criteria into the `/plan-grill` contract, and the
-tell audit plus trunk test to `/autonomous-loop` and `/browser-capability` as the check the loop
-actually runs.
+tell audit plus trunk test to `/autonomous-loop`, which drives them against the running UI with the
+`browser` tool.
 
 ## Common questions
 
@@ -69,7 +69,7 @@ entrance or exit animation on this trigger class," never a judgment call on how 
 prove the animation is suppressed?** No. A single still can't tell "suppressed by design" from "hasn't
 started or already finished" - both render the same final frame. Reduced-motion is proven from the
 stylesheet (a `prefers-reduced-motion` media query or the equivalent JS branch that actually guards the
-movement) or a repeated-trigger capture through `/browser-capability` showing the animation suppressed
+movement) or a repeated-trigger capture with the `browser` tool showing the animation suppressed
 across multiple fires - never from one PNG.
 
 ## It's working if

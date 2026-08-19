@@ -12,8 +12,8 @@ stands between that failure and silence is not a cadence: it is error tracking t
 failure, a health endpoint that makes "up" checkable, and one alert channel that pages a person. Wire
 those three, prove they fire, record them.
 
-Read `.better-dev/overrides.md` first (`.better-dev/bin/bd-mem read overrides`) - a repo may already
-name its monitoring stack, or hold "we never instrument prod" as a recorded decision; honor either.
+Read `.better-dev/overrides.md` first - a repo may already name its monitoring stack, or hold
+"we never instrument prod" as a recorded decision; honor either.
 
 ## Detect what already observes this repo
 
@@ -23,8 +23,8 @@ value plus where, and add only what is missing.
 - **Error tracking** - an error-tracking dependency in the manifest, its DSN-shaped env var named in
   the env template, the init call in the entry point. A dashboard mentioned in the README is a claim
   until the dependency and the init are seen.
-- **Health endpoint** - the recorded `deploy-health` rule (`.better-dev/bin/bd-mem recall "deploy"`),
-  or a health/status route in the code. Fetch it once and read the status.
+- **Health endpoint** - the recorded `deploy-health` rule in `.better-dev/rules.md`, or a
+  health/status route in the code. Fetch it once and read the status.
 - **Alert channel** - an alert rule in the tracker, an uptime probe pointed at prod, a deploy workflow
   that notifies on failure. The bar is "reaches a human": a rule posting to a channel nobody reads
   passes the grep and fails the test.
@@ -78,10 +78,12 @@ production nobody has broken.
 
 ## Record, absence as a named gap
 
-```bash
-.better-dev/bin/bd-mem remember "obs-error-tracking: <where prod errors aggregate, observed at file:line - or none>"
-.better-dev/bin/bd-mem remember "obs-alert-channel: <what pages a human on a prod incident - or none>"
-.better-dev/bin/bd-mem remember "obs-health: <the standing probe that watches prod between releases - or none>"
+Three lines into `.better-dev/rules.md`, added with `edit`:
+
+```markdown
+- obs-error-tracking: <where prod errors aggregate, observed at file:line - or none>
+- obs-alert-channel: <what pages a human on a prod incident - or none>
+- obs-health: <the standing probe that watches prod between releases - or none>
 ```
 
 The key vocabulary is `/guardrails-install`'s - its prose defines what each key means, and it detects

@@ -17,7 +17,7 @@ a reading list, and it changes nothing in the repo.
 | A vendor's or a paper's number has to survive its own limitations | `/deep-research` |
 | Sources disagree and the disagreement itself is what needs settling | `/deep-research` |
 | An answer arrived with no provenance and its chain has to be rebuilt | `/deep-research` |
-| Reading this codebase - callers, dependents, real schema | `/codebase-map` |
+| Reading this codebase - callers, dependents, real schema | the `lsp` tool (`references`, `definition`, `symbols`) |
 | Finding a tool or skill to install | `/tool-sourcing` |
 | One API signature or config key | a documentation lookup, not a research pass |
 

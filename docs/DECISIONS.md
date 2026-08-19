@@ -4,7 +4,17 @@ Opinionated defaults that resolve the spec's open design calls so skills are bui
 foundations. These are **my calls** (per principles #6 opinionated / #7 overridable) - flagged for review,
 not set in stone. Spec: `raw/better-dev-design-principles.md`. Build plan: `raw/sources/2026-07-03-harvest-manifest/`.
 
+**Read against the 2026-08-19 harness-native cutover.** Every entry below stands as the record of what
+was decided when. Where an entry settled a mechanism this library used to ship itself - the `bd-*`
+script spine, the hook and host-adapter layer, the vendored browser daemon, the graphify wrapper
+skills - that mechanism was deleted in the cutover and the host's own tool answers it now; the affected
+entries carry a marker saying so. A marked entry is history, never an instruction to run.
+
 ## D0 · Output layout
+**Superseded by the 2026-08-19 cutover:** the `bd-*` spine, `hosts/`, `hooks/`, and the
+`.better-dev/bin` bridge are all deleted - what remains at the root is `skills/`, four release-time
+helpers under `scripts/`, `docs/`, and the plugin manifest.
+
 Product lives at the **repo root**; `raw/` stays the research archive.
 ```
 skills/<name>/SKILL.md         # agentskills.io units (+ sibling .md refs, progressive disclosure)
@@ -20,6 +30,10 @@ portable reference `.better-dev/bin/bd-mem`. Full model in **D10** (which revise
 `.agents/` vendoring assumption).
 
 ## D10 · Install model - global per host; a repo carries data only (revises D0, 2026-07-04)
+**Partly superseded by the 2026-08-19 cutover:** the two-layer model stands (global tool clone, repo
+data only), but the `bin` bridge, `scripts/bd-link`, and the `hosts/` adapters are gone - the host
+resolves skills itself.
+
 Two layers (gstack-confirmed; per-repo skill-vendoring + a `.claude/skills` symlink-bridge is the deprecated
 model - dropped):
 - **Tool - global, once per machine.** `install.sh` links this clone's `skills/` into each detected host's
@@ -53,6 +67,10 @@ exhausted budget to a success state.**
 | `NO_PROGRESS` | stagnated → triggers restart-from-contract | loopy stagnated, stuck-check confirmed |
 
 ## D2 · Memory contract (4 ops) + files default
+**Superseded by the 2026-08-19 cutover:** the four ops and the resolver script are gone. Lessons live
+in the host's memory store (the `learn` tool, readable at `memory://root/learned.md`); the files below
+stay and are read and written directly.
+
 Skills call: `remember(rule)` · `recall(query)→rules/lessons` · `persist(override)` · `read(state)`.
 Resolver script routes to a backend set by `BETTER_DEV_MEMORY` (default `files`; else `mcp:<server>` or `cmd:<...>`).
 **Files backend (default, zero infra):**
@@ -71,6 +89,10 @@ On `NO_PROGRESS` confirmed by stuck-check → **reset the feature worktree off `
 Reimplemented in our own words (LOOPS.md §V is personal-use - inspiration only).
 
 ## D4 · Agent-agnostic dispatch verb (owned by `orchestrating-agents`, D9)
+**Superseded in its script half by the 2026-08-19 cutover:** dispatch is the host's `task` tool and the
+file-handoff bookkeeping is plain files under `.better-dev/ledger/<work-item>/`; the prose-dispatch
+ruling itself stands.
+
 **Dispatch itself is prose**, run through the host's fresh-context subagent primitive (Claude Code `Task`
 for one worker, `Workflow` for fan-out/pipeline; equivalents elsewhere) - a bash script cannot spawn the
 host's agent. Fallback when none exists: a single-session role-switch with an explicit context reset.
@@ -123,7 +145,7 @@ subtasks - a practice, not a provider spine). This is also how better-dev itself
 
 ## D11 - Review gates the PR; the PR stage is automation only (2026-07-07, user directive)
 A pull request opens only after the change carries a clean independent review verdict recorded in the
-ledger and keyed to the reviewed HEAD sha (`bd-mem ledger read <work-item> review.md`). `/pr-and-verify`
+ledger and keyed to the reviewed HEAD sha (the work-item's `review.md`). `/pr-and-verify`
 checks that verdict as an entry precondition and never runs review itself; its post-open job is CI
 truth-reading plus runtime verification. A CI-red fix pass is re-reviewed in the worktree and re-recorded
 before its commits push, so an open PR never waits on a reviewer.
@@ -324,6 +346,10 @@ with a remote), planned-at-SHA drift check skipped (text already prescribes it),
 (step 6 already prescribes per-step commits).
 
 ## D20 - tier-map resolution at the dispatch call (2026-07-10; recurring flagship-inherit complaint)
+**Superseded by the 2026-08-19 cutover:** the recorded tier-map and `tiers.md` are gone; the mapping is
+the host's own routing config (`modelRoles`, `task.agentModelOverrides`, an agent's frontmatter `model`
+list). The ruling that a band decision must reach the dispatch parameter stands.
+
 Source: repeated operator observation (podcast-thing and prior sessions) that fan-out workers run on
 the session's frontier model despite tiers.md placing them mid/cheap. Root cause: D18 rightly rejected
 a vendor-named routing table in the library, but "the host owns model choice" left the host's actual
@@ -446,6 +472,9 @@ Covered, not re-filed (so the next harvest does not re-litigate):
 - ADR ends in checkable invariants - D-entries already function as rulings with teeth.
 
 ## Tracer-bullet findings (2026-07-03, on the papers.town clone) - bind Phase 1
+**Finding 1 lost its subject in the 2026-08-19 cutover** - there are no helpers to place and no
+`.better-dev/bin`. Findings 2 to 6 still bind.
+
 Ran `onboard` + one feature slice → staging end-to-end on the real clone (locally, no push). Proven, plus:
 1. **Helpers → `.better-dev/bin/`** (bare `scripts/` collides with the project's own - see D0 install contract).
 2. **Ledger lives in the primary checkout's `.better-dev/ledger/<feature>/`, shared across worktrees** - not in
@@ -531,8 +560,8 @@ read the baseline and skipped the precedence rule. An override meant to narrow r
 name what survives it. `/overrides` says so at the line that creates the collision.
 
 5. **A known human gate is pre-authorized at seal, and the merge-time gate stands as backstop.** The
-contract gains a `gated paths:` line beside the `merge:` line that `bd-mem ledger approve` already
-refuses to pin without. Rationale is the cost of "no": at seal, no changes the seam or scope in a
+contract gains a `gated paths:` line beside the `merge:` line the seal already requires.
+Rationale is the cost of "no": at seal, no changes the seam or scope in a
 sentence; at merge, no discards finished work, so the answer is structurally yes and the gate has
 stopped reviewing anything. Because the seal names a PREDICTION of blast radius, it is
 pre-authorization and never a replacement - a gated path the seal did not name still stops at merge,
@@ -555,6 +584,10 @@ them for the operator to resolve (adds a stop, in the safety class). Deferred, n
 library-wide closed list of never-ask actions.
 
 ## D26 - a named list of machine-global writes is agent-run (2026-08-02; user-ratified)
+**Superseded by the 2026-08-19 cutover:** the three named commands were the graphify installs and the
+comms-block splice, all deleted with the wrappers and the `bd-*` spine. The consequence rule - a
+machine-global write is agent-run only when it is named, reversible, and non-secret - stands, with an
+empty list.
 
 A machine-global write **on the list below** is an agent write, and the running skill names it in
 its recap with its undo, so the change is visible rather than silent.
@@ -796,6 +829,9 @@ Covered, not re-filed (so the next harvest does not re-litigate):
 - Glamorous Toolkit's verbatim ingest, the Sourcegraph/Amp split, Riftmap - promoted hops this batch did not fetch; recorded as next-batch inputs in the batch manifest rather than dropped.
 
 ## D28 - observatory-viz harvest (2026-08-05; three calls operator-ratified)
+**Superseded by the 2026-08-19 cutover:** graphify, its wrapper skills, and `bd-atlas` are all deleted;
+structural orientation is the `lsp` tool. Ruling 3's two-surface firewall is the only part with a live
+subject.
 
 Sources: 4 dossiers, a completeness critic, and the master plan under
 `raw/synthesis/2026-08-05-observatory-viz/`, built against a live verification pass (graph built
@@ -1139,6 +1175,8 @@ root (a duplicate hook registration is not idempotent, and that is the worse fai
 the install is unsupported and names the migration. Silence is what let such an install sit forever.
 
 ## D34 - three legacy-path hook shims live under `better-dev/`, deliberately (amends D32; 2026-08-15)
+**Superseded by the 2026-08-19 cutover:** there are no hooks left to shim, and `better-dev/hooks/` is
+deleted with the rest of the hook layer.
 
 D32 moved everything to the repo root. `better-dev/hooks/` is back, holding three files and nothing
 else. It is a compatibility shim, not a reversal, and it exists because of an asymmetry D32 created:
@@ -1247,6 +1285,9 @@ The historical record is annotated, not rewritten: `docs/DECISIONS.md`, `docs/PL
 `docs/TRAPS.md` describe decisions that were really made about `staging`, and they still say so.
 
 ## D37 - enforcement reaches omp through the bridge that already runs the awareness hooks (2026-08-17)
+**Superseded by the 2026-08-19 cutover:** `bd-guard` and the omp bridge are both deleted. Destructive
+commands are gated by a committed `.omp/config.yml` under `bash.patterns`, and the path-based edit
+gate has no native equivalent - it is gone rather than replaced.
 
 `bd-guard check-bash` and `check-edit` were registered as Claude Code `PreToolUse` entries only, so every
 destructive command and out-of-boundary edit in an omp session ran unchecked and an onboarded repo could

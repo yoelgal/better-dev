@@ -188,16 +188,14 @@ interrupting the run for status - writing an answer into the question file is no
 the run asking; stopping is the user's move, per the stop-condition slot.
 
 A dead run resumes in a fresh session from the saved prompt plus the record: paste the prompt with
-one line added, read the record and continue. Where graphify is wired, or one AST-only sync on the
-artifact is cheap, have the run carry `graphify-wrapper-query --affected` output in each round block
-(the observatory sidecar carries why). The first work-item on the artifact
-after the run is a review pass over what landed, not a feature - the run stops holding thousands of
-lines of unreviewed machine-written code - and the bar rows seed that item's done-criteria, each row
-becoming a criterion with a runnable check or an explicitly dropped line.
+one line added, read the record and continue. Have the run carry `lsp` references output for what
+each round touched in that round's block (the observatory sidecar carries why). The first work-item
+on the artifact after the run is a review pass over what landed, not a feature - the run stops
+holding thousands of lines of unreviewed machine-written code - and the bar rows seed that item's
+done-criteria, each row becoming a criterion with a runnable check or an explicitly dropped line.
 
 The skill's terminal state is the handoff - a run started, watched, or debugged afterwards is its own
 new work, and a wired repo's loop items still route through `/plan-grill` and `/autonomous-loop`.
 
-Close out in one line: record the keyed lesson if the grill taught one
-(`.better-dev/bin/bd-mem learn "<lesson>" <0..1> "<key>"` where a repo is wired), else say
-`no durable lesson` and why.
+Close out in one line: record the keyed lesson with the `learn` tool if the grill taught one, else
+say `no durable lesson` and why.

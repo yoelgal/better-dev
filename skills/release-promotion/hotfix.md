@@ -87,12 +87,14 @@ run at the release sha, and the hotfix settles `UNVERIFIED` instead of resolved.
 
 ## Record it
 
-```bash
-printf 'hotfix: %s\ncommit: %s\non: %s + %s\nlive: %s\n' \
-  "$version" "$hotfix_sha" "$release" "$integration" "$live_observation" \
-  | .better-dev/bin/bd-mem ledger put "hotfix-$slug" hotfix.md -
-# live: what the deploy-verify observed, e.g. "symptom gone: /login 200, error banner absent"
+Write the receipt with the `write` tool to `.better-dev/ledger/hotfix-<slug>/hotfix.md`:
+
+```
+hotfix: 0.13.1
+commit: 4f2a91c
+on: main + staging
+live: symptom gone: /login 200, error banner absent   # what the deploy-verify observed
 ```
 
 If the incident taught something durable - a gap in CI that let the bug through, a fragile path -
-that's a `bd-mem learn`, so the next planning pass sees it.
+record it with the `learn` tool, so the next planning pass sees it.

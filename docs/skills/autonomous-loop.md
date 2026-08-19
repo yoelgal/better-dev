@@ -88,6 +88,5 @@ cause sits at a different layer - not permission to widen the diff.
 - On first green, the diff shows a cleanup pass (dead code and narrating comments stripped) and any
   documentation the diff falsified updated in the same commit range - not left for someone else to
   notice.
-- A `DONE` or `DONE_WITH_CONCERNS` hands off carrying a real command and its exit-0 output as evidence,
-  and the edit boundary (`bd-guard`) is lifted from the tree only on those two states, still standing
-  on every other stop.
+- A `DONE` or `DONE_WITH_CONCERNS` hands off carrying a real command and its exit-0 output as
+  evidence, never a narrated summary of one.

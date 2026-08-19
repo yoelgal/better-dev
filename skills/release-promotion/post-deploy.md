@@ -9,8 +9,8 @@ at the end of this file.
 
 ## Everything here comes from recorded rules
 
-Every command and URL in this pass comes from the recorded `deploy-*` rules
-(`.better-dev/bin/bd-mem recall "deploy"`), written once by `/guardrails-install` - detected,
+Every command and URL in this pass comes from the recorded `deploy-*` rules in
+`.better-dev/rules.md`, written once by `/guardrails-install` - detected,
 premise-verified, never guessed. A value that isn't recorded is a `NEEDS_INPUT` naming
 `/guardrails-install` as the recorder, not a guess. On a greenfield product where nothing was ever
 created, the recorder's own fork routes to `/deploy-capability` - the `NEEDS_INPUT` names the
@@ -28,7 +28,8 @@ gh run list --commit "$(git rev-parse "origin/$release")" --json status,conclusi
 
 A push-deploy platform with neither gets one fixed propagation wait (60s) before probing. Wait on
 the host's monitor primitive, not a tight poll, with a 20-minute default budget
-(`bd-mem recall "deploy-budget"` for a recorded override; the default holds when none is set). Two exits here are not green:
+(a recorded `deploy-budget` rule overrides it; the default holds when none is set). Two exits here
+are not green:
 
 - A run that concludes `failure` goes straight to the rollback section - there is nothing to
   verify yet.
@@ -65,14 +66,14 @@ CDN all differ, so a green worktree proves nothing about the deploy), and destru
 off a live system - read paths and idempotent writes only.
 
 An env-shaped failure gets named before it gets treated as code: when the release's diff newly
-reads an env var and the deploy run failed or the driven surface errors, recall `"deploy-env"` and
-re-confirm the var exists in production (the release gate confirmed it before the tag; this is the
-re-read on a red). A missing var settles `NEEDS_INPUT` naming the var, not a revert - rolling back
-code over a config gap re-ships the same red.
+reads an env var and the deploy run failed or the driven surface errors, read the recorded
+`deploy-env` rule and re-confirm the var exists in production (the release gate confirmed it before
+the tag; this is the re-read on a red). A missing var settles `NEEDS_INPUT` naming the var, not a
+revert - rolling back code over a config gap re-ships the same red.
 
 ## The bounded post-deploy watch
 
-Five checks at 60-second intervals (defaults; `bd-mem recall "deploy-watch"` for a recorded override).
+Five checks at 60-second intervals (defaults; a recorded `deploy-watch` rule overrides them).
 Each check: fetch the probed pages, read the console errors, read the load time.
 
 Grade each check against the **baseline** - the previous release receipt's `health:` line. With a
@@ -115,7 +116,7 @@ The receipt fields are the record; these are the states the release settles:
 - `DEGRADED` - `DONE_WITH_CONCERNS`, findings named.
 - `UNVERIFIED` - the deploy state is unknown, or the surface can't be driven from here (VPN-only,
   a missing credential): `NEEDS_INPUT` naming exactly what has to run.
-- `REVERTED` - the receipt says so, and the cause goes to `bd-mem learn` so the next planning
+- `REVERTED` - the receipt says so, and the cause goes to the `learn` tool so the next planning
   pass sees it.
 
 Neither a spent wait budget nor an unreachable probe is ever a success state.

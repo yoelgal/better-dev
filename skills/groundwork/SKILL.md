@@ -18,10 +18,10 @@ branching base, and before any single feature is grilled.
 Groundwork settles intent forward for something that does not exist yet; where the project already
 exists and its intent was never written down, `/vision` recovers it backward from the repo's own
 history. Where a vision is already recorded, read it before shaping
-(`.better-dev/bin/bd-mem recall "vision"`) - its acceptance policy is a premise this pass inherits
+(`VISION.md`) - its acceptance policy is a premise this pass inherits
 rather than re-derives.
 
-Read `.better-dev/overrides.md` first (`.better-dev/bin/bd-mem read overrides`). A project's own stack,
+Read `.better-dev/overrides.md` first. A project's own stack,
 architecture conventions, or a house way of slicing work wins over any default below.
 
 **One fork after that read, before shaping starts, on every greenfield build ask.** Two routes reach a
@@ -194,7 +194,7 @@ the files, directories, or modules it **owns** - and the ownership sets should b
 two work-items share, the less their worktrees fight at merge time.
 
 Disjointness is a structural claim, so check it structurally rather than by eye. For each candidate
-item's owned surface, `/graphify-wrapper-query <name> --affected "<owned module>"` returns what
+item's owned surface, the `lsp` tool's `references` action returns what
 depends on it; two items whose affected sets intersect will collide at merge even when their file
 lists look clean, because the collision is through an import, not a path. That is the failure mode
 the carve is most likely to miss and most expensive to discover - a wrong carve costs N worktrees.
@@ -302,23 +302,24 @@ and any epic-wide settled decision that is not substrate; the contribution-guide
 ```
 
 ```bash
-.better-dev/bin/bd-mem ledger put "<epic>" groundwork.md -   # stdin: the six sections above
+primary=$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")
+mkdir -p "$primary/.better-dev/ledger/<epic>"   # the six sections above go in groundwork.md here
 ```
 
-`bd-mem` resolves the primary checkout's ledger, so the record is visible from every worktree. Each
+The ledger lives in the primary checkout, so the record is visible from every worktree. Each
 work-item still gets its own contract when its front-end runs; this record is the higher-level plan that
 ties them together.
 
 **The record is the plan, and it holds no state.** Its `## Work-items` rows say what each work-item
-is. A work-item's state keeps one canonical home, `.better-dev/bin/bd-mem ledger status`, which
-derives it from disk each time it is read; a state column authored into the record is a snapshot, and
+is. A work-item's state keeps one canonical home, the last line of its own
+`.better-dev/ledger/<slug>/progress.md`; a state column authored into the record is a snapshot, and
 it is wrong from the first merge onward. When the two disagree about which work-items exist, the
-record is authoritative about the plan and `ledger status` about what happened to it, and the
+record is authoritative about the plan and the progress files about what happened to it, and the
 disagreement is itself the finding to report.
 
 **Re-entered on an epic that already has a record, groundwork reports before it reshapes.** Read the
-record back (`.better-dev/bin/bd-mem ledger read "<epic>" groundwork.md`) alongside
-`.better-dev/bin/bd-mem ledger status`, and open with one line per carved work-item - before anything
+record back (`.better-dev/ledger/<epic>/groundwork.md`) alongside each work-item's progress line, and
+open with one line per carved work-item - before anything
 else. Lead with the title and let the slug ride inside it, because a column of bare slugs is decoded
 where titles read at a glance:
 
@@ -328,7 +329,7 @@ Then exactly one of three moves: graduate a fog signpost the finished wave has m
 new carved work-item, through the carve gate asked again for the new work-items only; rule a signpost
 or work-item that now sits past the epic's differentiating idea out-of-scope, recorded in the
 record's `## Out of scope` section with its one-line why; or state that the list is complete and name
-the next wave's base. A second run that reports the epic already finished while `ledger status` shows
+the next wave's base. A second run that reports the epic already finished while the progress files show
 unstarted work-items is the failure this clause prevents.
 
 Two of those moves run on different axes, and only one of them reverses. Graduating is a sharpness

@@ -4,34 +4,50 @@
 # Dry-run is the DEFAULT: it prints exactly what it would remove and leaves everything in place.
 # Pass --yes to act.
 #
-#   bd-uninstall global [--host <name>|auto] [--yes]               remove per-host links, the awareness
-#                                                                  hooks, and the install marker
-#                                                                  (<name> = any adapter file in hosts/)
+#   bd-uninstall global [--host <name>|auto] [--yes]               remove the per-host skill links and
+#                                                                  the install marker
 #   bd-uninstall repo [path] [--unblock] [--purge-data] [--yes]    unwire this repo (default path: git root, else cwd)
 #   bd-uninstall selftest
 #
 # global: for each host skills dir, drop an entry only when it is ours by the same test install.sh uses -
 #   a symlink whose target names one of our skills (any clone, so a moved clone still cleans up) or a
-#   copy-mode dir carrying the .better-dev-skill sentinel. Foreign skills are left and named in the report.
-#   It also drops our SessionStart/SubagentStart registration from the host's machine-global hook
-#   target (bd_host_hook_settings), since install.sh registers it - a left-behind entry would run a
-#   command pointing at a removed clone on every session. It unwires through the same script the
-#   adapter names for wiring (bd_host_hook_wire, default bd-hook-wire), so a host wired by module
-#   rather than by JSON is undone by its own inverse. Foreign hooks and foreign files are left alone.
-# repo: drop the per-machine .better-dev/bin bridge (gitignored, always safe). --unblock also strips the
-#   managed CLAUDE.md/AGENTS.md discovery block. Your rules/overrides/learnings/ledger stay put unless you
-#   pass --purge-data.
+#   copy-mode dir carrying the .better-dev-skill sentinel. Foreign skills are left and named in the
+#   report. Skill links and the marker are the whole of a global install, so they are the whole of its
+#   removal: nothing is registered in the host's own config for this to undo.
+# repo: --unblock strips the managed CLAUDE.md/AGENTS.md discovery block. Your rules, overrides and
+#   ledger stay put unless you pass --purge-data.
 #
 # Reimplemented for better-dev from understanding; no source files copied.
 set -eu
 
 case "$0" in /*) SELF="$0" ;; *) SELF="$PWD/$0" ;; esac
-# Resolve through the repo's .better-dev/bin symlink (pwd -P) so SRC is the real clone, not the bridge.
 SCRIPTS_DIR="$(cd "$(dirname "$SELF")" && pwd -P)"
 SRC="$(cd "$SCRIPTS_DIR/.." && pwd -P)"
-HOSTS_DIR="$SRC/hosts"
-BD_BLOCK="$SCRIPTS_DIR/bd-block"
 die() { printf 'bd-uninstall: %s\n' "$*" >&2; exit 1; }
+
+# ── the host table ───────────────────────────────────────────────────────────
+# name|display|skills dir under $HOME|dir policy
+#
+# One line per host, and adding a host is adding a line. The name doubles as the PATH probe because
+# every host here ships a CLI of its own name; a host that breaks that gets a fifth field, not a
+# branch. `create` means the skills-dir convention was verified on a real install, so this script may
+# scaffold it; `require-existing` means link only into a directory the host itself made - linking into
+# an invented path reports success and delivers nothing.
+#
+# Named coverage limit: an omp PROFILE (`omp --profile <name>`) relocates its skills dir to
+# ~/.omp/profiles/<name>/agent/skills, which this static path does not cover. Pass --host with the
+# real dir created beforehand, or link by hand.
+#
+# install.sh carries this block byte for byte, because undoing an install has to enumerate exactly the
+# hosts that were installed for; bd-package-check compares the two so they cannot drift.
+BD_HOST_TABLE='claude|Claude Code|.claude/skills|create
+codex|OpenAI Codex CLI|.codex/skills|create
+hermes|Hermes|.hermes/skills|require-existing
+omp|Oh My Pi (omp)|.omp/agent/skills|create'
+
+host_field() {
+  printf '%s\n' "$BD_HOST_TABLE" | awk -F'|' -v n="$1" -v f="$2" '$1 == n { print $f; exit }'
+}
 
 # is host entry $1 (skill name $2) a better-dev install (ours)? Mirror of install.sh's ours-test.
 is_ours() {
@@ -46,16 +62,25 @@ is_ours() {
 
 repo_root() { git -C "${1:-$PWD}" rev-parse --show-toplevel 2>/dev/null || printf '%s' "${1:-$PWD}"; }
 
+# Strip one managed block from a file, in place. A block is its two sentinel lines and everything
+# between them, so this is one awk pass and everything outside the sentinels survives byte for byte.
+strip_block() {
+  _f="$1"; _name="$2"; _t="$_f.bd-uninstall.$$"
+  awk -v b="<!-- BEGIN $_name -->" -v e="<!-- END $_name -->" '
+    $0 == b { skip = 1; next }
+    $0 == e { skip = 0; next }
+    !skip' "$_f" > "$_t" && mv "$_t" "$_f"
+}
+
 # ── global ───────────────────────────────────────────────────────────────────
 do_global() {
   host="$1"; yes="$2"
-  # The hosts/ dir is the single registry (same rule as install.sh): every adapter file is a host.
   avail=""
-  for a in "$HOSTS_DIR"/*; do [ -f "$a" ] && avail="$avail $(basename "$a")"; done
+  for h in $(printf '%s\n' "$BD_HOST_TABLE" | awk -F'|' '{print $1}'); do avail="$avail $h"; done
   if [ "$host" = auto ]; then
     hosts="$avail"
   else
-    [ -f "$HOSTS_DIR/$host" ] || die "no adapter 'hosts/$host' (have:$avail)"
+    [ -n "$(host_field "$host" 1)" ] || die "no host '$host' (have:$avail)"
     hosts="$host"
   fi
   wd=""; [ "$yes" = 1 ] || wd="would "
@@ -63,10 +88,8 @@ do_global() {
                  || echo "== better-dev uninstall (global) - DRY RUN (pass --yes to apply) =="
   touched=0
   for h in $hosts; do
-    adapter="$HOSTS_DIR/$h"; [ -f "$adapter" ] || continue
-    bd_host_cli=""; bd_host_display=""; bd_host_skills_dir=""; bd_host_hook_settings=""; bd_host_hook_wire=""
-    . "$adapter"
-    dir="$bd_host_skills_dir"
+    display="$(host_field "$h" 2)"
+    dir="$HOME/$(host_field "$h" 3)"
     [ -d "$dir" ] || continue
     removed=""; kept=""
     # 1. Each shipped skill name: remove its host entry iff it is ours.
@@ -89,55 +112,19 @@ do_global() {
         */skills/"$nm"|*/skills/"$nm"/) removed="$removed $nm(orphan)"; [ "$yes" = 1 ] && rm -f "$entry" ;;
       esac
     done
-    # 3. Legacy whole-dir link.
-    old="$dir/better-dev"
-    if [ -L "$old" ]; then
-      case "$(readlink "$old" 2>/dev/null)" in
-        */skills|*/skills/) removed="$removed better-dev(legacy)"; [ "$yes" = 1 ] && rm -f "$old" ;;
-      esac
-    fi
-    # 4. Awareness hooks in the host's machine-global hook target. install.sh registers these, so
-    # uninstall owes their removal: a registration left pointing at a removed clone runs a command
-    # against a deleted path on every session, which is a worse state than never wiring them. Unwire
-    # goes through the SAME script the adapter names for wiring, because the mechanism differs per
-    # host: bd-hook-wire drops our entries from a JSON config, while bd-omp-hook-wire deletes the
-    # bridge module it installed. Either way only what we recognise as ours goes.
-    hookwire="${bd_host_hook_wire:-}"; [ -n "$hookwire" ] || hookwire="bd-hook-wire"
-    if [ -n "${bd_host_hook_settings:-}" ] && [ -f "$bd_host_hook_settings" ] \
-       && [ -f "$SRC/scripts/$hookwire" ] && command -v python3 >/dev/null 2>&1; then
-      if [ "$yes" = 1 ]; then
-        [ "$(python3 "$SRC/scripts/$hookwire" unwire "$SRC" "$bd_host_hook_settings" 2>/dev/null)" = unwired ] \
-          && removed="$removed awareness-hooks"
-      else
-        # The preview has to answer the same question the apply answers, and only the wiring script
-        # can: a grep for one host's string reads "nothing of ours" on a host whose mechanism writes
-        # a different file entirely, and --yes then removes it anyway. That is what the omp stub did
-        # here - its three lines name hooks/omp/bd-awareness.ts and never hooks/bd-session-start - so
-        # the operator consented to a preview that omitted the file it went on to delete.
-        # So the preview runs the REAL unwire against a throwaway COPY of the target: same script,
-        # same bytes, and both wiring scripts' ours-test reads the CONTENT rather than the path, so
-        # the copy answers exactly what the original would. Nothing of the operator's is opened for
-        # writing, which is the whole promise of a dry run.
-        pv="$(mktemp -d)"; pvt="$pv/$(basename "$bd_host_hook_settings")"
-        cp "$bd_host_hook_settings" "$pvt" 2>/dev/null \
-          && [ "$(python3 "$SRC/scripts/$hookwire" unwire "$SRC" "$pvt" 2>/dev/null)" = unwired ] \
-          && removed="$removed awareness-hooks"
-        rm -rf "$pv"
-      fi
-    fi
-    # 5. Install marker.
+    # 3. Install marker.
     marker=""
     if [ -f "$dir/.better-dev-install" ]; then
       marker=" +marker"; [ "$yes" = 1 ] && rm -f "$dir/.better-dev-install"
     fi
-    echo "  $bd_host_display ($dir/):"
+    echo "  $display ($dir/):"
     [ -n "$removed" ] && echo "    ${wd}remove$([ "$yes" = 1 ] && echo d):$removed$marker" \
                       || echo "    nothing of ours here$marker"
     [ -n "$kept" ] && echo "    left foreign skill(s) (not ours):$kept"
     touched=$((touched + 1))
   done
   echo
-  [ "$touched" -eq 0 ] && echo "No installed host found. (Try --host <name>; adapters:$avail.)"
+  [ "$touched" -eq 0 ] && echo "No installed host found. (Try --host <name>; hosts:$avail.)"
   [ "$yes" = 1 ] || echo "Nothing was changed. Re-run with --yes to apply."
 }
 
@@ -149,24 +136,20 @@ do_repo() {
   [ "$yes" = 1 ] && echo "== better-dev uninstall (repo: $repo) ==" \
                  || echo "== better-dev uninstall (repo: $repo) - DRY RUN (pass --yes to apply) =="
   removed=""
-  # The per-machine bridge is gitignored runtime state - always safe to drop.
-  bin="$repo/.better-dev/bin"
-  if [ -e "$bin" ] || [ -L "$bin" ]; then
-    removed="$removed .better-dev/bin"; [ "$yes" = 1 ] && rm -rf "$bin"
-  fi
-  # The managed discovery block, only on request.
+  # The managed discovery block, only on request. Matched as a whole line, so the comms block's own
+  # sentinel (BEGIN better-dev-comms) is not mistaken for this one and reported as removed.
   if [ "$unblock" = 1 ]; then
     for f in "$repo/CLAUDE.md" "$repo/AGENTS.md"; do
       [ -f "$f" ] || continue
-      if grep -q "BEGIN better-dev" "$f" 2>/dev/null; then
+      if grep -qxF '<!-- BEGIN better-dev -->' "$f" 2>/dev/null; then
         removed="$removed $(basename "$f")-block"
-        [ "$yes" = 1 ] && "$BD_BLOCK" remove "$f" >/dev/null 2>&1
+        [ "$yes" = 1 ] && strip_block "$f" better-dev
       fi
     done
   fi
   # Data is sacred: removed only under --purge-data.
   if [ "$purge" = 1 ]; then
-    for d in rules.md overrides.md learnings.jsonl ledger; do
+    for d in rules.md overrides.md ledger; do
       t="$repo/.better-dev/$d"
       [ -e "$t" ] && { removed="$removed .better-dev/$d"; [ "$yes" = 1 ] && rm -rf "$t"; }
     done
@@ -174,10 +157,13 @@ do_repo() {
   [ -n "$removed" ] && echo "  ${wd}remove$([ "$yes" = 1 ] && echo d):$removed" \
                     || echo "  nothing of better-dev's found in this repo."
   if [ "$purge" = 1 ]; then
-    echo "  --purge-data set: your rules/overrides/learnings/ledger are included above."
+    echo "  --purge-data set: your rules/overrides/ledger are included above."
   else
-    echo "  left .better-dev/ data (rules, overrides, learnings, ledger) untouched - pass --purge-data to remove it too."
+    echo "  left .better-dev/ data (rules, overrides, ledger) untouched - pass --purge-data to remove it too."
   fi
+  # Named rather than removed: .omp/config.yml is committed project policy that outlives this tool,
+  # and lessons live in the host's own memory store, which is not better-dev's to clear.
+  echo "  left committed policy (.omp/config.yml) and the host's memory store alone."
   echo
   [ "$yes" = 1 ] || echo "Nothing was changed. Re-run with --yes to apply."
 }
@@ -205,47 +191,22 @@ selftest() {
     [ ! -f "$sk/.better-dev-install" ]    || { echo "FAIL: marker survived --yes"; exit 1; }
     [ -f "$sk/review/SKILL.md" ]          || { echo "FAIL: foreign skill was removed"; exit 1; }
 
-    # The preview is the report the operator consents to, so for EVERY host whose hooks the
-    # installer wires it has to name the awareness hooks that --yes then removes. This loops the
-    # adapter registry rather than naming a host, because the defect it guards is mechanism-shaped:
-    # omp's target is a TypeScript module at a path of its own, carrying none of Claude's strings,
-    # and the grep this preview used to run reported "nothing of ours" and deleted it anyway.
-    # Skipped without python3, which is what wiring (and so unwiring) needs on either host.
-    if command -v python3 >/dev/null 2>&1; then
-      for a in "$HOSTS_DIR"/*; do
-        [ -f "$a" ] || continue
-        hn="$(basename "$a")"; hh="$d/home-$hn"; mkdir -p "$hh"
-        # Ask the adapter for its own target instead of restating it here: a second copy of the path
-        # would keep passing after the adapter moved it.
-        tgt="$(HOME="$hh" sh -c '. "$1"; printf "%s" "${bd_host_hook_settings:-}"' _ "$a")"
-        [ -n "$tgt" ] || continue
-        HOME="$hh" "$SRC/install.sh" --host "$hn" >/dev/null
-        [ -f "$tgt" ]                     || { echo "FAIL: install --host $hn wrote no hook target at $tgt"; exit 1; }
-        pre="$(HOME="$hh" "$SELF" global --host "$hn")"
-        case "$pre" in *awareness-hooks*) ;;
-          *) echo "FAIL: the $hn dry-run did not name the awareness hooks it would remove: $pre"; exit 1 ;;
-        esac
-        app="$(HOME="$hh" "$SELF" global --host "$hn" --yes)"
-        case "$app" in *awareness-hooks*) ;;
-          *) echo "FAIL: the $hn preview promised to remove awareness hooks and --yes did not: $app"; exit 1 ;;
-        esac
-      done
-    fi
-
-    # repo: bridge goes, data stays without --purge-data.
+    # repo: the block goes on request, data stays without --purge-data.
     repo="$d/repo"; mkdir -p "$repo/.better-dev/ledger"
-    # bd-link ships beside this script; a failure here should surface, so no raw-ln fallback
-    # (bd-package-check holds the no-link-site-outside-the-helpers invariant).
-    BD_SCRIPTS_DIR="$SRC/scripts" "$SRC/scripts/bd-link" link "$repo" >/dev/null 2>&1
     printf 'rule one\n' > "$repo/.better-dev/rules.md"
     printf 'over one\n' > "$repo/.better-dev/overrides.md"
     printf '# proj\n<!-- BEGIN better-dev -->\nblock\n<!-- END better-dev -->\nkeep\n' > "$repo/CLAUDE.md"
     HOME="$hm" "$SELF" repo "$repo" --unblock --yes >/dev/null
-    [ ! -e "$repo/.better-dev/bin" ]      || { echo "FAIL: bridge survived repo uninstall"; exit 1; }
     [ -f "$repo/.better-dev/rules.md" ]   || { echo "FAIL: rules.md removed without --purge-data"; exit 1; }
     [ -d "$repo/.better-dev/ledger" ]     || { echo "FAIL: ledger removed without --purge-data"; exit 1; }
     grep -q "keep" "$repo/CLAUDE.md"      || { echo "FAIL: --unblock clobbered outside content"; exit 1; }
+    grep -q "^# proj" "$repo/CLAUDE.md"   || { echo "FAIL: --unblock clobbered content above the block"; exit 1; }
     grep -q "BEGIN better-dev" "$repo/CLAUDE.md" && { echo "FAIL: managed block survived --unblock"; exit 1; }
+
+    # A file carrying only the comms block is not the discovery block: nothing is claimed or stripped.
+    printf '# proj\n<!-- BEGIN better-dev-comms -->\nstyle\n<!-- END better-dev-comms -->\n' > "$repo/AGENTS.md"
+    HOME="$hm" "$SELF" repo "$repo" --unblock --yes >/dev/null
+    grep -q "BEGIN better-dev-comms" "$repo/AGENTS.md" || { echo "FAIL: --unblock stripped the comms block"; exit 1; }
 
     # --purge-data removes the data too.
     HOME="$hm" "$SELF" repo "$repo" --purge-data --yes >/dev/null
@@ -257,7 +218,7 @@ selftest() {
 }
 
 # ── dispatch ─────────────────────────────────────────────────────────────────
-[ -d "$SRC/skills" ] && [ -d "$HOSTS_DIR" ] || die "cannot find the better-dev clone from $SELF"
+[ -d "$SRC/skills" ] || die "cannot find the better-dev clone from $SELF"
 
 cmd="${1:-}"; [ $# -gt 0 ] && shift || true
 case "$cmd" in

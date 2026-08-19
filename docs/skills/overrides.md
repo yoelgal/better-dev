@@ -43,14 +43,14 @@ code diverges, and review later re-litigates the operator's own instruction as a
 **Can an override waive a safety gate quietly?**
 No - a `safety-gate:`/`safety-scope:`/`safety-denylist:` line without an
 `[operator: "<their words>" <date>]` marker reads as absent. The recorded baseline gate stands and the
-waiver is put to the operator again before anything proceeds. `bd-mem persist-override` refuses to
-write a safety-class line missing that marker.
+waiver is put to the operator again before anything proceeds. Nothing refuses the write mechanically:
+the marker is a convention the next reader enforces.
 
 **If I override one gate, can it silently cancel a different one?**
 Yes, and this is a known unfixed edge, not a hypothetical: a same-key override replaces the *whole*
 baseline entry, not just the part meant to change. One recorded incident - a general "the agent merges
-its own green PR" override, persisted under the same `safety-gate` key as a path-scoped `hooks/**`
-gate, silently cancelled that path-scoped gate, and it stayed cancelled for weeks because agents read
+its own green PR" override, persisted under the same `safety-gate` key as a gate scoped to one
+directory, silently cancelled that path-scoped gate, and it stayed cancelled for weeks because agents read
 the baseline text and skipped the precedence rule. Nothing mechanically stops this; the stopgap is
 discipline, not enforcement - an override meant to narrow rather than waive has to say what survives it
 in its own text ("except the recorded machine-touching paths, which keep their gate"), because a reader

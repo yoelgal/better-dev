@@ -91,7 +91,7 @@ the mutation is the verdict.
 | **Vacuous setup** | the assertion's subject is empty or default at assert time - `assert errors == []` where nothing appends, a loop asserting over a collection the fixture left empty | mutation, plus one run asserting the subject is non-empty before the claim is made about it |
 | **Swallowed failure** | a `try` around the assertion, a bare `except`/`rescue`, a soft or logged assert, an early `return` above the assertion, an assertion inside a branch the run never enters | mutation: a swallowing test stays green under every break |
 | **Tautology** | the expected side is computed by the code under test, or duplicates its expression verbatim | mutation moves both sides together and the test stays green |
-| **Unreachable subject** | the only callers of the symbol under test are tests (`/graphify-wrapper-query <name> --affected "<symbol>"`, or grep the symbol across non-test paths) | no mutation: a green test over code production never reaches proves nothing about production, the same defect class as a security finding with no proof of reachability (`/security-pass` owns that gate) |
+| **Unreachable subject** | the only callers of the symbol under test are tests (the `lsp` tool with `action: references` on the symbol, then grep it across non-test paths) | no mutation: a green test over code production never reaches proves nothing about production, the same defect class as a security finding with no proof of reachability (`/security-pass` owns that gate) |
 | **Narrowed to pass** | history rather than current bytes - `git log -p -- <test-file>` shows an assertion loosened (an equality to a truthiness, an exact match to a substring, a deleted case) in the commit that turned the check green | reading that commit pair, then mutating against the assertion as it now stands |
 | **Never collected** | the runner's collected list is shorter than the declarations in the tree - a skip or permanent xfail marker, a name outside the runner's discovery pattern, a path excluded in config, a directory no runner root covers | diffing the runner's collection output against the declarations: a test that does not run cannot be mutated into redness |
 
@@ -141,10 +141,9 @@ tree-clean line reads yes. It re-reads this table rather than a summary of it. A
 stops the handoff and goes back as a nomination, since a test repaired against a description of its
 weakness is the next pass's `MISSED`.
 
-Close out at the end of a pass: record the one reusable line
-(`.better-dev/bin/bd-mem learn "<lesson>" <0..1> "<key>"` - a recurring shape such as "this repo's
-service tests assert on the fixture's own doubles"), or write an explicit `no durable lesson` line saying
-why. A count of what this run found is a receipt, not a lesson.
+Close out at the end of a pass: record the one reusable line with the `learn` tool - a recurring shape
+such as "this repo's service tests assert on the fixture's own doubles" - or write an explicit
+`no durable lesson` line saying why. A count of what this run found is a receipt, not a lesson.
 
 ## Composability
 

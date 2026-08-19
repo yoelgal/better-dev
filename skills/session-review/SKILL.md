@@ -5,12 +5,11 @@ description: Use when a session is finishing and what it learned has not been wr
 
 # Session review
 
-`bd-mem learn` keeps a keyed lesson, `bd-mem papercut add` keeps friction, the repo's trap record keeps
-a behavioural gap, and all three sit idle unless something reaches for them while the session still
-remembers what happened. This sweep is that something. The whole job is routing what this session
-produced to the surface that will replay it, so the tokens already spent pay a second time. Reviewing
-the code is `/review`; handing the work to another machine or colleague is `/worktree-branching`;
-editing a skill is `/self-extension`.
+The `learn` tool keeps a keyed lesson, the repo's trap record keeps a behavioural gap, and both sit
+idle unless something reaches for them while the session still remembers what happened. This sweep is
+that something. The whole job is routing what this session produced to the surface that will replay
+it, so the tokens already spent pay a second time. Reviewing the code is `/review`; handing the work
+to another machine or colleague is `/worktree-branching`; editing a skill is `/self-extension`.
 
 ## Run it at a terminal moment, never mid-work
 
@@ -24,15 +23,15 @@ pass receipt and keep working. `/autonomous-loop` and `/pr-and-verify` each writ
 lesson at their terminal state; this sweep runs over the whole session, so a lesson one of those
 close-outs already wrote is cited here, never written twice.
 
-## Four signals, four destinations
+## Four signals, three destinations
 
 Walk the session's trail - what you retried, what surprised you, what you had to grep twice, what you
 got wrong before you got it right - and route each finding by the row it matches:
 
 | What the session produced | Where it goes | The test it has to pass |
 |---|---|---|
-| a cause, technique, or standing fact a future session would otherwise re-derive | `.better-dev/bin/bd-mem learn "<lesson>" <0..1> "<key>"` | the two close-out tests, named below |
-| friction: a dead-end tool call, a broken doc link, a flaky command, output that lied | `.better-dev/bin/bd-mem papercut add "<what happened>" [context]` | it cost real time and nothing in the repo warned about it |
+| a cause, technique, or standing fact a future session would otherwise re-derive | the `learn` tool, one insight per call, keyed | the two close-out tests, named below |
+| friction: a dead-end tool call, a broken doc link, a flaky command, output that lied | the `learn` tool as well - what it cost and what to do instead, keyed so the next session meets it | it cost real time and nothing in the repo warned about it |
 | a gap where a future agent following the instructions as written would fail the same way | the repo's trap record, as a rigged scenario with its pass line and fail line (better-dev's own is `docs/TRAPS.md`) | you can name the input that produces the wrong behaviour, and the observable that separates the pass from the fail |
 | an instruction in this repo that sent the session the wrong way | the report, quoting the file and the exact sentence; the edit itself belongs to `/self-extension` or to the skill that owns the sentence | you can quote the sentence and say what it made you do |
 
@@ -41,35 +40,34 @@ tests that gate the write and the negative-lesson filter, and this sweep applies
 restating them. On the empty path there is nothing to gate, so skip the hop.
 
 The last row is the highest-value output of the sweep and the one most often lost, because the pull at
-this table is to file everything as a papercut - a papercut asks nothing of you, no key, no score, no
-wording. Sort by who the finding is for. Friction that annoyed you is a papercut for the operator to
-triage. A defect in a sentence the next agent will read is a correction, and filing it as a papercut
-buries it in a queue.
+this table is to file everything as a lesson - one call, and the finding is off your hands. Sort by
+who the finding is for. Friction the next session would hit the same way is a lesson, keyed so it
+surfaces there. A defect in a sentence the next agent will read is a correction, and a lesson about it
+leaves the sentence itself in place for the next session to fight.
 
 ## The empty result is a correct result
 
 A session that fixed a typo, or one that only applied lessons already in the store, has nothing durable
 to add, and its correct output is an explicit `no durable lesson: <why>`. The pull here is to
-manufacture one so the sweep looks diligent, and a manufactured lesson is worse than silence: it costs
-a read in every future recall it surfaces in and returns nothing. The check before any `learn` call is
-whether you would want this line printed at the top of a recall six weeks from now, ahead of a lesson
+manufacture one so the sweep looks diligent, and a manufactured lesson is worse than silence: it takes
+up room in the store every session reads and returns nothing. The check before any `learn` call is
+whether you would want this line in front of the next session six weeks from now, ahead of a lesson
 that would have paid off. An empty sweep still reports, though: one that found nothing and said nothing
 is indistinguishable from one that never ran.
 
 ## The report
 
-Five lines, each written explicitly, negative forms included:
+Four lines, each written explicitly, negative forms included:
 
 ```
 session-review 2026-08-17
-lessons: 1 - learn "a worktree session calls bd-mem by its absolute primary-checkout path; .better-dev is gitignored, so the relative form fails" 0.9 "worktree-bd-mem-path"
-papercuts: 2 - graphify status printed FRESH against a stale index; the skill lint exits 0 on a body that is one bare heading
-traps: none - no behavioural gap this session, both failures were tool friction
+lessons: 2 - "a worktree session's edit tool resolves a relative path against the primary checkout, not the worktree; pass the absolute worktree path" (key worktree-edit-path, 0.9); "the skill lint exits 0 on a body that is one bare heading, so a green lint proves nothing about the body" (key skill-lint-blind-spot, 0.7)
+traps: none - no behavioural gap this session; both findings were friction, recorded as lessons
 instructions: 1 - skills/writing-skills/SKILL.md's close-out section states the bar and names no trigger, so every close-out depends on memory; carried to /self-extension as a library-defect candidate
-prior lessons applied: worktree-bd-mem-path (confidence 0.9, from 2026-08-05)
+prior lessons applied: release-tag-readback (confidence 0.8, from 2026-07-30)
 ```
 
-An empty sweep writes the same five lines, with `no durable lesson: <why>` on the lessons line.
-Where the session had a work-item, put the same block in its ledger
-(`.better-dev/bin/bd-mem ledger put <work-item> session-review -`) so the sweep travels with the work
-that earned it rather than dying with the transcript.
+An empty sweep writes the same four lines, with `no durable lesson: <why>` on the lessons line.
+Where the session had a work-item, write the same block with the `write` tool to
+`.better-dev/ledger/<work-item>/session-review.md` so the sweep travels with the work that earned it
+rather than dying with the transcript.

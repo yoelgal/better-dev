@@ -90,17 +90,13 @@ Shipping: [pr-and-verify](pr-and-verify.md) · [release-promotion](release-promo
 [deploy-capability](deploy-capability.md) · [observability-install](observability-install.md) ·
 [guardrails-install](guardrails-install.md)
 
-Repo understanding: [codebase-map](codebase-map.md) · [vision](vision.md) ·
-[graphify-wrapper-map](graphify-wrapper-map.md) ·
-[graphify-wrapper-query](graphify-wrapper-query.md) · [graphify-wrapper-sync](graphify-wrapper-sync.md) ·
-[graphify-wrapper-index](graphify-wrapper-index.md) · [graphify-wrapper-status](graphify-wrapper-status.md) ·
-[graphify-wrapper-setup](graphify-wrapper-setup.md)
+Repo understanding: [vision](vision.md)
 
-Capabilities: [browser-capability](browser-capability.md) · [ios-capability](ios-capability.md) ·
+Capabilities: [ios-capability](ios-capability.md) ·
 [tool-sourcing](tool-sourcing.md) · [self-extension](self-extension.md) ·
 [source-harvest](source-harvest.md) · [deep-research](deep-research.md)
 
 Meta and upkeep: [writing-skills](writing-skills.md) · [overrides](overrides.md) ·
 [session-review](session-review.md) · [human-review](human-review.md) ·
-[wait-what](wait-what.md) · [bootstrap-hooks](bootstrap-hooks.md) · [packaging](packaging.md) ·
+[wait-what](wait-what.md) · [packaging](packaging.md) ·
 [update](update.md) · [uninstall](uninstall.md)

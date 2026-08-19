@@ -30,8 +30,8 @@ step, the config, the retry that worked), never the failure. The full filter, an
 belongs instead, is in `what-not-to-encode.md`; reach for it whenever you're unsure a lesson deserves to
 persist. "Nothing worth saving" is a real answer, just not the default one.
 
-**Does something already cover this?** Prefer improving what exists over adding a narrow sibling. Recall the
-project's memory (`.better-dev/bin/bd-mem recall "<capability>"`) and scan the installed skills; take the
+**Does something already cover this?** Prefer improving what exists over adding a narrow sibling. Read the
+project's lessons (`memory://root/learned.md`) and scan the installed skills; take the
 earliest fit:
 
 - an existing skill covers the class of work → patch that skill;
@@ -113,12 +113,14 @@ inlining it for the agent to retype each run.
 
 Nothing half-built reaches the live tree. The candidate lives in a throwaway staging dir, passes a check
 there, and lands only on approval; on any failure the staging dir is removed and nothing is left behind -
-no half-written skill in the list, no tombstone for something never approved. `.better-dev/bin/bd-skill-stage`
-owns the two steps that have to be machine-enforced rather than trusted to prose.
+no half-written skill in the list, no tombstone for something never approved. `bd-skill-stage` owns the
+two steps that have to be machine-enforced rather than trusted to prose. It ships in the better-dev clone
+at `scripts/bd-skill-stage`; resolve the clone from any installed skill link the way `/update` step 1
+does, and invoke it from there.
 
-1. **Stage.** `.better-dev/bin/bd-skill-stage dir` prints a fresh staging dir; write the `SKILL.md` (and any script or
+1. **Stage.** `bd-skill-stage dir` prints a fresh staging dir; write the `SKILL.md` (and any script or
    reference files) into it.
-2. **Check - lint, then prove.** `.better-dev/bin/bd-skill-stage lint <dir>` is the structural gate: it fails on a
+2. **Check - lint, then prove.** `bd-skill-stage lint <dir>` is the structural gate: it fails on a
    malformed or missing frontmatter, a name that isn't kebab-case, a description that doesn't state its
    trigger, a stray `version`/`license`, an `@`-link, or an oversized file. Passing lint means well-formed,
    not working - so before promoting, prove the skill does its job. Run one realistic input with the
@@ -152,14 +154,14 @@ owns the two steps that have to be machine-enforced rather than trusted to prose
 5. **Land or discard.** An installed skill lands in a `.claude/`-scoped or `$HOME`-scoped dir and then runs
    with full agent permissions, so that write stays operator-run, with consent adjacent to it, rather than
    agent-run. On a yes, emit the landing command paste-ready (offer it to the clipboard where the host has
-   one) and let the operator run it: `.better-dev/bin/bd-skill-stage commit <dir> local` atomically moves a
+   one) and let the operator run it: `bd-skill-stage commit <dir> local` atomically moves a
    local skill into this repo's project skills dir (`.claude/skills/<name>`, discovered only here), and
-   `.better-dev/bin/bd-skill-stage commit <dir> global` moves a global one into the operator's own global
+   `bd-skill-stage commit <dir> global` moves a global one into the operator's own global
    skills dir (`~/.claude/skills/<name>`, seen across their repos) - either way refusing to clobber an
    existing skill, follow a symlink, or land outside the target root. The folder is taken from the
    frontmatter `name`, so name and folder always match. Once the operator reports it ran, verify the
    landing yourself: confirm the skill dir now exists at the target root. On a no, or after the retries are
-   spent, `.better-dev/bin/bd-skill-stage discard <dir>` clears the staging dir - that write only touches
+   spent, `bd-skill-stage discard <dir>` clears the staging dir - that write only touches
    this repo's own staging dir, so it stays agent-run.
 
 ## 5. Verify and record
@@ -168,9 +170,9 @@ Once it lands, exercise it once - re-lint the committed copy, or run its script 
 output the prototype produced. If it drifted, surface the discrepancy rather than quietly undoing the
 commit; the caller deserves to see it.
 
-Record what the run taught through the memory contract: `.better-dev/bin/bd-mem learn "<lesson>"` for a
-durable technique, and `.better-dev/bin/bd-mem remember "authored <skill> for <capability>; retire when
-<condition>"` so the next time that gap surfaces the choice is reused instead of re-created. The retirement
+Record what the run taught: the durable technique goes through the `learn` tool, and an
+`authored <skill> for <capability>; retire when <condition>` line goes into `.better-dev/rules.md`, so the
+next time that gap surfaces the choice is reused instead of re-created. The retirement
 half is recorded now because now is when you know it: a skill authored to steer a weaker model caps a
 stronger one, and nothing downstream removes a skill - `/release-promotion`'s distill pass retires a stale
 *rule* on disuse, never a skill file - so a condition nobody wrote down is one nobody ever checks.

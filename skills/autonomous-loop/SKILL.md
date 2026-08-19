@@ -49,24 +49,26 @@ criteria cover the failure behaviors the contract names, not only the happy path
 pass that surfaces them, turning on the one question the happy path hides: what does the system do when
 the money doesn't add up the way it assumed. A run that reaches green with those failure criteria
 unexercised has a weak signal, not a `DONE`. If the front-end already produced the contract, load it;
-otherwise settle it before any code is written. A loaded
-contract is trusted only while `.better-dev/bin/bd-mem ledger check-approval <work-item>` passes - a
-re-opened gate means the contract was edited after sign-off, so stop and get it re-confirmed before
-driving rather than building against a stale agreement. The approval pin guards the contract's bytes;
-the ground under them needs its own check. At loop entry, read the contract's planned-at SHA from the
-ledger and diff the touched area against now (`git diff --stat <planned-at>..HEAD` over the touched
-paths); if the area moved since the contract was sealed, re-run the baseline check before implementing
-rather than building on a stale premise.
+otherwise settle it before any code is written. The contract carries its own approval: one line in
+`contract.md` quoting the operator's yes, dated. Nothing checks that line mechanically, so the loop
+reads it - a contract with no approval line, or one amended after the line was written, is an
+agreement that never closed or has re-opened, and it goes back for a fresh yes rather than being
+driven against. The approval covers the contract's text; the ground under it needs its own check. At
+loop entry, read the contract's planned-at SHA and diff the touched area against now
+(`git diff --stat <planned-at>..HEAD` over the touched paths); if the area moved since the contract
+was sealed, re-run the baseline check before implementing rather than building on a stale premise.
 
-Scaffold the durable ledger for it:
+Scaffold the durable ledger for it - three plain files under the **primary checkout's**
+`.better-dev/ledger/<work-item>/`, written with `write`:
 
+```bash
+primary=$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")
+mkdir -p "$primary/.better-dev/ledger/<work-item>"   # contract.md, progress.md, receipts.md
 ```
-.better-dev/bin/bd-mem ledger init <work-item>
-```
 
-That writes `contract.md`, `progress.md`, and `receipts.md` into the **primary checkout's**
-`.better-dev/ledger/<work-item>/` - one ledger, shared across worktrees, so it survives a compaction and
-every worktree sees the same state. `progress.md` is the recovery map: after any interruption, trust it
+One ledger directory, shared across worktrees, so it survives a compaction and every worktree reads
+the same state. The host's `todo` tool carries the live step state inside the session; these files are
+what outlives it. `progress.md` is the recovery map: after any interruption, trust it
 and `git log` over recollection, and treat a missing entry as data (that step didn't settle), not an
 error. Resuming and restarting both read this ledger and differ only in whether the branch's work is
 kept; resume additionally re-runs the last recorded green before new work rather than trusting it on the
@@ -87,11 +89,10 @@ absorbing it), the verify command from the contract, and a **protect-set** - the
 edit. It holds the tests and the contract artifacts (so the loop fixes the code
 rather than moving the goalposts), plus the repo's high-consequence path denylist - the policy
 `/guardrails-install` records. A test the loop writes this pass joins the protect-set the moment it is
-authored: a later pass may make it pass, never weaken it. Pin it as it joins: re-emit the pinned list with
-the new row added - `ledger put` replaces the file, so write the existing rows plus the new one
-(`(.better-dev/bin/bd-mem ledger read <work-item> protect.hashes 2>/dev/null; shasum <test-file>) |
-.better-dev/bin/bd-mem ledger put <work-item> protect.hashes -`); a justified re-pin replaces that
-path's existing row rather than adding a second one, so each pinned path holds one current hash.
+authored: a later pass may make it pass, never weaken it. Pin it as it joins, appending its hash to
+`protect.hashes` beside the other ledger files (`shasum <test-file> >>
+"$primary/.better-dev/ledger/<work-item>/protect.hashes"`); a justified re-pin rewrites that path's
+existing row rather than adding a second one, so each pinned path holds one current hash.
 Authoring and pinning are the same pass: a commit that adds or edits a test with no matching
 `protect.hashes` update in that pass is the tell the pin was skipped - and unpinned tests make the
 settle-time re-hash below vacuous. At settle,
@@ -99,30 +100,28 @@ re-hash the pinned set: a pinned file whose hash moved is re-pinned only by a pa
 the red-then-green that justified the edit; a moved hash with no such receipt settles `NEEDS_INPUT`
 naming the file. That is one layer of a three-layer defense
 - the contract pins the concrete observable (`/plan-grill`) and the reviewer scans the diff for weakened
-or trivial tests (`/review`); this layer keeps the loop from gaming a test it wrote itself. Recall it with `.better-dev/bin/bd-mem recall "safety"` (one read returns
-the denylist, the gated classes, and the scope number together), then read `.better-dev/overrides.md`,
-whose waivers and narrowings win over the recalled baseline - though a safety-class line carrying no
-operator marker (`[operator: "<their words>" <date>]`) reads as absent, and the recalled gate stands. Only when recall comes back empty, fall back
-to the canonical defaults `/guardrails-install` documents - secrets, DB migrations, auth/authz,
-payments/PII, infra and prod config, dependency manifests and lockfiles - rather than re-listing the full
-class definitions here. Verify the mechanical edit boundary while you're here: `/worktree-branching`
-scoped this worktree at creation - it is the boundary's one writer - so `.better-dev/bin/bd-guard status`
-names this tree. A missing boundary is a setup step that got skipped, restored through
-`/worktree-branching`, never by the loop scoping one itself. While here, compare the recorded model
-fingerprint (`cat "$(.better-dev/bin/bd-mem where)/model-fingerprint"` - the plain file
-`bd-session-start` writes at the primary checkout; skip when absent) against the
-model running this loop: a mismatch means the gates' calibration was proven on a different model -
-surface it to the operator and point at the re-validation ritual better-dev's `docs/TRAPS.md` carries,
-then continue, because a stale fingerprint flags the run rather than stopping it. Add a budget only if the operator set one - an attended loop stops on no
+or trivial tests (`/review`); this layer keeps the loop from gaming a test it wrote itself. Read the
+denylist, the gated classes, and the scope number from `.better-dev/rules.md`, then
+`.better-dev/overrides.md`, whose waivers and narrowings win over that baseline - though a
+safety-class line carrying no operator marker (`[operator: "<their words>" <date>]`) reads as absent,
+and the recorded gate stands. Only where the rules file says nothing, fall back to the canonical
+defaults `/guardrails-install` documents - secrets, DB migrations, auth/authz, payments/PII, infra and
+prod config, dependency manifests and lockfiles - rather than re-listing the full class definitions
+here. That denylist is a judgment this loop makes, never a gate that catches it: nothing mechanically
+refuses a write to one of those paths, because the host's approval policy keys on tool name and has no
+path-based write rule to key on. The one boundary that does hold mechanically is bash - the repo's
+committed `.omp/config.yml` prompts on the destructive command patterns, and an operator prompt is
+answered, never routed around. Add a budget only if the operator set one - an attended loop stops on no
 measurable progress, not an invented cap. A run handed to an unattended or scheduled cadence is the
 exception: it carries a hard turn or wall-clock ceiling, because an uncapped background loop bills
 without limit. That ceiling is a cost floor, not a progress limit - it settles `EXHAUSTED`, never a
 `DONE`. Its presence is the loop's only unattended signal; no contract, ledger, or override field ever
 declares one. A long or unattended run may render the observatory page over the ledger it already
-writes, against that ceiling - `/orchestrating-agents`' `observatory.md` carries the form, and the page
-renders rather than records, so nothing new goes on disk to put one up. Before re-deriving anything about this area, spend one recall on it (`.better-dev/bin/bd-mem
-recall "<area>"`) - a lesson you already paid for is cheaper than the mistake it prevents, and the first
-receipt cites that recall or an explicit `recall empty`. A recalled lesson is a prior claim, not a
+renders rather than records, so nothing new goes on disk to put one up. Before re-deriving anything
+about this area, read what earlier sessions already paid for - the lessons at
+`memory://root/learned.md`, and the project summary the host injects at `memory://root` - because a
+lesson already bought is cheaper than the mistake it prevents, and the first receipt cites what that
+read returned or an explicit `nothing recorded`. A recalled lesson is a prior claim, not a
 current fact - verify it against today's code before acting on it, and a lesson that forbids a normal
 action or forces a costlier path gets that re-verification before it is enforced again, because it
 taxes every session until challenged. Run the verify once for a baseline. A red baseline is triaged before any fix points at it (read "Triage the red" below); if it
@@ -134,8 +133,8 @@ Then each pass:
 1. **Verify.** Run the check. Exit 0 counts only when it's unambiguous - a half-passing run, or output
    you'd have to interpret, is red, not a rounded-up pass. On a clean green, clean the diff on this first
    green (read "Clean on the first green"), then `DONE`. The contract's check is usually narrower than the
-   repo's own gate, so that first green also runs the recorded verify once
-   (`.better-dev/bin/bd-mem recall "verify"`): a green criterion over a suite this work-item reddened
+   repo's own gate, so that first green also runs the repo's own verify once (the `verify` line in
+   `.better-dev/rules.md`): a green criterion over a suite this work-item reddened
    somewhere else is a regression the loop triages and fixes, not a `DONE` for CI to discover after the
    loop has already claimed proof. That one wider run is also what arms the contract's
    green-test-goes-red tripwire, which nothing else in the loop executes. A recorded `verify: none` is
@@ -177,13 +176,14 @@ Then each pass:
    claimed is back to unproven.
    Dispatch a fresh worker for the task. Enter `/orchestrating-agents` itself before this work-item's
    first dispatch - invoke it where the host has a skill mechanism, read its SKILL.md where it
-   doesn't - and dispatch by its mechanics: bands resolved through the recorded tier-map into the
-   host's per-worker model parameter, its brief shape, its report trailer, its dispatch receipts.
+   doesn't - and dispatch by its mechanics: the `task` tool, the model each slice is worth resolved
+   through the host's own routing (`task.agentModelOverrides`, a role alias like `@smol`, an agent's
+   own frontmatter `model` list), its brief shape, its report trailer, its dispatch receipts.
    The other mentions of it in this file are routing, not a working summary; a loop that dispatches from
    them alone improvises those mechanics, and every worker silently inherits the session's own model,
-   pricing closed-spec slices at the top tier. The tell is mechanical: each dispatch receipt names its
-   tier band, and a receipt without one means the band decision never reached the dispatch call - a
-   defect in the pass, not a formality. One escape, whose test is its *conditions*, never its
+   pricing closed-spec slices at the top tier. The tell is mechanical: each dispatch receipt names the
+   model it asked for, and a receipt without one means that decision never reached the dispatch call -
+   a defect in the pass, not a formality. One escape, whose test is its *conditions*, never its
    rationale: a step whose
    edit this session has already fully specified and live-verified (the exact file, the exact text,
    nothing left to decide) is applied inline rather than paying a fresh worker to retype it. An edit
@@ -208,12 +208,13 @@ Then each pass:
    Those per-step markers are a different vocabulary from the terminal-state taxonomy below, and
    `progress.md` carries both: step lines while the loop runs, then one terminal line at the end. Only
    the last line is read as the work-item's state, and only when the taxonomy token starts it - a
-   step line reading `settled: DONE` is a step marker, and the item still shows `in-flight`. Never
-   hand-write that final line; `ledger settle` (below) is what writes it correctly.
+   step line reading `settled: DONE` is a step marker, and the item still shows `in-flight`. The
+   terminal line's exact shape is pinned under "Where it settles" - written any other way, a later
+   session cannot read the item's state at all.
    The receipt lands before the next pass picks - it is part of this pass, not paperwork to batch at the
    end. Friction the pass pushed through - a dead-end tool call, a broken doc link, a flaky command -
-   gets one line too: `.better-dev/bin/bd-mem papercut add "<what happened>"`, the low-bar sibling of
-   `bd-mem learn` (a papercut is an annoyance the operator triages, not a lesson recall replays). A
+   gets one line too, through the `learn` tool: friction is a lesson like any other, written at low
+   confidence so the next session meets it instead of paying for it again. A
    `receipts.md` still at pass 0 after several implementation passes is the tell that recording is
    deferred; the settle-time backstop (write receipts from the actual trail) exists for a crashed
    loop, not as an alternative cadence, and a compaction mid-run loses everything a deferred receipt
@@ -233,17 +234,17 @@ untrusted-output rule). Honor the protect-set by escalating rather than editing 
 halves escalating differently: a step that could only pass by editing a test or contract artifact
 settles `BLOCKED` - that fix belongs in the spec, not the loop - while a step that would touch a denylist
 path settles `NEEDS_INPUT` with the evidence, because the blast radius is a human's call, not the loop's.
-Where enforcement is wired (the recorded `safety-enforcement` says hook), the `bd-guard` hook checks the
-same policy mechanically, and a deny or ask it raises is handled the same way: settle `NEEDS_INPUT` with
-the hook's message as the evidence - never retry the write, never lift the boundary to push through.
-The boundary also decides *where* a step may write: a target outside this worktree - the primary
-checkout (its `.git/hooks` included), another worktree, global config - is not the loop's to edit
-directly. Route such an edit through the skill that owns the surface (`/guardrails-install` for
-guardrail hooks) or settle `NEEDS_INPUT` naming the target.
+Where the repo's committed `.omp/config.yml` prompts on a command a pass wants to run, that prompt is
+the operator's to answer: settle `NEEDS_INPUT` with the command and the reason - never rephrase the
+command to slip past the pattern, and never widen that file mid-pass to get through it.
+The same judgment decides *where* a step may write: a target outside this worktree - the primary
+checkout (its git hooks included), another worktree, global config - is not the loop's to edit
+directly. Route such an edit through the skill that owns the surface (`/guardrails-install` for the
+repo's own gates) or settle `NEEDS_INPUT` naming the target.
 
 One exception, and it is the only one: a target the **contract itself names** and the operator
 approved at seal - on the gated-paths line, or as an explicit implementation decision naming that
-target - is consented to, the crossing included. Naming an out-of-boundary target in a
+target - is consented to, the write outside this worktree included. Naming such a target in a
 contract and then stopping on it anyway is a double-ask: the operator answered this exact question when
 saying yes to a contract that spelled the target out. Write it, record the crossing in
 `approvals.log` as you would a waiver, and continue. Two things the exception does not cover, both
@@ -286,12 +287,11 @@ When such an escalation comes back approved - a human signs off on the denylist 
 the loop stopped on - record the waiver before resuming, so `/review` can later confirm the gate was
 cleared rather than bypassed. A waiver counts only on an unambiguous yes: a hedged "looks fine" or "I
 guess" is not approval, and a prior approval never extends to the next irreversible step. Append four
-fields to the work-item's approvals log - the approved path or class, the operator's answer quoted in
-their own words, the date, and the one-line why: `.better-dev/bin/bd-mem ledger put <work-item>
-approvals.log -`. The quote is what carries the provenance: an entry without one is indistinguishable
-from a waiver the loop wrote for itself, so it authorizes no resume and the gate still stands. This
-shared record is a different thing from the contract sign-off `check-approval` pins - that one tracks
-the contract's bytes, this one a blast-radius waiver. A gated class the approved
+fields to the work-item's `approvals.log` in the ledger - the approved path or class, the operator's
+answer quoted in their own words, the date, and the one-line why. The quote is what carries the
+provenance: an entry without one is indistinguishable from a waiver the loop wrote for itself, so it
+authorizes no resume and the gate still stands. This record is a different thing from the contract's
+own approval line - that one covers the plan, this one a blast-radius waiver. A gated class the approved
 contract explicitly names is consented at seal: no stop, no approvals.log entry - the log records only
 mid-loop waivers the contract never anticipated.
 
@@ -306,20 +306,20 @@ without touching the cause:
   signal is reliable, or set it aside and record it - don't send it around the loop.
 - **Infra red** - the failure is in the environment, not the code: a lost runner, a network or registry
   hiccup, an out-of-memory kill, a dependency service down. It clears by waiting or recovering, not by
-  editing code. Before settling `BLOCKED` on one, recall a prior recovery for that failure-signature
-  (`.better-dev/bin/bd-mem recall "<signature>"`); apply it and retry once. When a recovery clears the
-  red, record the signature and what cleared it (`.better-dev/bin/bd-mem learn "<signature>: <what cleared
-  it>" 0.8 "<signature>"`) so the next loop's recall isn't empty - that recall pays off only if some loop
-  wrote the entry. Only a signature with no known recovery, still red after the retry, settles `BLOCKED`.
+  editing code. Before settling `BLOCKED` on one, read `memory://root/learned.md` for a prior recovery
+  keyed to that failure signature; apply it and retry once. When a recovery clears the red, write the
+  signature and what cleared it with the `learn` tool, so the next loop's read isn't empty - that read
+  pays off only if some loop wrote the entry. Only a signature with no known recovery, still red after
+  the retry, settles `BLOCKED`.
 - **Genuine defect** - a real assertion, compile, contract, or logic failure in the code. This is the
   only red that earns a fix pass - and the pass starts with one root-cause look, not an edit: name where
   the bad value or state was born before touching where it crashed. A guard at the crash site that
   leaves the origin wrong is a symptom patch the next pass pays for; a defect that resists one look gets
   diagnosed, not hammered (`/diagnose` owns the full discipline). Trace that origin structurally rather
-  than by re-reading files each pass: `/graphify-wrapper-query <name> --path "<crash site>" "<suspected
-  origin>"` returns the route between them, and `--affected "<function you are about to change>"` returns
-  every caller the fix could break. The loop is where this pays most - the index is built once and
-  queried on every iteration, where re-grepping the same subtree is paid for again on each pass.
+  than by re-reading files each pass: the `lsp` tool answers it directly - `definition` walks from the
+  crash site back toward where the bad value was born, and `references` on the function you are about
+  to change returns every caller the fix could break, the aliased and re-exported ones a name-grep
+  misses included.
 
 One red arrives pre-triaged: an attributed regression test - one whose body carries the attribution
 comment `/diagnose`'s contract requires, naming a past work-item and its root cause - going red is the
@@ -407,32 +407,29 @@ read the report you are about to hand back: if its closing line is a plan, a que
 yourself, or a promise of work not yet done, the loop is not settled - do that work, then settle. Audit
 each claim in that report against a session tool result: every claim points to a command, an exit code,
 or an observed behavior from this run, or it carries an explicit `unverified` label (`/pr-and-verify`
-verify-runtime owns the disposition). Before settling `DONE` or `DONE_WITH_CONCERNS`, re-run
-`.better-dev/bin/bd-mem ledger check-approval <work-item>` - the entry check proved the contract was
-clean when driving started; this one proves nothing edited it since. A re-opened gate settles
-`NEEDS_INPUT` naming the edit, never a done state. The same moment reads the work-item's `receipts.md`:
+verify-runtime owns the disposition). Before settling `DONE` or `DONE_WITH_CONCERNS`, re-read the
+contract's approval line - the entry check proved the agreement was closed when driving started, this
+one proves nothing amended it since. An amendment with no fresh yes settles `NEEDS_INPUT` naming the
+edit, never a done state. The same moment reads the work-item's `receipts.md`:
 at least one iteration entry, or the loop ran unrecorded - write the receipts from the session's actual
 tried/result/learned trail before settling, because an unrecorded loop settles nothing. The same moment re-hashes the protect-set's pins
 (the protect-set paragraph in "The loop" owns the disposition).
-Whichever of the six it is, record it with the one verb that writes it in the form `ledger status`
-actually reads - a hand-written final line is where this goes wrong, silently, and the item then shows
-as open work for weeks:
+Whichever of the six it is, write it as the **last line of `progress.md`**, state token first and
+nothing ahead of it, because that is the one line a later session reads as the item's state:
 
-```bash
-.better-dev/bin/bd-mem ledger settle <work-item> <STATE> "<one line>"
 ```
+DONE: <one line>
+```
+
+A terminal line in any other shape is where this goes wrong silently, and the item then shows as open
+work for weeks.
 
 `DONE` / `DONE_WITH_CONCERNS` hand off to the PR-into-staging gate (`/pr-and-verify`), the recorded green
 (the command and its exit-0 output) travelling with them as evidence a reviewer reads rather than a
 promise, concerns carried into the PR; a confirmed `NO_PROGRESS` restarts from the contract
 (`restart.md`); `BLOCKED`, `NEEDS_INPUT`, and `EXHAUSTED` stop honestly, each naming the one thing that
-has to change. A terminal state that ends the work-item - `DONE`, `DONE_WITH_CONCERNS` - lifts the edit
-boundary (`.better-dev/bin/bd-guard off`), since a boundary that outlives its work-item is a stale gate
-the next task in this tree trips over. A resumable stop leaves the boundary standing: `BLOCKED`,
-`NEEDS_INPUT`, `EXHAUSTED`, and `NO_PROGRESS` all expect this same work-item to continue, so the
-boundary that scoped it must still hold when it resumes - lifting it here would let the resumed run
-edit unbounded, and in the denylist case would drop the very guard whose deny is awaiting an answer.
-Teardown removes the boundary with the worktree once the item is truly done (`/worktree-branching`).
+has to change. The worktree itself stays until the work lands: teardown is keyed to the merge, not to
+this settle (`/worktree-branching`).
 
 ## What makes it a loop and not a slot machine
 
@@ -454,15 +451,11 @@ Teardown removes the boundary with the worktree once the item is truly done (`/w
   goal → scenario → test → a passing run you can point to.
 
 Closing the ledger is part of `DONE`, not a courtesy after it: a non-trivial work-item that solved
-something durable and left no note is unfinished. On `DONE`/`DONE_WITH_CONCERNS`, record the reusable
-core keyed for recall - `.better-dev/bin/bd-mem learn "<lesson>" <0..1> "<signature-key>"` - or
-write an explicit `no durable lesson` line saying why; promote a recurring one with `.better-dev/bin/bd-mem
-remember "<rule>"`. On a team adoption (`.better-dev/bin/bd-mem recall "adoption"`), the close-out also
-commits the memory delta its learn/remember calls left in the primary checkout - one `mem: <work-item>`
-commit staging only the memory files those calls touched, made only after confirming the primary
-checkout actually sits on the integration branch (`git branch --show-current` there matches the
-recorded one; a mismatch surfaces instead of committing) - so shared memory travels with the work
-that earned it. Keep the WHAT filter: capture signature, root cause, and fix, never the transient run
+something durable and left no note is unfinished. On `DONE`/`DONE_WITH_CONCERNS`, write the reusable
+core with the `learn` tool - keyed so a later session's read finds it - or write an explicit
+`no durable lesson` line saying why. A rule that has now held more than once graduates to a line in
+`.better-dev/rules.md`, tracked where a team adoption shares it, so the rule travels with the repo
+rather than with one machine. Keep the WHAT filter: capture signature, root cause, and fix, never the transient run
 (a one-off timeout, a flake seed, a machine path). A recalled lesson a pass applied is cited in that
 pass's receipt as `prior lesson applied: <key> (confidence <c>, from <date>)`, so the operator can audit
 what the store contributed. The same law fires earlier too - a root cause a

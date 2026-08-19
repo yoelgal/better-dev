@@ -1,6 +1,6 @@
 ---
 name: guardrails-install
-description: Use when a repo needs its guardrails installed or recorded - a missing commit-time or CI gate (no pre-commit hook, no lint/typecheck gate, no CI workflow), the autonomous loop's blast-radius policy (the high-consequence paths it should escalate rather than auto-edit, the change classes that gate a human, the scope threshold), the enforcement wiring that mechanically checks that policy (bd-guard hooks, recorded as safety-enforcement), or the recorded rules downstream skills recall - deploy-* (including deploy-migrate and deploy-env, or deploy-surface: none), dev-run, seed-reset, ops-runner, version-surface, release-automation, and obs-* with absence as a named gap. Invoked by /onboard while bootstrapping the minimum base, run directly to fill a guardrail gap or record the safety policy without touching what the repo already has, or when the operator keeps answering the same non-safety gate yes run after run - a re-run then proposes the standing allowance the kept record has earned.
+description: Use when a repo needs its guardrails installed or recorded - a missing commit-time or CI gate (no pre-commit hook, no lint/typecheck gate, no CI workflow), the autonomous loop's blast-radius policy (the high-consequence paths it should escalate rather than auto-edit, the change classes that gate a human, the scope threshold), the committed bash policy that prompts before a destructive command (`.omp/config.yml`, `bash.patterns`), or the recorded rules downstream skills read - deploy-* (including deploy-migrate and deploy-env, or deploy-surface: none), dev-run, seed-reset, ops-runner, version-surface, release-automation, and obs-* with absence as a named gap. Invoked by /onboard while bootstrapping the minimum base, run directly to fill a guardrail gap or record the safety policy without touching what the repo already has, or when the operator keeps answering the same non-safety gate yes run after run - a re-run then proposes the standing allowance the kept record has earned.
 allowed-tools:
   - Bash
   - Read
@@ -32,8 +32,8 @@ guardrails wired after the fact.
   and test commands - the ones you detected. An unmapped check is a gap to report and ask about, not a
   command to invent. Silence beats a wrong guess, the same discipline `/onboard` uses.
 
-Read `.better-dev/overrides.md` first (`.better-dev/bin/bd-mem read overrides`) - if the project has
-already recorded a guardrail preference, honor it before applying any default here.
+Read `.better-dev/overrides.md` first - if the project has already recorded a guardrail preference,
+honor it before applying any default here.
 
 Interactive installers stay operator-run, with the rest of the class `/onboard` names (host settings
 and permission files at either scope, and any machine-global change D26's list does not name): emit a
@@ -48,38 +48,36 @@ Detect this first, before any recording or asking: **no dependency manifest, no 
 tree** - a `git init` and a README, the shape `/onboard` hands over on a greenfield project. Almost
 everything below needs a stack to describe, and run against an empty tree it produces ceremony with no
 object: `verify: none`, `dev-run: none`, `seed-reset: none`, `ops-runner: none`, a denylist of globs
-matching nothing, gate classes with no surface, and a settings-class paste block wiring enforcement for
-a policy that guards no code. Observed 2026-08-02 on a repo holding one empty commit: four `none`
-records, a prospective policy, a question, and two paste blocks - none of which the operator applied,
+matching nothing, and gate classes with no surface. Observed 2026-08-02 on a repo holding one empty
+commit: four `none` records, a prospective policy, and a question - none of which the operator applied,
 because none of it had anything to act on yet.
 
 So on a no-stack repo, split the skill:
 
-- **Do install what needs no stack.** The staged-diff secret scan is the whole of it - it is worth
-  having from the first commit, costs no question, and needs nothing detected. Install it, prove it
-  (a clean commit passes, a planted secret is refused), and keep going.
-- **Do not write `none` placeholders.** One deferred line beats four hollow records that read like
-  findings: `.better-dev/bin/bd-mem remember "guardrails: deferred at onboard - no stack yet; re-run
+- **Do install what needs no stack.** Two gates qualify. The staged-diff secret scan costs no question
+  and needs nothing detected, and the committed bash policy below describes shell rather than a stack,
+  so its destructive-command patterns hold on an empty tree. Install both, prove each one (a clean
+  commit passes, a planted secret is refused, a `rm -r` prompts), and keep going.
+- **Do not write `none` placeholders.** One deferred line in `.better-dev/rules.md` beats four hollow
+  records that read like findings: `- guardrails: deferred at onboard - no stack yet; re-run
   /guardrails-install once /groundwork lands one, which is when verify/dev-run/seed-reset/ops-runner
-  and the real denylist can be recorded from what exists"`.
+  and the real denylist can be recorded from what exists`.
 - **Do not ask the policy questions.** Merge policy, release cadence, and the earned-autonomy line all
   govern something that cannot happen yet - there is no PR to merge and no release to cut. Park each
   as a `pending-decision` so the first skill that actually needs the answer must ask it
   (`/onboard` Phase 5's mechanism), instead of spending the operator's attention now on a choice they
   have no context to make. Park them by writing the record, not by intending to - an unwritten park is
   indistinguishable from a policy the operator deliberately left unset, and the difference is the whole
-  point of parking:
+  point of parking. Both lines go in `.better-dev/rules.md`:
 
-  ```bash
-  .better-dev/bin/bd-mem remember "pending-decision: merge-policy - may the agent merge a gates-passed green PR, or does a human click it? (parked at onboard, no stack yet)"
-  .better-dev/bin/bd-mem remember "pending-decision: release-cadence - does a merge continue into a release, or wait to be asked? (parked at onboard, no stack yet)"
+  ```
+  - pending-decision: merge-policy - may the agent merge a gates-passed green PR, or does a human click it? (parked at onboard, no stack yet)
+  - pending-decision: release-cadence - does a merge continue into a release, or wait to be asked? (parked at onboard, no stack yet)
   ```
 
   Name each parked line in the close-out too. A park is a promise that someone asks later; the skills
   that collect it are `/plan-grill`'s contract seal (merge policy, at the first item that can merge)
   and this skill's own re-run - so the promise is kept by a named collector, not by hope.
-- **Do not emit the enforcement paste block.** `bd-guard` mechanically checks the blast-radius policy;
-  with no code, the policy is prospective and the hook has nothing to catch. It rides the re-run.
 
 The re-run is the point, not a consolation: `/groundwork` lands the stack, and this skill then records
 real commands read off real files. A greenfield close-out that ends with zero paste blocks and zero
@@ -198,19 +196,19 @@ proof where a push is cheap, and an explicit "unproven: CI gate observed clean o
 
 Show the operator what you propose to write - the hook body, the CI file - before writing it. One
 decision at a time, not a wall of questions. Their answer becomes the default here; if it diverges from a
-better-dev default, offer to persist it (`.better-dev/bin/bd-mem persist-override "<line>"`) so later runs
+better-dev default, offer to persist it as a line in `.better-dev/overrides.md` so later runs
 honor it.
 
-After wiring, record each check you mapped as a durable rule so the rest of better-dev knows the repo's
-*real* verify commands rather than re-detecting them:
+After wiring, record each check you mapped as a durable rule in `.better-dev/rules.md`, so the rest of
+better-dev knows the repo's *real* verify commands rather than re-detecting them:
 
-```bash
-.better-dev/bin/bd-mem remember "verify lint: <detected lint command>"
-.better-dev/bin/bd-mem remember "verify typecheck: <detected typecheck command>"
-.better-dev/bin/bd-mem remember "verify test: <detected test command>"
+```
+- verify lint: <detected lint command>
+- verify typecheck: <detected typecheck command>
+- verify test: <detected test command>
 ```
 
-The autonomous loop and `/pr-and-verify` recall these to run the same checks the hook and CI enforce -
+The autonomous loop and `/pr-and-verify` read these to run the same checks the hook and CI enforce -
 one detection, reused everywhere, no guessing downstream.
 
 Where a CI workflow exists, it is the authority on what each invocation is: copy the command verbatim
@@ -230,9 +228,9 @@ that will not run is a gap to ask about, not a value to write. This is also the 
 re-probes rather than skips: a script renamed since the record was written surfaces three skills away
 as a worker's own check failing in a fresh worktree, where the cheapest reading is broken code and
 the cheapest fix is a local workaround that leaves the record wrong for every session after it. A
-probe that contradicts the record is re-recorded, and retiring the superseded line is an operator
-action - `remember` appends rather than replaces, so a corrected value otherwise leaves two rules in
-force - which puts it in the close-out with the rest.
+probe that contradicts the record is re-recorded, and the superseded line is edited out in the same
+pass - a rules file holding both values leaves two rules in force, and the stale one reads exactly as
+current.
 
 **Record the deploy surface.** Deploy commands travel exactly like the verify commands above - detected
 once, premise-verified, recorded, never guessed downstream. Detect the platform from files that exist
@@ -243,14 +241,14 @@ status code; run the status command once and read its exit code. A probe that fa
 gap with what you observed, not written as a fact - a README claiming "deployed on Vercel" with no
 `vercel.json` and no `.vercel/` is a claim that failed premise-verify, not a platform.
 
-```bash
-.better-dev/bin/bd-mem remember "deploy-platform: <platform or workflow file, observed at file:line>"
-.better-dev/bin/bd-mem remember "deploy-url: <production URL, operator-confirmed>"
-.better-dev/bin/bd-mem remember "deploy-status: <status command, or 'http'>"
-.better-dev/bin/bd-mem remember "deploy-health: <health URL or command>"
-.better-dev/bin/bd-mem remember "deploy-preview: <how a PR's preview URL resolves - deployments API | bot comment | command>"
-.better-dev/bin/bd-mem remember "deploy-migrate: <command | platform-auto | release-step | manual | none>"
-.better-dev/bin/bd-mem remember "deploy-env: <where per-environment config lives + how to enumerate its required var names>"
+```
+- deploy-platform: <platform or workflow file, observed at file:line>
+- deploy-url: <production URL, operator-confirmed>
+- deploy-status: <status command, or 'http'>
+- deploy-health: <health URL or command>
+- deploy-preview: <how a PR's preview URL resolves - deployments API | bot comment | command>
+- deploy-migrate: <command | platform-auto | release-step | manual | none>
+- deploy-env: <where per-environment config lives + how to enumerate its required var names>
 ```
 
 Two of these carry their own vocabulary. `deploy-migrate` records how schema migrations reach
@@ -267,7 +265,7 @@ gap to ask about, not a value to guess; `/release-promotion` reads the recorded 
 never ships against an un-migrated database. `deploy-env` records where per-environment config lives
 (the platform's env store, a secrets manager, an `.env.<environment>` scheme) and how to enumerate the
 variable *names* an environment needs (the platform's own env listing, an `.env.example`, a config
-schema) - names only, never values. Downstream verify passes recall it to confirm a newly required var
+schema) - names only, never values. Downstream verify passes read it to confirm a newly required var
 exists in each environment before a merge or promote, instead of meeting the miss as a red preview
 build triaged as generic infra.
 
@@ -295,15 +293,15 @@ the same way - detected from the sources the check sweep already reads (`package
 Makefile's targets, a Procfile, a compose file, a framework's seed convention; `stacks.md` holds the
 per-stack forms), reported as observed value + where, recorded on a yes:
 
-```bash
-.better-dev/bin/bd-mem remember "dev-run: <the command that stands the app up locally>"
-.better-dev/bin/bd-mem remember "seed-reset: <seed command + reset command, or 'none'>"
-.better-dev/bin/bd-mem remember "ops-runner: <where operational prod jobs run - job runner | platform console command | triggered workflow | none>"
+```
+- dev-run: <the command that stands the app up locally>
+- seed-reset: <seed command + reset command, or 'none'>
+- ops-runner: <where operational prod jobs run - job runner | platform console command | triggered workflow | none>
 ```
 
 - `dev-run` - what a fresh worktree runs to stand the app up. The verify rubric (`/pr-and-verify`'s
   `verify-runtime.md`, which the loop's runtime observation composes) and `/worktree-branching`'s
-  fresh-worktree baseline recall it instead of re-discovering it in every worktree.
+  fresh-worktree baseline read it instead of re-discovering it in every worktree.
 - `seed-reset` - how plausible data gets in and how local state resets. The explicit negative matters
   most here: `seed-reset: none` turns a missing seed path into a plannable work item for `/plan-grill`,
   where an unrecorded gap resurfaces as a fresh `NEEDS_INPUT` every time a verify pass needs data.
@@ -323,10 +321,10 @@ reaches a human before a churned user's email does - same premise-verify as the 
 init observed at `file:line`, a config that names a channel, a probe seen answering.
 (`deploy-surface: none` makes all three moot - skip them.)
 
-```bash
-.better-dev/bin/bd-mem remember "obs-error-tracking: <where prod errors aggregate, observed at file:line>"
-.better-dev/bin/bd-mem remember "obs-alert-channel: <what pages a human on a prod incident>"
-.better-dev/bin/bd-mem remember "obs-health: <the standing probe that watches prod between releases>"
+```
+- obs-error-tracking: <where prod errors aggregate, observed at file:line>
+- obs-alert-channel: <what pages a human on a prod incident>
+- obs-health: <the standing probe that watches prod between releases>
 ```
 
 - `obs-error-tracking` - the error tracker the app initializes: its SDK setup in code, its DSN named
@@ -352,8 +350,8 @@ A release has to write the version somewhere, and the releaser should not re-der
 pressure. Probe the root manifests at once (`ls .claude-plugin/plugin.json package.json pyproject.toml
 Cargo.toml VERSION`), read the version field out of each hit, and confirm it like any other key:
 
-```bash
-.better-dev/bin/bd-mem remember "version-surface: <file + where in it, or 'none'>"
+```
+- version-surface: <file + where in it, or 'none'>
 ```
 
 The value is the path plus where in it - `.claude-plugin/plugin.json at $.version`, `package.json at
@@ -372,8 +370,8 @@ tag time is the wrong moment to find out. Probe the tree for a release tool's co
 (`ls -d release-please-config.json .changeset .releaserc* 2>/dev/null`, plus a workflow that cuts
 tags - `grep -rl "git tag" .github/workflows 2>/dev/null`) and confirm it like any other key:
 
-```bash
-.better-dev/bin/bd-mem remember "release-automation: <the tool that cuts releases, or 'none'>"
+```
+- release-automation: <the tool that cuts releases, or 'none'>
 ```
 
 A config found but unrecorded is an **ask**, never a silent yes: name what you found and let the
@@ -385,21 +383,23 @@ releaser down its manual cut-and-tag path instead of re-probing for a tool every
 
 The surface detected above earns the same confirm-first flow: show the operator the resolved policy - the
 denylist paths, the gated classes, the scope number - one decision at a time, and write on a yes. Recording
-it turns that surface into something the loop, `/review`, and the PR brief recall and grade against, so the
+it turns that surface into something the loop, `/review`, and the PR brief read and grade against, so the
 one detection is reused everywhere and nothing downstream re-guesses it.
 
-Promote it as durable rules through the memory contract, keyed so a single `recall "safety"` returns the
-whole policy - the same shape this skill already uses for the verify commands. The line half of the scope
-key is calibrated from this repo's own merge history, the largest diffs its operator merged unchanged, and
-never inherited from another codebase: a borrowed ceiling gates the wrong diffs in both directions. One
-write per key, and this skill's prose above is the authoritative home for what each key means:
+Promote it as durable rules in `.better-dev/rules.md`, keyed under one `safety-` prefix family so a
+reader looking for the policy finds all of it together - the same shape this skill already uses for the
+verify commands. The scope key carries two axes: a file count, ~10 by default, and a line ceiling
+counting neither lockfiles, snapshots, generated output, nor docs. Its line half is calibrated from
+this repo's own merge history, the largest diffs its operator merged unchanged, and never inherited
+from another codebase: a borrowed ceiling gates the wrong diffs in both directions. One line per key,
+and this skill's prose above is the authoritative home for what each key means:
 
-```bash
-.better-dev/bin/bd-mem remember "safety-denylist: <detected globs>"    # the paths a loop edit escalates on, not edits
-.better-dev/bin/bd-mem remember "safety-gate: <classes with a real surface here>"
-.better-dev/bin/bd-mem remember "safety-scope: <files>/<substantive lines>"  # the two axes that trip the scope gate; ~10 files default, and a line ceiling counting neither lockfiles, snapshots, generated output, nor docs
-.better-dev/bin/bd-mem remember "merge-policy: <auto-on-green | human>" # standing allowance: who MAY merge a gates-passed green PR
-.better-dev/bin/bd-mem remember "release-cadence: <per-merge | on-demand>" # whether a merge continues into /release-promotion
+```
+- safety-denylist: <detected globs>
+- safety-gate: <classes with a real surface here>
+- safety-scope: <files>/<substantive lines>
+- merge-policy: <auto-on-green | human>
+- release-cadence: <per-merge | on-demand>
 ```
 
 The merge policy is recorded the same way the branch structure is - detected, proposed, written on a yes.
@@ -407,7 +407,7 @@ The proposed default is `auto-on-green`: the agent MAY merge a PR whose change c
 loop's review and gates - an allowance the operator grants here once, not a merge that happens by
 itself; each work-item still answers its own seal question before any merge fires. Record
 `human` where the base's branch protection requires a reviewing approval, or where the operator wants one -
-stakes, not habit, earn that gate. `/pr-and-verify` recalls this at entry: the recording is the
+stakes, not habit, earn that gate. `/pr-and-verify` reads this at entry: the recording is the
 standing *allowance*, never the act - each work-item's contract carries its own `merge: auto | hold`
 line (the seal question `/plan-grill`'s done-contract defines); the recording alone never merges
 anything. `/pr-and-verify`'s DONE state owns the full merge condition; an unset policy holds the
@@ -418,7 +418,7 @@ merge policy does not: once a PR is merged, does the work continue into `/releas
 there. The proposed default is `on-demand` - the merge lands, the close-out records that a release is
 owed, and the operator asks for it - because in most repos a release ships to real users and silence
 is never consent. Propose `per-merge` only where a release is cheap and reversible enough that
-batching buys nothing: the recalled `deploy-surface` is `none` (a library or CLI whose release is a
+batching buys nothing: the recorded `deploy-surface` is `none` (a library or CLI whose release is a
 tag plus a pull), or the repo already tags at roughly the rate it merges. Its payoff is that the
 version-bearing surface stops drifting from the branch, which is the failure a per-release version
 gate exists to catch. Recording nothing resolves to `on-demand`, so a repo wired before this key
@@ -433,8 +433,8 @@ was recorded to remove. Where `per-merge` is proposed, record the soak policy wi
 with no time-based window (`deploy-surface: none`, nothing baking in production), that is one full
 green CI cycle, which `/release-promotion` already accepts as the alternative to wall-clock:
 
-```bash
-.better-dev/bin/bd-mem remember "soak window: <one full green CI cycle | <n>h wall-clock>"
+```
+- soak window: <one full green CI cycle | <n>h wall-clock>
 ```
 
 A `per-merge` cadence recorded without it is not wrong, only inert, and inert in the direction that
@@ -454,23 +454,23 @@ it is.
 Two more durable safety rules travel with the policy - the *why* behind the denylist lives in
 `/security-pass`, not here; these are the standing rules a green check does not by itself satisfy:
 
-```bash
-.better-dev/bin/bd-mem remember "safety-secret-leak: a committed secret is compromised - revoke and reissue the key first, then purge history; deleting the line is not enough."
-.better-dev/bin/bd-mem remember "safety-gate-integrity: a red check is fixed, never silenced - do not disable a lint rule, skip or weaken a test, or lower a threshold to reach green."
+```
+- safety-secret-leak: a committed secret is compromised - revoke and reissue the key first, then purge history; deleting the line is not enough.
+- safety-gate-integrity: a red check is fixed, never silenced - do not disable a lint rule, skip or weaken a test, or lower a threshold to reach green.
 ```
 
 A recorded default, never a hardcode and never a permanent hard-fail - each entry is an escalation a human
 answers, not a wall. A project waives, narrows, or widens any of it through `/overrides`: a line in the
 read-first `.better-dev/overrides.md` (e.g. "safety scope-gate is 20 files", "don't gate dependency bumps
-here") wins over the recalled baseline. The loop and `/review` read that overrides layer first, then the
+here") wins over the recorded baseline. The loop and `/review` read that overrides layer first, then the
 baseline - so the resolved policy is honored every run and stays this project's to adjust.
 
 One standing rule beyond the blast-radius policy travels the same way. The repo's always-loaded context -
 CLAUDE.md and the managed blocks - is read on every turn, so it is a per-turn tax; carry it lean or it
-compounds. Record the discipline through the same memory contract:
+compounds. Record the discipline as one more line in the same file:
 
-```bash
-.better-dev/bin/bd-mem remember "context-hygiene: the repo's standing context (CLAUDE.md + always-loaded blocks) is a per-turn tax - keep it lean, prune stale lines on each release, and rewrite instructions written for an older model rather than carrying them forward."
+```
+- context-hygiene: the repo's standing context (CLAUDE.md + always-loaded blocks) is a per-turn tax - keep it lean, prune stale lines on each release, and rewrite instructions written for an older model rather than carrying them forward.
 ```
 
 ## Earned autonomy - propose the standing line the record already supports
@@ -529,51 +529,35 @@ the repo already carries - and gate the hook on that detection: no formatter fou
 never-guess-a-command discipline the rest of the skill holds. A repo without one is never handed a
 formatter it does not have.
 
-## Enforcement - wire the hook where the host has one
+## Enforcement - the committed bash policy
 
 The policy above is what the loop escalates on; enforcement is what checks it even when a model under
-pressure would not. The mechanism is one spine script, `bd-guard`: `check-bash` asks on a destructive
-command (recursive rm outside the build-artifact allowlist, SQL `DROP`/`TRUNCATE`, git force-push /
-`reset --hard` / working-tree discards, `kubectl delete`, docker prune) and denies an obfuscated shell
-construct outright - an assembled or hidden command is the injection vector, never a judgment call;
-`check-edit` denies a write outside the active scope boundary and asks on a `safety-denylist` glob. Both
-fire only in repos carrying `.better-dev/`, fail open on parse failure, and stay silent otherwise.
+pressure would not. It is one committed file: `.omp/config.yml` at the repo root, carrying a rule per
+destructive command class under the top-level `bash.patterns` key, each one
+`{ match: "<glob>", approval: prompt }`.
+Committing it is the point - the policy then travels with the repo, where a machine-global setting
+guards only the machine that set it. `stacks.md` holds the committed template and the class list it
+starts from - read it when you write the file, rather than composing patterns from memory.
 
-Detect, in order, which of these two deliveries this host supports. Never decline to wire the guard on
-the belief that a plugin already delivered it: a plugin install is not a supported state (D32 deleted
-the marketplace channel, and a version-pinned plugin cache cannot carry the `.better-dev/bin` bridge
-these scripts are called through). Declining on that belief is the failure direction that matters - it
-leaves a repo with no enforcement and a record saying it has some. A host that genuinely has no
-pre-execution hook is the one case that writes nothing, and it says so out loud rather than inventing
-a hook config for a host whose convention was never verified:
+The matching rules decide what a pattern is worth, so write against them. Rules are ordered and the
+first match wins, so a specific gate sits above any broader allow. A `deny` or `prompt` rule fires when
+its glob matches the whole command **or any single segment of a compound line** - split on `&&`, `||`,
+`;`, `|`, a single `&`, subshells and newlines - so `cd /tmp && rm -rf build` is caught without anyone
+counting occurrences by hand. An `allow` rule must match the entire command and never applies to a
+compound line, which is why a narrow allow cannot vouch for `git status && rm -rf /`.
 
-- **A clone install on a host with a pre-execution hook** - the agent never edits
-  `.claude/settings.json` itself; it emits the wiring as a paste-ready operator-run step carrying
-  `stacks.md`'s exact JSON (Claude Code: `hooks.PreToolUse`, merging into any existing array, never
-  replacing it - an existing hooks array survives byte-for-byte). The operator runs it per repo, on
-  an explicit yes, then the probe verification below confirms it took.
-- **A host with no pre-execution hook** - the policy stands as prose and the loop's escalation
-  discipline carries it alone. A named coverage limit, not a failure.
+Keep the file to the classes this repo has a surface for. The install then ends with the same proof
+every other gate here earns: run a matching command and see it prompt, run a near-miss and see it pass,
+and report which of the two you observed.
 
-On omp the pair rides the machine-global install rather than a per-repo settings write, so
-`safety-enforcement` reads `hook` there once the installer has run and the paste block above stays Claude
-Code's.
+**Writes are not gated by path, and cannot be.** Tool approval keys on a tool's name, never on what it
+touches, so nothing mechanically refuses a write to `.env`, `**/secrets/**`, a `*.pem` or a `*.key`. The
+denylist above is a policy the loop reads and escalates on, not a boundary a mechanism holds. Report
+that as a named coverage limit rather than recording a gate this repo does not have. What covers the
+surface instead is the staged-diff secret scan above, which refuses the commit that would introduce a
+credential, plus keeping secrets out of the tree in the first place.
 
-Record which, so downstream skills know what kind of gate they have:
-
-```bash
-.better-dev/bin/bd-mem remember "safety-enforcement: hook (claude, PreToolUse bash+edit)"   # or
-.better-dev/bin/bd-mem remember "safety-enforcement: prose"
-```
-
-One vocabulary, one policy layer: `bd-guard` reads `safety-denylist` and the scope state at check time -
-it carries no path list of its own, so widening the denylist is one `bd-mem remember`, never a hook
-edit. `safety-enforcement` records the mechanism's existence, not a second copy of the policy; exactly
-one line under the `safety-` prefix family, and a re-run that finds the wiring already present writes
-nothing. The boundary stops accidents, not attacks - a Bash `sed` can still write outside it; the
-denylist ask and `/security-pass` cover what a boundary cannot.
-
-Two disciplines the hook cannot see stay with the loop and `/security-pass`, not here: a real-world
+Two disciplines no config can see stay with the loop and `/security-pass`, not here: a real-world
 irreversible side effect (a remote delete, a prod write, a data drop) is confirmed as that specific
 action before it runs - a prior approval does not extend to the next destructive op - and data loss
 that already happened is reported immediately, never quietly repaired.

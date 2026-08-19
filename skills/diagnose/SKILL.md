@@ -22,12 +22,13 @@ process rules feed the fix scope, and branch/commit conventions ride the contrac
 fix-contract carries one census line - "contribution guide: `CONTRIBUTING.md`" or "no contribution
 guide found" - so a missed guide is a visible miss, not a silent one.
 
-Before you re-derive anything about this area, spend one recall on it
-(`.better-dev/bin/bd-mem recall "<area>"`) and cite what it returned, or an explicit "recall empty" -
+Before you re-derive anything about this area, read what earlier sessions recorded about it - the
+lessons at `memory://root/learned.md` - and cite what it returned, or an explicit "nothing recorded":
 a lesson you already paid for is cheaper than the mistake it prevents. A recalled lesson is a prior
 claim, not a current fact - verify it against today's code before acting on it. A fix item carved
-by `/groundwork` also reads its epic's record first (`.better-dev/bin/bd-mem ledger read <epic>
-groundwork.md`) and enters the settled decisions as settled; a fix that can't proceed without
+by `/groundwork` also reads its epic's record first
+(`.better-dev/ledger/<epic>/groundwork.md`) and enters the settled decisions as settled; a fix that
+can't proceed without
 contradicting one stops and shows the conflict rather than absorbing it - plan-grill's carved-item
 entry rule, same form here.
 
@@ -116,7 +117,8 @@ in Phase 3 and becomes the clean regression test in Phase 4.
 **Recall first.** Before generating any hypotheses, distill the red signal into a **failure
 signature** - the stable fingerprint of *this* failure, drawn from the whole error and stack you read
 in Phase 0, not the run that happened to expose it: the error class and message shape, the top frames
-of the stack, the failing assertion, the symptom in one line. Ask `.better-dev/bin/bd-mem recall "<signature>"` for a prior diagnosis of the same shape. A
+of the stack, the failing assertion, the symptom in one line. Search `memory://root/learned.md` for a
+prior diagnosis of the same shape. A
 confident match returns a known root cause and the fix that resolved it last time - apply it and
 re-run the Phase 1 signal to confirm it goes green here too, rather than re-deriving from scratch. A
 match that no longer holds (the signal stays red) isn't wasted: it rules out a candidate and tells you
@@ -174,7 +176,8 @@ the three honest next moves for the reporter to pick:
 The fix-contract is never written from a hypothesis that survived only by default.
 
 Fix the root cause, not the symptom. Before you settle where the fix lands, produce the **caller
-list**: grep every caller of the function you'd touch - run `/codebase-map` to surface them - and
+list**: every caller of the function you'd touch - the `lsp` tool's `references` action returns them,
+the aliased and re-exported ones a name-grep misses included - and
 record them in the evidence chain. One guard in the shared function all callers route through is a
 smaller, more correct change than a guard in the single path the ticket named - which leaves every
 sibling caller broken. Guarding at the surface - swallowing an unexpected null, de-duping in the
@@ -195,9 +198,10 @@ by a second source → reproduced. That chain, plus the correct hypothesis, is t
 
 ## Phase 4 - Write the fix-contract and hand off
 
-Resolve the item's ledger directory with `.better-dev/bin/bd-mem ledger dir <slug>` (it returns the
-**primary checkout's** path - the ledger is shared across worktrees, and the fix worktree doesn't exist
-yet) and write `contract.md` there. The contract is what makes the loop's done-criteria observable
+Write `contract.md` into the **primary checkout's** `.better-dev/ledger/<slug>/` - the ledger is
+shared across worktrees, and the fix worktree doesn't exist yet, so resolve that path with
+`dirname "$(git rev-parse --path-format=absolute --git-common-dir)"`. The contract is what makes the
+loop's done-criteria observable
 rather than asserted:
 
 - **Red signal** - the exact command and its captured red output. This is the loop's done-when-green.
@@ -206,10 +210,8 @@ rather than asserted:
 - **Fix scope** - the narrowest set of paths the root cause and caller list implicate: one directory,
   a short explicit file list, or `repo-wide` plus one sentence of why (a missing reason is a missing
   scope). Declared only now, after the root cause - a scope guessed at investigation start locks the
-  wrong module. When the scope is a single directory it doubles as the mechanical edit boundary where
-  the repo runs enforced guardrails (`bd-guard scope` - the mechanism lives with guardrails; this line
-  just declares its target); a file list or `repo-wide` scope stays a prose tripwire with its reason
-  recorded.
+  wrong module. The scope is a prose tripwire the loop reads and honors, never a mechanical boundary -
+  nothing refuses an edit outside it - so it carries its reason recorded beside it.
 - **Regression test at a correct seam** - a seam that exercises the *real* bug pattern at the call site.
   A too-shallow seam (a single-caller unit test for a bug that needs several callers) gives false
   confidence. If no correct seam exists, that itself is the finding: note it - the architecture is
@@ -230,18 +232,17 @@ against the original scenario. The fix's done-criteria are exactly *red signal g
 test at a correct seam* - no new discipline for the loop to learn; the merge line above rides the
 contract for the PR stage, not the loop.
 
-When the diagnosis was fresh (recall found nothing), close the loop that Phase 3 opened: propose
-capturing the **failure signature → root cause + fix** through `.better-dev/bin/bd-mem learn` so the
+When the diagnosis was fresh (nothing recorded matched), close the loop that Phase 3 opened: write the
+**failure signature → root cause + fix** with the `learn` tool so the
 next occurrence of this shape hits the fast-path instead of re-deriving. Record the *durable* thing -
 the root cause and the fix that resolved it, plus any repro technique worth reusing - never the
-transient run that surfaced it (a one-off timeout, a flake seed, a machine-specific path). `bd-mem`
-proposes rather than writes; you're offering a candidate, not editing memory by hand.
+transient run that surfaced it (a one-off timeout, a flake seed, a machine-specific path).
 
 ## Composability
 
 Diagnose adds; it never replaces an installed debugger, test runner, or observability skill - it
-sequences them. On a production incident with no telemetry to read, the recorded `obs-*` rules name
-the gap (`.better-dev/bin/bd-mem recall "obs"`), and once the incident is stabilized
+sequences them. On a production incident with no telemetry to read, the `obs-*` lines in
+`.better-dev/rules.md` name the gap, and once the incident is stabilized
 `/observability-install` is the route that fills it - per-incident instrumentation covers this
 diagnosis, not the next one. It's the fix-side twin of `/plan-grill` (the feature front-end); both
 feed the same `/autonomous-loop`. A live production incident is diagnosed here first; once the fix

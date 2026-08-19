@@ -21,9 +21,9 @@ What belongs in the brief:
 - The task itself, and the exact values it must use verbatim: numbers, magic strings, signatures, test
   cases. These live in the brief, not in your prose around it.
 - Interfaces and decisions from earlier tasks that the brief can't derive on its own.
-- Lessons that bear on this task's area: the relevant `learned` lines from this work-item's receipts,
-  and anything `.better-dev/bin/bd-mem recall "<area>"` returns. A pitfall one worker already paid for
-  is cheaper in the brief than rediscovered in the run.
+- Lessons that bear on this task's area: the relevant `learned` lines from this work-item's receipts, and
+  any lesson on the area in `memory://root/learned.md`. A pitfall one worker already paid for is cheaper
+  in the brief than rediscovered in the run.
 - Your resolution of any ambiguity you noticed while writing it - don't pass a known ambiguity through.
 - Capabilities, not exact tool names ("a browser check", never "the DesignSync tool"). A named tool the
   worker can't find means look for the equivalent capability under another name and proceed, reporting
@@ -34,10 +34,10 @@ What belongs in the brief:
   carries the list itself: if the task turns out to touch one of those paths - secrets and credentials, DB
   migrations, auth code, payments/PII, infra or prod config, dependency manifests and lockfiles - the
   worker settles `NEEDS_INPUT` with what it found and what it needs, rather than editing blind and letting
-  the rule surface only at review. `/guardrails-install` records that list per repo; recall it with
-  `.better-dev/bin/bd-mem recall "safety"`, then apply any `.better-dev/overrides.md` adjustments (which
+  the rule surface only at review. `/guardrails-install` records that list per repo as the `safety-` lines
+  in `.better-dev/rules.md`; read them there, then apply any `.better-dev/overrides.md` adjustments (which
   win), so the brief carries this repo's actual set rather than a generic one.
-- The entries from the project's skill list (`bd-mem recall "dispatch-skills"`, per this skill's
+- The entries from the project's skill list (the `dispatch-skills` line in `.better-dev/rules.md`, per this skill's
   SKILL.md) that bear on this slice, pasted as an instruction to load them before starting. The record
   pairs each skill with when it applies, so a worker whose slice touches none of them loads none:
 
@@ -53,9 +53,9 @@ What belongs in the brief:
   per-item need never rewrites it. Have the report name which listed skills it loaded, so "the list was
   consulted" is a claim you can check against the diff rather than assume.
 - The report file path, and the report trailer the reply must end with (the **Report** bullet in this
-  skill's SKILL.md defines the keys - point at it, don't restate them; `bd-dispatch brief` emits the
-  block). Ask for structured, capped output - a fixed skeleton, a named length bound. A report with no
-  bound sprawls to fill the worker's patience, and every unrequested line is spend; a bound stops it.
+  skill's SKILL.md defines the keys - point at it, don't restate them). Ask for structured, capped output:
+  a fixed skeleton, a named length bound. A report with no bound sprawls to fill the worker's patience,
+  and every unrequested line is spend; a bound stops it.
   When the brief hands a worker an output filename to produce, state the naming contract together with
   what happens on violation - "files not matching batch-N.json are silently dropped by the merge" binds
   a worker where "filenames must match" does not.
@@ -177,10 +177,9 @@ measures the spec, not the harness.
 Re-dispatching an unchanged brief to the same worker just reruns the same failure - change something first
 (more context, a smaller slice, a more capable worker, per the terminal-state table above).
 
-A re-dispatch also carries the prior attempt's lessons: put the `learned` lines from the work-item's last
-receipt (`.better-dev/bin/bd-mem ledger read <work-item> receipts.md`, tail) and the prior trailer's
-`BLOCKER` under the `## Prior attempts - do not re-enter` heading in the new brief - `bd-dispatch brief`
-emits the slot on any brief past the first. The retried worker's report file closes each carried lesson
+A re-dispatch also carries the prior attempt's lessons: put the `learned` lines from the tail of the
+work-item's `.better-dev/ledger/<work-item>/receipts.md` and the prior trailer's `BLOCKER` under a
+`## Prior attempts - do not re-enter` heading in the new brief. The retried worker's report file closes each carried lesson
 explicitly: addressed (what it did differently) or recurred (it hit the same wall). A recurred lesson
 means the decomposition is wrong, not the worker - it counts toward the two-failures rule, so the next
 move is re-decompose or escalate, never a third identical retry. The receipts stay append-only: the

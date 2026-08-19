@@ -3,12 +3,11 @@
 ## What it does
 
 Sweeps a finishing session for what it learned and routes each finding to the surface that will replay
-it: a keyed lesson, a friction note, a rigged scenario in the repo's trap record, or a quoted
-correction against an instruction that pointed the run the wrong way. The memory store, the papercut
-queue, and the trap record all sit idle unless something reaches for them while the session still
-remembers what happened, and this sweep is that something. Its defining constraint is that an empty
-result is a correct result - a manufactured lesson costs a read in every future recall and returns
-nothing.
+it: a keyed lesson, a rigged scenario in the repo's trap record, or a quoted correction against an
+instruction that pointed the run the wrong way. The memory store and the trap record both sit idle
+unless something reaches for them while the session still remembers what happened, and this sweep is
+that something. Its defining constraint is that an empty result is a correct result - a manufactured
+lesson costs a read every time the store is consulted and returns nothing.
 
 ## When to reach for it
 
@@ -52,10 +51,11 @@ sweep that found nothing and reported nothing is indistinguishable from one that
 same five lines are written with the negative forms filled in ("no durable lesson", "traps: none")
 rather than omitted.
 
-**Everything I find seems to be a papercut.** That is the pull the sweep is built against, because a
-papercut asks nothing of you - no key, no score, no wording. Sort by who the finding is for: friction
-that annoyed you is a papercut for the operator to triage, while a defect in a sentence the next agent
-will read is a correction, and filing that as a papercut buries it in a queue.
+**Everything I find looks like friction.** That is the pull the sweep is built against, because
+friction asks nothing of you - no key, no score, no wording. Sort by who the finding is for: friction
+that cost you time is a lesson, keyed so the next run reads it before paying the same cost, while a
+defect in a sentence the next agent will read is a correction to that sentence, and filing it as a
+lesson leaves the wrong sentence in place.
 
 **When does something become a trap rather than a lesson?** When a future agent following the
 instructions as written would fail the same way, and you can name the input that produces the wrong
@@ -67,9 +67,9 @@ rigged scenario, and it stays a lesson or a correction.
 - A session that ends in a compaction or a reset leaves its findings behind in a form the next session
   can recall, instead of losing them with the transcript
 - A wall you hit once gets recalled rather than re-derived weeks later
-- A sweep that learned nothing durable says so in as many words, and no filler lesson appears at the
-  top of a later recall ahead of one that would have paid off
+- A sweep that learned nothing durable says so in as many words, and no filler lesson appears in the
+  lesson store ahead of one that would have paid off
 - An instruction in this repo that sent the run the wrong way comes back as a quoted sentence with what
-  it made the run do, not as a line in a friction queue
+  it made the run do, not as a lesson that leaves the sentence unchanged
 - Every report carries all its lines, negatives included, so a quiet session and a skipped sweep do not
   look the same

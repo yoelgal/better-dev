@@ -125,8 +125,8 @@ generates it - a grep that found nothing is not a read. A finding you cannot quo
 On top of your axis, notice what *kind* of change this is - some surfaces carry sharp, recurring failure
 modes a general read slides past. Match the diff against this list, and where one fits, run that
 surface's checklist from `lenses.md` (a sibling of this brief) - the focused check is those items, not a
-vibe. `/codebase-map` finds the callers and dependents of a changed or removed symbol, so a
-blast-radius check rests on who actually reaches it rather than a guess:
+vibe. The `lsp` tool's `references` action finds the callers and dependents of a changed or removed
+symbol, so a blast-radius check rests on who actually reaches it rather than a guess:
 
 - **Auth / authz** - a check moved, weakened, or bypassed; a new entry point that skips one.
 - **Migrations / schema** - irreversibility, a backfill on a large table, a column dropped while code
@@ -175,10 +175,9 @@ creation (`/autonomous-loop`), and here you scan the diff for the shortcut that 
 Some of those surfaces carry a bounded-blast-radius policy the loop is meant to honor, and crossing it is
 a finding in its own right - the loop should have escalated for a human (settled NEEDS_INPUT with the
 evidence) rather than auto-editing or merging. The policy is the one `/guardrails-install` records per
-repo: recall it with `.better-dev/bin/bd-mem recall "safety"` (one read returns the denylist, the gated
-classes, and the scope number together), then read `.better-dev/overrides.md`, whose waivers and
-narrowings win. When recall is empty, fall back to the brief defaults below rather than treating the
-surface as unguarded:
+repo: read the denylist, the gated classes, and the scope number from `.better-dev/rules.md`, then
+`.better-dev/overrides.md`, whose waivers and narrowings win. Where the rules file says nothing, fall
+back to the brief defaults below rather than treating the surface as unguarded:
 
 - **High-consequence denylist** - the paths the loop escalates rather than auto-edits: secrets and
   credentials, DB migrations, auth/authz code, payments/billing/PII, infrastructure and prod config, and
@@ -191,7 +190,7 @@ surface as unguarded:
   execution-bearing and grades like the lockfile, because it runs in CI and on developer machines.
 - **Human-gate change classes** - security/auth, payments/PII/money, infra/Terraform/prod config, and
   dependency/version bumps land only behind a human gate; so does the scope tripwire - a diff touching more
-  than the recorded scope number of files (the `safety-scope` recall, ~10 by default, read not hardcoded).
+  than the recorded scope number of files (the `safety-scope` line, ~10 by default, read not hardcoded).
   A change in a gated class, or one that crosses the scope tripwire, with no recorded human gate, is a finding.
 - **A file whose content does not match its extension** - executable code in a `.md`, `.json`, or config
   file - is a finding on sight: extensions are not trusted, and where a `.md` file is instruction later
@@ -200,12 +199,11 @@ surface as unguarded:
 Confirm the gate before you flag. The gate line you were handed already names which denylist paths the
 package's file list matched and whether the diff crossed the scope number: you may raise what it
 matched and never clear it, because that match rests on the recorded policy rather than on a reading.
-Your half is the sign-off. A gated class or dependency the work-item's hash-pinned, human-approved
-`contract.md` names explicitly *is* the sign-off - confirm the pin first
-(`.better-dev/bin/bd-mem ledger check-approval <work-item>` exits 0); an intact pin is the stronger
-consent record.
-`approvals.log` is required only for gated edits the contract did not name: read it with
-`.better-dev/bin/bd-mem ledger read <work-item> approvals.log`, using the slug the orchestrator handed you.
+Your half is the sign-off. A gated class or dependency the work-item's human-approved
+`contract.md` names explicitly *is* the sign-off - read that file's approval line first, and check it
+is not older than the contract's last amendment; an intact approval is the stronger consent record.
+`approvals.log` is required only for gated edits the contract did not name: read
+`.better-dev/ledger/<work-item>/approvals.log`, using the slug the orchestrator handed you.
 A gated edit named in neither place is ungated, and that is the finding - this widens where consent can be
 read from, never the gate itself. Grade the breach on the ladder below and cite the offending paths - an auto-edited secret,
 migration, or auth path is Critical; an ungated dependency bump or a scope-gate sprawl with no sign-off is

@@ -20,7 +20,7 @@ output is that the evidence is not there, plus what would create it.
 | better-dev is being adopted in a repo that already has history | `/vision`, before the first grill |
 | A recorded vision needs checking against what has shipped since | `/vision`, drift-check mode |
 | The project does not exist yet | `/groundwork` settles intent forward |
-| Callers, dependents, blast radius | `/codebase-map` |
+| Callers, dependents, blast radius | the `lsp` tool, plus `grep` |
 | One feature's plan | `/plan-grill` |
 
 Four things it deliberately is not: a roadmap or feature list (the tracker and the ledger),

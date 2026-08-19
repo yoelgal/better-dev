@@ -11,7 +11,7 @@ watertight, and emit a **done-contract** with *observable* done-criteria the aut
 drive to. One job: everything a work-item needs settled *before* code, and nothing the
 implementation loop already owns.
 
-Read `.better-dev/overrides.md` first (`.better-dev/bin/bd-mem read overrides`). A project override -
+Read `.better-dev/overrides.md` first. A project override -
 a different spec location, a house planning style, a skipped phase - wins over anything below.
 
 The flow is four steps behind one closing gate; a gated step 0 runs first when the brief is
@@ -63,8 +63,8 @@ routes to `/diagnose`; a decode that uncovers an epic routes to `/groundwork`.
 A feature is built on assumptions - "X doesn't exist yet", "the flow works like Y and we'll extend
 it". Grilling a false premise wastes the whole loop, so verify the premise at `file:line` first, in
 one bounded observation pass. Locate the code path in the touched area, read what it does *today*,
-and look for anything that already provides the capability - run `/codebase-map` for the callers and
-dependents that answer it.
+and look for anything that already provides the capability - the `lsp` tool's `references` and
+`definition` actions answer the callers-and-dependents half of that.
 
 Land on a verdict backed by receipts (`file:line`, a command run and its output). If the baseline
 maps as assumed, proceed. If the capability **already exists**, or a core assumption is plainly
@@ -83,15 +83,15 @@ guide found" - so a missed guide is a visible miss, not a silent one.
 
 A carved work-item's baseline starts one level up. When the item came out of a `/groundwork` carve,
 the epic's record is settled ground, not conversation history a fresh session may drop: read it
-before grilling (`.better-dev/bin/bd-mem ledger read <epic> groundwork.md`) and carry its decisions
+before grilling (`.better-dev/ledger/<epic>/groundwork.md`) and carry its decisions
 as settled - never re-asked, never silently reopened - with the frozen surface and the cross-cutting
 policy entering as premises. A need this item can't meet without contradicting a settled decision is
 groundwork's pause-the-wave signal: stop and show the conflict rather than widening the answer inside
 this item. The carve's readiness gate is checked here too, not assumed: a foundation not yet merged
 green to the integration branch means this item isn't ready to grill.
 
-The repo's stated intent is a premise too, where one exists. `.better-dev/bin/bd-mem recall "vision"`
-names the acceptance policy `/vision` recorded; read it before grilling, and a feature its resist
+The repo's stated intent is a premise too, where one exists. `VISION.md` carries the acceptance policy
+`/vision` recorded; read it before grilling, and a feature its resist
 test rejects stops here - it goes to the user as a choice between the feature and the policy, never
 a plan to grill and never a line quietly reinterpreted to fit.
 
@@ -195,11 +195,10 @@ grill only the decisions the done-criteria will turn on and skip exhaustive bran
   as `NEEDS_INPUT`.
 - **Confirm as each decision locks.** When a decision settles, reflect it back in a line and move on
   once it holds. If a decision reads like a standing policy for this project (a convention, not a
-  one-off), offer to persist it - "make this the default here?" - and on a yes record it with
-  `.better-dev/bin/bd-mem persist-override "<line>"`. Don't persist transient facts. Keep the
+  one-off), offer to persist it - "make this the default here?" - and on a yes record it as one line in
+  `.better-dev/overrides.md`. Don't persist transient facts. Keep the
   settled decisions on disk, not in conversation: as each decision locks, append its one-line form
-  to a running `decisions.md` in the work-item's ledger
-  (`.better-dev/bin/bd-mem ledger put <work-item> decisions.md`). Step 4 synthesizes from that
+  to a running `decisions.md` in the work-item's ledger directory. Step 4 synthesizes from that
   file - a grill long enough to compact loses nothing.
 - **An answer that contradicts a receipt gets the receipt, not a nod.** When an answer conflicts
   with something the baseline pass already established, don't fold it into the contract and don't
@@ -257,9 +256,9 @@ someone meeting the words for the first time. Observed 2026-08-05, an operator m
 contract for a ~50-line endpoint and answered "I just wanted 'here's what I'll build, ok?'".
 
 Two things stay put while you fix that. The **typed lines keep their key form** - `merge: auto | hold`
-and the rest of `done-contract.md`'s fields are read by script, and `bd-mem ledger approve` refuses a
-contract missing the `merge:` line, so a field rewritten into prose blocks the seal it was meant to
-clarify. And a **section whose emptiness is a finding keeps its explicit marker** - "no contribution
+and the rest of `done-contract.md`'s fields are read by key downstream, `/pr-and-verify`'s merge gate
+reading the `merge:` line and the loop the gated-paths line, so a field rewritten into prose is a
+field the next skill cannot find. And a **section whose emptiness is a finding keeps its explicit marker** - "no contribution
 guide found", an Open-concerns section carrying its refutation, a gated-paths line reading
 `none expected`: those exist so a reader can tell "ran the pass, nothing there" from "never ran the
 pass", and dropping them erases exactly that distinction.
@@ -287,7 +286,7 @@ explicit user answer this session; a decision onboard parked as waiting-on-you i
 must-ask, and absent an answer the conservative form (human hold) goes in. An autonomous policy
 whose only "approval" is the gate the user clicked through is not consent - it's smuggling. A visual property is a
 done-criterion too, phrased observably - renders at the target widths, uses the token set, passes the
-guideline audit - and proven by a screenshot plus an audit over what it shows (`/browser-capability`),
+guideline audit - and proven by a screenshot plus an audit over what it shows (the `browser` tool),
 never a self-report.
 
 Give the goal one clear shape (a capability, an end-state, an invariant, or a removal) so its proof
@@ -308,18 +307,19 @@ itself as message text in (or immediately before) the message that asks for conf
 minimum the Problem, Goal, the done-criteria with their runnable checks, out-of-scope, and the Merge
 block's two lines: `merge:` and `gated paths:`, each named path beside the operator's answer. The
 gated-paths line is in the minimum because the loop treats a contract-named target as
-pre-authorized and crosses its own edit boundary on it, so a contract whose rendered text omits that
-line collects consent for a crossing the operator never read. These two are the contract's own field
+pre-authorized and writes it without a second ask, so a contract whose rendered text omits that
+line collects consent for a write the operator never read. These two are the contract's own field
 labels, not recorded-rule keys, so the plain-words rule above still holds: render each label with the
-answer said plainly beside it ("merges on green without another ask", "the loop may edit
-hooks/bd-session-start"), never a bare key the user has to decode. A
+answer said plainly beside it ("merges on green without another ask", "the loop may edit the CI
+workflow"), never a bare key the user has to decode. A
 "lock and run?" prompt whose only view of the contract is its own summary line, or a pointer to
 `done-contract.md` on disk, asks the user to sign what they haven't read - render first, then ask.
 And when the user's reply to the gate is itself a request to see it ("what is in the contract?"),
 the only correct next message is the rendered contract - re-raising the same prompt unrendered turns
-a mis-fired gate into a collected blind approval. On confirmation, pin the approval to the
-contract's content hash (via `.better-dev/bin/bd-mem`) so a later edit re-opens this gate rather than
-letting the loop advance on a stale sign-off - `done-contract.md` covers the pinning. If a question
+a mis-fired gate into a collected blind approval. On confirmation, write the approval into the
+contract itself - one line quoting the user's yes, dated - so a later edit leaves an approval that
+visibly predates the text it approves, and this gate re-opens rather than the loop advancing on a
+stale sign-off; `done-contract.md` covers the form. If a question
 can't be settled and blocks
 the plan, that's a `NEEDS_INPUT` state, not a guess: record it and stop rather than inventing an
 answer.
@@ -340,9 +340,9 @@ any flow, no grill in progress required. Draft the questionnaire from whatever c
 grill only the send, and park the owning work-item (when there is one) as `NEEDS_INPUT` until the
 answers come back.
 
-Write the contract to the **primary checkout's** shared ledger so every worktree sees it. Resolve the
-item's ledger directory with `.better-dev/bin/bd-mem ledger dir <work-item>` - it returns the
-primary-checkout path even when you run it from a feature worktree - and write `contract.md` there.
+Write the contract to the **primary checkout's** ledger so every worktree sees it: `contract.md` under
+`.better-dev/ledger/<work-item>/`, whose parent resolves from any worktree with
+`dirname "$(git rev-parse --path-format=absolute --git-common-dir)"`.
 Then hand the work-item to `/autonomous-loop`, which drives the done-criteria red-to-green.
 
 If `/domain-modeling` is installed and the feature turns on domain vocabulary, run the grill through

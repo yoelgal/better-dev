@@ -54,7 +54,7 @@ Once a release is unhealthy, the rollback path here hands back to `/diagnose` an
   trunk one. Where a recorded branch model and git disagree, git wins, the run says so, and the
   stale record is left for `/onboard`; the one shape that stops the run is a release branch that
   resolves to nothing, because there is nothing to release onto and none of it may be guessed.
-- The rules it recalls instead of guessing, all recorded by `/guardrails-install`: where the version
+- The rules it reads instead of guessing, all recorded by `/guardrails-install`: where the version
   lives (`version-surface`), whether a tool cuts releases here (`release-automation`), and the
   deploy conventions (the deploy surface, the migration-apply mechanism, any env vars the range
   newly needs). Where one of these was never recorded, the skill stops and names
@@ -112,7 +112,7 @@ nothing is pull-only, and pull-only means no line at all rather than a line with
 - The version and the release-ledger flags come back derived from the commit range with a clause of
   evidence each, including the flags that were *not* set - and a release that owed nothing is called
   pull-only rather than shipping a line with no flags on it.
-- The release receipt (`bd-mem ledger read release-<version>`) carries a typed `deploy:` verdict and
+- The release receipt under `.better-dev/ledger/release-<version>/` carries a typed `deploy:` verdict and
   settles a terminal ledger state instead of sitting open indefinitely.
 - A rollback produces a new forward tag, never a moved or force-pushed one, and where the repo has
   two branches a hotfix's commit shows up as an ancestor of both.

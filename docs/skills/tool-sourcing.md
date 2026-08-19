@@ -19,14 +19,14 @@ any code gets written for the gap.
 | Capability gap mid-work, nothing written yet for it | `/tool-sourcing` (here) |
 | Sourcing came up empty across every channel | `/self-extension` |
 | A proven, repeatable workflow worth capturing as new | `/self-extension` |
-| A UI needs a browser or an iOS simulator to verify against | `/browser-capability` or `/ios-capability` (the worked examples of sourcing a tool on this exact gap) |
+| A UI needs a browser to verify against | the native `browser` tool, nothing to source |
+| A UI needs an iOS device or simulator to verify against | `/ios-capability`, the worked example of sourcing on this exact gap |
 
 ## Where it fits
 
 Sits ahead of `/self-extension` in one ordered flow: source first, create only as the proven-empty
-fallback. Any front-end or loop step that hits a capability gap - `/browser-capability` and
-`/ios-capability` are its own worked examples - composes this skill rather than reaching for
-`npx skills` directly.
+fallback. Any front-end or loop step that hits a capability gap - `/ios-capability` is its own
+worked example - composes this skill rather than reaching for `npx skills` directly.
 
 ## Common questions
 

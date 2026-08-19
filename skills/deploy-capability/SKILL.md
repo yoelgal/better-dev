@@ -1,6 +1,6 @@
 ---
 name: deploy-capability
-description: Use when a product needs a live deploy surface that does not exist yet - "deploy this" or "get it live" on a greenfield product with no platform project, repo connection, domain, or per-environment config - when /release-promotion finds no recorded deploy rules and /guardrails-install has nothing to observe because nothing was ever created, or when a feature needs a product service provisioned (a database, an auth provider, transactional email, a domain). The deploy-surface sibling of /browser-capability - the same source-a-capability-on-a-gap practice.
+description: Use when a product needs a live deploy surface that does not exist yet - "deploy this" or "get it live" on a greenfield product with no platform project, repo connection, domain, or per-environment config - when /release-promotion finds no recorded deploy rules and /guardrails-install has nothing to observe because nothing was ever created, or when a feature needs a product service provisioned (a database, an auth provider, transactional email, a domain). Applies the source-a-capability-on-a-gap practice to deploy surface, composing /tool-sourcing where the host wires nothing.
 ---
 
 # Creating the deploy surface so a release has somewhere to land
@@ -10,8 +10,8 @@ records only what it can observe, and `/release-promotion` with no recorded rule
 naming the recorder - which, on a greenfield product, observes nothing and sends the question straight
 back. The circle breaks only when someone creates the surface: a platform project, the repo connected
 to it, a domain answering, the environment config uploaded. That is a capability gap, not a missing
-line of code, and it fills the way `/browser-capability` fills a missing browser: compose what the host
-already wires, walk the operator through what only they can create, source a tool for the rest.
+line of code, and it fills in three rungs: compose what the host already wires, walk the operator
+through what only they can create, and hand the rest to `/tool-sourcing`.
 
 One distinction runs first. `deploy-surface: none` is the correct record for a library or a CLI - a
 deliberate no, settled once. This skill is for the other case: a product that should deploy and has no
