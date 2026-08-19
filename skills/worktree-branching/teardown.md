@@ -1,0 +1,88 @@
+# Removing a worktree when the work-item is done
+
+better-dev's default finish is **push and open a PR into the integration branch, keeping the worktree
+alive** so review feedback can be addressed in place. Removal comes later - only once the work is
+merged or deliberately abandoned. Getting the order and the ownership check right is what keeps a
+teardown from deleting the wrong tree.
+
+## First, the safe order
+
+Three ordering facts, each of which git enforces the hard way if ignored:
+
+- **`cd` to the primary checkout before removing.** `git worktree remove` fails when run from inside
+  the tree it's removing.
+  ```bash
+  primary=$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")
+  cd "$primary"
+  ```
+  This `cd` is the one place the library asks for one, and it is **terminal**: the tree you came from
+  is gone a step later, so nothing cds back. Everywhere else, cwd persists across tool calls and a
+  bare `cd` re-points every later git command - reach the primary checkout with `git -C "$primary"`
+  or an absolute path instead (`SKILL.md`, Step 3).
+- **Remove the worktree before deleting its branch.** `git branch -d` refuses while a worktree still
+  has the branch checked out.
+- **Prune afterwards.** `git worktree prune` clears any stale registration left behind.
+
+The same ordering rules out `gh pr merge --delete-branch`: it fails from a repo whose primary
+checkout pins the integration branch ("'staging' is already used by worktree") because gh tries to
+switch the local checkout to do the deletion. Merge without `--delete-branch` and let this teardown
+own deletion - local branch delete after the worktree remove, then `git push origin --delete <branch>`
+as the remote step.
+
+## Then, the ownership proof
+
+Plain `git worktree remove` already refuses a dirty or unregistered tree - reach for it first and let
+git guard you. Only escalate to `--force` (or, worse, `rm -rf`) once two checks confirm the target is
+genuinely a linked worktree of *this* repo: the path holds a `.git` **file** (a linked worktree's
+gitdir pointer, never the primary's `.git` directory), and `git worktree list` names it here.
+
+```bash
+[ -f "$path/.git" ] && git worktree list --porcelain | grep -qxF "worktree $(cd "$path" && pwd -P)"
+```
+
+Any doubt refuses: a wrongly-refused removal costs a re-run, a wrongly-allowed one costs a working
+tree. Never remove a worktree this skill didn't create - a harness-owned or detached-HEAD workspace
+belongs to the platform; leave it and let a workspace-exit tool handle it.
+
+## Confirm each destructive step on its own
+
+Removal, `git branch -D`, `rm -rf`, and force-removing a tree are destructive and hard to reverse.
+Before running one, state exactly what you're about to run and why, and get confirmation for that
+specific action. A yes you got for one destructive step doesn't carry to the next - each `--force`,
+each branch delete, each discard is its own gate. The clean test for what needs the gate: anything
+you couldn't undo with a `git revert` or a re-clone.
+
+If you realize you already caused data loss - removed the wrong tree, deleted an unmerged branch -
+say so immediately and plainly. A quiet repair hides the blast radius; an honest report lets the
+operator recover from reflog or a backup while the trail is still warm.
+
+## The finish menu
+
+One case is already settled and does not go to the menu: the work landed. Prove that two ways, because
+either half alone lies - `git diff --stat <integration> <branch>` comes back empty, so the content is
+in the base however the forge merged it, and `gh pr view <n> --json state` reads `MERGED`. A squash
+merge leaves no ancestry for the first check to find by history, and a merged PR can still have
+follow-up commits sitting on the branch. With both, nothing here fails the destructive-step gate's own
+test - every commit is in the base, and the branch is recoverable from it. Take option 2's teardown,
+run it through the same checks and safe order, and report what you removed in one line. Asking here
+buys no scrutiny - the answer is not in doubt, and a question whose answer is not in doubt trains the
+operator to approve without reading, which is exactly what you need them not to do at option 4.
+Anything short of that state - unmerged commits, a live remote branch, a dirty tree, work you cannot
+prove landed - goes to the menu below.
+
+Otherwise, when the work-item is done and tests are green, offer the choice rather than assuming:
+
+1. **Push + PR into the integration branch** - keep the worktree (default; needed to iterate on
+   review).
+2. **Merge locally into the base** - then teardown: `cd` primary, merge, re-run tests, remove
+   worktree (guard first), delete branch, prune.
+3. **Keep as-is** - leave the worktree untouched.
+4. **Discard** - destructive. Name what will be lost (branch, unmerged commits, worktree path) and
+   wait for the operator to type `discard` before removing the worktree (guard first) and
+   `git branch -D`.
+
+## Restart-from-contract note
+
+When the autonomous loop resets a stuck work-item, it removes and recreates the worktree off the base
+recorded in the ledger (`worktree.md`), then replays the contract. That reset routes through the same
+ownership checks and the same safe order - it never force-removes a path it hasn't proven it owns.

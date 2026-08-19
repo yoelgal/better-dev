@@ -1,0 +1,731 @@
+#!/usr/bin/env bash
+# bd-package-check - validate the whole better-dev package before a release.
+#
+# Lints every skill (frontmatter minimal + name==folder + "Use when" description + no @-links + calm
+# voice), runs every helper's selftest, parses every shipped script, validates the plugin manifest,
+# asserts CLAUDE.md still carries the managed discovery block, and fails on any shipped file that
+# still names a path this release deleted. Non-zero exit on any failure - a release / CI gate, and
+# what `/self-extension` runs before promoting a freshly authored skill.
+set -uo pipefail
+
+# Package root = the dir holding skills/ + scripts/ (run from anywhere in the dev repo).
+ROOT="$(cd "$(dirname "$0")/.." 2>/dev/null && pwd)"
+[ -d "$ROOT/skills" ] || ROOT="$(pwd)"
+cd "$ROOT"
+# A resolved root with nothing to grade is an ungradeable tree, not a clean one. Say so in one line:
+# without this the run dies 70 checks later in `awk: can't open file skills/<name>/SKILL.md`, which
+# reads as a broken script rather than a wrong cwd, and the checks that did run reported nothing.
+# Checked in a subshell: `set --` here would eat this script's own --prove-new arguments, parsed below.
+( set -- skills/*/SKILL.md; [ -e "$1" ] ) ||
+  { printf 'package-check: no skills/*/SKILL.md under %s - wrong root, nothing graded\n' "$ROOT" >&2; exit 2; }
+
+fail=0
+ok()  { printf '  \033[32m✓\033[0m %s\n' "$*"; }
+bad() { printf '  \033[31m✗\033[0m %s\n' "$*"; fail=1; }
+
+# --- prove-new: every check a diff adds must have been red before its implementation ------------
+#
+# A check that is green before the thing it guards exists proves nothing, and reads exactly like one
+# that works. Three shipped in a single work-item before this existed. The rule: for every ok/bad
+# label the diff adds, run the CURRENT script against the BASE tree and require that label to come
+# back red. Green at base means the check was vacuous; absent at base means it silently skipped,
+# which is no better. A check that legitimately holds at base (a regression guard) says so on the
+# line and is exempted by name, never silently.
+
+# Longest run of literal text in a label, so an interpolated label still matches its printed line.
+_static_run() {
+  awk -v s="$1" 'BEGIN{
+    gsub(/\$\([^)]*\)/, "\001", s)
+    gsub(/\$\{[^}]*\}/, "\001", s)
+    gsub(/\$[A-Za-z_][A-Za-z0-9_]*/, "\001", s)
+    n = split(s, parts, "\001"); b = ""
+    for (i = 1; i <= n; i++) if (length(parts[i]) > length(b)) b = parts[i]
+    gsub(/^[ \t]+|[ \t]+$/, "", b)
+    print b
+  }'
+}
+
+# (repo root, script path relative to it, base ref) - parameterized so the fixtures below can point
+# it at a stub. Running the real gate inside a fixture repo would fail for unrelated reasons.
+# A check's ok-label and bad-label are different strings, and at base a check that FAILS prints its
+# bad-label. Matching ok-labels alone would read every genuinely-red check as "absent", so the two
+# are paired: an OK token immediately followed by a BAD token is one check, which is how every
+# `cond && ok "..." || bad "..."` in this file is written.
+#
+# Only TOP-LEVEL call sites count. Every real check in this file is top level; ok/bad text also
+# appears inside function bodies (this mode's own findings) and inside heredocs (its fixtures), and
+# counting those makes the mode trip over its own source. Line numbers come from the file at HEAD,
+# then get intersected with the lines the diff actually added.
+_check_tokens() {
+  local root="$1" script_rel="$2" base="$3" addedlines
+  # Basename glob, not the literal path. An exact pathspec defeats git's rename detection on a commit
+  # that MOVES this script, so the whole file reads as added lines and every pre-existing check counts
+  # as new. The glob matches both spellings, git pairs them as a rename, and the added-line set is
+  # correctly empty. But a leading `*` matches across `/` too, so the glob also drags in every OTHER
+  # tracked path ending in this basename (a fixture, a vendored copy); their hunks would pool into one
+  # flat line set and mark this file's pre-existing checks as added. So the pathspec stays wide enough
+  # for the rename and the awk keeps only the hunks whose destination IS this script - `--no-prefix`
+  # so the `+++ ` header carries the bare path to compare against. Git appends a TAB to that header
+  # when the path contains a space, so strip from the first tab or the compare silently never matches
+  # and the mode returns a vacuous "adds no checks" on a diff that added some.
+  addedlines="$(git -C "$root" diff --unified=0 --no-prefix "$base" -- "*${script_rel##*/}" \
+    | awk -v want="$script_rel" '
+        /^\+\+\+ / { dst = substr($0, 5); sub(/\t.*$/, "", dst); next }
+        dst == want && /^@@/ { if (match($0, /\+[0-9]+(,[0-9]+)?/)) {
+              spec = substr($0, RSTART + 1, RLENGTH - 1)
+              n = split(spec, a, ","); start = a[1] + 0; count = (n > 1 ? a[2] + 0 : 1)
+              for (i = 0; i < count; i++) print start + i } }' | tr '\n' ' ')"
+  case "$addedlines" in *[0-9]*) ;; *) return 0 ;; esac
+  awk -v added="$addedlines" '
+    BEGIN { n = split(added, arr, " "); for (i = 1; i <= n; i++) if (arr[i] != "") want[arr[i] + 0] = 1 }
+    {
+      line = $0; skip = ""
+      # A comment naming ok "..." while explaining the rule is not a check. This very file has one.
+      if (line ~ /^[ \t]*#/) skip = "comment"
+      else if (heredoc != "") { if (line == heredoc) heredoc = ""; skip = "heredoc" }
+      else if (match(line, /<<[-]?'"'"'?[A-Za-z_][A-Za-z0-9_]*'"'"'?/)) {
+        d = substr(line, RSTART, RLENGTH); gsub(/^<<-?'"'"'?|'"'"'$/, "", d); heredoc = d; skip = "heredoc"
+      }
+      # A one-liner definition (helper() { ...; }) opens and closes on the same line, so it must not
+      # flip the in-function state - doing so swallows every real check below it.
+      else if (line ~ /^[A-Za-z_][A-Za-z0-9_]*\(\)[ \t]*\{/) { if (line !~ /\}[ \t]*$/) infunc = 1; skip = "funcdef" }
+      else if (infunc && line ~ /^\}/) { infunc = 0; skip = "funcend" }
+      else if (infunc) skip = "infunc"
+      if (!(NR in want)) next
+      # Count what the filter drops rather than dropping it silently: an unaudited check is exactly
+      # what this mode exists to catch, so its own blind spot has to be visible.
+      if (skip != "") {
+        probe = line
+        while (match(probe, /(^|[^A-Za-z0-9_])(ok|bad)[ \t]+"[^"]*"/)) { skipped++; probe = substr(probe, RSTART + RLENGTH) }
+        next
+      }
+      reason = ""
+      if (match(line, /# prove-new: regression-guard[ \t]*/)) {
+        reason = substr(line, RSTART + RLENGTH); line = substr(line, 1, RSTART - 1)
+      }
+      rest = line
+      while (match(rest, /(^|[^A-Za-z0-9_])(ok|bad)[ \t]+"[^"]*"/)) {
+        tok = substr(rest, RSTART, RLENGTH); rest = substr(rest, RSTART + RLENGTH)
+        kind = (tok ~ /ok[ \t]+"/) ? "OK" : "BAD"
+        sub(/^[^"]*"/, "", tok); sub(/"$/, "", tok)
+        t++; tk[t] = kind; tl[t] = tok; tr[t] = reason
+      }
+    }
+    # Pair here rather than in the shell: one record per CHECK keeps the caller free of arrays and
+    # process substitution, both of which the repo pre-commit hook rejects via sh -n.
+    END {
+      if (skipped > 0) { printf "__SKIPPED__\n%d\n\n", skipped }
+      i = 1
+      while (i <= t) {
+        if (tk[i] == "OK" && tk[i + 1] == "BAD") { printf "%s\n%s\n%s\n", tl[i], tl[i + 1], tr[i]; i += 2 }
+        else if (tk[i] == "OK")                  { printf "%s\n\n%s\n",    tl[i], tr[i];            i += 1 }
+        else                                     { printf "\n%s\n%s\n",    tl[i], tr[i];            i += 1 }
+      }
+    }' "$root/$script_rel"
+}
+
+# (repo root, script path relative to it, base ref) - parameterized so the fixtures below can point
+# it at a stub. Running the real gate inside a fixture repo would fail for unrelated reasons.
+prove_new() {
+  local root="$1" script_rel="$2" base="$3"
+  local tmp base_out n_bad=0 checks
+
+  git -C "$root" rev-parse --verify --quiet "$base" >/dev/null \
+    || { printf 'prove-new: bad base ref: %s\n' "$base" >&2; return 1; }
+
+  checks="$(mktemp)"
+  _check_tokens "$root" "$script_rel" "$base" > "$checks"
+  if [ ! -s "$checks" ]; then
+    rm -f "$checks"
+    ok "prove-new: this diff adds no checks"
+    return 0
+  fi
+
+  tmp="$(mktemp -d)"
+  git -C "$root" archive "$base" 2>/dev/null | tar -x -C "$tmp" 2>/dev/null
+  mkdir -p "$tmp/$(dirname "$script_rel")"
+  cp "$root/$script_rel" "$tmp/$script_rel"
+  chmod +x "$tmp/$script_rel"
+  base_out="$( (cd "$tmp" && "./$script_rel" 2>&1) | sed 's/'$'\033''\[[0-9;]*m//g' )"
+  rm -rf "$tmp"
+
+  # Matches the label's longest literal run against a base line, and reports that line's mark.
+  _mark_at_base() {
+    local static line
+    static="$(_static_run "$1")"
+    [ "${#static}" -ge 8 ] || { printf 'SHORT'; return; }
+    line="$(printf '%s\n' "$base_out" | grep -F -- "$static" | head -1)"
+    case "$line" in
+      *"✗"*) printf 'RED' ;;
+      *"✓"*) printf 'GREEN' ;;
+      *)     printf 'ABSENT' ;;
+    esac
+  }
+
+  local oklab badlab why
+  while IFS= read -r oklab && IFS= read -r badlab && IFS= read -r why; do
+    [ -n "$oklab$badlab" ] || continue
+    if [ "$oklab" = "__SKIPPED__" ]; then
+      printf '  \033[33m\342\200\242\033[0m %s\n' "prove-new: $badlab added ok/bad call(s) sit inside a function, heredoc or comment and were NOT audited - a check placed there is invisible to this mode"
+      continue
+    fi
+
+    if [ -n "$why" ]; then
+      ok "prove-new: EXEMPT [$(_static_run "${oklab:-$badlab}")] - regression-guard: $why"
+      continue
+    fi
+
+    local okmark="" badmark=""
+    [ -n "$oklab" ] && okmark="$(_mark_at_base "$oklab")"
+    [ -n "$badlab" ] && badmark="$(_mark_at_base "$badlab")"
+    local shown; shown="$(_static_run "${oklab:-$badlab}")"
+
+    if [ "$okmark" = SHORT ] || { [ -z "$oklab" ] && [ "$badmark" = SHORT ]; }; then
+      bad "prove-new: UNKNOWN [${oklab:-$badlab}] - no distinctive literal text to match at base; give the label a fixed phrase"
+      n_bad=$((n_bad + 1))
+    elif [ "$okmark" = GREEN ]; then
+      bad "prove-new: UNPROVEN [$shown] - already green at base, so it never proved anything"
+      n_bad=$((n_bad + 1))
+    elif [ "$badmark" = RED ]; then
+      ok "prove-new: PROVEN [$shown] - red at base"
+    else
+      bad "prove-new: UNPROVEN [$shown] - never ran at base, so it skipped rather than failed"
+      n_bad=$((n_bad + 1))
+    fi
+  done < "$checks"
+  rm -f "$checks"
+
+  [ "$n_bad" = 0 ]
+}
+
+# /refs a skill may compose from the host but better-dev does not ship.
+HOST_OPTIONAL="code-review security-review verify domain-modeling"
+
+# Fixtures for prove-new. A stub script inside a throwaway repo, not the real gate: running the real
+# gate in a fixture tree would fail for a dozen unrelated reasons and prove nothing about the mode.
+prove_new_selftest() {
+  local fx rc=0 out base
+  fx="$(mktemp -d)"
+  (
+    cd "$fx" || exit 1
+    git init -q . && git config user.email t@t && git config user.name t
+    mkdir -p scripts
+    cat > scripts/stub <<'STUB'
+#!/usr/bin/env bash
+ok()  { printf '  \342\234\223 %s\n' "$*"; }
+bad() { printf '  \342\234\227 %s\n' "$*"; }
+ok "a pre-existing check nobody touched"
+STUB
+    chmod +x scripts/stub
+    git add -A && git commit -qm base
+  ) || { printf 'prove-new selftest: fixture setup failed\n' >&2; rm -rf "$fx"; return 1; }
+  base="$(git -C "$fx" rev-parse HEAD)"
+
+  # HEAD adds one check of every classification the mode has to tell apart.
+  cat > "$fx/scripts/stub" <<'STUB'
+#!/usr/bin/env bash
+ok()  { printf '  \342\234\223 %s\n' "$*"; }
+bad() { printf '  \342\234\227 %s\n' "$*"; }
+ok "a pre-existing check nobody touched"
+ok "an unconditional vacuous claim"
+[ -f marker.txt ] && ok "a genuine guarded new check" || bad "a genuine guarded new check missing"
+if [ -f marker.txt ]; then ok "a check that skips itself at base"; fi
+ok "$x-$y"
+ok "an invariant that already held"   # prove-new: regression-guard the tree already satisfied this
+hidden_checks() {
+  ok "a vacuous claim tucked inside a function body"
+}
+hidden_checks
+STUB
+  : > "$fx/marker.txt"
+  ( cd "$fx" && git add -A && git commit -qm head ) >/dev/null 2>&1
+
+  out="$(prove_new "$fx" "scripts/stub" "$base" 2>&1)"
+  local o="$out"
+  printf '%s' "$o" | grep -q 'UNPROVEN.*an unconditional vacuous claim' \
+    || { bad "prove-new selftest: a vacuous check was not flagged UNPROVEN"; rc=1; }
+  printf '%s' "$o" | grep -q 'PROVEN.*a genuine guarded new check' \
+    || { bad "prove-new selftest: a genuine red-at-base check was not cleared as PROVEN"; rc=1; }
+  printf '%s' "$o" | grep -q 'UNPROVEN.*a check that skips itself at base' \
+    || { bad "prove-new selftest: a check absent at base was not flagged UNPROVEN"; rc=1; }
+  printf '%s' "$o" | grep -q 'UNKNOWN' \
+    || { bad "prove-new selftest: an unattributable label was not flagged UNKNOWN"; rc=1; }
+  printf '%s' "$o" | grep -q 'EXEMPT.*the tree already satisfied this' \
+    || { bad "prove-new selftest: a regression-guard was not exempted and named"; rc=1; }
+  printf '%s' "$o" | grep -q 'NOT audited' \
+    || { bad "prove-new selftest: an ok/bad added inside a function was skipped without saying so"; rc=1; }
+  prove_new "$fx" "scripts/stub" "$base" >/dev/null 2>&1 \
+    && { bad "prove-new selftest: the mode exited 0 with unproven checks present"; rc=1; }
+
+  rm -rf "$fx"
+
+  # A commit that MOVES the script, with an unrelated file sharing its basename alongside. Both halves
+  # of the pathspec are pinned here: too tight and the move reads as a whole-file addition, too loose
+  # and the fixture's hunks land on this file's line numbers. Either way the untouched pre-existing
+  # check gets reported as newly added, and the gate blocks a diff that added no check at all.
+  local fx2 base2 out2
+  fx2="$(mktemp -d)"
+  (
+    cd "$fx2" || exit 1
+    git init -q . && git config user.email t@t && git config user.name t
+    mkdir -p old/scripts fixtures
+    cat > old/scripts/stub <<'STUB'
+#!/usr/bin/env bash
+ok()  { printf '  \342\234\223 %s\n' "$*"; }
+bad() { printf '  \342\234\227 %s\n' "$*"; }
+ok "a pre-existing check nobody touched"
+STUB
+    chmod +x old/scripts/stub
+    # Same basename, unrelated content, edited in the HEAD commit so its hunk covers the stub's lines.
+    printf 'fixture line %s\n' 1 2 3 4 5 6 7 8 9 10 > fixtures/stub
+    git add -A && git commit -qm base
+    mkdir -p scripts
+    git mv old/scripts/stub scripts/stub
+    printf 'rewritten fixture line %s\n' 1 2 3 4 5 6 7 8 > fixtures/stub
+    git add -A && git commit -qm move
+  ) || { printf 'prove-new selftest: rename fixture setup failed\n' >&2; rm -rf "$fx2"; return 1; }
+  base2="$(git -C "$fx2" rev-parse HEAD~1)"
+
+  out2="$(prove_new "$fx2" "scripts/stub" "$base2" 2>&1)"
+  printf '%s' "$out2" | grep -q 'a pre-existing check nobody touched' \
+    && { bad "prove-new selftest: a moved script's untouched checks were read as newly added"; rc=1; }
+  rm -rf "$fx2"
+
+  [ $rc = 0 ] && ok "prove-new: discriminates vacuous / genuine / skipped / unattributable / exempt, and reads a moved script as a rename"
+  return $rc
+}
+
+# Same integration-branch walk bd-review-package uses, so one repo has one idea of what BASE means.
+_default_base() {
+  local ref
+  for ref in staging origin/staging origin/main main; do
+    git rev-parse --verify --quiet "$ref" >/dev/null && { git merge-base "$ref" HEAD && return 0; }
+  done
+  git rev-parse --verify --quiet HEAD~1 >/dev/null && { git rev-parse HEAD~1; return 0; }
+  printf 'prove-new: no staging/main/HEAD~1 to derive a base from - pass one explicitly\n' >&2
+  return 1
+}
+
+case "${1:-}" in
+  selftest)   prove_new_selftest; exit $? ;;
+  # [base] [root] - the root override exists so this can be pointed at another checkout (auditing a
+  # past commit) without copying anything into it, which would make the diff read its own overlay.
+  --prove-new)
+    shift
+    prove_new "${2:-$ROOT}" "scripts/bd-package-check" "${1:-$(_default_base)}"; exit $? ;;
+esac
+
+# SKILL body with frontmatter, fenced code, inline code, and quoted spans removed - so a backticked
+# `@AGENTS.md` or a quoted "MUST" (naming a token to forbid it) doesn't read as a real violation.
+prose_of() {
+  awk 'NR==1&&$0=="---"{f=1;next} f&&$0=="---"{f=0;b=1;next} b{print}' "$1" \
+    | awk '/^```/{c=!c;next} !c{print}' \
+    | sed 's/`[^`]*`//g; s/"[^"]*"//g'
+}
+
+echo "== skills =="
+for f in skills/*/SKILL.md; do
+  [ -f "$f" ] || continue
+  dir="$(basename "$(dirname "$f")")"
+  fm="$(awk 'NR==1&&$0=="---"{f=1;next} f&&$0=="---"{exit} f{print}' "$f")"
+  name="$(printf '%s\n' "$fm" | awk -F': *' '/^name:/{print $2; exit}')"
+  desc="$(printf '%s\n' "$fm" | sed -n 's/^description: *//p' | head -1)"
+  prose="$(prose_of "$f")"
+  errs=""
+  [ "$name" = "$dir" ] || errs="$errs name!=dir($name)"
+  [ -n "$desc" ] || errs="$errs no-description"
+  case "$desc" in "Use when"*) ;; *) errs="$errs desc-not-'Use when'";; esac
+  ah="$(printf '%s\n' "$fm" | sed -n 's/^argument-hint: *//p' | head -1)"
+  case "$ah" in ""|\"*|\'*) ;; \[*|\{*) errs="$errs argument-hint-must-be-a-quoted-string" ;; esac
+  printf '%s' "$prose" | grep -qE '(^|[^A-Za-z0-9])@[A-Za-z0-9_./-]+\.(md|sh)' && errs="$errs @-link"
+  printf '%s' "$prose" | grep -qE '\b(MUST|ALWAYS|STOP|CRITICAL|SHALL)\b' && errs="$errs shouting"
+  [ -z "$errs" ] && ok "$dir" || bad "$dir:$errs"
+done
+
+echo "== helper scripts (selftest) =="
+# Every bd-* script but this one ships a selftest, and a sweep that matches none of them would
+# otherwise print a pass over zero suites - which is how this gate once certified a suite it never
+# executed. So the run count is asserted, not assumed.
+st_ran=0
+for s in scripts/bd-*; do
+  [ "$(basename "$s")" = "bd-package-check" ] && continue
+  b="$(basename "$s")"
+  [ -x "$s" ] || { bad "$b not executable"; continue; }
+  # Same reason as the hooks loop below: keep the failing run's output so a red selftest names the
+  # assertion that broke, not merely the file. Both loops, or the gap just moves.
+  st_out=""
+  st_ran=$((st_ran + 1))
+  if st_out="$("$s" selftest 2>&1)"; then
+    ok "$b" # prove-new: regression-guard every shipped selftest passes at base and still does; this loop's check and label are unchanged, only the failure OUTPUT was added, so there is no new assertion to come back red
+  else
+    bad "$b selftest FAILED"
+    printf '%s\n' "$st_out" | tail -5 | sed 's/^/      /'
+  fi
+done
+[ "$st_ran" -gt 0 ] && ok "the selftest sweep ran $st_ran suite(s)" || bad "no selftest-bearing script under scripts/ - the sweep matched nothing, so a pass here would cover zero suites" # prove-new: regression-guard the sweep matches every shipped bd-* script at base and still does; this catches the later change that empties it, which is the one failure a green selftest loop cannot report
+
+echo "== shell parses (bash -n) =="
+# A selftest is not a parse check. `<script> selftest` returns before bash ever reads the rest of the
+# file, so a syntax error in the MAIN path runs green through the selftest loop above - which is
+# exactly how an unparseable script reached a commit here, caught only by the repo's pre-commit hook.
+# CI and a --no-verify commit both skip that hook, so the gate has to parse every shipped script
+# itself.
+#
+# `bash -n`, not `sh -n`: every shipped script declares bash or sh and the parser has to be the one
+# they name. macOS /bin/sh IS bash 3.2, which hid this - on the only machine that gates a merge
+# (runs-on: ubuntu-latest) /bin/sh is dash, and dash rejects a herestring at PARSE time, turning CI
+# red on untouched, correct code. Measured with the real dash, not reasoned.
+unparseable=""
+parsed=0
+for s in scripts/*; do
+  [ -f "$s" ] || continue
+  bash -n "$s" 2>/dev/null || unparseable="$unparseable $s"
+  parsed=$((parsed + 1))
+done
+[ "$parsed" -gt 0 ] || bad "the parse sweep matched no shipped script, so a pass here would cover zero files"
+[ -z "$unparseable" ] && ok "every shipped script under scripts/ parses ($parsed file(s), bash -n)" || bad "syntax error in:$unparseable - a selftest cannot see this, it exits before the parse" # prove-new: regression-guard every shipped script parses at base, as it does after any change that did not break one; this catches the later edit that does, which the selftest runner structurally cannot see
+
+echo "== manifests (valid JSON) =="
+# Four manifests ship: package.json, the plugin manifest, and the same marketplace catalog under both
+# roots. A manifest a host cannot parse - or one naming a file the package does not carry - fails at
+# load on a user machine, so it is checked here instead. The path half is the deleted-paths sweep
+# below, which reads these files too.
+for j in package.json .claude-plugin/plugin.json .omp-plugin/marketplace.json .claude-plugin/marketplace.json; do
+  [ -f "$j" ] || { bad "$j missing"; continue; }
+  jq -e . "$j" >/dev/null 2>&1 && ok "$j" || bad "$j invalid JSON"
+done
+
+# Informational only: a backtick `/word` is used for real skill invocations, but also for illustrative
+# examples, placeholders (`/name`), URL paths (`/dashboard`), and flow names (`/learn`) - too ambiguous to
+# gate on. Surface unknowns for a human glance; don't fail the build.
+echo "== cross-skill /refs (informational) =="
+present="$(ls skills/ 2>/dev/null | tr '\n' ' ')"
+unknown=""
+for ref in $(grep -rhoE '`/[a-z][a-z-]+`' skills/*/SKILL.md 2>/dev/null | tr -d '`/' | sort -u); do
+  case " $present $HOST_OPTIONAL " in *" $ref "*) ;; *) unknown="$unknown $ref" ;; esac
+done
+[ -z "$unknown" ] && ok "every backtick /ref is a shipped or host-optional skill" \
+  || printf '  \033[33m•\033[0m illustrative/placeholder /refs (not gated):%s\n' "$unknown"
+
+echo "== em/en dash gate =="
+# Standing repo rule: no em (U+2014) or en (U+2013) dashes in shipped text. Match the raw UTF-8 bytes
+# under LC_ALL=C so this holds on BSD grep (no -P) as well as GNU. Covers the shipped surfaces,
+# CLAUDE.md included - it is the discovery block's only home, and nothing else scans it.
+em="$(printf '\342\200\224')"; en="$(printf '\342\200\223')"
+dash_hits=""
+for f in $(find skills rules scripts docs -type f 2>/dev/null; ls README.md BOOTSTRAP.md CLAUDE.md 2>/dev/null); do
+  LC_ALL=C grep -lq -e "$em" -e "$en" "$f" 2>/dev/null && dash_hits="$dash_hits $f"
+done
+[ -z "$dash_hits" ] && ok "no em/en dashes in shipped text" || bad "em/en dash in:$dash_hits"
+
+echo "== no-ai-slop gate =="
+# Standing library default, not a project preference: the no-ai-slop guidelines ship to every user inside
+# rules/comms.md, which is why they live in the block's delete list rather than in one repo's
+# overrides. Only the mechanically checkable ones are gated here; the rest is an authoring judgment a
+# grep cannot make, and the block carries those as prose.
+#
+# What is deliberately NOT in this list, and why the omission is the load-bearing part: the source's
+# banned-word list was written for consumer prose and bans `harness`, `leverage`, `robust`, `streamline`
+# and `realm`. This repo is a harness library that uses the first two as domain terms on nearly every
+# page. Gating them would fire hundreds of times on correct text, and a gate that cries wolf gets
+# disabled, taking the useful half with it. So this gate holds only phrases that have no legitimate use
+# in technical instruction text. Every one returned zero across the shipped surfaces when it was added,
+# so it locks in a property the repo already has rather than demanding a cleanup.
+#
+# BSD grep has no -P, so this stays in ERE (-E) with -i, and the alternation is one pass per file.
+slop='delve|tapestry|paradigm shift|game.changer|supercharge|ever-evolving|cutting-edge|multifaceted'
+slop="$slop|it'?s worth noting|it is worth noting|here'?s the thing|let me be clear|plot twist"
+slop="$slop|what if I told you|stands as a testament|marks a pivotal moment|plays a vital role"
+slop="$slop|underscores its significance|experts agree|at the end of the day|in today'?s world"
+slop="$slop|let'?s dive in|is not just|isn'?t just|the question isn'?t|in conclusion"
+slop_hits=""
+for f in $(find skills rules docs -type f -name '*.md' 2>/dev/null; ls README.md BOOTSTRAP.md CLAUDE.md 2>/dev/null); do
+  case "$f" in
+    # Three files must name a pattern in order to forbid it, so they are exempt by construction rather
+    # than by exception: the shipped block itself, the decision record that quotes the ruling, and any
+    # docs page about the patterns. Exempting the block is not a loophole - it is the one file whose job
+    # is to carry the list.
+    rules/comms.md|docs/skills/no-ai-slop*|docs/DECISIONS.md) continue ;;
+  esac
+  LC_ALL=C grep -Eilq "$slop" "$f" 2>/dev/null && slop_hits="$slop_hits $f"
+done
+if [ -z "$slop_hits" ]; then
+  ok "no gated ai-slop phrasing in shipped markdown"  # prove-new: regression-guard every pattern returned zero across the shipped surfaces when the list landed (see the note above), so the check locks in a property the repo already had rather than demanding a cleanup
+else
+  bad "ai-slop phrasing in:$slop_hits (the full list is the delete list in rules/comms.md)"
+fi
+
+echo "== zsh path-variable trap =="
+# A skill's bash blocks are executed by the agent's shell, which is zsh on macOS (and the Claude Code
+# default there). zsh ties the `path` variable to `PATH`, so a plain `path=...` assignment REPLACES the
+# command search path: every later graphify/jq/git call in that block dies with "command not found".
+# This silently disabled the whole graphify wrapper until 0.9.4. Sourced helpers are covered too, since
+# they are sourced INTO that zsh. Executed scripts declare bash/sh in a shebang and are exempt.
+# Convention: idx_path / wt_path / <thing>_path - never the bare name.
+path_hits=""
+for f in $(find skills -name SKILL.md 2>/dev/null); do
+  # Two forms, both fatal under zsh:
+  #   1. an assignment at a statement boundary (line start, or after ; & | ( or `do`/`then`)
+  #   2. a bare `path` in a `local`/`typeset`/`declare` name list - this one is worse, because it
+  #      ties AND EMPTIES PATH on the declaration line itself, before any assignment is visible.
+  #      It is the form that slipped a hand-rename and broke gfx_ensure_graph's first command.
+  LC_ALL=C grep -nE '(^|[;&|(]|[[:space:]](do|then))[[:space:]]*path=' "$f" 2>/dev/null >/dev/null \
+    && path_hits="$path_hits $f"
+  LC_ALL=C grep -nE '[[:space:]](local|typeset|declare)([[:space:]]+[^;#]*)?[[:space:]]path([[:space:]]|=|$)' "$f" 2>/dev/null >/dev/null \
+    && path_hits="$path_hits $f"
+done
+# sed drops the empty line `printf` emits for an empty hit list, so no-hits stays genuinely empty
+path_hits="$(printf '%s\n' $path_hits | sed '/^[[:space:]]*$/d' | sort -u | tr '\n' ' ')"
+[ -z "$path_hits" ] && ok "no bare 'path' variable in skill blocks or sourced helpers" \
+  || bad "zsh path-trap: a bare 'path' variable clobbers PATH in:$path_hits (use idx_path/wt_path)"
+
+# A falsified host observation shipped as background fact outlives the run that disproved it: this
+# one claimed remote branch deletion was classifier-gated, was contradicted on every run from
+# 2026-07-24, and survived only because a house rule in one repo cancelled it - which no adopter can
+# write. Pin the specific dead claim; a general "no observed: notes" rule would be wrong.
+# ok-branch first, like every check here: prove-new pairs an OK token with the BAD that follows it,
+# so a bad-first check splits into two orphans and its ok label reports UNPROVEN.
+if ! grep -q 'observed: both `git push --delete`' skills/pr-and-verify/SKILL.md 2>/dev/null; then
+  ok "no falsified remote-deletion observation in pr-and-verify"
+else
+  bad "pr-and-verify carries the falsified 'remote deletion is classifier-gated' observation - disproved since 2026-07-24"
+fi
+
+echo "== manifest version =="
+v="$(jq -r '.version // empty' .claude-plugin/plugin.json 2>/dev/null)"
+[ -n "$v" ] && ok "plugin.json version present ($v)" || bad "plugin.json has no non-empty version"
+
+echo "== marketplace catalog =="
+# The repo is both the marketplace and the single plugin it lists, and the catalog ships twice: omp
+# reads .omp-plugin/marketplace.json, Claude Code reads .claude-plugin/marketplace.json. Two files
+# that are supposed to be the same file is the drift shape this repo already lost a morning to, so
+# byte-identity is asserted rather than assumed - a fix applied to one copy and not the other would
+# otherwise ship a host-specific bug that only one host's users ever see.
+#
+# Every check below runs unconditionally rather than inside a "catalogs exist" guard. A guard would
+# make each of them SKIP when the files are absent, and a skipped check reads as a passing one to
+# --prove-new, which is the same lie this file exists to prevent.
+MO=".omp-plugin/marketplace.json"; MC=".claude-plugin/marketplace.json"
+[ -f "$MO" ] && [ -f "$MC" ] \
+  && ok "both marketplace catalogs ship" \
+  || bad "both catalogs must ship ($MO and $MC) - omp reads the first, Claude Code the second"
+cmp -s "$MO" "$MC" \
+  && ok "the two marketplace catalogs are byte-identical" \
+  || bad "$MO and $MC differ - they are one catalog published under two roots, so a change to one is a change to both"
+# The catalog's descriptive fields are what /marketplace discover shows BEFORE anything is installed,
+# so they cannot be omitted and left to the plugin manifest. That makes them a second copy by
+# necessity, and this compares the two rather than trusting them.
+pj="$(jq -S '{description, author, homepage, repository, license, keywords}' .claude-plugin/plugin.json 2>/dev/null)"
+cj="$(jq -S '.plugins[0] | {description, author, homepage, repository, license, keywords}' "$MO" 2>/dev/null)"
+[ -n "$pj" ] && [ "$pj" = "$cj" ] \
+  && ok "catalog entry's shared fields match .claude-plugin/plugin.json" \
+  || bad "the catalog entry and .claude-plugin/plugin.json disagree - discovery would advertise one thing and the installed plugin be another"
+# One number, four files, and it has to be all four. omp's all-plugin upgrade compares ONLY catalog
+# entries that declare a version, so omitting it here silently skipped better-dev in a bare
+# `/marketplace upgrade`; `omp plugin link` reads package.json's. plugin.json stays canonical and the
+# other three are checked against it, which is what makes four homes for one number survivable.
+# Keep it semver: omp treats a non-semver version as "changed when unequal", so every catalog refresh
+# would look like an upgrade.
+skew=""
+printf '%s' "$v" | LC_ALL=C grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || skew="$skew plugin.json:$v(not-semver)"
+for cp in "$MO" "$MC"; do
+  cv="$(jq -r '.plugins[0].version // empty' "$cp" 2>/dev/null)"
+  [ "$cv" = "$v" ] || skew="$skew $cp:${cv:-absent}"
+done
+pv="$(jq -r '.version // empty' package.json 2>/dev/null)"
+[ "$pv" = "$v" ] || skew="$skew package.json:${pv:-absent}"
+[ -z "$skew" ] && ok "every version copy equals plugin.json's ($v)" || bad "version drift against plugin.json $v:$skew - a release bump edits all four or omp upgrades the wrong thing"
+# A name omp rejects makes the plugin uninstallable, and the failure surfaces on a user machine at
+# /marketplace install rather than here. Same rule for both names: lowercase alphanumerics, hyphens
+# and dots, starting and ending alphanumeric, at most 64 chars. An empty name list fails too - a
+# sweep that matched nothing proves nothing.
+# A label carrying an embedded double quote is invisible to --prove-new: its token regex stops at the
+# first inner quote, leaving a fragment that matches no printed line, which the mode then reports as
+# "never ran at base". So the detail goes in a variable and the labels stay quote-free.
+nm_bad=""; nm_all="$(jq -r '.name, (.plugins[].name)' "$MO" 2>/dev/null)"
+for n in $nm_all; do
+  printf '%s' "$n" | LC_ALL=C grep -Eq '^[a-z0-9][a-z0-9.-]{0,62}[a-z0-9]$|^[a-z0-9]$' || nm_bad="$nm_bad $n"
+done
+nm_why="${nm_bad:- (none found - the catalog named no marketplace or plugin)}"
+[ -n "$nm_all" ] && [ -z "$nm_bad" ] \
+  && ok "marketplace and plugin names satisfy omp's naming rules" \
+  || bad "name(s) omp will reject:$nm_why - lowercase alphanumerics, hyphens and dots, start and end alphanumeric, max 64"
+# A relative source must start with ./ and resolve inside the marketplace root. A bare . is rejected
+# by that rule even though it names the same directory.
+src="$(jq -r '.plugins[0].source // empty' "$MO" 2>/dev/null)"
+[ "$src" = "./" ] \
+  && ok "plugin source is the marketplace root, so skills/ and rules/ need no move" \
+  || bad "plugin source is ${src:-absent}, expected ./ - the repo root IS the plugin, and a subdirectory source would need skills/ and rules/ moved into it"
+# `omp plugin link` refuses a directory with no package.json, and omp's plugin enumerator then does
+# `let Z = Y.omp || Y.pi; if(!Z) continue`, so without an `omp` key the link REPORTS SUCCESS and
+# contributes nothing: no skills, no rules, only a doctor warning nobody reads. Measured on 17.3.8 -
+# SKILL_SEEN=no RULE_SEEN=no without the key, both yes with it. Invisible until a fresh install.
+[ "$(jq -r 'has("omp")' package.json 2>/dev/null)" = "true" ] \
+  && ok "package.json declares an omp key, so a linked install actually loads" \
+  || bad "package.json has no \`omp\` key - \`omp plugin link\` would report success and load nothing"
+
+echo "== docs/skills mapping =="
+# R7h: the per-skill docs layer mirrors the shipped skill roster one-for-one, both directions - a
+# skill dir with no page is an unreviewed page, a page with no skill dir is stale after a removal or
+# rename (the #748 drift class: a sidecar left naming a skill that moved). The missing-pages half
+# guards additions: docs/skills/ now exists, so a skill shipped with no page fails here from now on.
+# README.md is the standard/index page, not a skill page, and is exempt from the reverse mapping.
+missing_pages=""
+for d in skills/*/; do
+  [ -d "$d" ] || continue
+  name="$(basename "$d")"
+  [ -f "docs/skills/$name.md" ] || missing_pages="$missing_pages $name"
+done
+[ -z "$missing_pages" ] && ok "every skills/<name>/ has a docs/skills/<name>.md page" \
+  || bad "docs/skills page missing for:$missing_pages"
+
+orphan_pages=""
+for f in docs/skills/*.md; do
+  [ -f "$f" ] || continue
+  name="$(basename "$f" .md)"
+  [ "$name" = "README" ] && continue
+  [ -d "skills/$name" ] || orphan_pages="$orphan_pages $name"
+done
+[ -z "$orphan_pages" ] && ok "every docs/skills page maps back to a shipped skills/<name>/ dir" || bad "docs/skills page with no shipped skill dir:$orphan_pages" # prove-new: regression-guard green at base because docs/skills/ does not exist there; guards the mapping after this batch creates it
+
+echo "== entry-skill utterances =="
+# Each entry skill's description should carry at least one phrase a real user would type for that need,
+# so natural-language activation routes without a skill name. Any-of match, case-insensitive.
+utt() {
+  sk="$1"; shift
+  d="$(sed -n 's/^description: *//p' "skills/$sk/SKILL.md" 2>/dev/null | head -1 | tr 'A-Z' 'a-z')"
+  for p in "$@"; do case "$d" in *"$p"*) return 0 ;; esac; done
+  bad "entry skill '$sk': description names no canonical user phrasing (want one of: $*)"
+}
+utt plan-grill    "feature" "build" "new feature"
+utt diagnose      "bug" "broken" "failing" "crash" "flaky" "slow" "regression"
+utt groundwork    "greenfield" "new project" "from scratch" "foundation"
+utt pr-and-verify "pull request" "open a pr" " pr "
+[ $fail = 0 ] && ok "entry skills carry canonical user phrasings" || true
+
+echo "== enumerated-count drift =="
+# A regression guard (declared as such on the ok/bad line below - prove-new reads that declaration as
+# a trailing comment on the call, never from a comment block like this one). It exists because the
+# announced number and the list drift apart silently: a later edit adds a bullet, the count above it
+# still reads six, and the skill now tells the agent to stop one item early. Scoped tight on purpose -
+# only a count whose sentence ENDS in a colon and is immediately followed by a top-level "- " list,
+# which is the one shape where the number is a promise about the list rather than prose. Two sites
+# match today and both are correct; a looser pattern reported prose like "four lenses" whose list sits
+# three paragraphs away and would have to be waived rather than fixed.
+count_drift=""
+for f in $(find skills docs -name '*.md' 2>/dev/null); do
+  d="$(awk '
+    BEGIN{ w["two"]=2;w["three"]=3;w["four"]=4;w["five"]=5;w["six"]=6
+           w["seven"]=7;w["eight"]=8;w["nine"]=9;w["ten"]=10 }
+    { L[NR]=$0 }
+    END{
+      for(i=1;i<=NR;i++){
+        if(match(L[i],/(two|three|four|five|six|seven|eight|nine|ten) (lines|steps|moves|checks|rungs|lenses|categories)/)==0) continue
+        tok=substr(L[i],RSTART,RLENGTH); split(tok,p," "); want=w[p[1]]
+        para=""; for(j=i;j<=NR && L[j]!="";j++) para=para L[j]
+        if(para !~ /:$/) continue
+        k=j; while(k<=NR && L[k]=="") k++
+        if(L[k] !~ /^- /) continue
+        n=0
+        while(k<=NR){
+          if(L[k] ~ /^- /) n++
+          else if(L[k]=="" || L[k] ~ /^  /){ }
+          else break
+          k++
+        }
+        if(n!=want) printf "%s:%d(%s!=%d) ", FILENAME, i, tok, n
+      }
+    }' "$f")"
+  count_drift="$count_drift$d"
+done
+[ -z "$count_drift" ] && ok "enumerated counts match the list that follows" || bad "enumerated count drift: $count_drift" # prove-new: regression-guard a skill announcing "six lines" above six bullets is correct at base; this catches the later edit that adds a seventh and leaves the count reading six
+
+echo "== comms-style block =="
+# The block ships from exactly one file, as a plugin rule the host injects: two copies of the body
+# drifted silently once, with two writers each running once and nothing reconciling them, so a doc
+# page beside the rule would rebuild that. Also gate the 85-line cap the body is deliberately held
+# to, since it is a per-turn tax in every session that loads it.
+# Cap history, because the shape of the mistake matters more than the number: 24 originally, 30 when the
+# block gained its first device that acts on a reply, 60 when the operator ruled the upstream wording be
+# kept rather than paraphrased (D31 allows it, and the paraphrase had measured vaguer), then 85 when the
+# operator ruled the no-ai-slop guidelines ship to every user through this block rather than sitting in
+# one project's overrides. That last move is why the block carries a long delete list: the rules have to
+# reach the reader's own machine, and a pointer to a reference file does not load on the turn it binds.
+# Upstream ships roughly 140 lines always-on, so this block IS still the compression.
+# What a cap is for is stopping unbounded drift, NOT making deletion the cheapest way to add a rule -
+# at 24 it did exactly that and silently dropped a shipped rule, which review had to catch.
+CB="rules/comms.md"
+# alwaysApply is the entire delivery mechanism. Without it the rule is discovered by name and its
+# body is never injected, which fails silently: sessions read as if the style were simply ignored.
+# Tested on omp 17.3.8 - honoured for rules, NOT for skills, which is why this is a rule. Checked
+# outside the exists-guard below so an absent file fails here instead of skipping.
+grep -qxF 'alwaysApply: true' "$CB" 2>/dev/null \
+  && ok "$CB carries alwaysApply: true, so its body is injected rather than merely listed" \
+  || bad "$CB has no 'alwaysApply: true' frontmatter - the body would never reach a session, and nothing would say so"
+if [ ! -f "$CB" ]; then
+  bad "$CB missing (the comms block body's single home)"
+else
+  # Sentinel = the body's opening sentence, which changes when the block is reworded - it changed once
+  # already (from "may have ADHD" to upstream's declarative "has ADHD") and a stale sentinel finds zero
+  # homes and reads as a missing block. Scan the shipped surfaces the same way the dash gate does,
+  # NOT the git index: an uncommitted second copy is exactly the drift this gate exists to catch, and
+  # `git ls-files` cannot see one. raw/ is the gitignored source archive and stays out of scope.
+  probe="The reader has ADHD"
+  homes="$(find skills rules scripts docs -type f 2>/dev/null; ls README.md BOOTSTRAP.md 2>/dev/null)"
+  homes="$(printf '%s\n' "$homes" \
+    | while read -r f; do [ -f "$f" ] && grep -lqF "$probe" "$f" 2>/dev/null && printf '%s\n' "$f"; done \
+    | grep -v 'scripts/bd-package-check' || true)"
+  nhomes="$(printf '%s' "$homes" | grep -c . || true)"
+  [ "$nhomes" = 1 ] && ok "comms block body has exactly one home ($CB)" \
+    || bad "comms block body must live in exactly one shipped file, found $nhomes:$(printf ' %s' $homes)"
+  # Count the BODY, not the file: frontmatter is stripped before injection, so it is not part of the
+  # per-turn tax the cap exists to bound. Counting the file instead would silently spend cap headroom.
+  lines="$(awk 'NR==1 && $0=="---" {fm=1; next} fm==1 && $0=="---" {fm=2; next} fm!=1' "$CB" | grep -c '' || true)"
+  if [ "$lines" -le 85 ]; then
+    ok "comms block within its 85-line cap ($lines)"  # prove-new: regression-guard the cap and its label are unchanged; only what they measure moved from the whole file to the body, and the measured number is the same 80, so there is no new assertion that could come back red
+  else
+    bad "comms block is $lines lines, cap is 85 - cut a line before adding one"
+  fi
+fi
+
+echo "== discovery block =="
+# CLAUDE.md's managed block is the whole of discovery: nothing announces the practices to a fresh
+# session but this text. So it has to be present, sentinel-closed, and to name where a session finds
+# the two files that override a default and record this repo's rules - a block that says the
+# practices exist but not where their overrides live sends the reader to guess one.
+CM="CLAUDE.md"
+db_errs=""
+[ -f "$CM" ] || db_errs=" missing-file"
+if [ -f "$CM" ]; then
+  grep -qxF '<!-- BEGIN better-dev -->' "$CM" || db_errs="$db_errs no-begin-sentinel"
+  grep -qxF '<!-- END better-dev -->' "$CM" || db_errs="$db_errs no-end-sentinel"
+  db_block="$(awk '/^<!-- BEGIN better-dev -->$/{f=1} f{print} /^<!-- END better-dev -->$/{exit}' "$CM")"
+  printf '%s' "$db_block" | grep -qF '.better-dev/overrides.md' || db_errs="$db_errs no-overrides-pointer"
+  printf '%s' "$db_block" | grep -qF '.better-dev/rules.md' || db_errs="$db_errs no-rules-pointer"
+fi
+[ -z "$db_errs" ] && ok "CLAUDE.md carries the managed block, closed, naming where overrides and rules live" || bad "CLAUDE.md managed block:$db_errs - this block is the only thing that tells a fresh session the practices are here"
+
+echo "== deleted paths =="
+# The harness now provides what this library used to ship, and every shipped file has to point at the
+# native replacement. A file that still names a removed script or directory costs its reader a turn
+# discovering the command is not there, which is worse than saying nothing at all.
+#
+# The historical records are exempt by construction, not by exception: docs/DECISIONS.md,
+# docs/RELEASES.md, docs/TRAPS.md, docs/PLAN.md and NOTICE record what happened and are read as past
+# tense, so they are outside the swept set below rather than filtered out of it. This file is
+# exempted by name because it has to spell the patterns in order to forbid them.
+gone='bd-mem|bd-guard|bd-gfx|bd-dispatch|bd-block|bd-link|bd-browse|bd-worktree-guard|bd-hook-wire'
+gone="$gone|bd-session-start|bd-subagent-start|bd-graphify-refresh-stale|bd-migrate-branch-model"
+gone="$gone|bd-omp-runtime-check|bd-awareness|[.]better-dev/bin|hooks/hooks[.]json|hooks/bd-"
+gone="$gone|hosts/(claude|codex|hermes|omp)|better-dev/hooks|graphify|browse/src|learnings[.]jsonl"
+gone="$gone|orchestrating-agents/tiers[.]md|/bootstrap-hooks|/codebase-map|/browser-capability"
+gone="$gone|install[.]sh|bd-uninstall|friction/"
+gone_hits=""
+for f in $(find skills rules scripts .github docs/skills -type f 2>/dev/null; ls README.md CLAUDE.md BOOTSTRAP.md .claude-plugin/plugin.json .omp-plugin/marketplace.json .claude-plugin/marketplace.json 2>/dev/null); do
+  [ "$f" = scripts/bd-package-check ] && continue
+  LC_ALL=C grep -Eq "$gone" "$f" 2>/dev/null && gone_hits="$gone_hits $f"
+done
+[ -z "$gone_hits" ] && ok "no shipped file names a script or directory this release deleted" || bad "deleted path named in:$gone_hits - each one has a native replacement, and a reader following the old name spends a turn finding out it is gone"
+
+echo
+[ $fail = 0 ] && echo "package-check: PASS ($(ls skills/ | wc -l | tr -d ' ') skills)" || { echo "package-check: FAIL"; exit 1; }

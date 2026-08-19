@@ -1,0 +1,198 @@
+---
+name: self-extension
+description: Use when sourcing an existing skill has come up empty and a capability still needs filling, when a proven, repeatable workflow is worth capturing as a new reusable skill of its own, or when a recurring correction or re-recorded override looks like a defect in the shipped skill text rather than this repo's preference - to name it a library-defect candidate for the operator to carry upstream.
+---
+
+# Self-extension
+
+Two things bring you here: a capability gap that sourcing could not fill, or a session that went unusually
+well - a deliverable markedly better than usual is itself the signal to interrogate the run (what did you
+consider, how did you verify, why did this actually work) and mine it before its context is gone. Either
+way you author one new skill from what you understand, and only let it reach the live tree once it has
+passed a check and an explicit yes. There is no distillation engine - you gather the sources and write the
+`SKILL.md` with the tools you already have, so this runs the same on any harness.
+
+Creating is the fallback, not the first move. `/tool-sourcing` hands off here only after discovery,
+vetting, and try-before-adopt all came up empty; a proven, installed skill beats a fresh one every time.
+Carry the gap line and the vetting note across - they are the spec for what to build.
+
+Read `.better-dev/overrides.md` first and honor any project override - a repo may pin where skills live,
+forbid new ones, or already name the shape it wants.
+
+## 1. Earn the create
+
+Two questions gate whether to author anything, and they run before you write a line.
+
+**Is the lesson durable?** A skill is a standing instruction the agent carries for months, so a transient
+truth hardens into a self-imposed constraint that bites later. Don't encode a passing "X is broken", an
+environment or setup failure someone can fix, or a one-off task narrative - capture the *fix* (the install
+step, the config, the retry that worked), never the failure. The full filter, and where a rejected lesson
+belongs instead, is in `what-not-to-encode.md`; reach for it whenever you're unsure a lesson deserves to
+persist. "Nothing worth saving" is a real answer, just not the default one.
+
+**Does something already cover this?** Prefer improving what exists over adding a narrow sibling. Read the
+project's lessons (`memory://root/learned.md`) and scan the installed skills; take the
+earliest fit:
+
+- an existing skill covers the class of work → patch that skill;
+- one is close but missing a piece → add a `references/` note or a `scripts/` file under it;
+- nothing fits → author a new skill.
+
+When you patch an existing skill, read it in full this turn first and write the edit from those bytes, not
+from what you remember of it - a skill edited from memory drifts from what's actually on disk.
+
+**Is a skill the owner of this gap at all?** Every rung above writes prose, and prose owns a
+*knowledge* gap: the agent could have done the work and did not know how, when, or where. Where the
+run failed because the capability was not there, because no check could tell a right result from a
+wrong one, or because the authority to act was missing, prose instructing the agent around the hole
+is a note where the repo needs a mechanism - and it reads as covered on every future run, which is
+worse than the gap. Route by what was actually missing: an unavailable capability to
+`/tool-sourcing`, a missing gate, verify command, or blast-radius rule to `/guardrails-install`, an
+unproven claim to `/plan-grill`'s done-criteria. A skill is right again once the mechanism exists and
+the agent kept failing to reach it.
+
+**Some recurring lessons are the library's defect, not this repo's.** When the same correction keeps
+recurring - a lesson re-learned, an override re-recorded - and its root cause is shipped skill text (a
+better-dev default that is wrong here and would be wrong in any repo, a skill line that keeps producing
+the same wrong move), none of the rungs above fit. Editing the installed tool's text is a fork the next
+tool update silently reverts, and burying the correction as one repo's override leaves every other
+adopter re-hitting it. Name it a **library-defect candidate** instead: write up the evidence - the
+recurring correction, the skill line at fault, the fix that keeps being applied - and hand it to the
+operator to carry upstream, an issue or patch on the tool's own repo. The negative form is explicit
+too: a correction that holds only because of this repo's stack, domain, or house taste is a preference,
+not a defect - it stays a project override or lesson, recorded as such, and never travels upstream.
+
+**State what you keep at the level that fires again.** The gate above decides which observations
+survive; this decides how specific they are once written, and it binds a skill's trigger, a rule in its
+body, and the recorded lesson alike. A claim only reaches situations its antecedent matches, so before
+writing one down, name two situations other than the one you just saw where it still fires. If you
+cannot, the antecedent is pinned to one path, one PR number, one tool version, or one vendor, and what
+you have is a record of the run rather than a lesson from it: restate it at the level of the mechanism
+you understood. Stop at the least specific claim that still covers every case you observed, because a
+claim weaker than that asserts what no run has shown. Specificity belongs to the evidence, never the
+claim - the commands, paths, and signatures a rule carries stay exactly as the source gave them (step 2
+holds), while the rule around them generalises.
+
+## 2. Gather the sources and the requirements
+
+The request mixes two kinds of content in any order: **sources** to gather (paths, directories, URLs, "what
+we just did", pasted notes) and **requirements** that shape the skill (what to focus on, what to leave out,
+scope, naming, the angle). Every part is load-bearing. Prose that follows a path or link is not incidental -
+it is the caller telling you what they want from that source. Gather each source with the tools you have
+(read files and search for local paths, fetch for URLs, this conversation for a workflow you just ran); if
+scope is ambiguous, make a reasonable choice and note it rather than stalling.
+
+When the source is a workflow you just ran or the user's own way of working, it lives in their head and the
+transcript, not on disk - don't guess it into a plausible-sounding procedure. Interview in
+draft-folding steps about how they do it, what good output looks like, and the edge cases that trip
+it: each answer lands in the draft before the next question, so every question reacts to the
+updated draft - a dependency chain whose frontier is one question wide, which is why this interview
+stays serial while the grill batches rounds. If a question is answerable from the codebase, look
+there instead of asking. Same rule as `/plan-grill`'s must-ask guard (`skills/plan-grill/SKILL.md`
+step 3): a fact you can find is yours to find, and an interview question answered by this same
+session is a broken interview.
+
+Prefer the exact commands, endpoints, and signatures that appear in the source over ones you half-recall,
+and don't invent a flag or path you never saw. A skill gets shared, so keep the host's or user's identity
+out of it - the skill names itself.
+
+On demand, your own recent sessions are a legitimate source for this step: clustering recurring findings
+across them to decide, per cluster, whether the answer is a new skill, an automation, a one-line fix, a
+library-defect candidate (step 1 names that disposition), or nothing is diagnosis only - it writes
+nothing without the same approval gate below.
+
+## 3. Author one SKILL.md
+
+One skill, one job. Author it to the better-dev authoring standard - and that standard is the
+`/writing-skills` skill, so apply it by invoking that skill, not by re-deriving frontmatter or structure
+rules here. Keeping the standard in one place is what lets it change once and hold everywhere. If the
+procedure needs a non-trivial script, write it as a file the skill references by relative path rather than
+inlining it for the agent to retype each run.
+
+## 4. Test before you promote
+
+Nothing half-built reaches the live tree. The candidate lives in a throwaway staging dir, passes a check
+there, and lands only on approval; on any failure the staging dir is removed and nothing is left behind -
+no half-written skill in the list, no tombstone for something never approved. That much holds wherever the
+skill is headed, and there are two destinations doing different jobs:
+
+- **Into the operator's own tree** - this repo's project skills dir, or their personal global skills dir
+  (step 3 picks between them). This is the default and what nearly every run here means. It needs no
+  tooling beyond the file tools you already have: any throwaway dir stages it, and the structural criteria
+  below are a bar you check the draft against by reading it.
+- **Into the better-dev library itself** - maintainer work, done in a checkout of the better-dev repo,
+  where `scripts/bd-skill-stage` is simply there on disk and machine-enforces the staging and the
+  structural check. That script is a maintainer gate, not shipped capability: a plugin install carries no
+  copy of it and no path to one, so outside a checkout the same criteria hold by reading, and every
+  command below that names the script is the maintainer's.
+
+1. **Stage.** Write the `SKILL.md` (and any script or reference files) into a throwaway dir - `mktemp -d`
+   is enough - and remove it on any failure. In a better-dev checkout, `scripts/bd-skill-stage dir` prints
+   one.
+2. **Check - lint, then prove.** The structural bar is the same wherever the skill lands: frontmatter
+   present and well-formed, a kebab-case name matching the folder, a description that states its trigger,
+   no stray `version`/`license`, no `@`-link, no oversized file. Read the draft against that list; in a
+   better-dev checkout `scripts/bd-skill-stage lint <dir>` fails it for you instead of resting on your
+   care. Structurally clean means well-formed, not working - so before promoting, prove the skill does its
+   job. Run one realistic input with the candidate loaded and confirm the agent actually does what the
+   skill promises, judged on the trace (the tool calls, the diff), not the narration. For a fragile or
+   judgment-heavy skill, use a trap - an input a skill-less agent gets wrong - and confirm the skill
+   catches it; a failed trap means the body is too vague, so make the weak step procedural and re-run. A
+   trap you invented this session has an unrun half: run it once without the candidate loaded before
+   crediting the skill with the catch, because an input the skill-less agent already handles grades
+   nothing and the pass reads identical either way. A scenario from the repo's trap record (better-dev's
+   own is `docs/TRAPS.md`) carries that half already recorded, so take it from there and skip the run. For
+   a skill that ships a script, also run that script's own
+   fixture and test inside the staging dir, asserting on real output, not just that it didn't throw. On a
+   structural failure fix in place and retry at most twice, showing the diff each time; if the proof still
+   fails, discard and stop rather than lower the bar.
+3. **Classify the scope - local or global.** Decide where the proven skill belongs before you commit it. A
+   skill that only makes sense *here* - it names this repo's tools, paths, domain, or conventions - is
+   **local**: it belongs to this repo alone and shouldn't surface in your other repos. A general,
+   repo-agnostic practice you'd want everywhere is a candidate for **global** - your own global host skills
+   dir (`~/.claude/skills/<name>` on Claude), so every repo you work in sees it. Global is still *your* skill:
+   it sits alongside the installed better-dev tool in that directory, never inside it, so a tool update never
+   touches it - and it is not packaged into better-dev or pushed upstream. It just travels with you across
+   your repos. When the answer is clear, take it. Unsure? Ask the one question that settles it - just this
+   repo, or all your repos? - and if it's still unclear, default to **local**: local is reversible (promote it
+   to global later in one move), while a global skill you didn't need surfaces in every repo and is more
+   annoying to walk back. Global is the bigger step, so gate it behind an explicit confirmation.
+4. **Approve.** An installed skill runs with full agent permissions, so land it only behind an explicit yes.
+   Present it plainly - what it captures, whether it's local or global and where that lands, the one thing
+   that could go wrong - and ask. In an autonomous run there's no human at the keyboard, so this stop is a
+   `NEEDS_INPUT` state (the vocabulary is `/autonomous-loop`'s), not a failure; promotion resumes when
+   approval comes.
+5. **Land or discard.** An installed skill lands in a `.claude/`-scoped or `$HOME`-scoped dir and then runs
+   with full agent permissions, so that write stays operator-run, with consent adjacent to it, rather than
+   agent-run. On a yes, emit the landing command paste-ready (offer it to the clipboard where the host has
+   one) and let the operator run it: a **local** skill moves into this repo's project skills dir
+   (`.claude/skills/<name>`, discovered only here), a **global** one into the operator's own global skills
+   dir (`~/.claude/skills/<name>`, seen across their repos). Whatever command you emit keeps three
+   refusals, because they are what makes the move safe rather than which tool performs it: never clobber an
+   existing skill, never follow a symlink, never land outside the target root - so the plain form creates
+   the target root and moves the staging dir in under a name that must not already exist, never a recursive
+   copy over one. In a better-dev checkout, `scripts/bd-skill-stage commit <dir> local|global` does exactly
+   that atomically and enforces the three itself. The folder is taken from the frontmatter `name`, so name
+   and folder always match. Once the operator reports it ran, verify the landing yourself: confirm the
+   skill dir now exists at the target root. On a no, or after the retries are spent, remove the staging dir
+   (`scripts/bd-skill-stage discard <dir>` in a checkout) - that write only touches a throwaway dir this
+   session made, so it stays agent-run.
+
+## 5. Verify and record
+
+Once it lands, exercise it once - re-read the committed copy against the structural bar above, or run its
+script and compare against the output the prototype produced. If it drifted, surface the discrepancy
+rather than quietly undoing the commit; the caller deserves to see it.
+
+Record what the run taught: the durable technique goes through the `learn` tool, and an
+`authored <skill> for <capability>; retire when <condition>` line goes into `.better-dev/rules.md`, so the
+next time that gap surfaces the choice is reused instead of re-created. The retirement
+half is recorded now because now is when you know it: a skill authored to steer a weaker model caps a
+stronger one, and nothing downstream removes a skill - `/release-promotion`'s distill pass retires a stale
+*rule* on disuse, never a skill file - so a condition nobody wrote down is one nobody ever checks.
+Separately and optionally, a skill that proves broadly
+useful can be shared to the wider ecosystem for others to source (`/tool-sourcing` in reverse) - a distinct,
+deliberate choice, never automatic and unrelated to the local/global scoping above. Before it leaves this
+machine, read it once for what travels badly: a path under your own home, a vault or notes directory, a
+hostname, an org name. A shared skill runs against a stranger's tree as if it were yours, and a
+model-invoked one fires there without anyone typing it.

@@ -1,0 +1,100 @@
+# Hotfixes - land the fix on both branches
+
+A hotfix skips the integration branch because production can't wait for the soak. That shortcut has
+one cost: the fix now lives on the release branch but not on integration, and the **next** promote
+fast-forwards the release branch onto integration - which doesn't have the fix - quietly undoing it.
+So a hotfix isn't done when it reaches production; it's done when it reaches *both* branches.
+
+Branch names come from the overrides read in the main body (`release` defaults to `main`,
+`integration` to `staging`).
+
+## The shape
+
+1. **Branch off the release branch.** `/worktree-branching` already bases `hotfix/<slug>` on
+   `main` - let it create the worktree rather than hand-rolling `git worktree add`.
+2. **Diagnose, then fix and prove it.** Route the incident through `/diagnose` first - its
+   production path stabilizes before root-causing and reads prod telemetry as the signal source -
+   and let it write the fix-contract `/autonomous-loop`'s entry gates check. Incident pressure earns
+   an expedited contract, never a skipped one; four lines pass the gates:
+
+   ```
+   symptom: checkout 500s on card payments since 14:02 UTC
+   red signal: curl -s https://<prod>/api/checkout -d @fixture.json → 500 (error tracker: TypeError at charge.ts:88)
+   fix scope: src/payments/charge.ts
+   merge: auto
+   ```
+
+   The red signal comes from prod telemetry, captured red and re-runnable - that is what the loop
+   drives green. Then drive the change with `/autonomous-loop` to a real green check, and run
+   `/review` before it lands - a hotfix under incident pressure is exactly when a skipped review
+   bites.
+3. **Merge to the release branch and tag.** Same fail-closed discipline as a normal promote: CI
+   green on the fix, then fast-forward or merge into `main` and tag the patch release.
+
+   ```bash
+   git switch "$release"
+   git merge --no-ff "hotfix/$slug" -m "hotfix: $slug"
+   git log --oneline -1                     # read the merge back before tagging it
+   hotfix_sha=$(git rev-parse HEAD)
+   git tag -a "$version" -m "hotfix $version"
+   git push origin "$release"
+   git push origin "$version"
+   git ls-remote --tags origin "$version"   # a tag that never left looks identical to one that did
+   ```
+
+   One command per line, for the reason the promote section gives: under incident pressure a chained
+   list reports only its last status, and a hotfix tag that never reached the remote is the rollback
+   target you will go looking for at the worst moment.
+
+   Incident pressure is exactly when `--no-verify` and `--force` start to look reasonable; they
+   aren't. A hook that fails or a push that's rejected here is a gate catching something while you
+   move fast - read it, don't bypass it. And if a step goes wrong and you realize you've lost data or
+   shipped the wrong sha, say so immediately rather than quietly patching over it; an honest report
+   lets the operator recover while the trail is warm.
+
+4. **Back-merge into integration - the step that's easy to forget.** Bring the release branch's new
+   history into integration so the fix survives the next promote:
+
+   ```bash
+   git switch "$integration"
+   git merge --no-ff "origin/$release" -m "back-merge hotfix $version"
+   git log --oneline -1                     # the back-merge is what stops the next promote reverting the fix
+   git push origin "$integration"
+   ```
+
+   Merging the whole release branch (rather than cherry-picking the fix commit) keeps the two
+   branches' histories reconciled, so the later `main`-is-ancestor-of-`staging` gate passes cleanly
+   instead of reporting `DIVERGED`.
+
+## Prove the fix reached both
+
+Don't assume the merges took - confirm the fix commit is an ancestor of each branch:
+
+```bash
+git merge-base --is-ancestor "$hotfix_sha" "origin/$release"     && echo "on release"
+git merge-base --is-ancestor "$hotfix_sha" "origin/$integration" && echo "on integration"
+```
+
+Both lines have to print. If integration is missing it, the back-merge didn't land - resolve it now,
+while the context is fresh, not at the next promote when the gate blocks and no one remembers why.
+
+Both lines printing is the git half of the proof. A hotfix's whole point is production behavior
+changing, so the proof finishes on the deployed surface: run the deploy-verify pass
+(`post-deploy.md`) against the release deploy and observe the incident symptom gone - driven, not
+inferred from the merge. A pipeline that silently no-ops (a paused auto-deploy) passes both
+ancestor checks while prod still runs the bug; the deploy wait catches exactly that, finding no
+run at the release sha, and the hotfix settles `UNVERIFIED` instead of resolved.
+
+## Record it
+
+Write the receipt with the `write` tool to `.better-dev/ledger/hotfix-<slug>/hotfix.md`:
+
+```
+hotfix: 0.13.1
+commit: 4f2a91c
+on: main + staging
+live: symptom gone: /login 200, error banner absent   # what the deploy-verify observed
+```
+
+If the incident taught something durable - a gap in CI that let the bug through, a fragile path -
+record it with the `learn` tool, so the next planning pass sees it.

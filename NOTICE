@@ -1,0 +1,240 @@
+better-dev
+Copyright 2026 Yoel Gal - MIT (see LICENSE)
+
+better-dev is built by REIMPLEMENTING patterns and methods from the projects below.
+Ideas, techniques, and system designs are not copyrightable, so reimplemented
+components are original work and owe no attribution. This file (a) lists any expression
+we actually copied verbatim/substantially, which MIT requires us to attribute, and
+(b) credits, as a courtesy, the projects whose patterns informed better-dev.
+
+── Copied verbatim / substantially (attribution required) ──
+  .omp/config.yml - destructive-command pattern set adapted from garrytan/gstack careful/
+    (MIT, (c) 2026 Garry Tan); the patterns are theirs, the approval policy around them
+    is the harness's own.
+  Nothing else is vendored. skills/ios-capability fetches the on-device QA tool from upstream
+    on demand (github.com/garrytan/gstack, subdir ios-qa/, MIT, commit 11de390) rather than
+    carrying a copy. Fetched code stays under its own upstream license, which travels with it;
+    no copied expression ships here.
+  mattpocock/skills - Matt Pocock (MIT, (c) 2026 Matt Pocock). Under D31 this library
+    keeps that repo's wording wherever the wording is what carries the value, so the
+    files below hold passages in their author's expression and not only reimplemented
+    patterns. The list is deliberately scoped by FILE, not by sentence: what a reader
+    needs is which of our files to treat as carrying upstream text, and a sentence-level
+    list is stale the day someone finds one more. Where a file is named here, assume its
+    debt may run past the examples given.
+      skills/review/standards-baseline.md, skills/review/SKILL.md,
+        skills/review/reviewer-brief.md <- skills/engineering/code-review/SKILL.md.
+        The Fowler smell baseline (entry wording, the what-it-is -> how-to-fix form, the
+        "possible <smell>" framing), the two-axis "a change can pass one axis and fail
+        the other" line, the repo-standard-overrides-the-baseline rule. The review
+        chain, its channels, its dispatch and its gates are ours.
+      skills/deploy-capability/SKILL.md rung 2 <- skills/engineering/wizard/SKILL.md.
+        The static-trace rule for a generated operator script: do not run it end to end
+        since it opens browsers and blocks on input, trace it statically, and the two
+        things that trace checks. The payload fork itself, its counting test and the
+        walkthrough machinery around it are ours.
+      skills/writing-skills/SKILL.md <- .agents/writing-docs.md,
+        skills/productivity/writing-for-agents/SKILL.md,
+        skills/productivity/writing-great-skills/GLOSSARY.md (the pre-rename file),
+        docs/productivity/wait-what.md. The branches-in-a-table rule, the
+        environment-as-cache rule, the negation mechanism, the read-the-draft-for-its-
+        silences rule, the fails-by-growing formulation and its four-hundred-line
+        illustration. The bar's other rules, the frontmatter standard, the deletion test
+        and the trap set around them are ours.
+      docs/skills/README.md and the pages under docs/skills/ <- .agents/writing-docs.md,
+        skills/productivity/writing-for-agents/SKILL.md. The four-section page spine
+        (What it does / When to reach for it / Common questions / It's working if) and
+        its orient-then-answer rationale, the working-if bar ("a few bullets naming what
+        the reader sees when the skill is doing its job"), the compliance-check-wearing-
+        this-section's-name line, the evidence-gated question sizing, and this file's own
+        copies of the branches and cache rules. Every page's contents, and the
+        bidirectional mapping the package gate enforces, are ours.
+      skills/wait-what/SKILL.md, docs/skills/wait-what.md <-
+        skills/productivity/wait-what/SKILL.md, docs/productivity/wait-what.md.
+        The corrective's own framing, kept in its author's words: "the last message did
+        not land", "comprehension failed here". The size gate, the context-line-leads
+        rule, the routing table and the comms-block boundary are ours.
+      skills/plan-grill/SKILL.md <- the grilling-question-format changeset that pinned
+        the format into skills/productivity/grilling/SKILL.md, and
+        skills/productivity/to-questionnaire/SKILL.md. The round's question format
+        ("each question, then your recommendation on its own line - so the user answers
+        by number") and the questionnaire unblock's rules (grill the user only about the
+        send; most-important-first because async may get one pass; one idea per question
+        with an answer stub under each). The two guards, the four-question cap, the
+        one-way-door class, the front-door routing and the NEEDS_INPUT park are ours.
+      docs/TRAPS.md trap 153 <- skills/productivity/to-questionnaire/SKILL.md. The
+        "send, not the subject" antithesis, the "Markdown questionnaire aimed at the gap"
+        phrasing, and the ordering-and-stub clause it restates. The trap's scenario and
+        its Pass/Fail structure are ours.
+      skills/prototype/SKILL.md, skills/prototype/artifacts.md <-
+        skills/engineering/prototype/SKILL.md, UI.md, LOGIC.md (HEAD 9c9f36c). The opening
+        definition, the look-versus-logic fork's fatal-mistake clause and its ambiguity
+        default, the variant count and its cap reason, the structural-difference bar
+        including "three slightly-tweaked card grids isn't a UI prototype, it's wallpaper",
+        the vacuum clause, the "header from B with the sidebar from C" reframe, the five
+        both-branch rules and the primary-source parking rule; in artifacts.md both branch
+        recipes stay close to upstream UI.md and LOGIC.md - the switcher spec and its
+        production gate, the `?variant=` block, the two placements, the four logic shapes,
+        the page layout and all nine anti-patterns. Punctuation normalised to house style.
+        The decision card and its refusal gate, the not-a-decision routing table, the
+        verbalized-candidates divergence, the runner-up ledger and the exit table are ours.
+      skills/codebase-audit/SKILL.md <- skills/engineering/improve-codebase-architecture;
+        skills/orchestrating-agents/briefs-and-reviews.md <- skills/engineering/research;
+        skills/groundwork/carving.md and skills/groundwork/SKILL.md <-
+        skills/engineering/to-tickets (the slicing vocabulary, and the three-question
+        gate on a proposed carve); skills/plan-grill/done-contract.md <-
+        skills/engineering/to-spec. Short kept runs inside otherwise original
+        procedures, found by the 2026-08-07 attribution sweep and listed here rather
+        than paraphrased away.
+      docs/DECISIONS.md and docs/TRAPS.md restate several of the rules above where a
+        ruling or a trap turns on one. Those are records of what was adopted and name
+        their source in the same breath; the reasoning and the scenarios are ours.
+  will-ness-ai/skills - will-ness-ai (MIT, itself forked from mattpocock/skills, HEAD
+    d31b391). skills/prototype/artifacts.md keeps the switcher's state-toggle buttons from
+    skills/grill-design/SKILL.md, and skills/prototype/SKILL.md's multi-phase zoom is that
+    repo's pattern, credited inline in the body.
+  jordan-gibbs/hyperresearch and jordan-gibbs/hyperresearchbench - Jordan Gibbs (MIT). Kept
+    per D31 where the wording carries the value.
+      skills/deep-research/SKILL.md <- hyperresearch-1-decompose.md, steps 5, 8, 11, 14 and
+        15, the CHANGELOG 0.9.0 selectivity note, issue #38's maintainer reply, and the
+        provenance and quote-integrity lint rules. The coverage matrix with its Gap? marker
+        and its cascade argument, the false-negative asymmetry rule, "committed position" as
+        the named unit, the corpus critic's "what source, if found, would overturn the
+        current direction?", the quote rule, the patch-not-regenerate invariant, the
+        selectivity definition, the tier-gate discipline, the written-verdict-for-a-skip
+        pattern, the provenance rooted-tree check, and the 57.77 / n=9 figures quoted with
+        the qualifiers the source attaches to them.
+      skills/deep-research/lenses.md <- the source-tier vocabulary (upstream's ground_truth
+        renamed primary), the blocked-fetch reason vocabulary, "never one interruption per
+        URL", and "CAPTCHAs, 2FA, and logins are never solved automatically".
+    The light/full profiles, the lens catalogue, the single-origin consensus rule, the
+    tension table and its Status vocabulary, the output shape and all routing are ours.
+  kunchenguid/vision - Kun Chen (MIT). skills/vision/SKILL.md keeps the acceptance-policy
+    definition, the artifact anatomy (identity opener, 3 to 6 principle sections, explicit
+    non-goals, the paired accept/resist tests, 40 to 70 lines, declarative present tense),
+    the evidence-over-vibes refusal including "a vision built on invented evidence is worse
+    than no vision", delta mode and "never write a competing document", the author-owns rule,
+    the fault-line taxonomy with its "delete and replace any proposal whose answer you can
+    predict" gate, and the history-mining recipe's shape. The drift check, the revision
+    cadence, the checkable invariant layer, the durable evidence sheet, the naming table and
+    all routing are ours, and upstream hard rule 6's pinned package and stylesheet are
+    deliberately declined. The same author's gnhf, firstmate and treehouse VISION.md files
+    (MIT) were read as evidence for the artifact's shape, with no text lifted.
+  visa/visa-vulnerability-agentic-harness - Visa, Inc. (Apache-2.0, (c) 2026 Visa, Inc.),
+    commit 3d972f679d8f5e3838b394edee0b5ea9c626b0fb (v1.2.0).
+      skills/security-pass/SKILL.md <- vvaharness/util/prompts.py (SELF_VERIFICATION and
+        EXCLUSION_RULES), vvaharness/pipeline/stages/s6_verify.py, and
+        vvaharness/validation/claude_config/rules/adversarial-review.md. The five check names
+        and their order, with "Walk backward from the sink and name the entry point",
+        "'Could potentially' is not a finding" and "No line numbers means no proof of data
+        flow, so do not emit" near-verbatim; the A-E exclusion grouping, its group titles and
+        several of its items near-verbatim; the adversarial framing; and the
+        Anti-Manipulation Safeguards artifact list with its note-it-but-do-not-let-it-alter
+        rule.
+      Change notice (Apache-2.0 section 4): adapted for better-dev - reworded to house style,
+        the checks renumbered as prose rather than a fixed-width prompt block, better-dev's
+        own scope items merged into the A-E groups, group A's boundary exception adopted as
+        the ruling that supersedes our prior trusted-local-input precedent, group E's
+        exclusion of LLM prompt text deliberately reversed, and the CVSS 3.1 and SEVERITY
+        SANITY blocks not carried. The Visa name appears here as prose attribution only;
+        nothing is branded with it.
+  simoncorry/foundry - simoncorry (MIT). skills/security-pass/SKILL.md keeps one definition
+    from security-scan.md - `Hardening` as a candidate "granting nothing beyond what
+    sanctioned callers already have" - reframed from a severity tier into a report
+    disposition, with our own reason attached.
+  PostHog monorepo - PostHog (MIT Expat; its LICENSE reserves only ee/, and both files sit
+    outside it). skills/review/reviewer-brief.md reuses two mechanics: the
+    core.hooksPath=/dev/null guard on an untrusted checkout, from
+    .agents/skills/qa-frontend/SKILL.md, and the untrusted-file-extension rule, from
+    tools/pr-approval-agent/.stamphog/review-guidance.md.
+  PostHog - "Stop being the code review bottleneck" ((c) 2026 PostHog, no open licence;
+    quotation with attribution is permitted, lifting prose is not). skills/test-audit/SKILL.md
+    quotes one sentence - "Don't accept an argument that the code works when you can watch it
+    work" - attributed in-line at the point of use; its application to a passing test is ours.
+  jakubkrehel/skills - Jakub Krehel (MIT, (c) 2026 Jakub Krehel), commit
+    ba35986bcf433fdca78ea571b0a3dc329cea89ba. Credited by FILE per D31, which keeps the wording
+    where the wording is what carries the value.
+      skills/design-brief/slop-and-checks.md <- better-ui/SKILL.md P1 (the concentric relation
+        between a nested pair's radii and the padding between them) and P11 (the theme-flip smear);
+        better-accessibility/SKILL.md's decorative-layer-swallows-clicks row;
+        better-layout/SKILL.md P1's 2x grouping ratio. Ours in those same tells: the per-tell
+        phrasing as detectables, the numbering and audit form, and the reduced-speed replay clause.
+      skills/design-brief/SKILL.md <- better-colors/SKILL.md P4 and P5 (the primitive/semantic
+        two-tier seam and the never-borrow-a-role rule) plus its mistakes table's
+        one-theme-switching-mechanism row; better-ui/SKILL.md P16 (motion is never the only
+        feedback channel). Ours: the icon/font import extension of the deviation criterion, and
+        the capability grading in step 3.
+      Deliberately NOT shipped: every constant in that cluster - scale(0.96) on press, the icon
+        animation values, the three named cubic-beziers and the five-row duration table.
+      No expression from jakubkrehel/oklch-skill, which has no LICENSE (the GitHub API reports
+        license=null): nothing from it landed, and its own author retracted its notation-first
+        position in jakubkrehel/skills PR #13.
+  emilkowalski/skills - Emil Kowalski (MIT, (c) 2026 Emil Kowalski), commit
+    78761e1b57f97dce65b983d640c70a68f39e8163. Credited by FILE per D31; also courtesy-credited
+    below for the motion rules that are reimplemented rather than kept.
+      skills/pick-ui-library/SKILL.md <- upstream skills/pick-ui-library/SKILL.md. Four operating
+        imperatives are kept close to the author's wording: identify the task, not the library the
+        user named; flag the recommendation but do not churn the dependency without being asked;
+        recommend one library, state what it is for in one sentence, and do not present a menu of
+        options; and the off-list honesty clause (say so explicitly, recommend from your own
+        knowledge, and be clear you have left the list). Ours: the solved-problem class taxonomy
+        and its what-hand-rolling-gets-wrong column, the observable-fact vetting checks and the
+        finished-versus-abandoned tie-break, the whole hand-roll branch, the recorded-preference
+        routing that replaces upstream's curated package list, and the step-5 decision block.
+        Upstream's 22-package lookup table is deliberately not shipped.
+      skills/design-brief/slop-and-checks.md's reduced-speed replay clause draws on upstream
+        skills/animate/SKILL.md's feel-check handoff. The component-level-picks sentence in
+        skills/design-brief/SKILL.md exists because of upstream pick-ui-library; the sentence
+        itself is ours.
+  ayghri/i-have-adhd - ayghri (MIT). docs/comms-block.md KEEPS ITS WORDING per D31, not only
+    its rules: the opening reader statement, the persistence clause, the pre-send delete list
+    and its first-line/last-line verify, the break-the-rules cases, and the phrasing of the
+    lead-with-the-action, numbered-steps, restate-state, suppress-tangents, visible-wins,
+    matter-of-fact-errors and cap-at-five rules. Ours in that file: the length budget by
+    question class, the whole-argument rule, the message-is-its-own-summary rule, the glossing
+    test, and the report-versus-track carve-out. That body is written into an entry file per
+    repo by onboard and machine-wide by BOOTSTRAP's install-time ask, so the kept wording
+    travels with every install.
+  Eight-category edge-case pass - @nurijanian (George, prodmgmt.world) (X article, no licence;
+    quotation with attribution is permitted, lifting prose is not). The eight category names
+    and their published order are reproduced as-is in skills/plan-grill/done-contract.md; the
+    pass around them is reimplemented.
+
+── Pattern inspiration (courtesy credit, not legally required) ──
+  lopopolo/harness-engineering - Ryan Lopopolo, tag v1.0.0. Licence: CC BY 4.0 for
+    repository-authored prose, editorial organization and diagrams; sources/raw/acp/ and
+    sources/raw/images/ are Apache 2.0 from the Agent Client Protocol project and are NOT
+    relicensed under CC BY. The 2026-08-17 batch briefing told six workers this repo was MIT and
+    that was wrong; the licence and the version are recorded here so the record is right. Nothing
+    verbatim landed, so no CC BY attribution obligation was triggered, and any future verbatim
+    reuse owes the licence's own required string - "Ryan Lopopolo, Harness Engineering, CC BY 4.0,
+    https://github.com/lopopolo/harness-engineering" - plus a note that changes were made. Ideas
+    reimplemented in our own words: the twelve theses read against our skills; the two playbooks
+    behind skills/codebase-audit/SKILL.md's severity floor and its two finding fields, and behind
+    skills/self-extension/SKILL.md's prose-owner gate and ablation clause; tool-legibility behind
+    skills/guardrails-install/SKILL.md's recorded-command probe; and the artichoke ledger's
+    pure-evidence discipline behind the worked-example recommendation recorded in D41. Neither
+    Apache carve-out was used.
+
+── NOT copied - inspiration only, NOT redistributable ──
+  Andrej Karpathy - LOOPS.md v060726 ("personal use permitted"). Concepts reimplemented
+  in our own words; no prose copied.
+  Andrej Karpathy - "CLAUDE.md: Field Notes" one-pager ((c) 2026, personal use) and the
+  system-prompt-learning one-pager. Concepts reimplemented in our own words; no prose copied.
+  "Fable Mode" one-pager (author withheld) and "CLAUDE.md: Field Notes on Running
+  Claude Fable 5 Without Overpaying" one-pager (author unknown) - both personal-use
+  only. Concepts reimplemented in our own words; no prose copied.
+  asgeirtj/system_prompts_leaks aggregates third-party proprietary system prompts.
+  The aggregation is CC0, but the underlying prompts are not ours to copy: techniques
+  studied and reimplemented as ideas only; no leaked prompt text ships in better-dev.
+  Victor Taelin - the AGENTS.md and BIP gists (no license file, so all rights reserved).
+  Only the generalisable residue of the machine rules reached shipped text: a threshold
+  measurement reports the machine and the repetition count beside it, in
+  skills/pr-and-verify/verify-runtime.md, in our own words. None of his caps, none of his
+  numbers, and not the product-coupled prompt table.
+  Matt Pocock - the reply at x.com/mattpocockuk/status/2081655893427450117 (2026-07-27),
+  recovered for the 2026-08-17 harvest, and the Daniel Miessler critique it answers
+  (x.com/DanielMiessler/status/2081502127181218249). One sentence of the reply is quoted in
+  docs/DECISIONS.md D41 as attributed quotation of the author's own ablation, not as licensed
+  reuse, and none of it ships in skill text. Distinct from mattpocock/skills, which is credited
+  above under its own licence.
