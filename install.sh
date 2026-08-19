@@ -100,6 +100,18 @@ classify() {
       case "$(readlink "$_d" 2>/dev/null)" in
         "$SRC"/skills/"$_n"|"$SRC"/skills/"$_n"/) echo live; return 0 ;;
       esac
+      # A link into a DIFFERENT better-dev clone is ours from another checkout, not a foreign skill.
+      # The dangling branch below already trusts the */skills/<name> shape when the target is gone;
+      # refusing that same shape while the target still EXISTS is what made a second live clone report
+      # every skill as somebody else's and advise renaming them - advice that would have the operator
+      # delete their own install. Judged on the target's TREE, never on the name: a clone carries
+      # install.sh beside skills/, which a foreign skill directory does not.
+      _t="$(readlink "$_d" 2>/dev/null)"
+      case "$_t" in
+        */skills/"$_n"|*/skills/"$_n"/)
+          _root="${_t%/skills/"$_n"*}"
+          if [ -f "$_root/install.sh" ] && [ -d "$_root/skills" ]; then echo dangling; return 0; fi ;;
+      esac
       echo foreign; return 0
     fi
     case "$(readlink "$_d" 2>/dev/null)" in
