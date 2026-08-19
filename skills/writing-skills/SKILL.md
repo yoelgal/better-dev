@@ -118,12 +118,12 @@ Never put `version`, `license`, or prose in frontmatter.
   `/update` reconciles a stale install and step one resolves the clone by globbing `$HOME` for a host
   skills dir, so a wrong glob strands the machine whose fix `/update` was carrying, and the silence reads
   like an install with nothing to pull. Grade it by putting the target in its worst *recorded* failure
-  state - `docs/TRAPS.md`, a recorded lesson, a ledger receipt, never an imagined one - and running step
-  one against it for real. The remedy is rarely self-sufficiency, which usually cannot be built: name at
-  that step the route whose inputs come from outside the target - a structural handle that already carries
-  the answer (an installed skill's symlink target names the clone, so `/uninstall` strips a suffix off it
-  instead of guessing a host layout), an operator-supplied value, or the one-paste front door that assumes
-  nothing is installed.
+  state - `docs/TRAPS.md`, a ruling in `docs/DECISIONS.md`, a prior PR's own findings, never an imagined
+  one - and running step one against it for real. The remedy is rarely self-sufficiency, which usually
+  cannot be built: name at that step the route whose inputs come from outside the target - a structural
+  handle that already carries the answer (an installed skill's symlink target names the clone, so
+  `/uninstall` strips a suffix off it instead of guessing a host layout), an operator-supplied value, or
+  the one-paste front door that assumes nothing is installed.
   Where no such route exists, say so at that step and name the manual escape, so a stranded machine reads
   a documented exit instead of silence. Where the lists share nothing - a planner, a reviewer, a map - add
   nothing: a robustness clause over an empty intersection is padding that pays its read cost every run.
