@@ -524,7 +524,7 @@ options a reader cannot tell apart is a question that has already failed, whatev
 install (`BOOTSTRAP.md`), which puts the same block in the host's own entry file - the
 `bd_host_global_entry` path in the matching `hosts/*` adapter, `~/.claude/CLAUDE.md` on Claude Code.
 Resolve the clone the same way the rest of this phase does, from the bridge this repo already has
-(`bd=$(dirname "$(dirname "$(readlink .better-dev/bin)")")`, or the install marker found in Phase 1,
+(`bd=$(dirname "$(readlink .better-dev/bin)")`, or the install marker found in Phase 1,
 which holds the clone path); the adapter and the block body both live under it. Check the entry file
 for the `<!-- BEGIN better-dev-comms -->` marker before writing, and let what you find decide:
 

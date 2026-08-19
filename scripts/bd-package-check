@@ -11,6 +11,12 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/.." 2>/dev/null && pwd)"
 [ -d "$ROOT/skills" ] || ROOT="$(pwd)"
 cd "$ROOT"
+# A resolved root with nothing to grade is an ungradeable tree, not a clean one. Say so in one line:
+# without this the run dies 70 checks later in `awk: can't open file skills/<name>/SKILL.md`, which
+# reads as a broken script rather than a wrong cwd, and the checks that did run reported nothing.
+# Checked in a subshell: `set --` here would eat this script's own --prove-new arguments, parsed below.
+( set -- skills/*/SKILL.md; [ -e "$1" ] ) ||
+  { printf 'package-check: no skills/*/SKILL.md under %s - wrong root, nothing graded\n' "$ROOT" >&2; exit 2; }
 
 fail=0
 ok()  { printf '  \033[32m✓\033[0m %s\n' "$*"; }
@@ -875,6 +881,31 @@ if grep -q 'clone="$clone/better-dev"' "$upd" \
 else
   bad "/update's clone resolver does not handle a moved clone: it steps only down (or follows the link with cd, which fails on the dangling link a moved clone leaves), so the sanctioned update path reports no clone found on exactly the install that needs updating"
 fi
+
+# --- self-repair independence: the resolver reads THIS REPO's bridge before any $HOME guess.
+# /update's job is to reconcile a stale install, and its first act used to be a guess about the host's
+# dir shape ($HOME globs). A wrong guess (omp declares its skills dir two levels down) left /update
+# unable to resolve anything on an omp-only machine - and /update is the verb that would have shipped
+# the fix for the guess. A mechanism whose repair path runs through the thing it repairs cannot reach
+# the installs that need it most. `.better-dev/bin` is a symlink to <clone>/scripts, so it names the
+# clone exactly with no host shape assumed, and it must be tried first.
+#
+# ORDER is the property, so this runs the SHIPPED block rather than grepping for the bridge string:
+# a fixture where all three sources resolve to a DIFFERENT valid checkout can only answer cloneA if
+# the bridge was read first. Grepping presence would pass with the read appended after the globs.
+ro="$(mktemp -d)"
+for ro_c in A B C; do mkdir -p "$ro/clone$ro_c/skills/onboard" "$ro/clone$ro_c/scripts"; git -C "$ro/clone$ro_c" init -q 2>/dev/null; done
+mkdir -p "$ro/home/.claude/skills" "$ro/repo/.better-dev"
+ln -snf "$ro/cloneB/skills/onboard" "$ro/home/.claude/skills/onboard"   # what the $HOME globs answer
+ln -snf "$ro/cloneA/scripts" "$ro/repo/.better-dev/bin"                # what this repo's bridge answers
+ro_block="$(awk '/^## 1\. Locate the clone/{f=1} f&&/^```bash/{b=1;next} b&&/^```/{exit} b{print}' "$upd")"
+ro_got="$(cd "$ro/repo" && HOME="$ro/home" CLAUDE_PLUGIN_ROOT="$ro/cloneC" \
+  bash -c "$ro_block"'
+printf %s "$clone"' 2>/dev/null)"
+[ -n "$ro_block" ] && [ "$ro_got" = "$ro/cloneA" ] \
+  && ok "/update resolves the clone from this repo's .better-dev/bin bridge before \$CLAUDE_PLUGIN_ROOT or any \$HOME glob, so a host whose dir shape the globs miss can still update itself" \
+  || bad "/update's clone resolver reaches a \$HOME guess (or the plugin root) before this repo's own bridge - resolved '${ro_got:-<nothing>}', wanted the bridge's clone - so a machine the globs cannot match is unreachable by the very verb that would fix the glob"
+rm -rf "$ro"
 
 # --- the declared-vs-hardcoded class, closed mechanically. hosts/<h> DECLARES bd_host_skills_dir;
 # the resolver globs in /update and /onboard have to FIND that dir before the clone (and therefore

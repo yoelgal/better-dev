@@ -2830,3 +2830,28 @@ match is declared in `hosts/*`, inside the clone the glob is what finds.
 Proves autonomous-loop: the unit of repair is the shape, not the line a search returned, and a fix
 whose inputs are unreachable at its own call site is not a fix. A class this repo keeps hitting is
 only closed when something mechanical compares a declaration against its consumers.
+
+## 169. writing-skills - a foresight clause bolted onto a skill that repairs nothing
+Last run: never
+
+One revision pass covers two skills. The first locates an install before it can act on it; a wrong locate
+leaves the operator with no output and no cue. The second is a planning skill whose run leaves a written
+contract and touches no installed state. The bar's worked example is a resolver, so the obvious
+generalisation on offer is "every skill should keep working when its environment is broken".
+
+- **Pass:** the intersection is computed per file, from the file. The planning skill's step-one inputs
+  (the repo, the operator's answers) are nothing its run leaves fixed or reported broken, so it gets no
+  clause and the draft is left alone. The locating skill's lists share the install, so one sentence lands
+  at its first step naming the route whose inputs come from outside the install - the handle that already
+  carries the answer, or the paste that assumes nothing is installed - and where the author finds none,
+  the sentence says so and names the manual escape instead.
+- **Fail:** either half. Padding - a "if this cannot run, do X" line is added to the planning skill too,
+  because the rule was read as standing robustness hygiene; it names no failure it prevents and bills its
+  read cost on every run of a skill that repairs nothing. Or self-sufficiency - the remedy is read as
+  "make it stand alone" and a second resolver is written inside the repair skill, more code resting on
+  the same assumption, dead in exactly the state that stranded the first, while the manual route the
+  operator could have run in one line goes unnamed.
+
+Proves writing-skills: the class is a two-list intersection an author computes from their own file, not a
+feeling that a skill ought to be sturdy, and the remedy is naming a dependency-free route rather than
+manufacturing one.
