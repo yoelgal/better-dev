@@ -1530,3 +1530,72 @@ those words rather than hiding it.
 plugin-tree hook (observable: the hook leads its injection with a `better-dev:comms` sentinel), a native
 rules provider (the rule's subject in context with no sentinel), or neither - because a step that cannot
 report "already delivered" gets re-run forever.
+
+## D44 - the plugin hook is an omp mechanism; Claude Code and hermes take the pointer (corrects D43; 2026-08-20)
+
+D43 recorded the mechanism as if the hook reached every plugin-capable host, and `/onboard`'s first cut
+read the hook file's presence on disk as evidence the hook had run. Both are wrong, and they compound.
+An independent review of `feat/plugin-session-hook` (`HookReview`, findings F1 and F2, report in
+`.better-dev/review/`) read the host sources:
+
+- **`hooks/pre/*.ts` is an omp convention.** omp treats every `.ts`/`.js` file under a plugin's
+  `hooks/pre/` as an extension entry point (`isExtensionFile`,
+  `pi-coding-agent/src/extensibility/extensions/loader.ts:491-493` - verified in the installed
+  `17.3.8`) and calls its default export as a hook factory.
+- **Claude Code** loads plugin hooks from `hooks/hooks.json`, or an inline `hooks` key in
+  `plugin.json`, as shell-command or HTTP entries keyed by event name. It has no `hooks/pre/`
+  convention and no TypeScript factory protocol, and this repo ships neither file
+  (code.claude.com/docs/en/plugins-reference; anthropics/claude-code
+  `plugins/plugin-dev/skills/hook-development/SKILL.md`).
+- **hermes 0.16.0** is a Python agent: plugins are Python modules discovered by entry point and loaded
+  by importing the module and calling its `register(ctx)`
+  (`~/.hermes/hermes-agent/hermes_cli/plugins.py:1490-1650`; the missing-`register()` refusal is at
+  `:1539`), and hooks are shell commands declared under `hooks:` in `~/.hermes/config.yaml`
+  (`~/.hermes/hermes-agent/agent/shell_hooks.py:175`). Nothing there scans `hooks/pre/*.ts`.
+
+So on both hosts the hook file ships, is never loaded, and the sentinel is absent by design. Confirmed
+on 2026-08-20 from the hosts' own CLIs (measured by `DocsFix`, not inferred):
+`claude --plugin-dir . plugin details better-dev` prints `Skills (33)` and **`Hooks (0)`**;
+`hermes plugins install <git-url>` warns the repo "doesn't contain plugin.yaml or `__init__.py`", after
+which `hermes plugins list` does not list better-dev at all.
+
+**Those hosts get the rule through `/onboard`'s pointer, and that is stated, not hidden.** Each reads a
+project entry file, which is the route the pointer block uses, so it genuinely works on both - and it is
+weaker than injection: it is one read the agent has to honour rather than a body already in context.
+Both hosts do land the **whole repo tree** even though neither runs the hook, so the pointer has a real
+target: `~/.hermes/plugins/better-dev/rules/comms.md` (verified on disk, 6877 bytes) and
+`~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/`. The channel table says pointer for Claude
+Code and hermes, and the hook only for omp marketplace installs. Supporting the two host-specific hook
+protocols above is a **named gap**, not a maybe: it would mean shipping a `hooks/hooks.json` shell entry
+for Claude Code and a Python `register(ctx)` module for hermes, neither of which exists here.
+
+**A skills-only install has no pointer target at all.** Measured the same day:
+`npx skills add yoelgal/better-dev --all -g` lands `skills/` only - real directories at
+`~/.agents/skills/<name>/`, symlinked into every host skills dir - and no `rules/` directory and no
+`comms.md` anywhere on the machine. So on that channel the hook cannot run *and* there is nothing to
+point at; `/onboard` reads the path back before writing, and where it does not resolve it writes no
+block and asks for a path where the repo itself is on disk (plugin channel or a plain clone), which
+turns the row back into the pointer row.
+
+**File presence was mistaken for execution.** `/onboard`'s detection tested whether
+`hooks/pre/bd-session.ts` sat two levels above the running skill and converted a yes into either "the
+hook delivers the rule" or "contradiction - write nothing". On Claude Code and hermes that file is
+present and the hook never runs, so both landed on the contradiction row, wrote nothing, and the one
+repair the skill had - the pointer - was suppressed by the observation that should have triggered it.
+The detection is now built on the sentinel alone, which is a positive in-session observable: present
+means the hook ran here this session, absent means it did not deliver and the reason never changes the
+response. The contradiction row is **deleted**, on two independent grounds: file presence never
+evidenced execution, and even on omp the hook deliberately stays quiet when a native rules provider
+already loads `rules/`, so a present hook file beside an absent sentinel is the dedup design working
+rather than a broken install. The tree walk survives only as path resolution for the pointer - it
+answers *what path can a pointer name*, never *is the rule delivered*.
+
+**One measurement cited for the marketplace path did not show it.** The claim that "a root named like a
+marketplace cache dir gave sentinel=true, correct" was an instance of the `___` basename false
+positive: that root (`/tmp/mkt___better-dev___0.1.0`) was still symlinked into
+`~/.omp/plugins/node_modules/better-dev`, making it a **link** root, which omp does load `rules/` from -
+so the injection observed there was a duplicate, not a marketplace delivery. The marketplace hole is
+real and confirmed in source (`discovery/claude-plugins.ts:603-641` registers Skill, SlashCommand, Hook,
+CustomTool and MCPServer providers and no Rule provider, against `discovery/omp-plugins.ts:110` which
+loads rules for other roots), and D43's own linked-probe measurement stands. That one end-to-end line
+does not, and no text in this repo may repeat it.

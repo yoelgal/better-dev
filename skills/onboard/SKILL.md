@@ -330,48 +330,71 @@ Then confirm `.better-dev/rules.md` and `.better-dev/overrides.md` exist and the
 correctly at its destination.
 
 **Then check whether the comms rule reaches this session at all.** better-dev's response-style rule
-ships as one file in the plugin tree, `rules/comms.md`, and the channel that delivered the skills
-decides whether anything loads it (`README.md` carries the per-host table). Three routes, one of which
-needs a write here - and which one you are on is a measurement, never an inference from the host's
-name: omp reaches a repo two different ways and only one of them registers `rules/`.
+ships as one file in the plugin tree, `rules/comms.md`, and whether anything loads it is decided by the
+channel that delivered the skills, never by the host's name (`README.md` carries the per-host table).
+Only one kind of evidence settles it: what you can see in *this* session's context. A file on disk is
+not evidence that a host loaded it - the plugin's session hook is an omp convention (`hooks/pre/*.ts`),
+while Claude Code loads plugin hooks from `hooks/hooks.json` as shell or HTTP entries and hermes loads
+Python `register(ctx)` modules, so on those hosts that exact file ships and never runs (D44). Absence
+of delivery is the ordinary case on most hosts, not a fault to diagnose.
 
-Three observations settle it, in this order:
+Two observations settle it, in this order:
 
-1. Search this session's own context for the literal token `better-dev:comms`. The plugin's session
-   hook leads its injection with that sentinel, so seeing it means the hook is delivering the rule
-   here. Not seeing it rules that route out and nothing more.
-2. **Before you open `rules/comms.md`**, answer whether an always-loaded instruction on communication
-   style - the rule's own subject - is already in context from a source you did not read. A rules
-   provider injects the body with no sentinel, which is what this catches. Reading the file puts the
-   text in context too, so the order is what makes the answer worth anything; and a memory of seeing
-   it in an earlier session is not an observation of this one.
-3. Resolve where the skill you are running lives and look two levels up, above `skills/onboard/`. Test
-   for the two files by name - `hooks/pre/bd-session.ts` and `rules/comms.md` - since a plugin tree
-   carries both beside `skills/` and a skills-only install carries neither. A `hooks/` directory alone
-   proves nothing: a host's own agent dir keeps `skills/` and `hooks/` side by side too, and this probe
-   landed in exactly that on 2026-08-20 (`~/.omp/agent/skills/onboard`, host `hooks/` present, neither
-   better-dev file in it) - no plugin tree, and a directory check would have called it one.
+1. Search this session's own context for the literal token `better-dev:comms`. The hook leads its
+   injection with that sentinel. **Proves:** the hook ran here, on this host, in this session, and the
+   rule's body is in context - which is the whole claim. **Absence proves only its own negation:** the
+   rule did not arrive that way, and never says why. You do not need why. Whether the host has no hook
+   mechanism, ships one this file cannot use, or loads `rules/` natively so the hook stayed quiet on
+   purpose, the response is identical - something else has to deliver the rule.
+2. **Before you open `rules/comms.md`**, answer whether better-dev's comms rule itself is already
+   standing in context from a source you did not read. A native rules provider injects the body with no
+   sentinel, which is what this catches. **Proves:** something already delivers the rule here, so a
+   pointer would be redundant. **Does not prove** which channel did it - and nothing downstream needs
+   to know. Three constraints on the answer: reading the file puts the text in context too, so the
+   order is what makes the answer worth anything; a memory of seeing it in an earlier session is not an
+   observation of this one; and your host's own brevity guidance is not this rule - recognise the rule,
+   not its topic. **Only a confident yes counts**, because the two errors do not cost the same: a wrong
+   yes writes nothing and leaves the session with no rule at all, a wrong no costs one redundant
+   pointer to a file already in context. Unsure is a no.
 
-| What you observed | Route | What to write |
+Resolving where `rules/comms.md` lives is a separate job from routing, and it answers a different
+question - not *is the rule delivered* but *what path can a pointer name*. Resolve the **real** path of
+the skill you are running - a skills-only install symlinks each skill directory into the host's own
+skills dir, so the path the host reports can be a link - then look two levels up, above
+`skills/onboard/`, where a plugin tree keeps `rules/` and `hooks/` beside `skills/`. **Proves:** a path
+a pointer can name, once `rules/comms.md` reads back from it. **Proves nothing about delivery**, in
+either direction: `hooks/pre/bd-session.ts` sitting there is the same shipped file on a host that cannot
+run it, and even on omp the hook deliberately stays silent whenever a native provider already loads
+`rules/` - so a present hook file next to an absent sentinel is the design working, not a broken
+install. Measured 2026-08-20, both directions: `npx skills add yoelgal/better-dev --all -g` lands
+`skills/` only (real dirs at `~/.agents/skills/<name>/`, symlinked into every host skills dir) and no
+`rules/` or `comms.md` anywhere on the machine - nothing to point at; while a plugin-channel install
+lands the whole repo, so the file is there to point at even on the hosts that never run the hook
+(`~/.hermes/plugins/better-dev/rules/comms.md`, and `~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/`).
+
+| What you observed | What that proves | What to write |
 |---|---|---|
-| the `better-dev:comms` sentinel in context | the plugin's session hook delivers the rule, every session, this one included | nothing |
-| no sentinel, and communication-style instruction in context already | a rules provider delivers it (an omp git or link root, Cursor, Windsurf) | nothing |
-| neither, and no plugin tree above this skill | no route reaches this host | the pointer block below |
-| neither, and yet `hooks/pre/bd-session.ts` sits beside `skills/` | contradiction | nothing - report it |
-| the host will not say where the running skill came from | unmeasured | nothing yet - ask |
+| the `better-dev:comms` sentinel in context | the hook delivered the rule into this session | nothing |
+| no sentinel, and the comms rule itself already standing in context | a native rules provider delivers it here | nothing |
+| no sentinel, no rule in context, and `rules/comms.md` reads back from a path you resolved or the operator named | nothing delivers it, and there is a file to point at | the pointer block below |
+| no sentinel, no rule in context, and no `rules/comms.md` on this machine | nothing delivers it and there is nothing yet to point at | ask for a path; with none, the recap line naming the install that fixes it |
+| the host will not say where the running skill came from | only the path is unmeasured; both observations above still stand | ask where better-dev is installed, then finish the row |
 
-The contradiction row is a defect report: an installed hook that delivered nothing is broken, and a
-pointer block written over it hides the breakage in the one repo positioned to notice it. Name the file
-you looked for, where you found it, and that neither the sentinel nor the rule's subject was in context.
+**Absence always ends in a route.** The last three rows are one finding - nothing delivers the rule -
+and they differ only in whether a pointer has a target. Row three writes it. Rows four and five ask the
+operator one question - *where is better-dev's own repo on this machine?* - and act on the answer: a
+path whose `rules/comms.md` reads back turns the row into row three, no matter how the repo got there
+(plugin channel, or a plain `git clone`). Only an operator who has none closes without a block, and
+that close is still a route: the recap names the install that puts the file on disk (`README.md`'s
+table names it per host). A pointer to a file that is not there fails every session in silence, so that
+line belongs in the recap and never as a dead path in an entry file. No observation ends in
+write-nothing-and-hope.
 
-Where the host exposes no path for the skill it is running, ask the operator the one question that
-separates row one from row three - *did better-dev arrive through your host's plugin channel, or through
-`npx skills add`?* - and act on the answer. Whichever row resolves, name it in the Phase 5 recap in a
-clause ("comms rule already delivered by the session hook - nothing written"); that clause is what stops
-the next run from measuring this over again.
+Whichever row resolves, name it in the Phase 5 recap in a clause ("comms rule already delivered by the
+session hook - nothing written"); that clause is what stops the next run from measuring this over again.
 
-For row three, write into the entry file this phase already chose - the consent rule above governs this
-write too - between its own markers, replacing any existing block in place:
+For the pointer row, write into the entry file this phase already chose - the consent rule above governs
+this write too - between its own markers, replacing any existing block in place:
 
 ```markdown
 <!-- BEGIN better-dev-comms -->
@@ -385,10 +408,11 @@ is a pointer to it, not a copy.
 into a host entry file, which D42 deleted, drifted from the shipped file and served a stale block for the
 rest of its life. One file, read live.
 
-Read the path back before writing it. A skills-only install often carries no `rules/` at all, and a
-pointer to a file that is not there fails every session in silence: where nothing reads, write no block
-and give the recap the honest line instead - this host has the skills without the comms rule, and what
-fixes it is installing better-dev through the host's own plugin channel, where it has one.
+Read the path back before writing it, every time - what an install actually puts on disk is a
+measurement, not an inference from its name. Where the read fails there is nothing to point at: write
+no block, and give the recap the honest line instead - this host has the skills without the comms rule,
+and what fixes it is getting the repo itself onto this machine, through the host's plugin channel or a
+plain clone, then telling `/onboard` where it landed.
 
 ---
 

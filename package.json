@@ -3,7 +3,7 @@
   "version": "0.1.1",
   "private": true,
   "scripts": {
-    "test": "bun test hooks/bd-session.test.ts"
+    "test": "bun test hooks/session-hook.test.ts"
   },
   "omp": {}
 }

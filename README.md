@@ -20,8 +20,8 @@ opinionated method and gets out of the way of everything else you have installed
 
 better-dev is text, plus one session hook. Your agent already provides discovery, dispatch, structural
 search, memory and command approval, so the library states the method and your agent carries it out. The
-hook runs at session start for one job: hand the session whatever your agent's own plugin channel leaves
-out.
+hook runs at session start, on a host that loads it, for one job: hand the session whatever that
+host's plugin channel leaves out.
 
 ## Install
 
@@ -31,25 +31,41 @@ installs better-dev through that agent's channel, and runs `/onboard` in this re
 files, so an agent missing from the table below still ends up wired.
 
 better-dev is one plugin carrying three things: the **skills**, the always-applied **comms rule** that
-shapes every reply, and the **session hook**. Which channel you install through decides how the comms
-rule reaches your session.
+shapes every reply, and the **session hook**. Which channel you install through decides how much of
+that reaches your session.
 
 | Host | Skills arrive by | Comms rule arrives by | Stays current by |
 |---|---|---|---|
 | omp (marketplace) | `omp plugin install <name@marketplace>` | the session hook | `marketplace.autoUpdate: auto`, or `omp plugin upgrade` by hand |
-| omp (git/link) | `omp plugin install <git-url>` | native rules provider (`alwaysApply`) | `git pull` in the linked clone, or re-running the install |
-| Claude Code | marketplace add + install | the session hook | its own plugin update verb, run by hand |
-| hermes | `hermes plugins install <git-url>` | the session hook | re-running that command |
-| Cursor / Windsurf | `npx skills add yoelgal/better-dev --all -g` | native rules dir | `npx skills update` |
-| Codex / other | `npx skills add yoelgal/better-dev --all -g` | `/onboard` writes a pointer | `npx skills update`, then `/onboard` again |
-| any host at all | the paste prompt in BOOTSTRAP.md | whichever of the above fits | whichever of the above fits |
+| omp (git, link or `-e`) | `omp plugin install <git-url>`, or `omp plugin link` | omp's own rules provider (`alwaysApply`) | `git pull` in the linked clone, or re-running the install |
+| Claude Code | marketplace add + install | a pointer `/onboard` writes into the entry file | its own plugin update verb, run by hand |
+| hermes | the clone, plus one `skills.external_dirs` line naming it | a pointer `/onboard` writes into the entry file | `hermes plugins update better-dev` |
+| Cursor / Windsurf | `npx skills add yoelgal/better-dev --all -g` | nothing on this path (measured) | `npx skills update` |
+| Codex / other | `npx skills add yoelgal/better-dev --all -g` | nothing on this path (measured) | `npx skills update` |
+| any host at all | the paste prompt in BOOTSTRAP.md | whichever row above fits | whichever row above fits |
 
-**The two `npx skills add` rows are a partial install.** That CLI copies the skills into your global
-skills directory and leaves no plugin tree, so the session hook never loads, taking its status-line
-upgrade line and its `/onboard` reminder with it. Cursor and Windsurf read the shipped `rules/` directory
-themselves, so the comms rule is live there. On Codex and anything else in that row, the comms rule
-reaches a session only as the pointer `/onboard` writes into the repo's entry file, so that row is
-unfinished until `/onboard` has run.
+**The hook loads on omp.** Every host reads plugin hooks in its own shape, and `hooks/pre/*.ts` is the
+shape omp reads. Claude Code wants shell-command or HTTP entries in `hooks/hooks.json` keyed by event
+name, which this repo does not ship, so `claude --plugin-dir . plugin details better-dev` reports 33
+skills and `Hooks (0)`. hermes wants a Python module that registers itself through `register(ctx)`, so
+`hermes plugins install` clones the repo and then registers nothing out of it. Shipping either shape is
+open work, recorded as a gap in [`docs/DECISIONS.md`](docs/DECISIONS.md). Until one lands, those two
+hosts get the comms rule from `/onboard`, and both channels do put `rules/comms.md` on disk for it to
+name.
+
+**A pointer is weaker than injection.** Where the hook or omp's rules provider delivers the rule, its
+text sits in the context of every call before your message is answered. A pointer names the
+file and asks your agent to go read it, so it costs a tool call and it holds only as far as your agent
+honours its entry file. It is the strongest route Claude Code and hermes have today, and which of the
+two you get is worth knowing before you pick a host.
+
+**The two `npx skills add` rows are a partial install, measured.** That CLI delivers the skills into
+`~/.agents/skills/` and symlinks them into each host's own skills directory. Run against a throwaway
+`HOME`, it landed no `rules/comms.md` anywhere on disk, and it leaves no plugin tree, so the session
+hook never loads and there is no installed rule for `/onboard` to point at. `/onboard` reads that path
+back before writing and says so in its recap rather than leaving a block that reads nothing. To get
+the comms rule onto one of those hosts, put the repo on disk as well, through a plugin channel or a
+plain `git clone`, and tell `/onboard` where it is.
 
 ### Per-agent commands
 
@@ -83,16 +99,35 @@ no skills and no rules; `omp plugin doctor` is what reports it.
 hermes plugins install https://github.com/yoelgal/better-dev
 ```
 
+That clones the whole repo to `~/.hermes/plugins/better-dev` and registers nothing out of it on its own:
+it warns that the tree carries no `plugin.yaml` or `__init__.py`, `hermes plugins list` leaves it out,
+and `hermes skills list` still reports zero. hermes reads skills from its own directories, so one config
+line naming the clone is what delivers them:
+
+```yaml
+# ~/.hermes/config.yaml
+skills:
+  external_dirs:
+    - ~/.hermes/plugins/better-dev/skills
+```
+
+`hermes skills list` then reports all 33 as enabled. That same clone puts the comms rule at
+`~/.hermes/plugins/better-dev/rules/comms.md`, which is the path `/onboard` points at.
+
 **Claude Code, and any other agent that reads a plugin marketplace:** point it at `yoelgal/better-dev`
 with its own marketplace-add verb, then install `better-dev@better-dev`. This repo is its own
 marketplace, carrying `.omp-plugin/marketplace.json` and a byte-identical
-`.claude-plugin/marketplace.json`, each listing one plugin sourced from the repo root.
+`.claude-plugin/marketplace.json`, each listing one plugin sourced from the repo root. Claude Code
+keeps the whole repo in its plugin cache, so the comms rule is on disk there for `/onboard` to point
+at.
 
 **Cursor, Windsurf, Codex, or an agent with no plugin channel:**
 
 ```bash
 npx skills add yoelgal/better-dev --all -g
 ```
+
+This delivers the skills on their own. The channel table above has what that leaves for the comms rule.
 
 Then, in each repo you want wired, ask your agent to run `/onboard`.
 
@@ -178,8 +213,8 @@ session ending and every worktree reads the same copy. Override any practice in 
 - `.better-dev/ledger/` - loop state per work-item, gitignored
 - a discovery block in `CLAUDE.md` / `AGENTS.md` - the routing table your agent reads every session
 - a committed `.omp/config.yml` - which shell commands need your approval, travelling with the repo
-- on an agent the session hook cannot reach, a pointer to the installed `rules/comms.md`, between its own
-  `<!-- BEGIN better-dev-comms -->` sentinels
+- on a host the session hook cannot reach, a pointer to the installed `rules/comms.md`, between its own
+  `<!-- BEGIN better-dev-comms -->` sentinels, once that file is on disk to point at
 
 Skills you later mint with `/self-extension` are **repo-scoped** by default, committed to that repo's own
 `.claude/skills/<name>` and seen only there. A plugin upgrade never touches them.
@@ -189,8 +224,8 @@ Skills you later mint with `/self-extension` are **repo-scoped** by default, com
 | Path | What |
 |------|------|
 | `skills/` | the practices, one dir per skill - the roster above is the count of record |
-| `rules/` | the always-applied rules, one file each: injected by your agent where its channel provides rules, and by the session hook where it does not |
-| `hooks/pre/` | the session hook, loaded from the installed plugin tree, versioned with it, and gone when you uninstall |
+| `rules/` | the always-applied rules, one file each: injected by omp's rules provider on a git or link install, by the session hook on an omp marketplace install, and named by `/onboard`'s pointer elsewhere |
+| `hooks/pre/` | the session hook in the shape omp reads, loaded from the installed plugin tree, versioned with it, and gone when you uninstall |
 | `.omp-plugin/` · `.claude-plugin/` | omp's marketplace catalog · Claude Code's catalog beside the version stamp (`plugin.json`) |
 | `package.json` | required: `omp plugin link` refuses a directory without one and skips the plugin entirely unless it declares an `omp` key |
 | `scripts/` | the two maintainer helpers, run from a clone of this repo and never from a repo that uses better-dev: `bd-package-check` (the release gate) and `bd-skill-stage` (stage, lint and promote a freshly authored skill) |

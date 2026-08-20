@@ -27,8 +27,9 @@
 // transcript, no-op when there is no UI. The rule this hook delivers bans banners and preamble; a
 // hook that shouted would discredit the thing it carries.
 
-import { existsSync, readFileSync, realpathSync } from "node:fs";
-import { basename, dirname, join, resolve, sep } from "node:path";
+import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
+import { homedir } from "node:os";
+import { basename, dirname, isAbsolute, join, resolve, sep } from "node:path";
 
 // --- host contract -----------------------------------------------------------------------------
 //
@@ -81,6 +82,12 @@ interface HookApi {
 // (rules/, package.json) is reachable from there. Resolved once, at load.
 const PLUGIN_ROOT = resolve(import.meta.dirname, "..", "..");
 
+// The directory the host was started in. Which roots the host loads plugins from depends on it:
+// omp anchors its project-scope plugin registry at the nearest config dir or `.git` above the
+// startup directory. That is a property of the process, not of any later session cwd, so it is
+// resolved once here alongside PLUGIN_ROOT.
+const CWD = process.cwd();
+
 // Named in /onboard's shipped prose as the observable for "the hook is delivering the rule": an
 // agent can search its own context for this token. Changing it breaks that skill.
 const SENTINEL = "better-dev:comms";
@@ -109,6 +116,15 @@ function readJson(path: string): Record<string, unknown> | undefined {
     return parsed !== null && typeof parsed === "object" ? (parsed as Record<string, unknown>) : undefined;
   } catch {
     return undefined;
+  }
+}
+
+/** Directory entry names, or none when the directory is absent or unreadable. */
+function readDirNames(path: string): string[] {
+  try {
+    return readdirSync(path);
+  } catch {
+    return [];
   }
 }
 
@@ -164,13 +180,32 @@ function isUpgrade(candidate: string, current: string): boolean {
 // --- where this plugin came from ---------------------------------------------------------------
 
 /**
- * The host's plugin state root, sibling to its agent dir. Undefined when the host exposes no agent
- * dir, which is also the answer for any host that is not omp - and undefined is read below as
- * "cannot confirm a rules provider", the direction that delivers the rule rather than dropping it.
+ * The host's agent dir. The only call in this file that reaches into the host, and the one thing
+ * that cannot be derived from this file's own path: it names the host's data root, so the plugin
+ * state roots beside it can be found without guessing at a home directory.
+ *
+ * Wrapped, because it is the one call here that could throw: on omp it cannot (`pi-utils`'s
+ * `getAgentDir` returns a field), but a host whose accessor throws would take this whole factory
+ * down at load and cost all three features with nothing on screen to say so. Undefined is also the
+ * answer for any host that is not omp, and is read below as "cannot confirm a rules provider" -
+ * the direction that delivers the rule rather than dropping it.
  */
-function pluginStateRoot(pi: HookApi): string | undefined {
-  const agentDir = pi.pi?.getAgentDir?.();
-  if (typeof agentDir !== "string" || agentDir === "") return undefined;
+function hostAgentDir(pi: HookApi): string | undefined {
+  let dir: unknown;
+  try {
+    dir = pi.pi?.getAgentDir?.();
+  } catch {
+    return undefined;
+  }
+  return typeof dir === "string" && dir !== "" ? dir : undefined;
+}
+
+/**
+ * The host's user-scope plugin state root, sibling to the agent dir. Undefined when it is not on
+ * disk, which is also the answer to "is there a marketplace cache here to read a catalog from".
+ */
+function pluginStateRoot(agentDir: string | undefined): string | undefined {
+  if (agentDir === undefined) return undefined;
   const root = join(dirname(agentDir), "plugins");
   return existsSync(root) ? root : undefined;
 }
@@ -180,6 +215,9 @@ function pluginStateRoot(pi: HookApi): string | undefined {
  * plugin lives in. Marketplace installs cache each plugin under a version-pinned directory named
  * `<marketplace>___<plugin>___<version>` - measured, not assumed - so the plugin's own location
  * carries its provenance and nothing has to be looked up.
+ *
+ * Read for the update nudge only, never for the delivery decision below: a link root is free to
+ * carry `___` in its name, and a wrong answer here costs at most a nudge that stays silent.
  */
 function cachedFrom(pluginRoot: string): { marketplace: string; plugin: string } | undefined {
   const parts = basename(pluginRoot).split("___");
@@ -189,24 +227,109 @@ function cachedFrom(pluginRoot: string): { marketplace: string; plugin: string }
 }
 
 /**
+ * Every plugin state root the host installs into, in the order the host resolves them: the user
+ * root beside the agent dir, then the project root - which the host anchors at the nearest ancestor
+ * of the startup directory carrying a config dir, or failing that a `.git`. Both scopes are loaded,
+ * so both scopes deliver rules/; reading only the user root is what made a project-scope install
+ * deliver this rule twice.
+ */
+function stateRoots(agentDir: string, cwd: string): string[] {
+  const configRoot = dirname(agentDir);
+  const userRoot = join(configRoot, "plugins");
+  // Read back off the agent dir rather than hardcoded: the config directory is renameable, and
+  // taking the host's own spelling keeps this in step with whatever it chose.
+  const configDir = basename(configRoot);
+  for (const marker of [configDir, ".git"]) {
+    let dir = resolve(cwd);
+    for (;;) {
+      if (existsSync(join(dir, marker))) {
+        const projectRoot = join(dir, configDir, "plugins");
+        return projectRoot === userRoot ? [userRoot] : [userRoot, projectRoot];
+      }
+      const up = dirname(dir);
+      if (up === dir) break;
+      dir = up;
+    }
+  }
+  return [userRoot];
+}
+
+/**
+ * Does a node_modules entry under `stateRoot` resolve to `pluginRoot`?
+ *
+ * Every entry is compared, rather than building `node_modules/<manifest name>` and testing that one
+ * path: the entry's DIRECTORY NAME is the host's key for a plugin and need not equal the manifest's
+ * `name`, so an install under a different name is loaded by the host and was missed here. Scoped
+ * packages nest one level deeper.
+ */
+function linkedUnder(stateRoot: string, pluginRoot: string): boolean {
+  const nodeModules = join(stateRoot, "node_modules");
+  const target = canonical(pluginRoot);
+  for (const entry of readDirNames(nodeModules)) {
+    const entryPath = join(nodeModules, entry);
+    if (entry.startsWith("@")) {
+      for (const scoped of readDirNames(entryPath)) {
+        if (canonical(join(entryPath, scoped)) === target) return true;
+      }
+      continue;
+    }
+    if (canonical(entryPath) === target) return true;
+  }
+  return false;
+}
+
+/**
+ * Is this plugin root named in the host's `extensions` settings, at either scope? The host treats a
+ * root listed there exactly like an installed plugin and loads its rules/, so a repo wired that way
+ * already has this rule.
+ *
+ * The same list can also be passed on the command line (`-e <dir>`), and those roots live in
+ * process state and reach no file - so a session started that way still pays for a duplicate. That
+ * is the one install shape here that cannot be read off disk, and it lands on the safe side.
+ */
+function namedInExtensions(agentDir: string, cwd: string, pluginRoot: string): boolean {
+  const target = canonical(pluginRoot);
+  const configDir = basename(dirname(agentDir));
+  for (const settings of [join(agentDir, "settings.json"), join(cwd, configDir, "settings.json")]) {
+    const entries = readJson(settings)?.extensions;
+    if (!Array.isArray(entries)) continue;
+    for (const entry of entries) {
+      if (typeof entry !== "string" || entry === "") continue;
+      // A bare tilde, or a tilde followed by a path, expands to the home directory. The other
+      // tilde spelling - a leading tilde naming another user - expands here to a path that exists
+      // nowhere, so it matches nothing and the rule goes out: the not-recognised direction.
+      const expanded = entry.startsWith("~") ? join(homedir(), entry.slice(1)) : entry;
+      if (canonical(isAbsolute(expanded) ? expanded : resolve(cwd, expanded)) === target) return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Does a rules provider already deliver this plugin's rules/?
  *
- * The host scans `rules/` under npm, git and link plugin roots, and does not scan it under
- * marketplace roots - both halves measured against a live session. So the question reduces to which
- * kind of root this is, and the answer is POSITIVE for native delivery: stay quiet only when a
- * node_modules entry for this package resolves to this very directory AND this directory is not a
- * marketplace cache. Every other outcome - no state root, a layout this code does not recognise, a
- * project-scoped install - falls through to delivering the rule. A duplicated rule wastes context;
- * a missing one loses the thing the operator asked for, so the uncertain case picks the duplicate.
+ * The host scans `rules/` under npm, git and link plugin roots at either scope, and does not scan
+ * it under marketplace roots - both halves measured against a live session and confirmed in the
+ * host's source. So the question reduces to which kind of root this is, and the answer is POSITIVE
+ * for native delivery: a duplicated rule wastes context, a missing one loses the thing the operator
+ * asked for, so every uncertain case picks the duplicate.
  */
-function hostDeliversRules(pi: HookApi, pluginRoot: string, packageName: string): boolean {
-  const stateRoot = pluginStateRoot(pi);
-  if (stateRoot === undefined || packageName === "") return false;
-  // Two independent marks of a marketplace cache root. Either is enough, so one of them going
-  // stale against a future host layout still leaves the rule delivered rather than dropped.
-  const cached = isInside(join(stateRoot, "cache", "plugins"), pluginRoot) || cachedFrom(pluginRoot) !== undefined;
-  if (cached) return false;
-  return canonical(join(stateRoot, "node_modules", packageName)) === canonical(pluginRoot);
+function hostDeliversRules(agentDir: string | undefined, pluginRoot: string, cwd: string): boolean {
+  if (agentDir === undefined) return false;
+  for (const root of stateRoots(agentDir, cwd)) {
+    if (!linkedUnder(root, pluginRoot)) continue;
+    // The resolved node_modules entry is authoritative, with one exception: a marketplace root can
+    // carry an entry too, and the host excludes marketplace roots from its rules roots by realpath,
+    // so the cache mark outranks the link.
+    //
+    // That mark is the only one used. The `<marketplace>___<plugin>___<version>` cache-directory
+    // grammar is deliberately NOT read here - a link root is free to carry `___` in its name, and
+    // testing the name before resolving the entry made every such root deliver the rule twice.
+    // `cachedFrom` still reads that grammar for the update nudge, where a wrong answer costs
+    // nothing but silence.
+    return !isInside(join(root, "cache", "plugins"), pluginRoot);
+  }
+  return namedInExtensions(agentDir, cwd, pluginRoot);
 }
 
 // --- (b) update available ----------------------------------------------------------------------
@@ -267,8 +390,8 @@ function needsOnboard(cwd: string): boolean {
 // --- the hook ----------------------------------------------------------------------------------
 
 export default function bdSession(pi: HookApi): void {
+  const agentDir = hostAgentDir(pi);
   const manifest = readJson(join(PLUGIN_ROOT, "package.json")) ?? {};
-  const packageName = typeof manifest.name === "string" ? manifest.name : "";
   const ownVersion = typeof manifest.version === "string" ? manifest.version : "";
 
   // (a) Read the one shipped copy of the rule, live, at load. Never a copy of its text held here:
@@ -282,12 +405,29 @@ export default function bdSession(pi: HookApi): void {
     pi.logger?.debug?.("bd-session: no comms rule to deliver", { ruleFile });
   }
 
-  const deliverRule = ruleBody !== undefined && ruleBody !== "" && !hostDeliversRules(pi, PLUGIN_ROOT, packageName);
+  const deliverRule = ruleBody !== undefined && ruleBody !== "" && !hostDeliversRules(agentDir, PLUGIN_ROOT, CWD);
 
   // Built once. `context` fires before every LLM call, so anything per-call here is paid per call.
+  //
+  // Role `developer`, position appended - both measured through the host's own wire converters
+  // rather than reasoned about.
+  //
+  // The host's message union has no `system` role a hook can emit, but it does have one above
+  // `user`: `developer`. Anthropic promotes a developer turn to a real wire `role: "system"` block
+  // when it immediately follows a user turn and is either last or followed by an assistant turn -
+  // so the promotion needs the APPEND, and prepending forfeits it by landing at index 0. Measured
+  // through `convertAnthropicMessages`: prepended is `role: "user"` either way; appended is
+  // `role: "system"`. Ollama maps `developer` to `system` outright, and omp defaults a developer
+  // message's attribution to "agent", which is the half of that mapping it keys on. OpenAI
+  // emits it as a developer instruction where the model supports the role.
+  //
+  // Where a provider does not elevate the role it falls back to `user`, which is exactly what this
+  // message was before - never worse anywhere, better where the elevation exists. Appending also
+  // puts a standing rule next to the turn it is meant to shape instead of at the far end of the
+  // context.
   const ruleMessage: HostMessage | undefined = deliverRule
     ? {
-        role: "user",
+        role: "developer",
         // The sentinel leads, so an agent asked "is the hook delivering this?" can answer from its
         // own context, and so a human reading a dump knows what put it there.
         content: `<!-- ${SENTINEL} source=hooks/pre/bd-session.ts -->\n\n${ruleBody}`,
@@ -310,7 +450,7 @@ export default function bdSession(pi: HookApi): void {
   // compacted away. It is chained, so this handler builds on whatever the previous one returned
   // instead of replacing it.
   if (ruleMessage !== undefined) {
-    pi.on("context", event => ({ messages: [ruleMessage, ...event.messages] }));
+    pi.on("context", event => ({ messages: [...event.messages, ruleMessage] }));
   }
 
   // Two nudges, two channels, and the split was forced by measurement rather than taste. Two
@@ -321,7 +461,7 @@ export default function bdSession(pi: HookApi): void {
   // /onboard suggestion is a one-time action and gets the one notification.
   pi.on("session_start", (_event, ctx) => {
     // (b) The catalog the host already cached is ahead of what is installed.
-    const stateRoot = pluginStateRoot(pi);
+    const stateRoot = pluginStateRoot(agentDir);
     const cached = cachedFrom(PLUGIN_ROOT);
     if (stateRoot !== undefined && cached !== undefined && ownVersion !== "") {
       const available = cachedCatalogVersion(stateRoot, cached.marketplace, cached.plugin);

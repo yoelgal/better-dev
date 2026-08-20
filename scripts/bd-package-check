@@ -574,39 +574,88 @@ echo "== session hook =="
 # plugin tree, discovered by the host from hooks/pre/ - no manifest entry, no path written into a
 # host's global config. That is the whole difference between it and the hook this release deleted,
 # which install.sh registered BY ABSOLUTE PATH into machine-global config: a `git pull` that moved
-# the target then left every session failing a hook forever, with no uninstall path. Three
-# properties keep that from coming back, and each fails invisibly on a user machine if it breaks.
-bdhook=hooks/pre/bd-session.ts
-bdhooktest=hooks/bd-session.test.ts
+# the target then left every session failing a hook forever, with no uninstall path. The properties
+# below keep that from coming back, and each fails invisibly on a user machine if it breaks.
+bdhookdir=hooks/pre
+bdhookfile=bd-session.ts
+bdhook="$bdhookdir/$bdhookfile"
 [ -f "$bdhook" ] \
   && ok "the session hook ships at $bdhook" \
   || bad "the session hook is missing from $bdhook - a marketplace install then delivers no comms rule at all, and both session-start nudges are gone with it"
-# A module the host cannot read a default factory out of lands in the loader's error list and
-# contributes nothing. Nothing surfaces that to a user, so the export shape is asserted here.
-[ -f "$bdhook" ] && grep -qE '^export default function [A-Za-z_][A-Za-z0-9_]*\(pi\b' "$bdhook" \
-  && ok "$bdhook default-exports a factory the host can load" \
-  || bad "$bdhook has no top-level \`export default function <name>(pi\` - the host loads it, finds no factory, and reports nothing"
-# Every path the hook needs resolves from import.meta.dirname, so nothing in it can rot away from the
-# tree it shipped in. One absolute path - a home dir, a /tmp scratch path left in from a debug run -
-# reintroduces the exact failure mode this design replaced.
-[ -f "$bdhook" ] && ! grep -qE '["'"'"'`]/|~/|/(Users|home|private|var|tmp|opt|etc|usr)/' "$bdhook" \
-  && ok "$bdhook names no absolute path" \
-  || bad "$bdhook contains an absolute path - it would break on any machine but the one it was written on"
-# The behaviour test may NOT sit in hooks/pre/: the host discovers every .ts file there as a hook and
-# expects a factory, so a test file parked beside the hook is loaded into every session and fails at
-# load. One directory up is outside the scan.
-[ -f "$bdhooktest" ] && [ -z "$(ls hooks/pre/*.test.ts 2>/dev/null)" ] \
-  && ok "$bdhooktest sits outside hooks/pre/, where the host will not load it as a hook" \
-  || bad "the session hook's behaviour test is missing, or sits in hooks/pre/ where the host loads it as a hook and fails at load"
-# The three static checks above cannot tell whether the hook still WORKS. The behaviour suite can, so
+# The host discovers a hook by LISTING the directory, never by name: discoverHooksInPackageRoot reads
+# hooks/pre/ and keeps every entry isExtensionFile accepts - `.ts || .js`, any basename, symlinks
+# included (omp extensibility/extensions/loader.ts:491, :603). So this directory's contents ARE the
+# hook roster, and anything else parked here is imported into every session, found to export no
+# factory, and logged where only a debug file sees it. Excluding one filename pattern (*.test.ts) is
+# narrower than that rule and let both `helper.ts` and `extra.test.js` through, so the roster is
+# asserted as an exact set instead.
+bdhookroster=""
+for bdhookentry in "$bdhookdir"/*.ts "$bdhookdir"/*.js; do
+  [ -f "$bdhookentry" ] && bdhookroster="$bdhookroster ${bdhookentry##*/}"
+done
+bdhookroster="${bdhookroster# }"
+[ "$bdhookroster" = "$bdhookfile" ] \
+  && ok "$bdhookdir/ holds exactly the one file the host should load as a hook" \
+  || bad "$bdhookdir/ should hold exactly $bdhookfile; the host would load: ${bdhookroster:-nothing} - every extra .ts/.js there is imported into every session, found to export no factory, and logged where nobody reads it"
+# The behaviour suite lives in hooks/ but NOT in hooks/pre/: one directory up is outside the scan
+# above. Discovered rather than named, because the roster check already pins what hooks/pre/ may
+# hold - so the suite's own filename is free to change without this gate having to learn the new one.
+bdhooktest=""
+for bdhookentry in hooks/*.test.ts hooks/*.test.js; do
+  [ -f "$bdhookentry" ] && bdhooktest="${bdhooktest:+$bdhooktest }$bdhookentry"
+done
+[ -n "$bdhooktest" ] \
+  && ok "the session hook's behaviour suite ships in hooks/, above the directory the host scans: $bdhooktest" \
+  || bad "no *.test.ts or *.test.js ships in hooks/ - nothing then grades whether the session hook still works, and the three static properties below are all a release would have"
+# The three checks below read the hook's TEXT, so they are gated on it being there. Folded into one
+# `[ -f ] && <property> && ok || bad` chain, a missing file short-circuits into the bad branch and
+# prints a claim about a file nobody opened - "has no top-level export default", "contains an
+# absolute path" - and scores itself red at a base that simply lacked the file. Each is proven red on
+# a present-but-broken file instead: the factory param renamed `pi` -> `api`, `export default`
+# removed, a const holding a home-dir path added, and SENTINEL changed in the hook alone.
+if [ -f "$bdhook" ]; then
+  # A module the host cannot read a default factory out of lands in the loader's error list and
+  # contributes nothing. Nothing surfaces that to a user, so the export shape is asserted here.
+  if grep -qE '^export default function [A-Za-z_][A-Za-z0-9_]*\(pi\b' "$bdhook"; then
+    ok "$bdhook default-exports a factory the host can load" # prove-new: regression-guard reads the hook's text, so a base without the file grades nothing - proven red instead by renaming the factory param pi to api
+  else
+    bad "$bdhook has no top-level \`export default function <name>(pi\` - the host loads it, finds no factory, and reports nothing"
+  fi
+  # Every path the hook needs resolves from import.meta.dirname, so nothing in it can rot away from
+  # the tree it shipped in. One absolute path - a home dir, a scratch path left in from a debug run -
+  # reintroduces the exact failure mode this design replaced.
+  if ! grep -qE '["'"'"'`]/|~/|/(Users|home|private|var|tmp|opt|etc|usr)/' "$bdhook"; then
+    ok "$bdhook names no absolute path" # prove-new: regression-guard reads the hook's text, so a base without the file grades nothing - proven red instead by adding a const holding a home-dir path
+  else
+    bad "$bdhook contains an absolute path - it would break on any machine but the one it was written on"
+  fi
+  # /onboard's comms detection has ONE observable: it searches the session's own context for this
+  # token. The hook's own comment says changing the constant breaks that skill, and the behaviour
+  # test pins the literal - so hook and test move together while the skill's documented observable
+  # silently does not. Keyed on the VALUE, never a line number: both files get edited in the same
+  # rounds this one does.
+  bdsentinel="$(sed -n 's/^const SENTINEL = "\([^"]*\)".*/\1/p' "$bdhook" | head -1)"
+  if [ -n "$bdsentinel" ] && grep -qF "$bdsentinel" skills/onboard/SKILL.md; then
+    ok "the hook's SENTINEL is the token skills/onboard/SKILL.md tells the agent to search for" # prove-new: regression-guard reads the hook's text, so a base without the file grades nothing - proven red instead by changing SENTINEL in the hook alone
+  else
+    bad "the hook's SENTINEL ${bdsentinel:+($bdsentinel) }is not named in skills/onboard/SKILL.md - /onboard's detection then searches for a token nothing injects, and calls the rule undelivered on the one host that delivers it"
+  fi
+fi
+# The static checks above cannot tell whether the hook still WORKS. The behaviour suite can, so
 # run it where a runtime exists. Announced rather than skipped where none does: a check that passes in
 # silence reads exactly like one that ran.
-if command -v bun >/dev/null 2>&1; then
-  bun test "$bdhooktest" >/dev/null 2>&1 \
-    && ok "session hook behaviour suite passes" \
-    || bad "session hook behaviour suite FAILS - run \`bun test $bdhooktest\` to see which of the three behaviours broke"
+# With no suite discovered, `bun test` bare would fall through to whole-repo discovery and grade
+# something else entirely, so that case announces itself instead of running.
+if [ -z "$bdhooktest" ]; then
+  printf '  \033[33m\342\200\242\033[0m %s\n' "session hook behaviour suite NOT RUN - none was found to run, reported above"
+elif command -v bun >/dev/null 2>&1; then
+  if bun test $bdhooktest >/dev/null 2>&1; then
+    ok "session hook behaviour suite passes" # prove-new: regression-guard runs the suite, so a base that ships none has nothing to run - proven red instead by gutting the hook factory to `return;`, and by changing SENTINEL in the hook alone
+  else
+    bad "session hook behaviour suite FAILS - run \`bun test $bdhooktest\` to see which behaviour broke"
+  fi
 else
-  printf '  \033[33m\342\200\242\033[0m %s\n' "session hook behaviour suite NOT RUN - no bun on this machine, so only the three static properties above were graded"
+  printf '  \033[33m\342\200\242\033[0m %s\n' "session hook behaviour suite NOT RUN - no bun on this machine, so only the static properties above were graded"
 fi
 
 echo "== docs/skills mapping =="
@@ -761,16 +810,34 @@ echo "== deleted paths =="
 # exempted by name because it has to spell the patterns in order to forbid them.
 gone='bd-mem|bd-guard|bd-gfx|bd-dispatch|bd-block|bd-link|bd-browse|bd-worktree-guard|bd-hook-wire'
 gone="$gone|bd-session-start|bd-subagent-start|bd-graphify-refresh-stale|bd-migrate-branch-model"
-gone="$gone|bd-omp-runtime-check|bd-awareness|[.]better-dev/bin|hooks/hooks[.]json|hooks/bd-"
+gone="$gone|bd-omp-runtime-check|bd-awareness|[.]better-dev/bin|hooks/bd-"
 gone="$gone|hosts/(claude|codex|hermes|omp)|better-dev/hooks|graphify|browse/src|learnings[.]jsonl"
 gone="$gone|orchestrating-agents/tiers[.]md|/bootstrap-hooks|/codebase-map|/browser-capability"
 gone="$gone|install[.]sh|bd-uninstall|friction/"
+swept="$(find skills rules scripts .github docs/skills -type f 2>/dev/null; ls README.md CLAUDE.md BOOTSTRAP.md .claude-plugin/plugin.json .omp-plugin/marketplace.json .claude-plugin/marketplace.json 2>/dev/null)"
 gone_hits=""
-for f in $(find skills rules scripts .github docs/skills -type f 2>/dev/null; ls README.md CLAUDE.md BOOTSTRAP.md .claude-plugin/plugin.json .omp-plugin/marketplace.json .claude-plugin/marketplace.json 2>/dev/null); do
+for f in $swept; do
   [ "$f" = scripts/bd-package-check ] && continue
   LC_ALL=C grep -Eq "$gone" "$f" 2>/dev/null && gone_hits="$gone_hits $f"
 done
 [ -z "$gone_hits" ] && ok "no shipped file names a script or directory this release deleted" || bad "deleted path named in:$gone_hits - each one has a native replacement, and a reader following the old name spends a turn finding out it is gone"
+# `hooks/hooks.json` is the one deleted name that came back as somebody else's: it is Claude Code's
+# own plugin-hook manifest, and the channel table has to spell that shape to record which host
+# protocol better-dev does NOT implement. So it is swept on ATTRIBUTION rather than on the literal -
+# legitimate where the file says whose format it is, and the install-era better-dev path again where
+# it does not, sending a reader after a manifest this repo has not shipped since. Attribution is read
+# per file, not per line, because the sentence that carries it wraps.
+unattributed=""
+for f in $swept; do
+  [ "$f" = scripts/bd-package-check ] && continue
+  LC_ALL=C grep -Eq 'hooks/hooks[.]json' "$f" 2>/dev/null || continue
+  LC_ALL=C grep -qF 'Claude Code' "$f" || unattributed="$unattributed $f"
+done
+if [ -z "$unattributed" ]; then
+  ok "every file naming hooks/hooks.json says it is Claude Code's format" # prove-new: regression-guard holds at a base whose docs name that manifest nowhere at all; proven red by naming it in a file that never says whose format it is
+else
+  bad "hooks/hooks.json named without attribution in:$unattributed - better-dev has not shipped that manifest since install.sh went, so an unattributed mention sends a reader looking for a file that is not there"
+fi
 
 echo
 [ $fail = 0 ] && echo "package-check: PASS ($(ls skills/ | wc -l | tr -d ' ') skills)" || { echo "package-check: FAIL"; exit 1; }
