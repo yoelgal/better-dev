@@ -569,6 +569,46 @@ src="$(jq -r '.plugins[0].source // empty' "$MO" 2>/dev/null)"
   && ok "package.json declares an omp key, so a linked install actually loads" \
   || bad "package.json has no \`omp\` key - \`omp plugin link\` would report success and load nothing"
 
+echo "== session hook =="
+# rules/comms.md, the update nudge and the /onboard nudge all reach a session through one file in the
+# plugin tree, discovered by the host from hooks/pre/ - no manifest entry, no path written into a
+# host's global config. That is the whole difference between it and the hook this release deleted,
+# which install.sh registered BY ABSOLUTE PATH into machine-global config: a `git pull` that moved
+# the target then left every session failing a hook forever, with no uninstall path. Three
+# properties keep that from coming back, and each fails invisibly on a user machine if it breaks.
+bdhook=hooks/pre/bd-session.ts
+bdhooktest=hooks/bd-session.test.ts
+[ -f "$bdhook" ] \
+  && ok "the session hook ships at $bdhook" \
+  || bad "the session hook is missing from $bdhook - a marketplace install then delivers no comms rule at all, and both session-start nudges are gone with it"
+# A module the host cannot read a default factory out of lands in the loader's error list and
+# contributes nothing. Nothing surfaces that to a user, so the export shape is asserted here.
+[ -f "$bdhook" ] && grep -qE '^export default function [A-Za-z_][A-Za-z0-9_]*\(pi\b' "$bdhook" \
+  && ok "$bdhook default-exports a factory the host can load" \
+  || bad "$bdhook has no top-level \`export default function <name>(pi\` - the host loads it, finds no factory, and reports nothing"
+# Every path the hook needs resolves from import.meta.dirname, so nothing in it can rot away from the
+# tree it shipped in. One absolute path - a home dir, a /tmp scratch path left in from a debug run -
+# reintroduces the exact failure mode this design replaced.
+[ -f "$bdhook" ] && ! grep -qE '["'"'"'`]/|~/|/(Users|home|private|var|tmp|opt|etc|usr)/' "$bdhook" \
+  && ok "$bdhook names no absolute path" \
+  || bad "$bdhook contains an absolute path - it would break on any machine but the one it was written on"
+# The behaviour test may NOT sit in hooks/pre/: the host discovers every .ts file there as a hook and
+# expects a factory, so a test file parked beside the hook is loaded into every session and fails at
+# load. One directory up is outside the scan.
+[ -f "$bdhooktest" ] && [ -z "$(ls hooks/pre/*.test.ts 2>/dev/null)" ] \
+  && ok "$bdhooktest sits outside hooks/pre/, where the host will not load it as a hook" \
+  || bad "the session hook's behaviour test is missing, or sits in hooks/pre/ where the host loads it as a hook and fails at load"
+# The three static checks above cannot tell whether the hook still WORKS. The behaviour suite can, so
+# run it where a runtime exists. Announced rather than skipped where none does: a check that passes in
+# silence reads exactly like one that ran.
+if command -v bun >/dev/null 2>&1; then
+  bun test "$bdhooktest" >/dev/null 2>&1 \
+    && ok "session hook behaviour suite passes" \
+    || bad "session hook behaviour suite FAILS - run \`bun test $bdhooktest\` to see which of the three behaviours broke"
+else
+  printf '  \033[33m\342\200\242\033[0m %s\n' "session hook behaviour suite NOT RUN - no bun on this machine, so only the three static properties above were graded"
+fi
+
 echo "== docs/skills mapping =="
 # R7h: the per-skill docs layer mirrors the shipped skill roster one-for-one, both directions - a
 # skill dir with no page is an unreviewed page, a page with no skill dir is stale after a removal or

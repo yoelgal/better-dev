@@ -1483,3 +1483,50 @@ readers; `/packaging` says so in those words.
 
 `scripts/bd-package-check` and `scripts/bd-skill-stage` survive as maintainer gates run from a checkout.
 They are not shipped capability, and shipped skill prose no longer instructs anyone to run them.
+
+## D43 - the comms rule reaches a hookless channel through a hook in the plugin tree (extends D42; 2026-08-20)
+
+D42 made `rules/comms.md` the single home for the comms block and deleted the splice that used to paste
+its body into a host entry file. It also measured the hole that left: the provider serving marketplace
+roots registers skills, commands, hooks, tools and MCP but not rules, so a marketplace-installed plugin
+ships the rule file and no session loads it - the block reached a session only through
+`omp plugin link`. **A hook shipped inside the plugin tree closes that hole**, at
+`hooks/pre/bd-session.ts`: it injects `rules/comms.md` where nothing else delivered it, surfaces an
+available update, and nudges `/onboard` in a repo carrying no discovery block.
+
+**Measured before it was designed.** A minimal probe plugin carrying one `hooks/pre/probe.ts` was
+linked, and a single `omp -p` run wrote:
+
+```
+FACTORY-CALLED dir=/private/tmp/bd-hookprobe/hooks/pre
+SESSION_START-FIRED
+CONTEXT-FIRED messages=1
+```
+
+The negative control - the same probe with the plugin uninstalled - wrote nothing at all. So the hook is
+discovered from the installed plugin tree with no manifest entry and no path registered anywhere
+(`marketplace.md:151`, "runtime hooks are discovered from the installed plugin tree"); both the
+`session_start` and `context` events fire; and `import.meta.dirname` resolves to the hook's own directory
+*inside the plugin*, which is the fact the whole design rests on - the hook reaches its sibling content
+by relative path, so an update cannot strand it. The probe also fired on a run whose model call failed,
+so the mechanism costs no tokens.
+
+**This is not the hook D42 deleted.** `install.sh` registered its hooks by absolute path into
+machine-global config, so a `git pull` that moved a target left every session failing a hook forever -
+the defect that killed the installer. A hook in the plugin tree resolves its siblings relative to
+`import.meta.dirname`, is versioned with the plugin that ships it, and is gone the moment the plugin is
+uninstalled; there is no absolute path anywhere to strand. The cutover was right to delete the installer
+and wrong to conclude the hook had to go with it.
+
+**Hookless hosts get a documented pointer, never a copy.** A host reached only by `npx skills add` has
+no plugin hook mechanism, so `/onboard` writes a pointer between
+`<!-- BEGIN better-dev-comms -->` / `<!-- END better-dev-comms -->` in the repo's entry file, replacing
+any existing block in place. Its body points at the installed `rules/comms.md` and restates none of it:
+a copy cannot receive an update, and the drifted 80-line splice D42 deleted is this library's own
+instance of that bug. That install is genuinely partial, and the channel table in `README.md` says so in
+those words rather than hiding it.
+
+`/onboard` writes that block only after measuring which of the three routes the session is on - the
+plugin-tree hook (observable: the hook leads its injection with a `better-dev:comms` sentinel), a native
+rules provider (the rule's subject in context with no sentinel), or neither - because a step that cannot
+report "already delivered" gets re-run forever.
