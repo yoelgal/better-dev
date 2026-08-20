@@ -339,6 +339,11 @@ for f in skills/*/SKILL.md; do
   case "$ah" in ""|\"*|\'*) ;; \[*|\{*) errs="$errs argument-hint-must-be-a-quoted-string" ;; esac
   printf '%s' "$prose" | grep -qE '(^|[^A-Za-z0-9])@[A-Za-z0-9_./-]+\.(md|sh)' && errs="$errs @-link"
   printf '%s' "$prose" | grep -qE '\b(MUST|ALWAYS|STOP|CRITICAL|SHALL)\b' && errs="$errs shouting"
+  # A strict YAML parser reads ': ' inside an UNQUOTED scalar as a nested mapping and rejects the whole
+  # file. Our own frontmatter read above is a regex, so it cannot see that: three shipped descriptions
+  # carried one and a real installer skipped those three skills with a parse error while this gate stayed
+  # green. Quote the value, or reword to drop the colon.
+  printf '%s\n' "$fm" | grep -qE '^[a-z-]+: [^"'"'"'|>].*: ' && errs="$errs unquoted-colon-in-frontmatter"
   [ -z "$errs" ] && ok "$dir" || bad "$dir:$errs"
 done
 
