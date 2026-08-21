@@ -20,9 +20,11 @@ Three rules hold across the whole run:
   4, tell the operator in plain words and name the repair. Reporting success over a stage that did not
   land is the single outcome this file exists to prevent.
 
-better-dev has two layers, and this procedure sets up both: the **plugin** (the skills, the
-always-applied comms rule, the session hook), installed once for the machine and shared by every repo,
-and a repo's **`.better-dev/`** data, written per repo by `/onboard` in stage 5.
+better-dev has two layers. This procedure installs the first and offers the second. The **plugin** (the
+skills, the always-applied comms rule, the session hook) is installed once for the machine and shared by
+every repo, and that is what stages 1 to 4 do. A repo's **`.better-dev/`** data is written per repo by
+`/onboard`, which stage 5 offers rather than performs, because the directory the operator happened to
+run this from is not necessarily one they want wired.
 
 ## Stage 1. Identify the host, and what is already installed
 
@@ -289,11 +291,24 @@ id - `158452`, `167274`, `168441`, each at `https://forum.cursor.com/t/topic/<id
 your plan rather than presenting it as a delivery route, and re-read those three before you revisit the
 call: fixed upstream, this row becomes a real channel.
 
-## Stage 5. Wire the repo: run `/onboard`
+## Stage 5. Offer to wire a repo, and wire it only if asked
 
-With the plugin installed, run `/onboard` from inside the repo. Run it even where stage 2 and stage 3
-both passed: on a host that gets the rule by pointer this is the step that delivers it, and on every
-host it is where the repo's own data comes from.
+Stages 1 to 4 changed the machine. This stage changes a repo, so it is offered rather than performed.
+The operator may have installed from their home directory, a scratch clone, or somewhere they have no
+intention of wiring, and a directory being the one they happen to stand in is not consent to write
+into it.
+
+Two questions before anything, both answerable from the shell:
+
+- **Is this directory inside a git repo?** Where it is not, do not offer. Say the install landed, name
+  that `/onboard` wires a repo when they want one wired, and stop. That is a complete, successful run.
+- **Do they want this one wired?** Ask, in one line, naming the repo by its root. A yes runs `/onboard`.
+  Anything else finishes the same way: installed, nothing written, and `/onboard` available whenever
+  they ask for it.
+
+Where they accept, run `/onboard` from inside that repo. Run it even where stage 2 and stage 3 both
+passed: on a host that gets the rule by pointer this is the step that delivers it, and on every host it
+is where the repo's own data comes from.
 
 `/onboard` detects the stack, memory system and branching, adapts to what is already there, and writes:
 
@@ -310,7 +325,12 @@ host it is where the repo's own data comes from.
   cannot drift from what shipped. `/onboard` reads the path back first and writes no block where nothing
   resolves, naming the gap instead.
 
-**Check.** Three observations, and each one has to be something this stage did not itself create:
+**Check, where nothing was wired.** The observation is the absence: name the directory, say it is not a
+repo or that the operator declined, and confirm you wrote nothing into it. A run that installs and
+wires nothing is complete, and reporting it as complete is the honest outcome rather than a shortfall.
+
+**Check, where `/onboard` ran.** Three observations, and each one has to be something this stage did not
+itself create:
 
 - Read the entry file back and quote the line inside the sentinels that names the installed
   `rules/comms.md`, then read that path back too. The sentinels alone prove nothing - `/onboard` was
@@ -330,12 +350,13 @@ the operator's conventions or edits.
 
 ## Stage 6. Report
 
-Give the operator five lines, and no more than five:
+Give the operator six lines, and no more than six:
 
 - the host, and the channel you installed through
 - how the comms rule reaches a session here: injected, or by pointer
 - how it stays current: auto-update, an alert you have seen fire, an alert wired that nobody has yet
   seen fire, or neither, in which case name the repair
+- which repo you wired, or that you wired none and why: not a repo, or they declined
 - anything you handed over as a paste block and are waiting on
 - any check that did not pass, with what it means for them
 
