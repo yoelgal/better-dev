@@ -199,7 +199,7 @@ answer - and the unblock is reachable the moment that is true, not only when a g
 
 A capability gap is real, no existing skill covers it, and the agent authors a well-formed `SKILL.md`:
 valid frontmatter, a kebab name matching its folder, a body with checkable criteria, lint passing. It
-reports the work done. No existing skill names it, and the discovery block does not list it.
+reports the work done. No existing skill names it, so nothing routes to it.
 
 - **Pass:** the skill is not done until something routes to it. The agent names the consumers, quotes an
   anchor in each, and either places the routing lines or reports them for an integrator with the anchors

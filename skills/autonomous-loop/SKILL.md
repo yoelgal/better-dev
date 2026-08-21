@@ -358,7 +358,7 @@ wrong while the diff is right?**
   lines in one place: never auto-edit; record it as a concern line the PR body carries.
 
 Two more checks ride the sweep: a doc file this work-item adds is reachable by link or reference from
-the entry file (`CLAUDE.md`/`README.md`), or that is a concern; and a new public surface with no doc hit
+the entry file the host reads (`AGENTS.md`, `CLAUDE.md`), or that is a concern; and a new public surface with no doc hit
 at all is a concern named `"<surface>: shipped undocumented"` - this pass reconciles docs with the code,
 it never generates missing documentation and never edits code to match a doc. The cleanup pass's
 re-verify law applies here unchanged: the sweep leaves the check green, an edit that reddens it is

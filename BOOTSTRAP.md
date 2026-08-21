@@ -314,13 +314,16 @@ is where the repo's own data comes from.
 
 - **`.better-dev/`, data only, committed:** `rules.md` and `overrides.md`. Loop state under `ledger/`
   stays gitignored.
-- **A discovery block** in the entry file (`CLAUDE.md` or `AGENTS.md`), naming where this repo's
-  overrides and rules live. This block is the whole of discovery, so a later session that lacks it never
-  learns the practices are installed.
+- **A discovery block** in every entry file this repo's agents read - root `AGENTS.md` always, root
+  `CLAUDE.md` beside it where that host reads it - naming where this repo's overrides and rules live.
+  The two hosts read disjoint sets of files (D46), so one copy per host is the rule, and `/onboard`
+  replaces between its own markers on every run, which is what keeps the copies from drifting. This
+  block is the whole of discovery, so a later session that lacks it never learns the practices are
+  installed.
 - **A committed `.omp/config.yml`** naming the shell commands that need the operator's approval, so the
   policy travels with the repo rather than living on one machine.
 - **The comms pointer where stage 3 landed on the pointer row**, written between
-  `<!-- BEGIN better-dev-comms -->` and `<!-- END better-dev-comms -->` in the entry file and replacing
+  `<!-- BEGIN better-dev-comms -->` and `<!-- END better-dev-comms -->` in those same entry files and replacing
   any existing block in place. It names the installed `rules/comms.md` instead of copying its text, so it
   cannot drift from what shipped. `/onboard` reads the path back first and writes no block where nothing
   resolves, naming the gap instead.

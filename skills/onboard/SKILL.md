@@ -1,6 +1,6 @@
 ---
 name: onboard
-description: Use when setting up better-dev in a repository for the first time, or re-running to wire in anything missing - greenfield or existing codebase. Also use when the repo has the better-dev skills available but no .better-dev/ scaffold and no CLAUDE.md discovery block yet. Also use to unwire a repo - "remove better-dev from this repo", "unwire this", or a repo left carrying the managed discovery block after the plugin was uninstalled - which takes the block out by its markers and treats `.better-dev/` as the operator's data on a separate ask.
+description: Use when setting up better-dev in a repository for the first time, or re-running to wire in anything missing - greenfield or existing codebase. Also use when the repo has the better-dev skills available but no .better-dev/ scaffold and no discovery block yet. Also use to unwire a repo - "remove better-dev from this repo", "unwire this", or a repo left carrying the managed discovery block after the plugin was uninstalled - which takes the block out by its markers and treats `.better-dev/` as the operator's data on a separate ask.
 argument-hint: "[phase to jump to, optional]"
 allowed-tools:
   - Bash
@@ -24,8 +24,8 @@ repo, and never into your personal skills folder, which is why a skill of your o
 still wins. If this skill is running, the plugin is already installed, so there is no install to check
 here and no bootstrap to hand over. What onboard wires is one repo: `.better-dev/` with its rules and
 overrides - tracked and shared on a team adoption, local-only on a solo one (Phase 2 asks which) - and
-a discovery block in the entry file. The host loads and resolves the practices itself, so there is no
-bridge to link and no hook to register.
+a discovery block in every entry file this repo's agents read. The host loads and resolves the
+practices itself, so there is no bridge to link and no hook to register.
 
 ## Agent contract
 
@@ -65,7 +65,7 @@ wired on the strength of the reply.
 A read-only sweep. Report each as *observed value + where*, then move on:
 
 ```bash
-ls CLAUDE.md AGENTS.md 2>/dev/null                        # entry file(s)
+ls AGENTS.md CLAUDE.md .omp/AGENTS.md CLAUDE.local.md 2>/dev/null   # which of Phase 4's targets exist
 grep -l '@AGENTS.md' CLAUDE.md 2>/dev/null                # which imports which
 ls -d .better-dev .omp 2>/dev/null                        # prior data scaffold? project-local omp policy?
 git rev-parse --is-inside-work-tree 2>/dev/null && git branch --format='%(refname:short)'
@@ -75,9 +75,10 @@ git log --merges --oneline -n 5 2>/dev/null              # which base merged PRs
 
 Read (don't guess) five things:
 
-1. **Entry file** - `CLAUDE.md`, `AGENTS.md`, both, or neither. If both exist, the convention is that
-   one `@`-imports the other (papers.town: `CLAUDE.md` opens `@AGENTS.md`); the **importer is the
-   entry file** and the block goes there. Neither → create `CLAUDE.md`.
+1. **Entry files** - which of Phase 4's measured targets already exist: root `AGENTS.md`, root
+   `CLAUDE.md`, `.omp/AGENTS.md`, `CLAUDE.local.md`. Note which host you are running on too, because
+   it decides two of the four. Phase 4 owns the choice; here, only record what is there and whether
+   `CLAUDE.md` `@`-imports `AGENTS.md`.
 2. **Installed skills / MCP** - note them so you never disable or replace them. better-dev only adds.
 3. **Git + branching** - does an integration branch (`staging`/`develop`) exist, what's the feature
    prefix in use (`feat/` vs `feature/`), is there a remote, and which base recent merged PRs
@@ -113,7 +114,7 @@ recorded as an override rather than overwritten:
   question before anything shared is written: *adopting for the team, or just you?* Record the answer
   as an `adoption: team` (or `adoption: solo`) line in `.better-dev/rules.md`. One
   adopter's yes is not team consent, so **solo** keeps `.better-dev/` out of git entirely, puts the
-  discovery block in a local-only entry file, and never creates a shared branch - Phases 3 and 4
+  discovery block in its host's own local-only file, and never creates a shared branch - Phases 3 and 4
   mark where each lands. A repo whose history is all yours records `team` quietly, no question
   asked. Going team later is the team's call: re-run `/onboard`, answer team, and the tracked
   shape is written the normal way.
@@ -152,7 +153,7 @@ trunk-based - PRs merge to `main`, `main` releases - is a first-class model, not
   `main` has recorded a convention it is not standing on, and the operator's next commit lands on the
   wrong base; a `git branch -f staging main` used to drag the branch along afterwards is the tell that
   the commits went to the wrong place. Phase 5 names the checked-out branch in the recap.
-- **A wiring commit carries wiring.** `.better-dev/`, the entry file's blocks, and the ignore file
+- **A wiring commit carries wiring.** `.better-dev/`, the entry files' blocks, and the ignore file
   this run wrote - that is the whole contents. Anything else the run wants to
   land (a lockfile, a lint config, a new dependency, a formatter) is the operator's call, asked before
   the write and committed separately if they say yes. A repo the operator described as green and
@@ -232,14 +233,59 @@ step that got skipped.
 
 ### Phase 4 - Self-describe
 
-Write the discovery block into the **entry file** from Phase 1, between its own two markers -
-`<!-- BEGIN better-dev -->` / `<!-- END better-dev -->` - replacing any existing block in place
-and never touching the operator's own text.
+Write the discovery block into **every entry file this repo's agents actually read**, between its own
+two markers - `<!-- BEGIN better-dev -->` / `<!-- END better-dev -->` - replacing any existing block
+in place and never touching the operator's own text.
+
+Which files those are is a measurement, and the answer is awkward: the two hosts read disjoint sets,
+so no single file reaches both. Probed 2026-08-21 - one unique token written into each of three files
+in a throwaway git repo, then the agent asked which tokens stood in its context, with no tool calls
+allowed:
+
+| File | omp | Claude Code 2.1.233 |
+|---|---|---|
+| root `AGENTS.md` | loaded | not loaded |
+| root `CLAUDE.md` | **not loaded** | loaded |
+| `CLAUDE.local.md` | **not loaded** | loaded |
+
+Claude Code's own answer noted `AGENTS.md` sitting on disk while its contents were absent from
+context, so on-disk is not in-context. omp's half has a documented cause: its context providers match
+`.omp/AGENTS.md`, `.claude/CLAUDE.md`, `.agent/AGENTS.md`, `.agents/AGENTS.md`, and a standalone
+`AGENTS.md` walked up to the repo root - and no provider matches a bare root `CLAUDE.md`
+(`omp://context-files.md`). Re-run the probe when a host version moves: this is two versions read on
+one day, not a standard.
+
+The targets that follow, on a team adoption:
+
+- **root `AGENTS.md` - always.** The one file omp reads, and Codex and the cross-tool convention
+  read it too.
+- **root `CLAUDE.md` - when it already exists, or when the host you are running on is Claude Code.**
+  Anywhere else it is a file nothing loads, so do not create one.
+
+Write both wherever both apply, even where `CLAUDE.md` holds nothing but an `@AGENTS.md` import. That
+import is Claude Code's own mechanism and no other host's guarantee, and the two failures do not cost
+the same: a duplicate block is a few lines of per-turn tax the operator can see and delete, while a
+missed write is silent - the repo reads as never wired and nothing says why. Name the import in the
+Phase 5 recap so they can collapse it if they want to.
+
+**Two files are allowed here because this skill is what reconciles them.** Duplicated prose drifts,
+which is why better-dev deleted its last copy - the spliced comms body that then served a stale rule
+for the rest of its life (D42). The difference here is mechanical: `/onboard` is idempotent and
+**replaces** the text between its markers on every run, so a re-run makes both copies identical again
+by construction. Nothing else reconciles them. That makes the write shape load-bearing: **if this
+write ever becomes an append rather than a replace-between-markers, the copies start drifting and this
+rule stops being safe** - whoever changes the write shape owns re-deciding the target set with it.
+
+**The reconciler stops at the markers, so nothing else gets a second copy.** Text outside them is the
+operator's, and no run replaces it - duplicate it across two entry files and it drifts with nobody
+watching. Where their own prose needs to reach both hosts, it lives once in the file the running host
+reads and the other file carries a pointer to it. That split is theirs to approve, not yours to make
+silently: propose it, and leave one copy where it is if they decline.
 
 **An entry file that withholds consent in its own text keeps it.** Read the file before writing:
 where it says to ask first - "do not edit without asking", "my notes, hands off" - that sentence is
-addressed to you, and appending below it is still editing it. Ask, and offer the local-only entry file
-beside it as the other option - not as a way around the answer: that file loads into every session
+addressed to you, and appending below it is still editing it. Ask, and offer the host's own local-only
+file beside it as the other option - not as a way around the answer: that file loads into every session
 too, so an operator who declined always-loaded better-dev text has declined it there as well. Their
 answer picks a destination or none, and it covers the whole block. Being invoked is not the
 permission: `/onboard` is an instruction to wire the repo, and the operator who wrote that line was
@@ -248,14 +294,25 @@ appended and explained itself with "`/onboard` was taken as the 'ask' its edit r
 operator came back with "next time actually ask before touching CLAUDE.md". The rule holds for any file
 carrying that instruction, not `CLAUDE.md` alone.
 
-Solo adoption changes only the destination: the block goes in a local-only entry file - on the
-Claude family, `CLAUDE.local.md`, loaded beside `CLAUDE.md` and kept out of git by its own
-`.git/info/exclude` line, the same mechanism Phase 3 used - and the block's tracked-data bullet
-reads local, not tracked. A host with no local-only entry file gets no block; name that limitation
-in the Phase 5 recap - discovery then rests on the installed skills' own descriptions. On a team
-re-run upgrading a solo adoption, remove any better-dev marker block from `CLAUDE.local.md` before
-writing the block into the entry file - two discovery blocks loaded per turn is the exact per-turn
-tax the block shape exists to avoid.
+**Solo adoption keeps the same rule and changes the files.** Local-only means a file git never tracks,
+and which file that is depends on the host:
+
+- **omp** - `.omp/AGENTS.md`, with that path appended to `.git/info/exclude`, the same mechanism
+  Phase 3 used for `.better-dev/`. It is omp's own documented answer for project-local uncommitted
+  context, and its `native` provider reads it.
+- **Claude Code** - `CLAUDE.local.md`, loaded beside `CLAUDE.md` and excluded the same way.
+
+`CLAUDE.local.md` is Claude Code's file and no other host's, so **it is never the only target.** A
+solo adoption on omp that writes only there writes into a void: nothing loads the file, the operator
+sees no block, and every later session behaves as though the repo was never wired. That was the live
+defect the probe above was run to settle. A host with no local-only file of its own gets no block;
+name that limitation in the Phase 5 recap, where discovery then rests on the installed skills' own
+descriptions.
+
+The consent rule above governs each of these writes, and the operator's answer covers the whole block
+wherever it lands - one ask, not one per file. On a team re-run upgrading a solo adoption, remove any
+better-dev marker block from the local-only file before writing the tracked ones; two discovery blocks
+loaded per turn is the exact tax the block's shape exists to avoid.
 
 In an interactive session, make that write with the host's **file-edit tool**, not a shell pipe: an
 opaque heredoc piped into the always-loaded entry file is the exact shape a host's action classifier
@@ -263,71 +320,37 @@ reads as instruction injection and denies, while a native edit shows a reviewabl
 Replace between the markers rather than appending, so the block stays byte-stable across re-runs -
 that property is what keeps the prompt cache below it valid, so preserve it when changing the shape.
 
-Fill the block from what you actually detected (branching, the integration branch). The block is
-always-loaded context - a per-turn tax - so when tailoring it, cut or merge a row before adding one.
-Shape:
+**Keep the block small.** Its unique payload is two facts: this repo is wired, and where its records
+live. Two measurements say the rest is already covered. 28 of better-dev's 33 skills read
+`.better-dev/overrides.md` themselves, so a block that restates an override taxes every turn to help
+skills that were going to read the file anyway. And the routing table restated skill descriptions the
+host injects regardless - proven in this repo, which ran a whole session with its own block unread
+while routing worked. Fill what is left from what you actually detected, and cut a row before adding
+one: the block lands in two files now, so every line is paid for twice. Shape:
 
 ```markdown
+<!-- BEGIN better-dev -->
 ## better-dev is wired here
 
-This repo uses **better-dev**: portable dev practices that run inside your agent (delivered by the
-better-dev plugin your host loads, not vendored here). Say what you want; the right skill enters, and
-the chain runs itself - a tool you name wins over a row:
+This repo uses **better-dev**: portable dev practices delivered by the plugin your host loads, not
+vendored here. Say what you want and the matching skill enters - you name the entry, not every step,
+and a tool you name wins over a skill.
 
-| You say... | Enters | Then, on its own |
-|---|---|---|
-| "add / build feature X", "I want Y" (non-trivial) | `/plan-grill` | -> `/autonomous-loop` -> `/pr-and-verify` |
-| "upgrade the dependency", "clear the CVE", "chore: X" | `/plan-grill` (contract-lite) | -> the loop, priced under a feature grill |
-| "X is broken / failing / slow", "why is prod down" | `/diagnose` | -> `/autonomous-loop` -> `/pr-and-verify` |
-| "let's build an app that does Y", a new project or epic | `/groundwork` | asks steered or one-shot (`/gauntlet`) first, then sets the foundation |
-| "gauntlet this", "one-shot the whole thing", "write me a prompt to build X in a fresh session" | `/gauntlet` | grills goal + bar, hands you one loop prompt for a fresh session |
-| "ship it", "open a PR", "let's land this" | `/pr-and-verify` | -> `/release-promotion` on green |
-| "release this / promote to main", "roll back / revert the release", "hotfix prod", "did the deploy land / is prod healthy" | `/release-promotion` | tags, verifies live, reverts a bad release, double-merges the hotfix |
-| "deploy this", "get it live", "set up hosting" | `/deploy-capability` | creates the surface; `/guardrails-install` records it |
-| "wire monitoring", "can I see prod errors?", "does anything page me?" | `/observability-install` | fills the recorded `obs-*` gaps |
-| "review this PR", "review my colleague's PR" | `/review` | inbound path: host mechanics + this repo's recorded policy |
-| "what's in flight?", "where did we leave off?" | read the last line of each `.better-dev/ledger/*/progress.md` | one line per work-item with its state |
-| "we're done - anything worth recording?", before a `/clear` or session end | `/session-review` | routes the session's lessons, friction, and instruction defects to the store; "no durable lesson" is a valid line |
-| "hand this off", "pick up X's work" | `/worktree-branching` (handoff) | the bundle rides the branch; the receiving operator re-confirms the contract |
-| "make it look good", "design the page" | `/design-brief` | -> `/plan-grill` or the loop |
-| "we can't decide between two options", "build something throwaway to settle it" | `/prototype` | the verdict lands in `decisions.md`; the code leaves the tree |
-| "is this safe", a security pass on a risky diff | `/security-pass` | composed by `/review` automatically |
-| "is there a tool or skill for X" | `/tool-sourcing` | -> `/self-extension` only if discovery is empty |
-| "does this claim hold up", "what's the prior art on X" | `/deep-research` | a sourced answer carrying its provenance; changes nothing |
-| "what's worth doing here", "audit this codebase" | `/codebase-audit` | ranked findings; you pick -> front-ends |
-| "are these tests actually testing anything", a green suite that keeps shipping bugs | `/test-audit` | mutation-settled findings; you pick -> `/plan-grill` -> the loop |
-| "what is this project even for", "write down what we refuse to build" | `/vision` | recovers the acceptance policy from the repo's own history into `VISION.md` |
-| "here are some links / ingest these / harvest this", a link or dump of source material for the library - even one framed as "implement this" | `/source-harvest` | captures verbatim -> critical synthesis; a build ask then -> `/plan-grill` |
-| "just push to the PR / use feat/ / skip the grill" | `/overrides` | records the standing default |
-| "wait, you lost me", "what does that mean?" - a reply that didn't land | `/wait-what` | re-pitches it plainly in this repo's own vocabulary |
-| "I can't answer this - my colleague / the client owns it" | `/plan-grill` (questionnaire unblock) | drafts the doc, grills only the send; the item waits on the answers |
-| a one-to-two-step change | no front-end - just make it | inline in the work-item's worktree; verify before done |
-
-You name the entry, not every step: each front-end hands to `/autonomous-loop`, which hands a DONE
-result to `/pr-and-verify`, which hands a green PR to `/release-promotion`. Every work-item - even a
-trivial one that skips the front-ends - runs in
-its own git worktree, off `<integration-branch>` (`/worktree-branching` sets it up first); a follow-up
-to an open item rides that item's existing worktree. Branching is `<detected convention>`.
-
-- Durable rules: `.better-dev/rules.md`. Project overrides in `.better-dev/overrides.md` **win over
-  defaults**, so read them first. Lessons earlier sessions recorded live in your host's own memory,
-  readable at `memory://root/learned.md`.
-- Hit a capability gap? Source an existing skill with `/tool-sourcing` before building anything; author
-  one with `/self-extension` only when discovery genuinely comes up empty. A skill you author here is
-  repo-scoped: it lands in this repo's own project skills dir, not the better-dev plugin.
-- `/guardrails-install` records this repo's real verify command and safety baseline; on a greenfield
-  build ask, `/groundwork` opens by asking how you want it built - steered (foundation plus
-  parallelizable work-items, you review each) or one-shot (`/gauntlet` hands a fresh session one
-  prompt and runs long with minimal interaction).
-- `.better-dev/` holds tracked data (rules, overrides); `ledger/` is per-work-item loop state and
-  gitignored.
-- Re-run `/onboard` any time to wire in what's missing.
-
-better-dev is additive: it complements, never replaces, whatever else is installed.
+- **Read before you apply a default:** `.better-dev/overrides.md` - a line there beats any built-in
+  default. This repo's own recorded rules (verify command, safety baseline, branch model) sit beside
+  it in `.better-dev/rules.md`. Both are plain files; read them with your file tool.
+- **Work in flight:** one `.better-dev/ledger/<slug>/` dir per work-item, holding that item's contract
+  and its progress. `ledger/` is loop state and stays out of git.
+- **Branching:** `<detected convention>`, off `<integration branch>`. Every work-item gets its own git
+  worktree off that branch, a trivial one included.
+- **Lessons** earlier sessions recorded live in your host's own memory, at `memory://root/learned.md`.
+- Re-run `/onboard` to wire in anything missing.
+<!-- END better-dev -->
 ```
 
-Then confirm `.better-dev/rules.md` and `.better-dev/overrides.md` exist and the block reads
-correctly at its destination.
+Then confirm `.better-dev/rules.md` and `.better-dev/overrides.md` exist, and read the block back out
+of every file you wrote it into. A write you did not read back is indistinguishable from a write into
+a void, which is the failure this phase exists to stop.
 
 **Then check whether the comms rule reaches this session at all.** better-dev's response-style rule
 ships as one file in the plugin tree, `rules/comms.md`, and whether anything loads it is decided by the
@@ -409,7 +432,7 @@ one repo positioned to notice its own delivery route failing. Write the pointer,
 
 > better-dev's comms rule did not reach this session. The plugin tree is installed at `<resolved path>`,
 > and on omp the session hook in that tree is the delivery route - so it ran and delivered nothing.
-> That is a defect in better-dev, not in this repo. I wrote the pointer block into `<entry file>`, so
+> That is a defect in better-dev, not in this repo. I wrote the pointer block into `<entry files>`, so
 > the rule governs this session anyway. It is a workaround, not the fix: the hook decides delivery per
 > install shape, so `omp plugin list` (and the scope you installed with) is the one fact that makes this
 > reproducible - worth reporting with that line attached.
@@ -419,8 +442,9 @@ rule for this session. Never quietly substitute the workaround for the fix. A ru
 delivery route and says nothing is how a channel dies in silence - which is the whole reason this clause
 exists rather than just the pointer.
 
-For the pointer row, write into the entry file this phase already chose - the consent rule above governs
-this write too - between its own markers, replacing any existing block in place:
+For the pointer row, write into the same files this phase already chose - all of them, for the same
+reason, and the consent rule above governs this write too - between its own markers, replacing any
+existing block in place:
 
 ```markdown
 <!-- BEGIN better-dev-comms -->
@@ -522,17 +546,19 @@ intent from whatever files it happened to open.
 ## Unwiring, when better-dev is removed
 
 Uninstalling the plugin takes the skills away and nothing else: a wired repo still carries the managed
-discovery block in its entry file and its `.better-dev/` directory, and no other skill knows where those
-sentinels are. This skill wrote them, so it removes them - on an explicit ask to unwire the repo, never as
-part of a re-run, which only ever fills gaps.
+discovery block in each of its entry files and its `.better-dev/` directory, and no other skill knows
+where those sentinels are. This skill wrote them, so it removes them - on an explicit ask to unwire the
+repo, never as part of a re-run, which only ever fills gaps.
 
 - **The block comes out by its markers, never by a line range.** Locate
   `<!-- BEGIN better-dev -->` and `<!-- END better-dev -->` and cut from one to the other with the
-  file-edit tool, in the entry file and in the local-only entry file a solo adoption used
-  (`CLAUDE.local.md`). A recorded range is stale the moment the operator edits above the block, and what a
+  file-edit tool, in every file Phase 4 wrote it into: root `AGENTS.md`, root `CLAUDE.md`, and the
+  local-only file a solo adoption used (`.omp/AGENTS.md` on omp, `CLAUDE.local.md` on Claude Code).
+  A recorded range is stale the moment the operator edits above the block, and what a
   wrong range deletes is their own prose. A missing marker or an unbalanced pair is a stop: report the
-  file and let the operator point at the boundary rather than inferring it. Read back before reporting
-  done - a search for `better-dev` in that file returns nothing.
+  file and let the operator point at the boundary rather than inferring it. Read each file back before
+  reporting done - a search for `better-dev` in each one returns nothing. Both blocks come out, the
+  discovery block and the `better-dev-comms` pointer, wherever each landed.
 - **`.better-dev/` is the operator's data, so removing it is a second explicit ask.** The recorded rules,
   the overrides they wrote by hand, and the ledger history are theirs; unwiring the entry file does not
   license deleting them, and the two asks stay separate even when the answer to both is yes. When they do
@@ -540,8 +566,8 @@ part of a re-run, which only ever fills gaps.
   then stat the path to confirm it is gone) rather than naming files inside it: a purge here once
   enumerated three files and left six others sitting in the directory it reported clean, so either the
   directory goes or you enumerate every file and read the directory back empty. Solo adoption also
-  appended a `.better-dev/` line to `.git/info/exclude`; drop that line in the same step, or git keeps
-  ignoring a path that no longer exists.
+  appended a `.better-dev/` line to `.git/info/exclude`, and on omp an `.omp/AGENTS.md` line beside
+  it; drop both in the same step, or git keeps ignoring a path that no longer exists.
 
 What this does not do is uninstall the plugin. That runs through the host's own plugin channel and is the
 operator's to do, and this repo's unwiring is correct either way - a repo can be unwired while the plugin
@@ -552,6 +578,6 @@ stays installed for every other repo.
 The wiring phases above are additive and idempotent, and the unwiring section is the one path that
 removes anything - it runs on an explicit ask and never on a re-run. Neither one disables an installed
 skill, neither rewrites a shared skill to encode a preference (that's what `.better-dev/overrides.md`
-is for), and neither clobbers the operator's own text in the entry file. Nothing is vendored into the
+is for), and neither clobbers the operator's own text in any entry file. Nothing is vendored into the
 repo - the practices stay in the plugin; the repo keeps only data. When authoring or revising this
 skill, follow `/writing-skills`.

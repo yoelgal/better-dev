@@ -3,9 +3,9 @@
 #
 # Lints every skill (frontmatter minimal + name==folder + "Use when" description + no @-links + calm
 # voice), runs every helper's selftest, parses every shipped script, validates the plugin manifest,
-# asserts CLAUDE.md still carries the managed discovery block, and fails on any shipped file that
-# still names a path this release deleted. Non-zero exit on any failure - a release / CI gate, and
-# what `/self-extension` runs before promoting a freshly authored skill.
+# asserts the managed discovery block sits in a file this repo's own host reads, and fails on any
+# shipped file that still names a path this release deleted. Non-zero exit on any failure - a release
+# / CI gate, and what `/self-extension` runs before promoting a freshly authored skill.
 set -uo pipefail
 
 # Package root = the dir holding skills/ + scripts/ (run from anywhere in the dev repo).
@@ -415,10 +415,11 @@ done
 echo "== em/en dash gate =="
 # Standing repo rule: no em (U+2014) or en (U+2013) dashes in shipped text. Match the raw UTF-8 bytes
 # under LC_ALL=C so this holds on BSD grep (no -P) as well as GNU. Covers the shipped surfaces,
-# CLAUDE.md included - it is the discovery block's only home, and nothing else scans it.
+# both root entry files included - each one carries a copy of the discovery block, and nothing else
+# scans them.
 em="$(printf '\342\200\224')"; en="$(printf '\342\200\223')"
 dash_hits=""
-for f in $(find skills rules scripts docs -type f 2>/dev/null; ls README.md BOOTSTRAP.md CLAUDE.md 2>/dev/null); do
+for f in $(find skills rules scripts docs -type f 2>/dev/null; ls README.md BOOTSTRAP.md AGENTS.md CLAUDE.md 2>/dev/null); do
   LC_ALL=C grep -lq -e "$em" -e "$en" "$f" 2>/dev/null && dash_hits="$dash_hits $f"
 done
 [ -z "$dash_hits" ] && ok "no em/en dashes in shipped text" || bad "em/en dash in:$dash_hits"
@@ -444,7 +445,7 @@ slop="$slop|what if I told you|stands as a testament|marks a pivotal moment|play
 slop="$slop|underscores its significance|experts agree|at the end of the day|in today'?s world"
 slop="$slop|let'?s dive in|is not just|isn'?t just|the question isn'?t|in conclusion"
 slop_hits=""
-for f in $(find skills rules docs -type f -name '*.md' 2>/dev/null; ls README.md BOOTSTRAP.md CLAUDE.md 2>/dev/null); do
+for f in $(find skills rules docs -type f -name '*.md' 2>/dev/null; ls README.md BOOTSTRAP.md AGENTS.md CLAUDE.md 2>/dev/null); do
   case "$f" in
     # Three files must name a pattern in order to forbid it, so they are exempt by construction rather
     # than by exception: the shipped block itself, the decision record that quotes the ruling, and any
@@ -630,7 +631,11 @@ if [ -f "$bdhook" ]; then
   # Every path the hook needs resolves from import.meta.dirname, so nothing in it can rot away from
   # the tree it shipped in. One absolute path - a home dir, a scratch path left in from a debug run -
   # reintroduces the exact failure mode this design replaced.
-  if ! grep -qE '["'"'"'`]/|~/|/(Users|home|private|var|tmp|opt|etc|usr)/' "$bdhook"; then
+  #
+  # A quoted root slash needs a SECOND segment to count. `/onboard` in a comment is a slash-command,
+  # not a path, and this file's prose names several; requiring `/seg/` keeps "/Users/me" and `/tmp/x`
+  # caught while a one-segment command reference passes. Proven both ways.
+  if ! grep -qE '["'"'"'`]/[A-Za-z0-9._-]+/|~/|/(Users|home|private|var|tmp|opt|etc|usr)/' "$bdhook"; then
     ok "$bdhook names no absolute path" # prove-new: regression-guard reads the hook's text, so a base without the file grades nothing - proven red instead by adding a const holding a home-dir path
   else
     bad "$bdhook contains an absolute path - it would break on any machine but the one it was written on"
@@ -789,21 +794,50 @@ else
 fi
 
 echo "== discovery block =="
-# CLAUDE.md's managed block is the whole of discovery: nothing announces the practices to a fresh
-# session but this text. So it has to be present, sentinel-closed, and to name where a session finds
-# the two files that override a default and record this repo's rules - a block that says the
-# practices exist but not where their overrides live sends the reader to guess one.
-CM="CLAUDE.md"
-db_errs=""
-[ -f "$CM" ] || db_errs=" missing-file"
-if [ -f "$CM" ]; then
-  grep -qxF '<!-- BEGIN better-dev -->' "$CM" || db_errs="$db_errs no-begin-sentinel"
-  grep -qxF '<!-- END better-dev -->' "$CM" || db_errs="$db_errs no-end-sentinel"
-  db_block="$(awk '/^<!-- BEGIN better-dev -->$/{f=1} f{print} /^<!-- END better-dev -->$/{exit}' "$CM")"
-  printf '%s' "$db_block" | grep -qF '.better-dev/overrides.md' || db_errs="$db_errs no-overrides-pointer"
-  printf '%s' "$db_block" | grep -qF '.better-dev/rules.md' || db_errs="$db_errs no-rules-pointer"
-fi
-[ -z "$db_errs" ] && ok "CLAUDE.md carries the managed block, closed, naming where overrides and rules live" || bad "CLAUDE.md managed block:$db_errs - this block is the only thing that tells a fresh session the practices are here"
+# The managed block is the whole of discovery: nothing announces the practices to a fresh session but
+# this text. What replaced the old check here matters more than the check. The old one asserted
+# `CLAUDE.md carries the managed block` and it passed every run, while this repo's own host provably
+# could not read that file - a green line reporting a property that did not hold where it mattered.
+#
+# Measured 2026-08-21, one unique token per file in a temp git repo, each agent then asked which
+# tokens were in its context with no tool calls: omp loads root AGENTS.md and loads NEITHER root
+# CLAUDE.md NOR CLAUDE.local.md. Claude Code 2.1.233 loads both of those and not AGENTS.md - its
+# answer even noted AGENTS.md existed on disk while its contents were absent from context. The two
+# hosts read disjoint sets of committed files, so no single file is agent-agnostic and /onboard has to
+# write one copy per host.
+#
+# Two copies of anything normally drift. They are safe here for one reason, and it is the reason this
+# check exists rather than a comment: /onboard replaces between its markers on every run, so it is
+# the reconciler the two-copies pattern usually lacks, and this line fails the moment two copies stop
+# agreeing. Drop either half and the pattern stops being safe.
+DB_BEGIN='<!-- BEGIN better-dev -->'
+DB_END='<!-- END better-dev -->'
+# The targets omp's own context providers reach, per its provider table: `agents-md` picks up a
+# standalone root AGENTS.md, `native` picks up `.omp/AGENTS.md`. No provider matches a bare root
+# CLAUDE.md, which is why the measurement above comes out the way it does.
+DB_HOST_READS="AGENTS.md .omp/AGENTS.md"
+# /onboard's remaining targets. Real homes for the block, read by Claude Code rather than by this
+# repo's host - so a copy in one of these is legitimate and can never be the only copy.
+DB_OTHER="CLAUDE.md CLAUDE.local.md"
+db_errs=""; db_carriers=""; db_host=""; db_first=""; db_first_file=""
+for f in $DB_HOST_READS $DB_OTHER; do
+  [ -f "$f" ] && grep -qxF "$DB_BEGIN" "$f" || continue
+  db_carriers="$db_carriers $f"
+  case " $DB_HOST_READS " in *" $f "*) db_host="$db_host $f" ;; esac
+  grep -qxF "$DB_END" "$f" || db_errs="$db_errs $f:no-end-sentinel"
+  db_block="$(awk -v b="$DB_BEGIN" -v e="$DB_END" '$0==b{f=1} f{print} $0==e{exit}' "$f")"
+  # A block that says the practices exist but not where their overrides live sends the reader to guess.
+  printf '%s' "$db_block" | grep -qF '.better-dev/overrides.md' || db_errs="$db_errs $f:no-overrides-pointer"
+  printf '%s' "$db_block" | grep -qF '.better-dev/rules.md' || db_errs="$db_errs $f:no-rules-pointer"
+  if [ -z "$db_first_file" ]; then
+    db_first="$db_block"; db_first_file="$f"
+  elif [ "$db_block" != "$db_first" ]; then
+    db_errs="$db_errs $f:disagrees-with-$db_first_file"
+  fi
+done
+[ -n "$db_carriers" ] || db_errs="$db_errs no-copy-in-any-entry-file"
+[ -n "$db_host" ] || db_errs="$db_errs no-copy-in-a-file-this-repo-host-reads"
+[ -z "$db_errs" ] && ok "the managed block sits in a file this repo's own host reads (${db_host# }) and every copy agrees (${db_carriers# })" || bad "managed block:$db_errs - a block in a file the running host does not read is invisible to every session, and the /onboard nudge it was meant to clear then never stops firing"
 
 echo "== deleted paths =="
 # The harness now provides what this library used to ship, and every shipped file has to point at the
@@ -820,7 +854,7 @@ gone="$gone|bd-omp-runtime-check|bd-awareness|[.]better-dev/bin|hooks/bd-"
 gone="$gone|hosts/(claude|codex|hermes|omp)|better-dev/hooks|graphify|browse/src|learnings[.]jsonl"
 gone="$gone|orchestrating-agents/tiers[.]md|/bootstrap-hooks|/codebase-map|/browser-capability"
 gone="$gone|install[.]sh|bd-uninstall|friction/"
-swept="$(find skills rules scripts .github docs/skills -type f 2>/dev/null; ls README.md CLAUDE.md BOOTSTRAP.md .claude-plugin/plugin.json .omp-plugin/marketplace.json .claude-plugin/marketplace.json 2>/dev/null)"
+swept="$(find skills rules scripts .github docs/skills -type f 2>/dev/null; ls README.md AGENTS.md CLAUDE.md BOOTSTRAP.md .claude-plugin/plugin.json .omp-plugin/marketplace.json .claude-plugin/marketplace.json 2>/dev/null)"
 gone_hits=""
 for f in $swept; do
   [ "$f" = scripts/bd-package-check ] && continue
