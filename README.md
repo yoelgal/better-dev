@@ -25,30 +25,33 @@ host's plugin channel leaves out.
 
 ## Install
 
-Paste this into your agent, from inside the first repo you want wired:
+Paste this into your agent. It installs for the whole machine, so it does not matter where you run it:
 
 ```
-Install better-dev on this machine if it is not already there, then onboard this repo. Read
-https://raw.githubusercontent.com/yoelgal/better-dev/main/BOOTSTRAP.md and follow it: work out
-which agent you are, install through your own channel, run the check each stage names, then run
-/onboard here. If your channel cannot keep better-dev current, tell me that instead of finishing
-quietly.
+Install better-dev on this machine if it is not already there. Read
+https://raw.githubusercontent.com/yoelgal/better-dev/main/BOOTSTRAP.md and follow it: work out which
+agent you are, install through your own channel, and run the check each stage names. Write nothing
+into a repo unless I ask - when the install lands, say what it did and offer to onboard this
+directory if it is a repo. If your channel cannot keep better-dev current, tell me that instead of
+finishing quietly.
 ```
 
-**Every repo after that needs only `/onboard`.** The install is one plugin for the whole machine, so
-once it is there the skills are already loaded and `/onboard` is one of them. Re-pasting the prompt in
-a second repo is safe and lands in the same place, since the procedure checks what the machine already
-has before installing anything, but the shorter path is to ask for `/onboard` and let it wire the repo
-you are standing in.
+**Wiring a repo is a separate step, and it is asked for rather than assumed.** The install puts the
+skills and the comms rule on your machine; `/onboard` writes into one repo, so it runs when you say so
+and never on whatever directory you happened to be standing in. Once the plugin is there, any repo
+needs only `/onboard` - it is one of the skills that arrived.
 
 [`BOOTSTRAP.md`](BOOTSTRAP.md) is written for your agent to execute: it carries the channel for each
 host, the check that proves each stage landed, and the words to hand back when a check cannot pass.
 Your agent is the part that adapts, so a host nobody has written a channel for still ends up wired, or
 hears why it cannot be.
 
-**What your agent sets up.** One plugin, installed once for the machine, carrying the 33 skills, the
-always-applied comms rule that shapes every reply, and the session hook. Then this repo's own
-`.better-dev/` data and a discovery block in `CLAUDE.md` or `AGENTS.md`, both written by `/onboard`.
+**What the install puts on your machine.** One plugin, once, carrying the 33 skills, the
+always-applied comms rule that shapes every reply, and the session hook. Nothing in any repo.
+
+**What `/onboard` adds, per repo, when you ask for it.** That repo's own `.better-dev/` data and a
+discovery block in `CLAUDE.md` or `AGENTS.md`.
+
 On a plugin channel your own skills folder stays yours: plugin skills load through your agent's
 plugin provider, so `~/.claude/skills` and `~/.omp/agent/skills` keep only what you put there, and a
 skill you wrote under the same name still wins.
