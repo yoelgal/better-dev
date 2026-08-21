@@ -1523,8 +1523,9 @@ no plugin hook mechanism, so `/onboard` writes a pointer between
 `<!-- BEGIN better-dev-comms -->` / `<!-- END better-dev-comms -->` in the repo's entry file, replacing
 any existing block in place. Its body points at the installed `rules/comms.md` and restates none of it:
 a copy cannot receive an update, and the drifted 80-line splice D42 deleted is this library's own
-instance of that bug. That install is genuinely partial, and the channel table in `README.md` says so in
-those words rather than hiding it.
+instance of that bug. That install is genuinely partial, and the channel table says so in those words
+rather than hiding it. (That table has since moved to `BOOTSTRAP.md`, where it is the agent's decision
+procedure rather than a menu a human picks from; only the pointer moved, not the ruling.)
 
 `/onboard` writes that block only after measuring which of the three routes the session is on - the
 plugin-tree hook (observable: the hook leads its injection with a `better-dev:comms` sentinel), a native
@@ -1630,7 +1631,10 @@ re-reviewer from omp's own logs rather than from the implementer's report:
   directory wearing a marketplace-shaped name.
 - Two omp sessions run against it in `/tmp/bd-mkt-proj` observed
   `lastRole=developer lastHasSentinel=true firstRole=user`: the hook delivered, as a `developer` turn
-  appended after the operator's own prompt.
+  appended after the operator's own prompt - on the promoting model that session used. Appending is
+  now conditional on the resolved model carrying `supportsMidConversationSystem`; elsewhere the rule
+  goes immediately before the last user turn, because three providers read the final entry as the
+  request itself and an appended rule became the request.
 - The link-root control gave `n=1` and no sentinel - the hook correctly silent where omp loads `rules/`
   natively - and that control's `~/.omp/plugins/node_modules/better-dev` symlink is stamped **after**
   both marketplace sessions, so it was not present during them. That stray symlink is exactly what

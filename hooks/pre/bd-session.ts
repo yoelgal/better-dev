@@ -64,6 +64,11 @@ interface HookContext {
     notify?(message: string, type?: "info" | "warning" | "error"): void;
     setStatus?(key: string, text: string | undefined): void;
   };
+  // The host's active model, whose compat record is fully resolved before a hook can see it
+  // (`buildModel` materializes it once). One field is read, `compat.supportsMidConversationSystem`,
+  // and it is the same field the Anthropic converter reads before promoting a developer turn - so
+  // the placement below is keyed on the promotion's own signal instead of guessing at the provider.
+  model?: { compat?: { supportsMidConversationSystem?: boolean } };
 }
 
 interface HookApi {
@@ -229,9 +234,14 @@ function cachedFrom(pluginRoot: string): { marketplace: string; plugin: string }
 /**
  * Every plugin state root the host installs into, in the order the host resolves them: the user
  * root beside the agent dir, then the project root - which the host anchors at the nearest ancestor
- * of the startup directory carrying a config dir, or failing that a `.git`. Both scopes are loaded,
- * so both scopes deliver rules/; reading only the user root is what made a project-scope install
- * deliver this rule twice.
+ * of the startup directory carrying a config dir. Both scopes are loaded, so both scopes deliver
+ * rules/; reading only the user root is what made a project-scope install deliver this rule twice.
+ *
+ * The host takes `.git` as a second anchor when no config dir is found at all
+ * (`resolveActiveProjectRegistryPath`, pass 2). That pass is deliberately not mirrored, because it
+ * cannot name a root this function would find anything under: a project plugin root that EXISTS
+ * implies a config dir at or below the same ancestor, so the config-dir pass has already answered.
+ * The host needs the fallback to choose where to CREATE a registry; this only ever reads one.
  */
 function stateRoots(agentDir: string, cwd: string): string[] {
   const configRoot = dirname(agentDir);
@@ -239,19 +249,19 @@ function stateRoots(agentDir: string, cwd: string): string[] {
   // Read back off the agent dir rather than hardcoded: the config directory is renameable, and
   // taking the host's own spelling keeps this in step with whatever it chose.
   const configDir = basename(configRoot);
-  for (const marker of [configDir, ".git"]) {
-    let dir = resolve(cwd);
-    for (;;) {
-      if (existsSync(join(dir, marker))) {
-        const projectRoot = join(dir, configDir, "plugins");
-        return projectRoot === userRoot ? [userRoot] : [userRoot, projectRoot];
-      }
-      const up = dirname(dir);
-      if (up === dir) break;
-      dir = up;
+  let dir = resolve(cwd);
+  for (;;) {
+    if (existsSync(join(dir, configDir))) {
+      const projectRoot = join(dir, configDir, "plugins");
+      // Not a behaviour guard - a duplicate root answers every question below identically. It stops
+      // a session started beside the user config dir from reading that root twice, and each read is
+      // a directory listing plus a realpath per entry, paid at every session start.
+      return projectRoot === userRoot ? [userRoot] : [userRoot, projectRoot];
     }
+    const up = dirname(dir);
+    if (up === dir) return [userRoot];
+    dir = up;
   }
-  return [userRoot];
 }
 
 /**
@@ -316,18 +326,24 @@ function namedInExtensions(agentDir: string, cwd: string, pluginRoot: string): b
  */
 function hostDeliversRules(agentDir: string | undefined, pluginRoot: string, cwd: string): boolean {
   if (agentDir === undefined) return false;
-  for (const root of stateRoots(agentDir, cwd)) {
-    if (!linkedUnder(root, pluginRoot)) continue;
-    // The resolved node_modules entry is authoritative, with one exception: a marketplace root can
-    // carry an entry too, and the host excludes marketplace roots from its rules roots by realpath,
-    // so the cache mark outranks the link.
-    //
-    // That mark is the only one used. The `<marketplace>___<plugin>___<version>` cache-directory
-    // grammar is deliberately NOT read here - a link root is free to carry `___` in its name, and
-    // testing the name before resolving the entry made every such root deliver the rule twice.
-    // `cachedFrom` still reads that grammar for the update nudge, where a wrong answer costs
-    // nothing but silence.
-    return !isInside(join(root, "cache", "plugins"), pluginRoot);
+  const roots = stateRoots(agentDir, cwd);
+  // The marketplace cache mark is tested first, and against EVERY root rather than against the root
+  // that carried a link. The cache is a property of the machine, not of an install scope:
+  // `getPluginsCacheDir()` takes no scope argument, so a cached plugin always sits under the user
+  // root, while the runtime symlink the installer writes goes under the INSTALL scope's root
+  // (`#nodeModulesPath(scope)`). At project scope those are different directories by construction,
+  // so a mark tested against the link's own root can never fire there - and
+  // `omp plugin install --scope project` read as a link root and lost the rule by every route.
+  for (const root of roots) {
+    if (isInside(join(root, "cache", "plugins"), pluginRoot)) return false;
+  }
+  // Otherwise a resolved node_modules entry is authoritative. The
+  // `<marketplace>___<plugin>___<version>` cache-directory grammar is deliberately NOT read here: a
+  // link root is free to carry `___` in its name, and testing the name before resolving the entry
+  // made every such root deliver the rule twice. `cachedFrom` still reads that grammar for the
+  // update nudge, where a wrong answer costs nothing but silence.
+  for (const root of roots) {
+    if (linkedUnder(root, pluginRoot)) return true;
   }
   return namedInExtensions(agentDir, cwd, pluginRoot);
 }
@@ -387,6 +403,58 @@ function needsOnboard(cwd: string): boolean {
   return false;
 }
 
+// --- (a) where the rule goes --------------------------------------------------------------------
+
+/**
+ * Where the rule lands in one call's message list, and why it is not simply "last".
+ *
+ * Following a user turn is what earns the strongest role. Anthropic upgrades a `developer` turn to
+ * a real wire `role: "system"` block, but only when it immediately follows a user turn and is
+ * either last or followed by an assistant turn (`convertAnthropicMessages`), and only when the
+ * model's resolved compat carries `supportsMidConversationSystem` - first-party endpoint and Opus
+ * 4.8+ / Sonnet 5+ (`pi-catalog/src/compat/anthropic.ts`). Measured through that converter across
+ * six session shapes: the placement below reaches the wire as `role: "system"` on all six, where a
+ * plain append reached it on four and prepending reached it on none.
+ *
+ * Appending is not free everywhere, though, and the earlier claim that it was "never worse
+ * anywhere" was wrong. Three provider paths read the FINAL entry instead of treating it as context:
+ *
+ *   - Cursor takes `messages[length - 1]` and, when that message is `user` OR `developer`, makes it
+ *     the request's own `userMessageAction` and excludes it from history
+ *     (`pi-ai/src/providers/cursor.ts`, `buildCursorRequest`). Appended, this rule BECAME the
+ *     operator's request and demoted the real one into history. Prepending never did that.
+ *   - GitHub Copilot classifies the request from the last message's role, so a non-`user` tail makes
+ *     every request read as agent-initiated rather than user-initiated (`inferCopilotInitiator`).
+ *   - The OpenAI Chat Completions and Responses adapters place their prompt-cache breakpoint from
+ *     the last user-or-developer entry, so a trailing rule moves that boundary each call.
+ *
+ * So the placement is keyed on the promotion's own signal rather than on taste. Where the promotion
+ * is available the rule takes the tail, which is worth having. Where it is not, the rule is an
+ * ordinary turn with nothing to gain from being last, so it goes as late as it can WITHOUT being
+ * the tail and without landing between an assistant's tool call and its result - the API rejects a
+ * tool_use whose tool_result does not follow it. That means directly after the last user turn, or
+ * directly before that turn when the turn is itself the tail. Measured on the same six shapes: one
+ * position later than a prepend on five of them, the same on the sixth (a first turn, where there
+ * is only one message to be earlier than), and never last on any.
+ *
+ * One case both branches share: an assistant turn at the tail is a prefill the model is meant to
+ * continue, and appending after it would break the prefill and forfeit the promotion anyway, since
+ * the appended turn no longer follows a user turn. There the rule goes before the prefill, where
+ * the promotion still fires.
+ */
+function placeRule(messages: HostMessage[], rule: HostMessage, promotable: boolean): HostMessage[] {
+  const last = messages.length - 1;
+  const at = ((): number => {
+    if (promotable) return messages[last]?.role === "assistant" ? last : messages.length;
+    for (let i = last; i >= 0; i--) {
+      if (messages[i]?.role !== "user") continue;
+      return i === last ? i : i + 1;
+    }
+    return 0;
+  })();
+  return [...messages.slice(0, at), rule, ...messages.slice(at)];
+}
+
 // --- the hook ----------------------------------------------------------------------------------
 
 export default function bdSession(pi: HookApi): void {
@@ -409,22 +477,10 @@ export default function bdSession(pi: HookApi): void {
 
   // Built once. `context` fires before every LLM call, so anything per-call here is paid per call.
   //
-  // Role `developer`, position appended - both measured through the host's own wire converters
-  // rather than reasoned about.
-  //
   // The host's message union has no `system` role a hook can emit, but it does have one above
-  // `user`: `developer`. Anthropic promotes a developer turn to a real wire `role: "system"` block
-  // when it immediately follows a user turn and is either last or followed by an assistant turn -
-  // so the promotion needs the APPEND, and prepending forfeits it by landing at index 0. Measured
-  // through `convertAnthropicMessages`: prepended is `role: "user"` either way; appended is
-  // `role: "system"`. Ollama maps `developer` to `system` outright, and omp defaults a developer
-  // message's attribution to "agent", which is the half of that mapping it keys on. OpenAI
-  // emits it as a developer instruction where the model supports the role.
-  //
-  // Where a provider does not elevate the role it falls back to `user`, which is exactly what this
-  // message was before - never worse anywhere, better where the elevation exists. Appending also
-  // puts a standing rule next to the turn it is meant to shape instead of at the far end of the
-  // context.
+  // `user`: `developer`. Ollama maps `developer` to `system` outright, OpenAI emits it as a
+  // developer instruction where the model supports the role, and Anthropic can promote it to a real
+  // wire `role: "system"` block - see `placeRule`, which is where that promotion is won or lost.
   const ruleMessage: HostMessage | undefined = deliverRule
     ? {
         role: "developer",
@@ -450,7 +506,12 @@ export default function bdSession(pi: HookApi): void {
   // compacted away. It is chained, so this handler builds on whatever the previous one returned
   // instead of replacing it.
   if (ruleMessage !== undefined) {
-    pi.on("context", event => ({ messages: [...event.messages, ruleMessage] }));
+    // The one field read off the host's model, and it is the promotion's own gate: a host that
+    // reports no model, or a provider whose compat record has no such field, both answer false -
+    // the placement that is safe on every provider.
+    pi.on("context", (event, ctx) => ({
+      messages: placeRule(event.messages, ruleMessage, ctx.model?.compat?.supportsMidConversationSystem === true),
+    }));
   }
 
   // Two nudges, two channels, and the split was forced by measurement rather than taste. Two

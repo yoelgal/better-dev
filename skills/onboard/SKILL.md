@@ -331,7 +331,7 @@ correctly at its destination.
 
 **Then check whether the comms rule reaches this session at all.** better-dev's response-style rule
 ships as one file in the plugin tree, `rules/comms.md`, and whether anything loads it is decided by the
-channel that delivered the skills, never by the host's name (`README.md` carries the per-host table).
+channel that delivered the skills, never by the host's name (`BOOTSTRAP.md` carries the per-host table).
 Only one kind of evidence settles it: what you can see in *this* session's context. A file on disk is
 not evidence that a host loaded it - the plugin's session hook is an omp convention (`hooks/pre/*.ts`),
 while Claude Code loads plugin hooks from `hooks/hooks.json` as shell or HTTP entries and hermes loads

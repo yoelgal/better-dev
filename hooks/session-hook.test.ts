@@ -13,10 +13,10 @@
 // project-scope plugin root is anchored above the directory the process started in and the hook
 // reads it at load, exactly as the host does.
 
-import { expect, test } from "bun:test";
-import { cpSync, mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { afterAll, expect, test } from "bun:test";
+import { cpSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
+import { dirname, join, relative } from "node:path";
 
 const HOOK_SOURCE = join(import.meta.dirname, "pre", "bd-session.ts");
 
@@ -27,18 +27,23 @@ const FRONTMATTER_ONLY = "---\nalwaysApply: true\n---\n";
 const PACKAGE_NAME = "better-dev";
 
 /**
- * Install shapes. Everything but `marketplace` and `unknown` is a shape the host DOES load rules
- * from, so the hook must stay quiet on it; the four `*-duplicate-shape` names are the ones that
- * used to answer wrong and deliver the rule a second time.
+ * Install shapes. Everything but the two `marketplace*` shapes and `unknown` is a shape the host
+ * DOES load rules from, so the hook must stay quiet on it. Each of those carries its own reason the
+ * old answer was wrong, so each needs its own fixture - and each is paired with `omitRecognition`,
+ * which strips the one artifact that identifies it and asserts the rule then goes out. Without that
+ * pair every one of these cases is a bare negative assertion, which a hook that does nothing also
+ * satisfies.
  */
 type Install =
   | "marketplace"
+  | "marketplace-project"
   | "link"
   | "link-triple-underscore"
   | "link-renamed"
   | "link-scoped"
   | "project"
   | "settings-extension"
+  | "settings-extension-user"
   | "unknown";
 
 interface Fixture {
@@ -63,6 +68,23 @@ interface Fixture {
   host?: "no-ui" | "throwing-notify" | "no-pi" | "throwing-agent-dir";
   /** Ship a package.json that is not JSON. */
   badManifest?: boolean;
+  /**
+   * Build the shape's tree but omit the artifact that identifies it - the node_modules link, or the
+   * settings entry. The positive control for every "stays quiet on shape X" case: the same tree
+   * minus that one file has to deliver.
+   */
+  omitRecognition?: boolean;
+  /** How a settings `extensions` entry is spelled. The host accepts all three. */
+  extensionEntry?: "absolute" | "tilde" | "relative";
+  /**
+   * What the host reports as the active model. `promoting` is a first-party Anthropic Opus 4.8+ /
+   * Sonnet 5+ model, whose resolved compat carries `supportsMidConversationSystem: true` - the
+   * exact field the converter reads before it promotes a developer turn to a wire `system` block.
+   * `absent` is a host that has selected no model yet.
+   */
+  modelCompat?: "promoting" | "plain" | "absent";
+  /** The messages already in the request when the context event fires. */
+  conversation?: Message[];
 }
 
 interface Message {
@@ -82,8 +104,20 @@ interface Run {
   contextHandlers: number;
 }
 
+// A tree built under the real home directory, so a `~`-spelled path in it expands to itself. Bun's
+// os.homedir() reads the passwd entry and ignores $HOME, so overriding the environment cannot
+// exercise the expansion - only a tree that really is under the home directory can.
+const homeRoots: string[] = [];
+afterAll(() => {
+  for (const root of homeRoots) rmSync(root, { recursive: true, force: true });
+});
+
 async function run(fixture: Fixture): Promise<Run> {
-  const root = mkdtempSync(join(tmpdir(), "bd-session-"));
+  // A `~`-spelled entry only expands to the fixture's own tree when the tree really is under the
+  // home directory, so that one case builds there and is removed afterwards.
+  const underHome = fixture.extensionEntry === "tilde";
+  const root = mkdtempSync(join(underHome ? homedir() : tmpdir(), ".bd-session-"));
+  if (underHome) homeRoots.push(root);
   // Mirrors the host's real layout: the plugin state root is a sibling of the agent dir, and the
   // directory holding both names the config dir the project scope is looked up under.
   const agentDir = join(root, ".omp", "agent");
@@ -102,7 +136,10 @@ async function run(fixture: Fixture): Promise<Run> {
   const version = fixture.version ?? "0.1.0";
   const pluginRoot = (() => {
     switch (fixture.install) {
+      // Both marketplace shapes cache under the USER root, whatever scope the install used:
+      // `getPluginsCacheDir()` takes no scope argument. Only the runtime symlink moves.
       case "marketplace":
+      case "marketplace-project":
         return join(stateRoot, "cache", "plugins", `bd___${PACKAGE_NAME}___${version}`);
       // A link root is free to carry the marketplace cache-dir grammar in its name. Reading the
       // name instead of resolving the install is what made this shape deliver the rule twice.
@@ -129,26 +166,52 @@ async function run(fixture: Fixture): Promise<Run> {
     mkdirSync(dirname(target), { recursive: true });
     symlinkSync(pluginRoot, target);
   };
-  switch (fixture.install) {
-    case "link":
-    case "link-triple-underscore":
-      linkAt(PACKAGE_NAME);
-      break;
-    case "link-renamed":
-      linkAt("bd-fork");
-      break;
-    case "link-scoped":
-      linkAt(join("@yoelgal", PACKAGE_NAME));
-      break;
-    case "project":
-      linkAt(PACKAGE_NAME, join(repoRoot, ".omp", "plugins"));
-      break;
-    case "settings-extension":
-      mkdirSync(join(repoRoot, ".omp"), { recursive: true });
-      writeFileSync(join(repoRoot, ".omp", "settings.json"), JSON.stringify({ extensions: [pluginRoot] }));
-      break;
-    default:
-      break;
+  // The same root, spelled the three ways the host accepts: absolute, tilde-relative to the home
+  // directory, and relative to the startup directory.
+  const extensionsAt = (settings: string): void => {
+    const entry =
+      fixture.extensionEntry === "tilde"
+        ? `~${pluginRoot.slice(homedir().length)}`
+        : fixture.extensionEntry === "relative"
+          ? relative(cwd, pluginRoot)
+          : pluginRoot;
+    mkdirSync(dirname(settings), { recursive: true });
+    writeFileSync(settings, JSON.stringify({ extensions: [entry] }));
+  };
+  if (fixture.omitRecognition !== true) {
+    switch (fixture.install) {
+      // A marketplace install ALSO writes a runtime symlink into the state root of its install
+      // scope (MarketplaceManager#registerRuntimePlugin -> #nodeModulesPath(scope)). Omitting it
+      // made linkedUnder() miss on every root, so the cache mark - the one line that decides a
+      // real marketplace install - was reached by no test in this file, and a mutation deleting it
+      // kept the whole suite green.
+      case "marketplace":
+      case "link":
+      case "link-triple-underscore":
+        linkAt(PACKAGE_NAME);
+        break;
+      // `omp plugin install --scope project <name@marketplace>`. Cache at the user root, link under
+      // the project root: the two differ by construction, which is what made this shape - the only
+      // install shape that HAS a project scope - deliver by no route at all.
+      case "marketplace-project":
+      case "project":
+        linkAt(PACKAGE_NAME, join(repoRoot, ".omp", "plugins"));
+        break;
+      case "link-renamed":
+        linkAt("bd-fork");
+        break;
+      case "link-scoped":
+        linkAt(join("@yoelgal", PACKAGE_NAME));
+        break;
+      case "settings-extension":
+        extensionsAt(join(repoRoot, ".omp", "settings.json"));
+        break;
+      case "settings-extension-user":
+        extensionsAt(join(agentDir, "settings.json"));
+        break;
+      default:
+        break;
+    }
   }
 
   if (fixture.catalogVersion !== undefined) {
@@ -190,7 +253,12 @@ async function run(fixture: Fixture): Promise<Run> {
     },
     setStatus: (key: string, text: string | undefined) => void statuses.push(`${key}=${text}`),
   };
-  const ctx = { cwd, ui: fixture.host === "no-ui" ? undefined : ui };
+  // The host's resolved model compat decides where the rule can go, so the fixture has to carry it.
+  const model =
+    fixture.modelCompat === "absent"
+      ? undefined
+      : { id: "claude-opus-4-8", compat: { supportsMidConversationSystem: fixture.modelCompat === "promoting" } };
+  const ctx = { cwd, ui: fixture.host === "no-ui" ? undefined : ui, model };
 
   // Dynamic by necessity: the specifier is a per-case fixture path, and loading the hook from that
   // path is the behaviour under test - a static import would resolve the repo's copy and measure
@@ -207,7 +275,7 @@ async function run(fixture: Fixture): Promise<Run> {
   factory(api);
   for (const handler of sessionStart) handler(undefined, ctx);
 
-  let messages: Message[] = [{ role: "user", content: "the actual request" }];
+  let messages: Message[] = fixture.conversation ?? [{ role: "user", content: "the actual request" }];
   for (const handler of context) {
     const result = handler({ messages }, ctx);
     if (result?.messages) messages = result.messages;
@@ -230,20 +298,100 @@ test("injects the comms rule on a marketplace install, where the host delivers n
   expect(rule).toContain("SENTINEL-RULE-BODY-LINE");
   // Frontmatter is stripped: the host's own rule loader never sends it, so neither does this.
   expect(rule).not.toContain("alwaysApply");
-  // The real conversation survives, in order.
-  expect(result.messages[0]?.content).toBe("the actual request");
+  // The real conversation survives, and the operator's own turn is still the last one.
+  expect(result.messages[result.messages.length - 1]?.content).toBe("the actual request");
 });
 
-// Role and position are the whole value of the injection, and both are load-bearing. Measured
-// through the host's own `convertAnthropicMessages`: a `developer` turn appended after the last user
-// turn lands on the Anthropic wire as `role: "system"`, while the same content prepended - or sent
-// as `user` from anywhere - lands as `role: "user"`. Ollama maps `developer` to `system` outright.
-// Neither the role nor the position is recoverable from anything else in this suite, so this is the
-// only guard on the difference between the rule being an instruction and being a remark.
-test("delivers the rule as a `developer` turn appended after the conversation", async () => {
-  const result = await run({ install: "marketplace", rule: RULE_FILE });
-  expect(result.messages.map(message => message.role)).toEqual(["user", "developer"]);
-  expect(result.messages[result.messages.length - 1]).toBe(injected(result));
+// The feature's headline path, and the one shape that reaches the model by no other route.
+// `omp plugin install --scope project <name@marketplace>` caches under the USER root
+// (`getPluginsCacheDir()` takes no scope) and writes its runtime symlink under the PROJECT root
+// (`#nodeModulesPath(scope)`), so those two roots differ by construction. Testing the cache mark
+// against the root that carried the link made this read as a link root, and the rule was dropped
+// entirely - a miss, which is the one direction this design says can never happen. `--scope` is
+// refused for npm and git specs, so project scope IS the marketplace channel.
+test("injects the comms rule on a project-scope marketplace install, where no route delivers it", async () => {
+  const result = await run({ install: "marketplace-project", rule: RULE_FILE });
+  expect(result.contextHandlers).toBe(1);
+  expect(String(injected(result)?.content)).toContain("SENTINEL-RULE-BODY-LINE");
+});
+
+// Role and position are the whole value of the injection, and both are load-bearing.
+//
+// Role, measured through the host's own `convertAnthropicMessages`: a `developer` turn reaches the
+// Anthropic wire as `role: "system"` on a model whose resolved compat allows a mid-conversation
+// system block, and as `role: "user"` everywhere else - which is what this message was before.
+// Ollama maps `developer` to `system` outright.
+test("delivers the rule as a `developer` turn, the strongest role a hook can emit", async () => {
+  const rule = injected(await run({ install: "marketplace", rule: RULE_FILE }));
+  expect(rule?.role).toBe("developer");
+});
+
+// Position is conditional, and the condition is the same field the promotion itself reads:
+// `model.compat.supportsMidConversationSystem`. Where the promotion is available the rule is
+// appended, because the promotion requires a turn that follows a user turn and is last or precedes
+// an assistant turn. Where it is not, the rule must never be the LAST entry - Cursor reads the last
+// message as the request being sent, so an appended rule became the request and demoted the
+// operator's own into history.
+test("appends the rule on a model that promotes a developer turn to a system block", async () => {
+  const conversation = [
+    { role: "user", content: "an older request" },
+    { role: "assistant", content: "done" },
+    { role: "user", content: "the actual request" },
+  ];
+  const result = await run({ install: "marketplace", rule: RULE_FILE, modelCompat: "promoting", conversation });
+  expect(result.messages.map(message => message.role)).toEqual(["user", "assistant", "user", "developer"]);
+  expect(injected(result)).toBe(result.messages[result.messages.length - 1]);
+});
+
+test("keeps the rule off the last position on every other model, where the last turn IS the request", async () => {
+  const conversation = [
+    { role: "user", content: "an older request" },
+    { role: "assistant", content: "done" },
+    { role: "user", content: "the actual request" },
+  ];
+  const result = await run({ install: "marketplace", rule: RULE_FILE, modelCompat: "plain", conversation });
+  expect(result.messages.map(message => message.role)).toEqual(["user", "assistant", "developer", "user"]);
+  expect(result.messages[result.messages.length - 1]?.content).toBe("the actual request");
+});
+
+// A host that has selected no model yet cannot be confirmed to promote, and an unconfirmed promotion
+// is not one - so it takes the placement that is safe on every provider.
+test("treats a host that reports no model as one that cannot promote", async () => {
+  const conversation = [
+    { role: "user", content: "an older request" },
+    { role: "assistant", content: "done" },
+    { role: "user", content: "the actual request" },
+  ];
+  const result = await run({ install: "marketplace", rule: RULE_FILE, modelCompat: "absent", conversation });
+  expect(result.messages.map(message => message.role)).toEqual(["user", "assistant", "developer", "user"]);
+});
+
+// An assistant turn at the tail is a prefill the model is meant to continue. Appending after it
+// destroys the prefill AND forfeits the promotion, since the appended turn no longer follows a user
+// turn. Before it, both hold.
+test("puts the rule before a trailing assistant prefill rather than after it", async () => {
+  const conversation = [
+    { role: "user", content: "the actual request" },
+    { role: "assistant", content: "Sure, here" },
+  ];
+  const result = await run({ install: "marketplace", rule: RULE_FILE, modelCompat: "promoting", conversation });
+  expect(result.messages.map(message => message.role)).toEqual(["user", "developer", "assistant"]);
+});
+
+// A tool result at the tail is the agentic loop's own shape, and the position that is safe there is
+// not the same one. On a promoting model the rule appends after the result and still promotes -
+// measured. On every other model it goes back to just after the last user turn: any later position
+// would land between an assistant's tool call and its result, which the API rejects outright.
+test("never splits an assistant's tool call from its result", async () => {
+  const conversation = [
+    { role: "user", content: "the actual request" },
+    { role: "assistant", content: [{ type: "toolCall", id: "t1", name: "read" }] },
+    { role: "toolResult", content: "file contents" },
+  ];
+  const plain = await run({ install: "marketplace", rule: RULE_FILE, conversation });
+  expect(plain.messages.map(message => message.role)).toEqual(["user", "developer", "assistant", "toolResult"]);
+  const promoting = await run({ install: "marketplace", rule: RULE_FILE, modelCompat: "promoting", conversation });
+  expect(promoting.messages.map(message => message.role)).toEqual(["user", "assistant", "toolResult", "developer"]);
 });
 
 // Not decoration: `synthetic` marks the turn as not authored by the operator, and the host reads a
@@ -280,45 +428,74 @@ test("stays quiet when rules/comms.md is nothing but frontmatter", async () => {
 
 // --- (a) which install shapes the host already covers -------------------------------------------
 
+/**
+ * Every shape the host already delivers rules for, asserted in BOTH directions: the shape stays
+ * quiet, and the same tree with its one identifying artifact removed delivers. The second half is
+ * the positive control, and without it each of these cases is a bare negative assertion - satisfied
+ * just as well by a hook that does nothing at all. It is also what pins the artifact as the reason:
+ * the two runs differ by one symlink or one settings file and nothing else.
+ */
+async function quietWithPositiveControl(fixture: Fixture): Promise<void> {
+  const quiet = await run(fixture);
+  expect(quiet.contextHandlers).toBe(0);
+  expect(quiet.messages).toHaveLength(1);
+  expect(JSON.stringify(quiet.messages)).not.toContain("SENTINEL-RULE-BODY-LINE");
+  const control = await run({ ...fixture, omitRecognition: true });
+  expect(String(injected(control)?.content)).toContain("SENTINEL-RULE-BODY-LINE");
+}
+
 test("stays quiet on a link install, where a rules provider already delivered the rule", async () => {
-  const result = await run({ install: "link", rule: RULE_FILE });
-  expect(result.contextHandlers).toBe(0);
-  expect(result.messages).toHaveLength(1);
-  expect(JSON.stringify(result.messages)).not.toContain("SENTINEL-RULE-BODY-LINE");
+  await quietWithPositiveControl({ install: "link", rule: RULE_FILE });
 });
 
-// The four shapes below all resolve to a root the host loads rules from, and all four used to get
-// the rule twice - 6877 bytes, ~1.7k tokens, on every LLM call. Each one is a separate reason the
-// old answer was wrong, so each needs its own fixture.
+// The shapes below all resolve to a root the host loads rules from, and each one used to get the
+// rule twice - 6877 bytes, ~1.7k tokens, on every LLM call. Each is a separate reason the old answer
+// was wrong, so each needs its own fixture.
 
 test("stays quiet on a link root whose directory name carries the marketplace cache grammar", async () => {
-  const result = await run({ install: "link-triple-underscore", rule: RULE_FILE });
-  expect(result.contextHandlers).toBe(0);
-  expect(result.messages).toHaveLength(1);
+  await quietWithPositiveControl({ install: "link-triple-underscore", rule: RULE_FILE });
 });
 
 test("stays quiet on a project-scope install, which the host loads as readily as a user one", async () => {
-  const result = await run({ install: "project", rule: RULE_FILE });
-  expect(result.contextHandlers).toBe(0);
-  expect(result.messages).toHaveLength(1);
+  await quietWithPositiveControl({ install: "project", rule: RULE_FILE });
+});
+
+// `omp plugin install --scope project` bootstraps `<cwd>/.omp/` in a directory that is not a git
+// repo at all (`resolveOrDefaultProjectRegistryPath`), and the config-dir marker is then the only
+// anchor that can find that install. Every other fixture has a `.git` beside the config dir, where
+// both markers answer the same - which is why dropping the config-dir pass changed no result.
+test("finds a project-scope install anchored on the config dir alone, with no .git above it", async () => {
+  await quietWithPositiveControl({ install: "project", rule: RULE_FILE, repo: false });
 });
 
 test("stays quiet when the install directory name is not the manifest's package name", async () => {
-  const result = await run({ install: "link-renamed", rule: RULE_FILE });
-  expect(result.contextHandlers).toBe(0);
-  expect(result.messages).toHaveLength(1);
+  await quietWithPositiveControl({ install: "link-renamed", rule: RULE_FILE });
 });
 
 test("stays quiet when the root is named in the host's `extensions` settings", async () => {
-  const result = await run({ install: "settings-extension", rule: RULE_FILE });
-  expect(result.contextHandlers).toBe(0);
-  expect(result.messages).toHaveLength(1);
+  await quietWithPositiveControl({ install: "settings-extension", rule: RULE_FILE });
+});
+
+// The host reads `extensions` at both scopes - the user list from `<agentDir>/settings.json`, the
+// project list from `<cwd>/.omp/settings.json` with no walk-up. Only the project one was fixtured,
+// so dropping the user-scope read broke nothing in this suite.
+test("stays quiet when the root is named in the user-scope `extensions` settings", async () => {
+  await quietWithPositiveControl({ install: "settings-extension-user", rule: RULE_FILE });
+});
+
+// Two spellings the host accepts for the same root, and neither was fixtured: a leading tilde
+// expands against the home directory, and a relative entry resolves against the startup directory.
+// Read literally, either one names a path that exists nowhere and the rule goes out twice.
+test("stays quiet when the `extensions` entry is spelled with a leading tilde", async () => {
+  await quietWithPositiveControl({ install: "settings-extension", rule: RULE_FILE, extensionEntry: "tilde" });
+});
+
+test("stays quiet when the `extensions` entry is a path relative to the startup directory", async () => {
+  await quietWithPositiveControl({ install: "settings-extension", rule: RULE_FILE, extensionEntry: "relative" });
 });
 
 test("stays quiet on a scoped-package install, which nests one directory deeper", async () => {
-  const result = await run({ install: "link-scoped", rule: RULE_FILE });
-  expect(result.contextHandlers).toBe(0);
-  expect(result.messages).toHaveLength(1);
+  await quietWithPositiveControl({ install: "link-scoped", rule: RULE_FILE });
 });
 
 // The bias, and it is the whole reason the answers above are allowed to be wrong in one direction

@@ -6,7 +6,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT" />
-  <img src="https://img.shields.io/badge/hosts-omp%20·%20hermes%20·%20any%20marketplace%20host-0d9488" alt="hosts" />
+  <img src="https://img.shields.io/badge/hosts-omp%20·%20Claude%20Code%20·%20hermes%20·%20any%20marketplace%20host-0d9488" alt="hosts" />
 </p>
 
 ---
@@ -25,141 +25,41 @@ host's plugin channel leaves out.
 
 ## Install
 
-**Fastest path, and the one that works on an agent nobody has tested:** paste the prompt at the top of
-[`BOOTSTRAP.md`](BOOTSTRAP.md) into your agent. It reads the install story, works out which agent it is,
-installs better-dev through that agent's channel, and runs `/onboard` in this repo. Your agent places the
-files, so an agent missing from the table below still ends up wired.
+Paste this into your agent, from inside the repo you want wired:
 
-better-dev is one plugin carrying three things: the **skills**, the always-applied **comms rule** that
-shapes every reply, and the **session hook**. Which channel you install through decides how much of
-that reaches your session.
-
-| Host | Skills arrive by | Comms rule arrives by | Stays current by |
-|---|---|---|---|
-| omp (marketplace) | `omp plugin install <name@marketplace>` | the session hook | `marketplace.autoUpdate: auto`, or `omp plugin upgrade` by hand |
-| omp (git, link or `-e`) | `omp plugin install <git-url>`, or `omp plugin link` | omp's own rules provider (`alwaysApply`) | `git pull` in the linked clone, or re-running the install |
-| Claude Code | marketplace add + install | a pointer `/onboard` writes into the entry file | its own plugin update verb, run by hand |
-| hermes | the clone, plus one `skills.external_dirs` line naming it | a pointer `/onboard` writes into the entry file | `hermes plugins update better-dev` |
-| Cursor / Windsurf | `npx skills add yoelgal/better-dev --all -g` | nothing on this path (measured) | `npx skills update` |
-| Codex / other | `npx skills add yoelgal/better-dev --all -g` | nothing on this path (measured) | `npx skills update` |
-| any host at all | the paste prompt in BOOTSTRAP.md | whichever row above fits | whichever row above fits |
-
-**The hook loads on omp.** Every host reads plugin hooks in its own shape, and `hooks/pre/*.ts` is the
-shape omp reads. Claude Code wants shell-command or HTTP entries in `hooks/hooks.json` keyed by event
-name, which this repo does not ship, so `claude --plugin-dir . plugin details better-dev` reports 33
-skills and `Hooks (0)`. hermes wants a Python module that registers itself through `register(ctx)`, so
-`hermes plugins install` clones the repo and then registers nothing out of it. Shipping either shape is
-open work, recorded as a gap in [`docs/DECISIONS.md`](docs/DECISIONS.md). Until one lands, those two
-hosts get the comms rule from `/onboard`, and both channels do put `rules/comms.md` on disk for it to
-name.
-
-**A pointer is weaker than injection.** Where the hook or omp's rules provider delivers the rule, its
-text sits in the context of every call before your message is answered. A pointer names the
-file and asks your agent to go read it, so it costs a tool call and it holds only as far as your agent
-honours its entry file. It is the strongest route Claude Code and hermes have today, and which of the
-two you get is worth knowing before you pick a host.
-
-**The two `npx skills add` rows are a partial install, measured.** That CLI delivers the skills into
-`~/.agents/skills/` and symlinks them into each host's own skills directory. Run against a throwaway
-`HOME`, it landed no `rules/comms.md` anywhere on disk, and it leaves no plugin tree, so the session
-hook never loads and there is no installed rule for `/onboard` to point at. `/onboard` reads that path
-back before writing and says so in its recap rather than leaving a block that reads nothing. To get
-the comms rule onto one of those hosts, put the repo on disk as well, through a plugin channel or a
-plain `git clone`, and tell `/onboard` where it is.
-
-### Per-agent commands
-
-**omp** - the marketplace channel, where the hook carries the comms rule:
-
-```bash
-omp plugin marketplace add yoelgal/better-dev
-omp plugin install better-dev@better-dev
+```
+Set up better-dev in this repo. Read
+https://raw.githubusercontent.com/yoelgal/better-dev/main/BOOTSTRAP.md and follow it: work out
+which agent you are, install better-dev through your own channel, run the check each stage names,
+then run /onboard here. If your channel cannot keep better-dev current, tell me that instead of
+finishing quietly.
 ```
 
-**omp** - a git or link root instead, where omp's own rules provider injects the comms rule:
+That is the install. [`BOOTSTRAP.md`](BOOTSTRAP.md) is written for your agent to execute: it
+carries the channel for each host, the check that proves each stage landed, and the words to hand
+back when a check cannot pass. Your agent is the part that adapts, so a host nobody has written a
+channel for still ends up wired, or hears why it cannot be. Wiring a second repo is the same paste
+from inside it.
 
-```bash
-omp plugin install https://github.com/yoelgal/better-dev
-```
+**What your agent sets up.** One plugin, installed once for the machine, carrying the 33 skills, the
+always-applied comms rule that shapes every reply, and the session hook. Then this repo's own
+`.better-dev/` data and a discovery block in `CLAUDE.md` or `AGENTS.md`, both written by `/onboard`.
+On a plugin channel your own skills folder stays yours: plugin skills load through your agent's
+plugin provider, so `~/.claude/skills` and `~/.omp/agent/skills` keep only what you put there, and a
+skill you wrote under the same name still wins.
 
-Or clone it and link the clone, which keeps the update in your hands: a linked install loads from that
-clone, so `git pull` there is the update.
+**The bar a channel has to clear.** These rules shape every reply, so an install that ages in
+silence is the failure this library designs against: you experience a months-old copy as the
+practices not working. So a channel earns its place by auto-updating or by raising an update alert.
+omp's marketplace channel auto-updates once you allow it. Claude Code raises the alert from a
+session-start hook, once that hook refreshes the host's own copy of the marketplace. A skills-only
+install through `npx skills add` can do neither, by that CLI's own command list, so your agent is told
+to say so in as many words and name what to add rather than reporting success. Either way you finish
+knowing which of the two you got.
 
-```bash
-git clone https://github.com/yoelgal/better-dev ~/better-dev
-omp plugin link ~/better-dev
-```
-
-A link needs the repo's root `package.json` and its `omp` key. Without them omp prints success and loads
-no skills and no rules; `omp plugin doctor` is what reports it.
-
-**hermes:**
-
-```bash
-hermes plugins install https://github.com/yoelgal/better-dev
-```
-
-That clones the whole repo to `~/.hermes/plugins/better-dev` and registers nothing out of it on its own:
-it warns that the tree carries no `plugin.yaml` or `__init__.py`, `hermes plugins list` leaves it out,
-and `hermes skills list` still reports zero. hermes reads skills from its own directories, so one config
-line naming the clone is what delivers them:
-
-```yaml
-# ~/.hermes/config.yaml
-skills:
-  external_dirs:
-    - ~/.hermes/plugins/better-dev/skills
-```
-
-`hermes skills list` then reports all 33 as enabled. That same clone puts the comms rule at
-`~/.hermes/plugins/better-dev/rules/comms.md`, which is the path `/onboard` points at.
-
-**Claude Code, and any other agent that reads a plugin marketplace:** point it at `yoelgal/better-dev`
-with its own marketplace-add verb, then install `better-dev@better-dev`. This repo is its own
-marketplace, carrying `.omp-plugin/marketplace.json` and a byte-identical
-`.claude-plugin/marketplace.json`, each listing one plugin sourced from the repo root. Claude Code
-keeps the whole repo in its plugin cache, so the comms rule is on disk there for `/onboard` to point
-at.
-
-**Cursor, Windsurf, Codex, or an agent with no plugin channel:**
-
-```bash
-npx skills add yoelgal/better-dev --all -g
-```
-
-This delivers the skills on their own. The channel table above has what that leaves for the comms rule.
-
-Then, in each repo you want wired, ask your agent to run `/onboard`.
-
-### Staying current
-
-omp's marketplace channel is the one that can update itself, once you ask it to:
-
-```bash
-omp config set marketplace.autoUpdate auto
-```
-
-`auto` upgrades plugins at startup. The shipped default, `notify`, writes update availability to omp's
-debug log and puts nothing on your screen, so a version behind is easy to sit on for months.
-Recommended anyway, though it means the rules that shape every reply can change between one session and
-the next without you reading what changed.
-
-Every other channel updates when you run one command: `git pull` in a linked clone, `hermes plugins
-install` again, `npx skills update`, or your agent's own plugin update verb. On an omp marketplace
-install, better-dev puts the upgrade command in the status line when the catalog copy your agent already
-cached is ahead of the installed version. It reads local state only, so an offline session stays quiet,
-and a git or link install says nothing, since git is what updates it.
-
-### Also worth knowing
-
-Nothing of better-dev's lands in your own skills folder on a plugin channel. Plugin skills load through
-your agent's plugin provider, so `~/.claude/skills` and `~/.omp/agent/skills` stay yours, and a skill you
-wrote under the same name still wins.
-
-Removal goes through the same channel that installed it: `omp plugin uninstall better-dev@better-dev`,
-`hermes plugins remove`, your agent's marketplace-uninstall verb, or the `skills` CLI for an
-`npx skills add` install. A repo you wired keeps its own `.better-dev/` data and its managed blocks until
-you remove them; `/onboard` has an unwiring step for that.
+Removal runs through the same paste: ask your agent to remove better-dev from this machine, and
+`BOOTSTRAP.md` carries the verb for the channel it used. A repo you wired keeps its own
+`.better-dev/` data and its managed blocks until you ask for those to go too.
 
 Once a repo is wired, your next message can just be *"here's a bug…"*, *"here's a feature…"*, or *"let's
 build an app that…"* - the wired repo carries an utterance-to-skill routing table, so you say what you want
@@ -229,7 +129,7 @@ Skills you later mint with `/self-extension` are **repo-scoped** by default, com
 | `.omp-plugin/` · `.claude-plugin/` | omp's marketplace catalog · Claude Code's catalog beside the version stamp (`plugin.json`) |
 | `package.json` | required: `omp plugin link` refuses a directory without one and skips the plugin entirely unless it declares an `omp` key |
 | `scripts/` | the two maintainer helpers, run from a clone of this repo and never from a repo that uses better-dev: `bd-package-check` (the release gate) and `bd-skill-stage` (stage, lint and promote a freshly authored skill) |
-| `BOOTSTRAP.md` | the canonical install story, assuming nothing is installed, and the only home of the paste prompt |
+| `BOOTSTRAP.md` | the install procedure your agent reads and runs: the channel per host, the check that proves each stage, and what to report where a check cannot pass |
 | [`docs/`](docs/) · [`NOTICE`](NOTICE) | design plan + decisions · attribution |
 
 > **Status:** built and self-verified (`bd-package-check` green), reimplemented from ~100 sources. Not yet
