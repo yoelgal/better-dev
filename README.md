@@ -25,21 +25,26 @@ host's plugin channel leaves out.
 
 ## Install
 
-Paste this into your agent, from inside the repo you want wired:
+Paste this into your agent, from inside the first repo you want wired:
 
 ```
-Set up better-dev in this repo. Read
+Install better-dev on this machine if it is not already there, then onboard this repo. Read
 https://raw.githubusercontent.com/yoelgal/better-dev/main/BOOTSTRAP.md and follow it: work out
-which agent you are, install better-dev through your own channel, run the check each stage names,
-then run /onboard here. If your channel cannot keep better-dev current, tell me that instead of
-finishing quietly.
+which agent you are, install through your own channel, run the check each stage names, then run
+/onboard here. If your channel cannot keep better-dev current, tell me that instead of finishing
+quietly.
 ```
 
-That is the install. [`BOOTSTRAP.md`](BOOTSTRAP.md) is written for your agent to execute: it
-carries the channel for each host, the check that proves each stage landed, and the words to hand
-back when a check cannot pass. Your agent is the part that adapts, so a host nobody has written a
-channel for still ends up wired, or hears why it cannot be. Wiring a second repo is the same paste
-from inside it.
+**Every repo after that needs only `/onboard`.** The install is one plugin for the whole machine, so
+once it is there the skills are already loaded and `/onboard` is one of them. Re-pasting the prompt in
+a second repo is safe and lands in the same place, since the procedure checks what the machine already
+has before installing anything, but the shorter path is to ask for `/onboard` and let it wire the repo
+you are standing in.
+
+[`BOOTSTRAP.md`](BOOTSTRAP.md) is written for your agent to execute: it carries the channel for each
+host, the check that proves each stage landed, and the words to hand back when a check cannot pass.
+Your agent is the part that adapts, so a host nobody has written a channel for still ends up wired, or
+hears why it cannot be.
 
 **What your agent sets up.** One plugin, installed once for the machine, carrying the 33 skills, the
 always-applied comms rule that shapes every reply, and the session hook. Then this repo's own
