@@ -24,9 +24,10 @@ jobs.
 - **The fix loop** - review findings and red CI both go back to `/autonomous-loop`, which
   owns the implement-and-verify loop. This skill decides *when* the change is not yet green; it does not
   run a second fix loop of its own.
-- **Overrides first** - read `.better-dev/overrides.md` and `.better-dev/rules.md` before applying any
-  default here: the integration branch, whether merging is gated to a release step, the protect-set of
-  files a fix may never touch.
+- **Recorded decisions first** - honor this project's recorded decisions before applying any default
+  here, from your harness's durable memory where you have it, otherwise from the brief you were given
+  (see `/overrides`): the integration branch, whether merging is gated to a release step, the
+  protect-set of files a fix may never touch.
 
 The default integration branch is `staging` (else `main`); a project override wins.
 
@@ -119,7 +120,7 @@ grades the runtime probe only - docs currency was the loop's docs sweep, already
 verdict), never a re-run of the suite to fill the space. A criterion that genuinely can't be driven from here is unproven,
 and unproven is not green - it settles `NEEDS_INPUT`, naming what has to run, not a guess that it would pass.
 
-Where `.better-dev/rules.md` records a `deploy-preview` surface, the PR's
+Where this project records a `deploy-preview` surface, the PR's
 own preview deployment is the runtime surface of choice: it is the shipping artifact, carrying the env,
 build flags, and platform behavior the local tree cannot show. Resolve its URL mechanically per the
 recorded rule - prefer the platform's deployments API keyed to the PR's head sha; the platform bot's
@@ -199,7 +200,7 @@ deterministic, so none needs a model to run:
 |---|---|---|
 | 1. State | step 2's signal is GREEN | RUNNING waits, RED goes back through step 4, GATED surfaces |
 | 2. Blast radius | `git diff --name-only <base>...HEAD` against the recorded `safety-denylist` globs and the contract's gated-paths line, minus the paths that line pre-authorized at seal | `NEEDS_INPUT`, PR left green and mergeable |
-| 3. Size | files and substantive lines both under the recorded ceiling (the `safety-scope` line in `.better-dev/rules.md`) | `NEEDS_INPUT` naming the split below |
+| 3. Size | files and substantive lines both under the recorded ceiling (the recorded `safety-scope` line) | `NEEDS_INPUT` naming the split below |
 | 4. Policy | the contract's `merge:` line reads `auto`, the recorded merge-policy reads `auto-on-green`, and nothing else gates: branch protection on the base, an override gating merges to a release step, or a `deploy-order:` line (the cross-repo coordination line `/orchestrating-agents` defines) whose provider deploy is not yet observed live, since a consumer merged first ships calls into an interface that is not there yet | the hold the `DONE` bullet below reports |
 
 Judgment runs last, and it runs one way: it may withhold a merge every gate allowed, and it may never
@@ -238,7 +239,7 @@ diff the offending range (`git diff --name-only <range>`) against the recorded m
 out (its `migrations.md` carries the down-migration discipline): settle `NEEDS_INPUT` naming it; a
 clean diff reverts without ceremony. Pause new merges onto the branch;
 revert the offending change so the branch is green again for everyone building on it; record the incident
-with the `learn` tool - "<what got through and why>" - so the lesson outlives the session; and
+durably (see `/overrides`) - "<what got through and why>" - so the lesson outlives the session; and
 tighten the thing that let it through - a missing done-criterion in the contract, a gap in the verify
 step, a class the reviewer wasn't looking for - before any restart. Only then does the work re-enter the
 loop against the tightened contract.
@@ -247,8 +248,8 @@ This is deliberately distinct from `/autonomous-loop`'s restart-from-contract, w
 loop that never merged; here the mistake already landed, so containment (revert) comes first and the
 tightened contract is what the eventual restart replays against. A denylist path or a human-gate change
 class reaching the branch unescalated is a step 6 gate that did not fire, so what gets tightened there is
-the gate rather than the change: those are recorded by `/guardrails-install` and narrowable in
-`.better-dev/overrides.md`.
+the gate rather than the change: those are recorded by `/guardrails-install` and narrowable in your
+harness's durable memory (see `/overrides`).
 
 ## Where it settles
 
@@ -323,9 +324,9 @@ PR #<n> → <state>: <one line>
 On merge or close, run the close-out - six lines, each written explicitly. The negative form is a line,
 never an omission; a close-out with a line missing is unfinished:
 
-- **Lesson** - the one keyed lesson this PR's verification taught, written with the `learn` tool, or
+- **Lesson** - the one keyed lesson this PR's verification taught, recorded in your harness's durable memory (see `/overrides`), or
   `no durable lesson: <why>` - an event of this run ("PR merged
-  cleanly") is a receipt, not a lesson. Graduate it to a rule in `.better-dev/rules.md` only on the
+  cleanly") is a receipt, not a lesson. Graduate it from a lesson to a durable rule only on the
   same confidence test, which you apply rather than put to the operator: a fact
   verified once this run is a lesson (scored, reversible), one you have now watched hold more than
   once is a rule, and neither needs a click. Offering the write instead of doing it spends a
@@ -333,8 +334,8 @@ never an omission; a close-out with a line missing is unfinished:
   `/session-review` afterwards for what this one line does not cover: the run's friction, its
   trap-worthy gaps, and any instruction that pointed it the wrong way.
 - **Shared-behavior change** - if the diff renamed a pattern, altered a default others rely on, or added
-  a step every future change in this area must take, record the convention as a line in
-  `.better-dev/rules.md` and add one heads-up line to the PR body's brief naming
+  a step every future change in this area must take, record the convention in your harness's durable
+  memory (see `/overrides`) and add one heads-up line to the PR body's brief naming
   the behavior that changed - the rule reaches the next session, the PR line reaches the colleague. When
   the merged diff changes a practice that other machines consume by linked install (a skill library like
   better-dev itself), name the propagation step in that line too: consuming clones pull, sessions restart
@@ -351,7 +352,7 @@ never an omission; a close-out with a line missing is unfinished:
 - **Worktree disposition** - on merge, tear down or keep via `/worktree-branching` (its finish menu and
   ownership checks own the mechanics, including which dispositions still need the operator), and record which one
   you took. Not tearing down is a line, never an omission.
-- **Release** - read the recorded `release-cadence` line in `.better-dev/rules.md`; nothing recorded
+- **Release** - read this project's recorded `release-cadence` line; nothing recorded
   resolves to `on-demand`. On `per-merge`, continue into `/release-promotion` in this same
   turn and record what it settled - `promoted: <tag>`, or the gate that held it, since that skill fails
   closed on its own checks and a held promote is a normal outcome. On `on-demand`, record `release:

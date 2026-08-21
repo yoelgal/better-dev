@@ -97,4 +97,4 @@ live: symptom gone: /login 200, error banner absent   # what the deploy-verify o
 ```
 
 If the incident taught something durable - a gap in CI that let the bug through, a fragile path -
-record it with the `learn` tool, so the next planning pass sees it.
+record it durably (see `/overrides`), so the next planning pass sees it.

@@ -1801,3 +1801,164 @@ cannot read, which silenced the only message that would have fixed it.
 Cost, stated plainly: a repo wired on a machine that only ever runs one agent carries one block it
 does not need, at a few lines of per-turn tax in a file that host does not load. A missed write costs
 silence instead, and silence is the failure this whole line of decisions exists to remove.
+
+## D48 - the discovery block is deleted; a wired repo carries the ledger and nothing else (supersedes D46 and D47, retires the repo-writing half of D42 and D45; 2026-08-21)
+
+D45, D46 and D47 are three answers to one question - which file `/onboard` writes its discovery block
+into - and D42 deleted the installer that put a block there in the first place. This entry deletes the
+block, and with it the reason `/onboard` writes into a repo at all. Read as a reversal it looks like
+churn, so the reasoning is recorded here rather than in a commit message: none of those rulings was
+wrong when it was written, and the question all three answered stopped being worth answering.
+
+**Four target revisions landed in one day, each forced by a measurement rather than an argument.** The
+measurements are below, and the probe behind them is D46's, which is re-runnable: unique tokens in
+candidate files, then ask the agent which tokens are in context with no tool calls allowed.
+
+- A root `CLAUDE.md` is never loaded by omp. No provider in its table matches a bare root `CLAUDE.md`,
+  and the probe confirmed it - including in this repo, whose own block sat in a file its own host does
+  not read.
+- A root `AGENTS.md` is loaded by omp only while nothing shadows it. The `agents-md` provider sits at
+  priority 10, under every config-directory provider, so any of them displaces it.
+- `.omp/AGENTS.md` is the top of that table at priority 100. Writing it to reach omp silently displaces
+  whatever omp was loading before, which on a repo with its own context file is a removal disguised as
+  an install.
+- The four target harnesses read disjoint sets, so no single file serves them all. D46 answered with two
+  writes and D47 moved the choice from the running host to the adoption tier. Both answers hold, and
+  both charge a per-turn tax in every session for a payload the next measurement shows was not needed.
+
+**The block was nearly redundant regardless, and that is measured too.** 28 of the 33 skills read the
+overrides record themselves, so a block restating an override reached nobody who was not already going
+to read it. Routing came from the skill descriptions the host injects, never from the block's table. And
+this repo ran a full session with its own block unread while nothing degraded - which is how the wrong
+target survived four revisions without anyone noticing, and is also the cleanest evidence available
+that the block was not carrying the load it was written to carry.
+
+**So the footprint goes and the capability stays.** Overrides and rules move to the harness's own
+durable memory. On omp that is one tool call to write, and what it writes is auto-injected at the start
+of a later session. That is strictly better than the file it replaces, and the chain above is the price
+the file charged: the record needed a discovery block to point at it, the block needed an entry file the
+host actually loads, and no such file exists for all four hosts. A record that arrives without being
+pointed at cannot be pointed at wrongly.
+
+**Skills name the intent; one file names the mechanism.** Every skill now says to consult the harness's
+durable memory for the project's recorded decisions, or to record a decision there, and points at
+`/overrides`. `skills/overrides/SKILL.md` is the only place that names a harness's actual surface,
+because it is the read-first layer every skill already consults. The count is the argument: 57 mentions
+of the overrides file across 28 skills and 68 of the rules file across 19 were rewritten here, and a
+path repeated at that many sites has to be rewritten at all of them the next time a host moves it. That
+coupling is what this change exists to remove, so naming a mechanism outside `/overrides` reintroduces
+it.
+
+**`.better-dev/ledger/` is retained, and that is not an inconsistency.** It holds `contract.md`,
+`progress.md`, `receipts.md` and `protect.hashes` - the sealed done-criteria and the recovery map that
+have to outlive a compaction. Git holds neither: the contract is deliberately not a commit, and the
+recovery map describes work that has not landed. Moving structured per-work-item state into prose memory
+risks an interrupted loop with nothing to resume from, which is the failure `/autonomous-loop` was built
+around. Whether the ledger should follow is a separate decision with its own evidence to gather, not a
+corollary of this one. After this change `.better-dev/` exists solely for the ledger, and the loop
+creates it when it first needs it rather than `/onboard` scaffolding it up front.
+
+**Two costs, both named rather than implied solved.**
+
+- Harness memory is per-machine and per-user, so a recorded decision no longer travels to a colleague
+  who clones the repo. The tracked overrides file did travel. Shared team conventions are therefore
+  **unsolved**, not solved by this: whoever needs them next has to decide where a shared record lives,
+  and the answer is not a file a discovery block points at.
+- The comms rule loses its last route to two hosts. Its pointer block was the one thing `/onboard`
+  still wrote into a repo, and deleting the write deletes the route. Delivery survives on omp only - the
+  plugin session hook on a marketplace install, omp's own rules provider on a git or link install -
+  while Claude Code and hermes neither run `hooks/pre/*.ts` nor read a plugin's `rules/`, so they now
+  get the skills and not the rule. This is D44's hookless-host path with no writer, recorded as an
+  open gap in `BOOTSTRAP.md`'s stage 3 rather than left implied.
+
+**What stays behind for repos already wired.** `/onboard` keeps the ability to remove a discovery block
+and a comms pointer, narrowed to cleanup by marker, because repos wired under 0.1.1 and 0.1.2 carry
+those blocks and nothing else knows where their markers are. Root `AGENTS.md` survives in this repo as
+its own context file with the managed block cut out; root `CLAUDE.md` is deleted, since after the block
+came out it held only a pointer at `AGENTS.md`.
+
+## D49 - durable memory is the main conversation's surface; a worker gets the decisions in its brief (corrects D48's delivery claim; 2026-08-21)
+
+D48 said the harness's durable memory is *strictly* better than the file it replaced, because a later
+session gets it injected without anything having to point at it. That is true of a main session and
+false of a worker, and the correction landed hours after the entry, so it goes here rather than into
+D48's text.
+
+**The measurement, on this machine, with the backend on.** In a subagent: `read memory://root` returns
+`Unknown protocol: memory://`, no `recall`, `reflect`, `retain` or `memory_edit` appears in the tool
+inventory, and no `<memories>` block is injected. omp's own documentation states the reason - subagents
+"do not run their own automatic recall or retention". Claude Code has the same asymmetry by a different
+mechanism.
+
+**Why that bites here rather than being a footnote.** Most of this library's skills run in a worker,
+because `/autonomous-loop` and `/orchestrating-agents` dispatch fresh contexts on purpose. So a skill
+body telling the agent to consult durable memory is true where the main agent runs it and false in the
+place most of them actually run. That is the same defect class as the discovery block D48 deleted: an
+instruction pointing at a surface the reader does not have.
+
+**So the phrasing carries the fallback, and only one side writes.**
+
+- Read: *"Honor this project's recorded decisions - from your harness's durable memory where you have
+  it, otherwise from the brief you were given (see `/overrides`)."*
+- Write: *"Record it in your harness's durable memory (see `/overrides`)."* Unchanged, because only the
+  main agent writes.
+
+A worker reports a finding, the parent confirms it with the operator, and the parent does the write.
+That is correct ownership rather than a workaround, for two reasons: a confirm gate belongs in the
+conversation the operator is actually in, and two workers writing one key would race.
+
+**What this costs D48, stated rather than absorbed.** The tracked overrides file *was* readable by a
+worker - `read` it and 28 skills said to. Durable memory is not. So the replacement is better for the
+main conversation and worse for a worker unless the brief carries the decisions down, which makes the
+dispatch brief load-bearing in a way it was not before. `skills/orchestrating-agents/briefs-and-reviews.md`
+carries the slot, and it names the seven facts rather than saying "project decisions", because a
+dispatcher facing a vague line fills it with whatever it happened to remember: branch model, integration
+branch, feature prefix, shared-or-solo and stack-or-greenfield from `/onboard`, plus the verify surface
+and the runnable entry points from `/guardrails-install`. A fact nobody settled reads `unknown` and never
+blank, because blank reads as "no constraint" and the worker invents one. The return direction is paired
+with it: a worker that finds something worth standing returns it as a finding instead of recording it,
+and the parent pastes down what the worker cannot read. The footprint deletion itself stands: nothing
+about it depended on this claim, and the four target measurements behind it are untouched.
+
+## D50 - a signal that cannot tell "no" from "not asked" is not a signal (this session's through-line; 2026-08-21)
+
+Six failures were found in one day and they are one defect: **the absence of a signal is
+indistinguishable from a positive one.** They are recorded together rather than as six cautionary tales,
+because a reader who meets them separately fixes six things and keeps the shape.
+
+**The rule.** Make absence loud, or stop treating presence as evidence.
+
+**Both ends have to hold, and either one alone still lets a missing thing read as a settled thing.**
+
+- **Loud at the producer.** From `/overrides`: a `safety-gate:` line missing its
+  `[operator: "<their words>" <date>]` marker reads as *absent*, so the baseline gate stands and the
+  waiver goes back to the operator. The reasoning is the transferable part - the agent is the constrained
+  party under a safety gate and it can write to that store, so the reader tests for the marker rather
+  than trusting that the confirm ever happened.
+- **Untrusted at the consumer.** From the dispatch brief slot: a silent slot is stated to be no evidence
+  that nothing was recorded, so a worker asks instead of concluding the project holds no opinion. That
+  pairs with `unknown`-never-blank (D49), which closes the same hole at the producer end.
+
+**The six, sorted by the end that failed rather than by the surface they appeared on.**
+
+Producer - nothing made the absence loud:
+
+- Three skill descriptions failed a strict YAML parse and were dropped silently, so a green install read
+  as 33 skills delivered.
+- A gate asserted `CLAUDE.md carries the managed block` and passed for a whole session while omp could
+  not read that file, so a green check read as the property holding.
+- A marketplace test fixture omitted the symlink a real install writes, so the one line that makes
+  delivery work was reached by no test, and 33 passing tests read as the behaviour working.
+
+Consumer - something treated absence as a settled negative:
+
+- The `/onboard` nudge stayed silent in a repo with no entry file, so silence read as "this repo is
+  wired".
+- `learn` is not registered when the backend is off, so no call fails and reaching the step reads as the
+  write landing.
+- A blank brief slot reads as "no constraint", and the worker invents one.
+
+**Why six in one day rather than one.** Every instance sat behind a signal that was already green, so
+nothing prompted a second look. That is the argument for proving a check red before trusting it green as
+a habit rather than a ceremony, and it is why every fix today carries its own red proof: a check that
+cannot fail is itself an instance of this defect, and a passing one certifies whatever it missed.

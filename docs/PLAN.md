@@ -27,11 +27,11 @@ run yourself, and none of them is a runtime installed in place of your own.
 
 1. **Agent-agnostic** - `SKILL.md` (agentskills.io) is the portable unit; no lock to one model/harness.
 2. **Composable, never blocking** - additive; complements installed skills/tools/MCP; never exclusive; no maximalist "MUST/STOP" tone. Firmness is not blocking: a gate is a calm declarative naming its consequence; a hedged gate reads as optional and fails (D13; writing-skills owns the rule).
-3. **Self-describing** - a project's `CLAUDE.md`/`AGENTS.md` + each skill's `description` auto-teach usage.
+3. **Self-describing** - each skill's `description` is what teaches usage, and the host injects those descriptions itself, so nothing has to be written into a repo to make the practices discoverable (D48).
 4. **Self-improving & self-extending** - one ordered flow on a gap: **source first** (`find-skills`), **create only as fallback** (hermes `/learn`). See §7.
 5. **Self-hostable / OSS-preferred; minimal deps** (bash-light).
 6. **Project-scoped & opinionated** - one repo, not a cross-project brain; one strong way to work.
-7. **User-steerable & self-revising** - override a practice in flow → the agent honors it now **and** persists it to `.better-dev/overrides.md` (light confirm before a one-off becomes policy). Never rewrites a shared skill.
+7. **User-steerable & self-revising** - override a practice in flow → the agent honors it now **and** records it in the harness's durable memory (light confirm before a one-off becomes policy; `/overrides` owns the read-first layer). Never rewrites a shared skill.
 
 **Invocation rule (applies to every skill):** default **model-invoked** (agent-reachable). Use
 `disable-model-invocation: true` **only** for things a *human* should deliberately trigger - destructive/
@@ -45,7 +45,7 @@ stay model-invoked.
 3. **Autonomous implementation loop** - same loop for both; run to real done-criteria; a fix's contract = red-signal-goes-green + regression test. See §5-loop below.
 4. **Capability-gap → source the tool** (§7). Ships the *practice of sourcing*, not every tool.
 
-Feedback: sourced capability feeds the loop; lessons + overrides persist to per-project rules (self-revising).
+Feedback: sourced capability feeds the loop; lessons + overrides persist to the harness's durable memory (self-revising).
 
 ## 4. Branching (locked)
 
@@ -54,38 +54,54 @@ Feedback: sourced capability feeds the loop; lessons + overrides persist to per-
 → merges to both. Flow: worktree off staging → loop → PR → grill/review → merge staging → soak → promote
 main. (Prefix naming is a per-project override - e.g. papers.town uses `feat/`.)
 
-## 5. Memory - the host's store plus per-repo files
+## 5. Memory - the harness's own durable store
 
-No memory engine of ours. Lessons live in the host's memory store: the `memory.backend` setting picks
-`local` or `mnemopi`, the `learn` tool writes one keyed lesson at a time, and what earlier sessions
-learned reads back at `memory://root/learned.md`, with the compact project summary the host injects at
-startup at `memory://root`. Friction is a lesson like any other - there is no separate queue to triage.
+No memory engine of ours, and since D48 no records file of ours either. Lessons, overrides and promoted
+rules all live in the harness's own durable memory: on omp, `learn` writes one keyed entry and a later
+**main** session receives it injected at start. That asymmetry is the whole subtlety (D49) - a dispatched
+worker gets no automatic recall and no injected memories, and most of this library's skills run in a
+worker. So a skill says to honor this project's recorded decisions from durable memory where it has it
+and otherwise from the brief it was given, which makes the dispatch brief that
+`/orchestrating-agents` defines a worker's only delivery path. That brief names the seven facts one by
+one rather than saying "project decisions" - branch model, integration branch, feature prefix,
+shared-or-solo and stack-or-greenfield from `/onboard`, plus the verify surface and runnable entry
+points from `/guardrails-install` - and an unsettled fact reads `unknown`, never blank, since blank
+reads as "no constraint" and the worker invents one. Writing stays with the main agent alone: a worker
+that finds something worth standing returns it as a finding, and the parent confirms with the operator
+and records. `skills/overrides/SKILL.md` is the single place that names a harness's actual surface, and
+every other skill points at `/overrides`. Friction is a lesson like any other - there is no separate
+queue to triage.
 
-**Files layout** under `.better-dev/`: `rules.md` (promoted, human-readable) · `overrides.md` (managed
-block, principle #7) · `ledger/<work-item>/` (loop state: `contract.md`, progress, receipts). Plain
-files, read with `read` and written with `write`, which is what makes them compose with the host's own
-memory - they are part of what it already ingests.
+**The one thing still on disk** is `.better-dev/ledger/<work-item>/`: `contract.md`, progress, receipts,
+`protect.hashes`. It stays a file because it is the sealed done-criteria plus the recovery map an
+interrupted loop resumes from, git holds neither, and prose memory is the wrong shape for structured
+per-item state. The loop creates it when it first needs it; nothing scaffolds it up front. That is the
+entire repo footprint - no entry-file block, no overrides file, no install marker.
 
 ## 5-loop. The autonomous loop (the differentiated core) - four layers + a fresh spine
 
 - **OUTER (orchestration):** reimplement superpowers' subagent-driven-development - read plan+constraints → per task dispatch a **fresh isolated-context worker** (the host's `task` tool, single-session role-switch fallback) with a file brief → generate a diff/review package → **independent reviewer that distrusts the report** (spec + quality verdict) → fix worker for Critical/Important (the implementing worker itself while its session lives - independence binds the re-reviewer, never the fixer; fresh on dead session or defended defect - D15) → append ledger line → next → broad final review → hand off to PR-into-staging. File handoffs; never grade own work.
 - **INNER (drive-to-green):** reimplement devloop `grind` (verify→pick→implement-one-step→re-verify→log→commit, budget, protect-set) + `stuck-check` (rabbit-hole detector → halt-STUCK); precondition from mp `diagnosing-bugs`: name one **already-run red-capable command** before hypothesizing; per-slice from mp `tdd` (one test→one impl at agreed seams).
-- **INVARIANTS (legitimacy):** from loop-library `loopy` + forge - observable done-criteria (no "until happy"), **never error/exhausted = success**, no-progress stop (don't invent limits), ask-don't-invent, verify separate from signal, independent evaluator, "done means proven not asserted", pre-loop ground-truth gate.
+- **INVARIANTS (legitimacy):** from loop-library `loopy` + forge - observable done-criteria (no "until happy"), **never error/exhausted = success**, no-progress stop (don't invent limits), ask-don't-invent, verify separate from signal, independent evaluator, "done means proven not asserted", pre-loop ground-truth gate. Plus **absence is not evidence** (D50): a check that cannot fail proves nothing, so prove it red before trusting it green.
 - **SPINE (fresh, ours):** ONE canonical terminal-state taxonomy = `DONE · DONE_WITH_CONCERNS · BLOCKED · NEEDS_INPUT · EXHAUSTED · NO_PROGRESS` (every source's verdicts map onto it); ONE durable ledger (SDD progress + grind scratchpad + loopy receipt merged) as plain files in the **primary checkout's** `.better-dev/ledger/<feature>/`, shared across worktrees (tracer-bullet finding); **restart-from-contract** (on `NO_PROGRESS` confirmed by stuck-check → reset worktree off staging, replay `contract.md`, human only if the contract is wrong - karpathy §V reimplemented, never quoted); dispatch + contract front-end + worktree/PR glue.
 
 ## 6. Onboarding - the entry skill `onboard`
 
 Idempotent; greenfield **or** existing codebase. **Detect** (harness; installed skills/MCP; git +
-branching; `CLAUDE.md`/`AGENTS.md`) → **adapt, don't impose** (respect existing conventions as
-overrides - never force main/staging or a prefix; scaffold minimum base only where absent; never
-disable installed skills) → **self-describe** (write a managed block into the entry file +
-`.better-dev/` scaffold) → **grill + light-confirm** before
-writing. Detection is a *premise* - verify at file:line before scaffolding on it (never guess a command;
-unmapped capability = a gap, not an invention). Reimplement shape from orrgal1 `welcome` (idempotent
-detect→report→ask→act, `argument-hint` resume) + mp `setup` (present-one-decision-at-a-time; entry-file
-rule). **Entry-file rule (from papers.town):** if both `CLAUDE.md` and `AGENTS.md` exist, the convention is
-`CLAUDE.md` `@`-imports `AGENTS.md`; write our managed block into the entry file, update in place, never
-duplicate, never clobber user edits.
+branching; the conventions the repo already follows) → **adapt, don't impose** (respect those
+conventions as overrides - never force main/staging or a prefix; scaffold minimum base only where
+absent; never disable installed skills) → **record what it found in durable memory** → **grill +
+light-confirm** before recording. Detection is a *premise* - verify at file:line before recording it
+(never guess a command; unmapped capability = a gap, not an invention). Reimplement shape from orrgal1
+`welcome` (idempotent detect→report→ask→act, `argument-hint` resume) + mp `setup`
+(present-one-decision-at-a-time).
+
+**It writes no file into the repo (D48):** no entry-file block, no `.better-dev/` scaffold, no ignore
+line. It detects, records, hands off to `/guardrails-install`, and closes. The one repo mutation left is
+not a file - on a staged model with no integration branch it offers once, on a yes, to create that
+branch, because recording a model that names a branch nobody has is the premise-versus-fact failure this
+skill exists to stop. It keeps one cleanup path: removing a discovery block or comms pointer by marker
+in repos wired under 0.1.1 or 0.1.2, since nothing else knows where those markers are.
 
 ## 7. Sourcing & self-extension - **source before create**
 
@@ -137,7 +153,7 @@ deeply, then reimplement** (§12) - capture the actual mechanism, don't approxim
 | **tool-sourcing** | find-skills CLI (ride it) + wrapped discovery (§7) |
 | **self-extension** | hermes `/learn` (prompt-authored) + read-before-write + gstack `skillify` test-before-promote (§7) |
 | **packaging-distribution** | `.claude-plugin/plugin.json`, symlink+copy-fallback install; delegate long-tail to `npx skills add` |
-| **overrides** (own component) | `.better-dev/overrides.md` managed block, read-first, confirm gate |
+| **overrides** (own component) | read-first layer over the harness's durable memory, confirm gate; the one file that names each harness's surface (D48) |
 | **release/promotion** | staging→main soak/promote, tags, hotfix double-merge (owned; no source) |
 | **guardrails-install** | onboard *installs* pre-commit/lint/CI, not just detects |
 | **pr-and-verify** | `gh pr create` into staging + end-to-end verify (drive the flow, not just tests) |
@@ -151,9 +167,9 @@ reimplemented from real opensrc source and integration-tested. The 2026-07-07 sy
 14-branch quality rewrite over them: reward-hack invariants + rationalizations table + learning-law in
 the loop; claim-blind effort-graduated review; review-verdict-gates-the-PR (D11) + `verify-runtime.md`;
 failure-behavior + threat-surface passes in plan-grill; parallel-baseline hardening in groundwork;
-concurrent-actor + rollback discipline in worktree/release; the utterance routing table in onboard's
-managed block; three new skills (D12: security-pass, design-brief, uninstall); disposition menu + proving
-bar in writing-skills; `docs/TRAPS.md`.
+concurrent-actor + rollback discipline in worktree/release; three new skills (D12: security-pass,
+design-brief, uninstall); disposition menu + proving bar in writing-skills; `docs/TRAPS.md`. That wave's
+utterance routing table is gone with the block that carried it (D48).
 
 **Install model (D42, superseding D10, D24, D32 and D37):** better-dev ships as a **host plugin**. The repo
 root is both the marketplace and the single plugin it lists (plugin source `./`, catalog shipped
@@ -165,8 +181,9 @@ installs through - a marketplace install or a plugin link - is not settled yet, 
 is why: on omp 17.3.8 a marketplace-installed plugin's `rules/` is never loaded, because the provider
 serving marketplace roots registers skills, commands, hooks, tools and MCP but not rules, while the
 provider that does scan `rules/` filters marketplace roots out. So the comms block ships correctly and
-reaches a session only through a linked install. A repo's `.better-dev/` is **data only**; repo-authored
-skills stay repo-local; `/onboard` wires a repo and installs nothing.
+reaches a session only through a linked install. A repo's `.better-dev/` now holds the work-item ledger
+and nothing else - `/onboard` writes no file into a repo at all, and overrides and promoted rules live in
+the harness's durable memory (D48). Repo-authored skills stay repo-local.
 
 **2026-08 harness-native cutover:** everything in the library that duplicated a capability the host
 harness already ships was deleted - the `bd-*` script spine, the hook and host-adapter layer, the
@@ -179,9 +196,9 @@ gating of edits to `.env*`, `**/secrets/**`, `*.pem`, and `*.key`.
 Remaining work is human-only (see §13): real-remote branch protection, live multi-harness runs.
 
 **Tracer-bullet gate (after Phase 0): ✅ PASSED** - ran `onboard` + one feature slice → staging on the
-papers.town clone, locally, no push. onboard adapted (didn't impose) and wrote an idempotent
-non-clobbering discovery block; the slice went worktree-off-staging → verify GREEN → merge-to-staging
-→ DONE. **Its findings still bind (see `DECISIONS.md` → Tracer-bullet findings):** the ledger lives in
+papers.town clone, locally, no push. onboard adapted (didn't impose); the slice went
+worktree-off-staging → verify GREEN → merge-to-staging → DONE. **Its findings still bind (see
+`DECISIONS.md` → Tracer-bullet findings):** the ledger lives in
 the *primary* checkout's `.better-dev/ledger/<feature>/` (shared across worktrees); detection is
 premise-verified at the git level; the primary checkout tracks the integration branch while features are
 worktrees off it; done = a real check going GREEN.

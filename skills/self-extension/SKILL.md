@@ -16,8 +16,9 @@ Creating is the fallback, not the first move. `/tool-sourcing` hands off here on
 vetting, and try-before-adopt all came up empty; a proven, installed skill beats a fresh one every time.
 Carry the gap line and the vetting note across - they are the spec for what to build.
 
-Read `.better-dev/overrides.md` first and honor any project override - a repo may pin where skills live,
-forbid new ones, or already name the shape it wants.
+Honor this project's recorded decisions - from your harness's durable memory where you have it,
+otherwise from the brief you were given (see `/overrides`). A repo may pin where skills live, forbid
+new ones, or already name the shape it wants.
 
 ## 1. Earn the create
 
@@ -31,7 +32,8 @@ belongs instead, is in `what-not-to-encode.md`; reach for it whenever you're uns
 persist. "Nothing worth saving" is a real answer, just not the default one.
 
 **Does something already cover this?** Prefer improving what exists over adding a narrow sibling. Read the
-project's lessons (`memory://root/learned.md`) and scan the installed skills; take the
+project's recorded lessons - from your harness's durable memory where you have it, otherwise from the
+brief you were given (see `/overrides`) - and scan the installed skills; take the
 earliest fit:
 
 - an existing skill covers the class of work → patch that skill;
@@ -184,9 +186,9 @@ Once it lands, exercise it once - re-read the committed copy against the structu
 script and compare against the output the prototype produced. If it drifted, surface the discrepancy
 rather than quietly undoing the commit; the caller deserves to see it.
 
-Record what the run taught: the durable technique goes through the `learn` tool, and an
-`authored <skill> for <capability>; retire when <condition>` line goes into `.better-dev/rules.md`, so the
-next time that gap surfaces the choice is reused instead of re-created. The retirement
+Record what the run taught in your harness's durable memory (see `/overrides`): the durable technique,
+and an `authored <skill> for <capability>; retire when <condition>` line, so the next time that gap
+surfaces the choice is reused instead of re-created. The retirement
 half is recorded now because now is when you know it: a skill authored to steer a weaker model caps a
 stronger one, and nothing downstream removes a skill - `/release-promotion`'s distill pass retires a stale
 *rule* on disuse, never a skill file - so a condition nobody wrote down is one nobody ever checks.

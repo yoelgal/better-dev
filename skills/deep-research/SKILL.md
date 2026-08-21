@@ -9,8 +9,9 @@ One job: **answer one question from outside sources, with evidence a reader can 
 deliverable is an answer plus the chain that produced it - which sources, what each one actually
 says, and where they disagree. Not a reading list, not a summary of the first three hits.
 
-Read `.better-dev/overrides.md` first: a repo may pin its sources of record, forbid a fetch lane, or
-name the domains it does not trust.
+Honor this project's recorded decisions - from your harness's durable memory where you have it,
+otherwise from the brief you were given (see `/overrides`). A repo may pin its sources of record,
+forbid a fetch lane, or name the domains it does not trust.
 
 Two failures shape everything below, and both are silent. A pass answers the interesting part of the
 question and drops the rest. And a pass averages two sources that flatly disagree into one bland
@@ -159,7 +160,7 @@ section 1 is what proves or refutes it.
 
 ## Close out
 
-At the end of a run, record the one durable line with the `learn` tool - a source worth trusting or
+At the end of a run, record the one durable line in your harness's durable memory (see `/overrides`) - a source worth trusting or
 distrusting, a query shape that worked, a settled outside fact - or write `no durable lesson` with the
 reason. A finding about this run's topic is a lesson; a receipt of having researched it is not.
 

@@ -11,8 +11,9 @@ watertight, and emit a **done-contract** with *observable* done-criteria the aut
 drive to. One job: everything a work-item needs settled *before* code, and nothing the
 implementation loop already owns.
 
-Read `.better-dev/overrides.md` first. A project override -
-a different spec location, a house planning style, a skipped phase - wins over anything below.
+Honor this project's recorded decisions - from your harness's durable memory where you have it,
+otherwise from the brief you were given (see `/overrides`). A different spec location, a house
+planning style, or a skipped phase wins over anything below.
 
 The flow is four steps behind one closing gate; a gated step 0 runs first when the brief is
 somebody else's words. Work from the work-item's worktree
@@ -195,8 +196,8 @@ grill only the decisions the done-criteria will turn on and skip exhaustive bran
   as `NEEDS_INPUT`.
 - **Confirm as each decision locks.** When a decision settles, reflect it back in a line and move on
   once it holds. If a decision reads like a standing policy for this project (a convention, not a
-  one-off), offer to persist it - "make this the default here?" - and on a yes record it as one line in
-  `.better-dev/overrides.md`. Don't persist transient facts. Keep the
+  one-off), offer to persist it - "make this the default here?" - and on a yes record it in your
+  harness's durable memory (see `/overrides`). Don't persist transient facts. Keep the
   settled decisions on disk, not in conversation: as each decision locks, append its one-line form
   to a running `decisions.md` in the work-item's ledger directory. Step 4 synthesizes from that
   file - a grill long enough to compact loses nothing.

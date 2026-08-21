@@ -12,8 +12,9 @@ stands between that failure and silence is not a cadence: it is error tracking t
 failure, a health endpoint that makes "up" checkable, and one alert channel that pages a person. Wire
 those three, prove they fire, record them.
 
-Read `.better-dev/overrides.md` first - a repo may already name its monitoring stack, or hold
-"we never instrument prod" as a recorded decision; honor either.
+Honor this project's recorded decisions - from your harness's durable memory where you have it,
+otherwise from the brief you were given (see `/overrides`). A repo may already name its monitoring
+stack, or hold "we never instrument prod" as a recorded decision; either wins.
 
 ## Detect what already observes this repo
 
@@ -23,7 +24,7 @@ value plus where, and add only what is missing.
 - **Error tracking** - an error-tracking dependency in the manifest, its DSN-shaped env var named in
   the env template, the init call in the entry point. A dashboard mentioned in the README is a claim
   until the dependency and the init are seen.
-- **Health endpoint** - the recorded `deploy-health` rule in `.better-dev/rules.md`, or a
+- **Health endpoint** - this project's recorded `deploy-health` rule (see `/overrides`), or a
   health/status route in the code. Fetch it once and read the status.
 - **Alert channel** - an alert rule in the tracker, an uptime probe pointed at prod, a deploy workflow
   that notifies on failure. The bar is "reaches a human": a rule posting to a channel nobody reads
@@ -78,7 +79,7 @@ production nobody has broken.
 
 ## Record, absence as a named gap
 
-Three lines into `.better-dev/rules.md`, added with `edit`:
+Three lines recorded in your harness's durable memory (see `/overrides`):
 
 ```markdown
 - obs-error-tracking: <where prod errors aggregate, observed at file:line - or none>

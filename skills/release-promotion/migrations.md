@@ -9,7 +9,7 @@ gate's diff (main body) finds the promote range touching the recorded migrations
 
 ## Which mechanism runs it
 
-Read the recorded `deploy-migrate` rule out of `.better-dev/rules.md` first with the `read` tool.
+Read this project's recorded `deploy-migrate` rule first (see `/overrides`).
 
 `deploy-migrate` is recorded by `/guardrails-install` - run it if absent; an unrecorded value is a
 `NEEDS_INPUT` naming the recorder, never a guess. Five recorded answers:
@@ -67,12 +67,12 @@ the mismatch this section exists to catch.
 An expand/contract pair split across releases carries a sequencing constraint no single promote can
 see: the contract migration must not promote until the release that stopped reading the old shape
 is deployed and verified. When this release's range holds the *expand* half, record the hold so the
-next promote finds it - add the line to `.better-dev/rules.md` with `edit`:
+next promote finds it - record this line in your harness's durable memory:
 
 ```
 migration-hold: <contract-migration> waits for <version> VERIFIED in prod
 ```
 
-Before promoting any range that contains a held migration, read the `migration-hold` lines back out
-of that file: a hold whose condition isn't yet a verified release receipt is a `BLOCKED` gate, not a
+Before promoting any range that contains a held migration, read the `migration-hold` lines back out of
+that memory: a hold whose condition isn't yet a verified release receipt is a `BLOCKED` gate, not a
 judgment call. Retire the line when the contract half ships.

@@ -11,8 +11,10 @@ build or a passing unit test shows none of these. Proving them means driving the
 device or simulator and observing what a user would see. When a contract carries a criterion
 like that, the gap is a missing runtime check, not a missing line of code.
 
-Read `.better-dev/overrides.md` first. A repo may already pin its own device harness (an XCUITest
-suite, a device farm, a `test:device` script) - honor that and skip straight to wiring the check.
+Honor this project's recorded decisions - from your harness's durable memory where you have it,
+otherwise from the brief you were given (see `/overrides`). A repo may already pin its own device
+harness (an XCUITest suite, a device farm, a `test:device` script) - honor that and skip straight to
+wiring the check.
 
 ## 1. Name the gap as an observable check
 

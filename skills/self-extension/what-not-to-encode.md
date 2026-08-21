@@ -35,8 +35,8 @@ gets noisy:
 
 - *How to do a class of task* is a skill - a durable procedure the agent applies whenever that kind of work
   comes up.
-- *Who the user is and what the current state of things is* is project memory - a durable rule as a line
-  in `.better-dev/rules.md`, a lesson through the `learn` tool, never written into a skill.
+- *Who the user is and what the current state of things is* is project memory - a durable rule or a
+  keyed lesson in your harness's durable memory (see `/overrides`), never written into a skill.
 
 A preference the user states about how a class of work should go can belong in both: the skill that governs
 that work carries the practice, and memory carries the standing preference.

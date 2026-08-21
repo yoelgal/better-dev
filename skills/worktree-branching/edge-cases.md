@@ -51,7 +51,7 @@ discoverable from inside the repo, which is why `.worktrees/` is the default.
 
 ## Trunk-based repo - integration and release coincide
 
-Where `.better-dev/rules.md` records `branch-model: trunk`, the
+Where this project records `branch-model: trunk`, the
 integration branch and the release branch are the same branch: worktrees base off `main` (or whatever
 the trunk is named), PRs merge into it, and no separate staging sits between a merge and a release.
 Step 1's base column reads the trunk for every row, and `hotfix/` loses its special base - a hotfix is

@@ -20,13 +20,14 @@ execution stages stand down; they judge harvested material, not feature requests
 The target is the repo the session is in, or the one the user names - never a
 remembered default from a previous harvest. Find its archive before the first write:
 
-1. Read `.better-dev/rules.md` for a recorded `harvest-archive` path - a project
-   override in `.better-dev/overrides.md` wins over it.
+1. Read this project's recorded `harvest-archive` path - from your harness's durable
+   memory where you have it, otherwise from the brief you were given; a recorded
+   project override wins over it (see `/overrides`).
 2. No record: detect an existing archive - a sources dir with a filing README
    (`raw/sources/` is the common shape).
 3. Neither: create `raw/sources/`, seed a conventions README (folder naming, the
    source.md frontmatter, the manifest), and record the path as a
-   `harvest-archive: <path>` line in `.better-dev/rules.md`. A new archive defaults
+   `harvest-archive: <path>` line in your harness's durable memory. A new archive defaults
    to untracked - offer a gitignore entry, never force one; some repos gitignore
    `raw/`, others track it - check, don't assume.
 
@@ -298,8 +299,8 @@ work-item; opening the worktree late means any tracked archive (some repos gitig
 `raw/`, others track it - check, don't assume) accumulates on the integration branch's
 working tree while the "real" work waits for a branch. The repo's
 log is not the contribution process - a prior commit straight to the integration branch
-records an exception, not a standing override; only `.better-dev/overrides.md` grants
-those. When the target repo doesn't run better-dev, follow that repo's own documented
+records an exception, not a standing override; only a recorded override grants
+those (see `/overrides`). When the target repo doesn't run better-dev, follow that repo's own documented
 process with the same default: branch and review, never straight to the trunk. Rules
 that keep the landing honest:
 

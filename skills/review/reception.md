@@ -77,7 +77,7 @@ finding too.
 
 When reception overturns a grading, that is a calibration event, not just a fix: a finding the reviewer
 demoted to `⚠️` or Minor that proves out as a real Critical or Important, or a `REBUTTED` row later shown
-right. Record the corrected pattern with the `learn` tool - "<pattern> - graded low at review, confirmed
+right. Record the corrected pattern durably (see `/overrides`) - "<pattern> - graded low at review, confirmed
 real", keyed so the next review grades it on sight instead of relearning the doubt.
 
 ## Documented deviations, judged on merit

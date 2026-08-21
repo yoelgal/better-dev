@@ -22,8 +22,9 @@ needs a symptom, `/groundwork` is for greenfield. This one starts from "here is 
 where to spend effort." When a feature or a symptom is already named, route there instead - auditing a
 repo to answer a question you can already state concretely is wasted motion.
 
-Read `.better-dev/overrides.md` first - a project override (an area to always skip, a house
-severity language, a "we never audit vendored code" rule) wins over anything here.
+Honor this project's recorded decisions - from your harness's durable memory where you have it,
+otherwise from the brief you were given (see `/overrides`). An area to always skip, a house severity
+language, or a "we never audit vendored code" rule wins over anything here.
 
 ## 1. Orient before you judge
 
@@ -45,8 +46,9 @@ wastes their attention and reads as an audit that didn't do its homework. Carry 
 forward - they scope what the sweep is allowed to report.
 
 The repo's own record of what already went wrong is evidence too, and it costs one read rather than a
-sweep: `memory://root/learned.md` carries the lessons a prior run paid for, friction included, and
-`memory://root` carries the compact project summary. Read both with the `read` tool, as leads and never
+sweep: the project's recorded lessons carry what a prior run paid for, friction included, and the
+recorded project summary carries the compact shape of it - from your harness's durable memory where you
+have it, otherwise from the brief you were given (see `/overrides`). Read both as leads and never
 as findings - a lesson names a cause and no location, so it points the sweep at a file and step 3 still
 has to open it.
 

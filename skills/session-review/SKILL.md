@@ -5,7 +5,7 @@ description: Use when a session is finishing and what it learned has not been wr
 
 # Session review
 
-The `learn` tool keeps a keyed lesson, the repo's trap record keeps a behavioural gap, and both sit
+Durable memory keeps a keyed lesson, the repo's trap record keeps a behavioural gap, and both sit
 idle unless something reaches for them while the session still remembers what happened. This sweep is
 that something. The whole job is routing what this session produced to the surface that will replay
 it, so the tokens already spent pay a second time. Reviewing the code is `/review`; handing the work
@@ -30,8 +30,8 @@ got wrong before you got it right - and route each finding by the row it matches
 
 | What the session produced | Where it goes | The test it has to pass |
 |---|---|---|
-| a cause, technique, or standing fact a future session would otherwise re-derive | the `learn` tool, one insight per call, keyed | the two close-out tests, named below |
-| friction: a dead-end tool call, a broken doc link, a flaky command, output that lied | the `learn` tool as well - what it cost and what to do instead, keyed so the next session meets it | it cost real time and nothing in the repo warned about it |
+| a cause, technique, or standing fact a future session would otherwise re-derive | durable memory, one insight per record, keyed (see `/overrides`) | the two close-out tests, named below |
+| friction: a dead-end tool call, a broken doc link, a flaky command, output that lied | durable memory as well - what it cost and what to do instead, keyed so the next session meets it | it cost real time and nothing in the repo warned about it |
 | a gap where a future agent following the instructions as written would fail the same way | the repo's trap record, as a rigged scenario with its pass line and fail line (better-dev's own is `docs/TRAPS.md`) | you can name the input that produces the wrong behaviour, and the observable that separates the pass from the fail |
 | an instruction in this repo that sent the session the wrong way | the report, quoting the file and the exact sentence; the edit itself belongs to `/self-extension` or to the skill that owns the sentence | you can quote the sentence and say what it made you do |
 
@@ -66,7 +66,7 @@ Prose that asks for evidence beats a match on one filename.
 A session that fixed a typo, or one that only applied lessons already in the store, has nothing durable
 to add, and its correct output is an explicit `no durable lesson: <why>`. The pull here is to
 manufacture one so the sweep looks diligent, and a manufactured lesson is worse than silence: it takes
-up room in the store every session reads and returns nothing. The check before any `learn` call is
+up room in the store every session reads and returns nothing. The check before any such record is
 whether you would want this line in front of the next session six weeks from now, ahead of a lesson
 that would have paid off. An empty sweep still reports, though: one that found nothing and said nothing
 is indistinguishable from one that never ran.

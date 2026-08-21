@@ -18,8 +18,10 @@ deliberate no, settled once. This skill is for the other case: a product that sh
 surface yet. Unsure which this repo is? That is the operator's question, asked before anything is
 created - creating a surface nobody wanted is as wrong as recording `none` on a product that ships.
 
-Read `.better-dev/overrides.md` first. A repo may already pin its platform, forbid new infrastructure,
-or name the team that owns provisioning - honor that before any rung below.
+Honor this project's recorded decisions - from your harness's durable memory where you have it,
+otherwise from the brief you were given (see `/overrides`). A repo may already pin its platform,
+forbid new infrastructure, or name the team that owns provisioning - honor that before any rung
+below.
 
 ## 1. Name the gap as an observable check
 

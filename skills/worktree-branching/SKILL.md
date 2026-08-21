@@ -14,15 +14,12 @@ checkout. Detect an existing one before making a new one; never make two.
 
 Native `git worktree` is the whole mechanism - no wrapper is added where git already does the job.
 
-## Before anything: read the overrides
+## Before anything: honor the recorded decisions
 
 A project may already have opinions here - a different branch prefix (`feat/` not `feature/`), a
-different integration branch (`develop` not `staging`), a different placement. Read them first and
-let them win:
-
-Read `.better-dev/overrides.md` and `.better-dev/rules.md` - two plain files, read with the `read`
-tool. Where `.better-dev/` is kept out of git, a linked worktree has no copy of its own: read them
-from the primary checkout, whose path Step 3 resolves.
+different integration branch (`develop` not `staging`), a different placement. Honor this project's
+recorded decisions - from your harness's durable memory where you have it, otherwise from the brief you
+were given (see `/overrides`) - and let them win.
 
 Detect the layout, don't impose one. What the repo already does is the default.
 
@@ -86,7 +83,7 @@ re-verified and rewritten (`/overrides`), never obeyed.
 
 Before opening a second parallel worktree, read the live lanes: `git worktree list`, then per live
 branch `git diff --name-only <base>...<branch>` - a path two lanes both touch makes the work
-sequential, not parallel. So does a `shared-runtime: serialize` line in `.better-dev/rules.md`:
+sequential, not parallel. So does a recorded `shared-runtime: serialize` line:
 lanes coupled through one mutable datastore collide in data, not files - Step 2's datastore note
 records that line.
 
@@ -151,10 +148,9 @@ equivalent - are operator-owned and never copied here: the agent never writes th
 nothing of that class for this step to carry forward.
 
 **`.better-dev/` is read where it lives, never copied.** Where the repo keeps that directory out of
-git - a solo adoption does - the rules, the overrides, and the shared ledger exist only in the
-primary checkout, so read them there by absolute path. A copy forks the one set of rules every lane
-is meant to share, and the ledger in particular has to stay single or a resume reads a different
-state depending on which tree it runs in.
+git - a solo adoption does - the shared ledger exists only in the primary checkout, so read it there
+by absolute path. A copy forks the one ledger every lane is meant to share, and a resume then reads a
+different state depending on which tree it runs in.
 
 That copied runtime config points every lane at the same mutable datastore - one `DATABASE_URL`, one
 Redis, one object store - so when `git worktree list` shows another live lane, this lane's dev server
@@ -162,7 +158,7 @@ and checks write the data that lane reads, even with zero file overlap between t
 stack supports it, namespace the copy per lane: suffix the schema or database name with the slug, or
 point the copy at a separate ephemeral store (a per-lane SQLite file, a second local database), so one
 lane's writes and resets never surface in another lane's verify. Where the stack offers no per-lane
-split, record the coupling once as a `shared-runtime: serialize` line in `.better-dev/rules.md`, so
+split, record the coupling once as a `shared-runtime: serialize` line in your harness's durable memory, so
 `/orchestrating-agents`' live-lanes check treats data-coupled lanes as sequential rather than parallel;
 unrecorded, a failure born in another lane's data reads as flake, and no file diff explains it.
 
@@ -172,7 +168,7 @@ failure. Prefer the project's own named setup entry point (a documented setup or
 or task) over an ad-hoc install command composed here; a fixed, idempotent entry point is what a
 later session or a restart re-runs without guessing which command you used. If none exists, record
 it as a groundwork gap rather than papering over it with a one-off a future session can't find. The
-`dev-run` line in `.better-dev/rules.md` is the command that stands this tree's app up when a check
+recorded `dev-run` line is the command that stands this tree's app up when a check
 needs it live - recorded once by `/guardrails-install`, read here instead of re-discovered per
 worktree. If
 this skill hands off immediately (the interlock in Step 3), `/autonomous-loop`'s ground-truth gate

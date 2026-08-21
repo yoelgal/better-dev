@@ -39,7 +39,7 @@ file diff explains it). Treat a store two items both *write* as a path owned twi
 moves in step 4: push per-lane isolation down into the foundation (a database, schema, or namespace per
 worktree, reset through the seed/reset entry point the foundation names in groundwork step 2), or sequence
 the items - and when sequencing is the resolution, record it once as a `shared-runtime: serialize` line
-in `.better-dev/rules.md` (`/worktree-branching`'s datastore note owns the key) so
+in your harness's durable memory (`/worktree-branching`'s datastore note owns the key) so
 `/orchestrating-agents`' live-lanes check sees the coupling. Items that only read a stable store stay
 disjoint - the contention
 is in the writes.

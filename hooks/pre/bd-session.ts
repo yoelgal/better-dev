@@ -1,4 +1,4 @@
-// better-dev's session hook: it closes the three gaps the deleted installer used to cover, and
+// better-dev's session hook: it closes the two gaps the deleted installer used to cover, and
 // nothing else. Discovered by the host from `hooks/pre/` inside the installed plugin tree - no
 // manifest entry, no path registered into machine-global config, nothing an installer writes.
 //
@@ -9,7 +9,7 @@
 // directory inside the plugin), is versioned with the plugin, and disappears when the plugin is
 // removed. Nothing here can outlive or rot away from the tree it shipped in.
 //
-// The three jobs, each measured against a real omp session before being written:
+// The two jobs, each measured against a real omp session before being written:
 //
 //   (a) deliver rules/comms.md when no rules provider did. On a marketplace install the host loads
 //       the plugin's skills, commands, hooks and tools but NOT its rules/ - measured: a marketplace
@@ -21,11 +21,9 @@
 //       own docs, `notify` mode "writes update availability only to the debug log; it does not show
 //       a user-facing notification". This reads the same on-disk state that computation reads.
 //
-//   (c) suggest /onboard in a repo that has no discovery block.
-//
-// All three are one line at most, and (b) and (c) go through ctx.ui.notify - no tokens, no
-// transcript, no-op when there is no UI. The rule this hook delivers bans banners and preamble; a
-// hook that shouted would discredit the thing it carries.
+// Both are one line at most, and (b) goes through ctx.ui.setStatus - no tokens, no transcript,
+// no-op when there is no UI. The rule this hook delivers bans banners and preamble; a hook that
+// shouted would discredit the thing it carries.
 
 import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
@@ -59,9 +57,7 @@ interface ContextResult {
 }
 
 interface HookContext {
-  cwd: string;
   ui: {
-    notify?(message: string, type?: "info" | "warning" | "error"): void;
     setStatus?(key: string, text: string | undefined): void;
   };
   // The host's active model, whose compat record is fully resolved before a hook can see it
@@ -93,13 +89,10 @@ const PLUGIN_ROOT = resolve(import.meta.dirname, "..", "..");
 // resolved once here alongside PLUGIN_ROOT.
 const CWD = process.cwd();
 
-// Named in /onboard's shipped prose as the observable for "the hook is delivering the rule": an
-// agent can search its own context for this token. Changing it breaks that skill.
+// The observable for "the hook is delivering the rule": an agent can search its own context for this
+// token, and BOOTSTRAP.md's stage 3 tells a reader to do exactly that. Changing it breaks that check,
+// so the package gate sweeps the shipped prose for whatever value stands here.
 const SENTINEL = "better-dev:comms";
-
-// The managed discovery block /onboard writes into a repo's entry file. Not a substring of
-// `<!-- BEGIN better-dev-comms -->`, so a comms pointer block never reads as a discovery block.
-const DISCOVERY_BLOCK = "<!-- BEGIN better-dev -->";
 
 // --- small helpers -----------------------------------------------------------------------------
 
@@ -189,7 +182,7 @@ function isUpgrade(candidate: string, current: string): boolean {
  *
  * Wrapped, because it is the one call here that could throw: on omp it cannot (`pi-utils`'s
  * `getAgentDir` returns a field), but a host whose accessor throws would take this whole factory
- * down at load and cost all three features with nothing on screen to say so. Undefined is also the
+ * down at load and cost both features with nothing on screen to say so. Undefined is also the
  * answer for any host that is not omp, and is read below as "cannot confirm a rules provider" -
  * the direction that delivers the rule rather than dropping it.
  */
@@ -441,63 +434,6 @@ function cachedCatalogVersion(stateRoot: string, marketplace: string, pluginName
   return undefined;
 }
 
-// --- (c) onboard nudge -------------------------------------------------------------------------
-
-function repoRoot(from: string): string | undefined {
-  let dir = resolve(from);
-  for (;;) {
-    if (existsSync(join(dir, ".git"))) return dir;
-    const up = dirname(dir);
-    if (up === dir) return undefined;
-    dir = up;
-  }
-}
-
-// Every file /onboard can write the block into, so a wired repo is never told it is unwired. Two
-// hosts, and they read disjoint sets of committed files - measured 2026-08-21, one unique token per
-// file in a temp repo, each agent asked which tokens reached its context: omp loads root AGENTS.md
-// and loads NEITHER root CLAUDE.md NOR CLAUDE.local.md, while Claude Code 2.1.233 loads both of
-// those and not AGENTS.md. So no single file is agent-agnostic, and `/onboard` writes one copy per
-// host: root `AGENTS.md` always, root `CLAUDE.md` for Claude Code, `.omp/AGENTS.md` for a solo
-// adoption that commits nothing, `CLAUDE.local.md` for the same on Claude Code.
-//
-// This list is NOT that union. It is only the subset THIS host reads, because the question the nudge
-// asks is "is this repo wired for me", never "is it wired for somebody". `hooks/pre/*.ts` is an omp
-// convention - Claude Code reports Hooks (0) against this repo - so whenever this code runs, it runs
-// on omp, and only omp's readable paths count.
-//
-// The difference is not academic. A repo wired by an earlier solo run carries its block in
-// `CLAUDE.local.md`, which omp never loads. Counting that file reports the repo as wired while every
-// omp session in it has no discovery block at all, and the nudge that would have fixed it stays
-// silent. Observed on a real repo, 2026-08-21: `terminal-browser` has exactly that shape.
-//
-// Relative paths only - each is joined against the repo root. It sits here rather than up with the
-// other constants because it reads `PROJECT_CONFIG_DIR`, which is declared further down: a
-// module-level const evaluated before its own dependency throws at load, and this hook failing at
-// load costs all three of its features at once.
-const ENTRY_FILES = ["AGENTS.md", join(PROJECT_CONFIG_DIR, "AGENTS.md")];
-
-/**
- * Is this repo unwired?
- *
- * Asked as "does any entry file carry the block", never as "does the first entry file that exists
- * carry it". Two faults in the earlier reading, both observed on real repos:
- *
- * A repo with NO entry file fell through to false and said nothing, which is backwards - a repo with
- * no agent config at all is the clearest case for onboarding, and it was the one case that got
- * silence. Measured 2026-08-21: `terminal-browser` (both files, no block) nudged, `meetings-thing`
- * (neither file) stayed quiet.
- *
- * And returning on the first file that existed made the answer depend on `ENTRY_FILES` order: a repo
- * carrying the block in `AGENTS.md` and an unrelated `CLAUDE.md` was told it was unwired. Repos with
- * both files are common - `terminal-browser` is one.
- */
-function needsOnboard(cwd: string): boolean {
-  const root = repoRoot(cwd);
-  if (root === undefined) return false;
-  return !ENTRY_FILES.some(name => readText(join(root, name))?.includes(DISCOVERY_BLOCK) === true);
-}
-
 // --- (a) where the rule goes --------------------------------------------------------------------
 
 /**
@@ -619,12 +555,9 @@ export default function bdSession(pi: HookApi): void {
     }));
   }
 
-  // Two nudges, two channels, and the split was forced by measurement rather than taste. Two
-  // notify calls in one tick leave only the last on screen, so the second call drops the first
-  // line rather than adding one; and joining both into a single notify produced a 111-column line
-  // the host clipped mid-sentence. So each goes where its content belongs: an update available is
-  // a standing fact and lives in the status line, where it persists and stays short, while the
-  // /onboard suggestion is a one-time action and gets the one notification.
+  // The update alert is a standing fact, so it goes to the status line rather than through notify:
+  // a status entry persists and stays short, while a notification is one transient line that the
+  // next notify in the same tick replaces outright.
   pi.on("session_start", (_event, ctx) => {
     // (b) The catalog the host already cached is ahead of what is installed.
     const stateRoot = pluginStateRoot(agentDir);
@@ -637,15 +570,6 @@ export default function bdSession(pi: HookApi): void {
         } catch {
           // A nudge that throws would be a hook error on the session-start path. Never worth it.
         }
-      }
-    }
-
-    // (c) This repo has an entry file with no discovery block in it.
-    if (needsOnboard(ctx.cwd)) {
-      try {
-        ctx.ui?.notify?.("Run /onboard - this repo has no better-dev block in its entry file", "info");
-      } catch {
-        // Same reason.
       }
     }
   });

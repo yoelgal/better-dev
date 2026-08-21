@@ -22,12 +22,13 @@ matter as much as what it is:
 | Not this | Where that lives |
 |---|---|
 | A roadmap or feature list | The issue tracker and the ledger files under `.better-dev/ledger/` |
-| Coding standards or an agent guide | `AGENTS.md` / `CLAUDE.md`, and `.better-dev/overrides.md` for recorded per-repo rules |
+| Coding standards or an agent guide | `AGENTS.md` / `CLAUDE.md`, and your harness's durable memory for recorded per-repo rules |
 | The domain or business-logic model - how the world works | A domain doc or glossary; a vision explaining entity relationships has absorbed it |
 | One feature's plan | `/plan-grill`'s done-contract |
 
-Read `.better-dev/overrides.md` first. A project may pin where this artifact lives or that it is
-maintained by hand; that wins over anything below.
+Honor this project's recorded decisions - from your harness's durable memory where you have it,
+otherwise from the brief you were given (see `/overrides`). A project may pin where this artifact
+lives or that it is maintained by hand; that wins over anything below.
 
 ## 1. Pick the mode before drafting a line
 
@@ -138,14 +139,15 @@ back to batched questions, which are sufficient.
 
 ## 5. Land it and make it findable
 
-Write `VISION.md` (or the override's path) and `VISION-evidence.md` beside it, then record the pointer
-as a line in `.better-dev/rules.md` so a later session finds the policy instead of re-deriving it:
+Write `VISION.md` (or the override's path) and `VISION-evidence.md` beside it, then record the pointer in
+your harness's durable memory (see `/overrides`) so a later session finds the policy instead of
+re-deriving it:
 
 ```markdown
 vision: VISION.md is this repo's acceptance policy; drift-checked <date>
 ```
 
-That one line is what answers for `/plan-grill` and `/review` when they read the rules file. Without
+That one line is what answers for `/plan-grill` and `/review` when they read the recorded rules. Without
 it the vision is a document nobody opens.
 
 ## 6. The drift check - the reason the file stays honest
@@ -190,7 +192,7 @@ A rewrite re-runs sections 2 through 4 and keeps the old file's text in the evid
 end date, so what the project used to believe stays readable. A vision that turns out wrong is not a
 failure of the practice - it is the practice working, one release later than the code.
 
-Close out with the single durable lesson this pass earned, recorded with the `learn` tool, or an
+Close out with the single durable lesson this pass earned, recorded in your harness's durable memory (see `/overrides`), or an
 explicit `no durable lesson` line saying why. The vision's content is not the lesson; what the mining
 pass revealed about this repo is.
 

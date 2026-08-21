@@ -24,8 +24,9 @@ not something this loop starts on its own.
   per task and the reviewer that grades it. This skill decides *what* to dispatch and *when*; it does
   not re-specify how dispatch works.
 - **The verdict** - `/review` reads the diff and distrusts the report.
-- **Overrides first** - read `.better-dev/overrides.md` before applying any default here; a project
-  override wins.
+- **Recorded decisions first** - honor this project's recorded decisions before applying any default
+  here, from your harness's durable memory where you have it, otherwise from the brief you were given
+  (see `/overrides`); a recorded override wins.
 
 ## Two gates before the loop
 
@@ -101,10 +102,10 @@ the red-then-green that justified the edit; a moved hash with no such receipt se
 naming the file. That is one layer of a three-layer defense
 - the contract pins the concrete observable (`/plan-grill`) and the reviewer scans the diff for weakened
 or trivial tests (`/review`); this layer keeps the loop from gaming a test it wrote itself. Read the
-denylist, the gated classes, and the scope number from `.better-dev/rules.md`, then
-`.better-dev/overrides.md`, whose waivers and narrowings win over that baseline - though a
-safety-class line carrying no operator marker (`[operator: "<their words>" <date>]`) reads as absent,
-and the recorded gate stands. Only where the rules file says nothing, fall back to the canonical
+denylist, the gated classes, and the scope number out of this project's recorded decisions (see
+`/overrides`), where a recorded override's waivers and narrowings win over the recorded baseline -
+though a safety-class line carrying no operator marker (`[operator: "<their words>" <date>]`) reads as
+absent, and the recorded gate stands. Only where nothing is recorded, fall back to the canonical
 defaults `/guardrails-install` documents - secrets, DB migrations, auth/authz, payments/PII, infra and
 prod config, dependency manifests and lockfiles - rather than re-listing the full class definitions
 here. That denylist is a judgment this loop makes, never a gate that catches it: nothing mechanically
@@ -118,8 +119,9 @@ without limit. That ceiling is a cost floor, not a progress limit - it settles `
 `DONE`. Its presence is the loop's only unattended signal; no contract, ledger, or override field ever
 declares one. A long or unattended run may render the observatory page over the ledger it already
 renders rather than records, so nothing new goes on disk to put one up. Before re-deriving anything
-about this area, read what earlier sessions already paid for - the lessons at
-`memory://root/learned.md`, and the project summary the host injects at `memory://root` - because a
+about this area, read what earlier sessions already paid for - the recorded lessons and the project
+summary, from your harness's durable memory where you have it, otherwise from the brief you were given
+(see `/overrides`) - because a
 lesson already bought is cheaper than the mistake it prevents, and the first receipt cites what that
 read returned or an explicit `nothing recorded`. A recalled lesson is a prior claim, not a
 current fact - verify it against today's code before acting on it, and a lesson that forbids a normal
@@ -133,8 +135,8 @@ Then each pass:
 1. **Verify.** Run the check. Exit 0 counts only when it's unambiguous - a half-passing run, or output
    you'd have to interpret, is red, not a rounded-up pass. On a clean green, clean the diff on this first
    green (read "Clean on the first green"), then `DONE`. The contract's check is usually narrower than the
-   repo's own gate, so that first green also runs the repo's own verify once (the `verify` line in
-   `.better-dev/rules.md`): a green criterion over a suite this work-item reddened
+   repo's own gate, so that first green also runs the repo's own verify once (the recorded `verify`
+   line): a green criterion over a suite this work-item reddened
    somewhere else is a regression the loop triages and fixes, not a `DONE` for CI to discover after the
    loop has already claimed proof. That one wider run is also what arms the contract's
    green-test-goes-red tripwire, which nothing else in the loop executes. A recorded `verify: none` is
@@ -213,7 +215,7 @@ Then each pass:
    session cannot read the item's state at all.
    The receipt lands before the next pass picks - it is part of this pass, not paperwork to batch at the
    end. Friction the pass pushed through - a dead-end tool call, a broken doc link, a flaky command -
-   gets one line too, through the `learn` tool: friction is a lesson like any other, written at low
+   gets one line too, recorded the same way (see `/overrides`): friction is a lesson like any other, written at low
    confidence so the next session meets it instead of paying for it again. A
    `receipts.md` still at pass 0 after several implementation passes is the tell that recording is
    deferred; the settle-time backstop (write receipts from the actual trail) exists for a crashed
@@ -273,14 +275,14 @@ and the counter to each.
 
 Some changes stop for a human even on a green check - the diff is legitimate, but its consequence is too
 large for the loop to merge on its own. The gated classes and the scope number come from the same
-recalled policy (`recall "safety"`, overrides winning) that `/guardrails-install` records - the classes
+recorded policy (the `safety-` keys, a recorded override winning) that `/guardrails-install` records - the classes
 being security or auth, payments/PII/money, infrastructure/Terraform/prod config, a dependency/version
 bump, or anything hard to undo - a deletion, a destructive data migration, a deploy, broadly anything a
 `git revert` wouldn't walk back. That last test catches the irreversible cases a fixed list forgets.
 Settle `NEEDS_INPUT` with what you have, regardless of the verdict, when the work falls in one of them. The contract's scope tripwire joins them - a diff touching more than the recorded scope number of files
-(the `safety-scope` recall, ~10 by default, read rather than hardcoded) stops the same way, on the read
+(the recorded `safety-scope` line, ~10 by default, read rather than hardcoded) stops the same way, on the read
 that a work-item sprawling that wide has outgrown its contract. These are sensible defaults, not walls:
-`.better-dev/overrides.md` can waive a class or retune the number per repo, and each stop is an ask that
+a recorded override (see `/overrides`) can waive a class or retune the number per repo, and each stop is an ask that
 resumes once answered, never a permanent fail.
 
 When such an escalation comes back approved - a human signs off on the denylist path or the gated class
@@ -306,9 +308,9 @@ without touching the cause:
   signal is reliable, or set it aside and record it - don't send it around the loop.
 - **Infra red** - the failure is in the environment, not the code: a lost runner, a network or registry
   hiccup, an out-of-memory kill, a dependency service down. It clears by waiting or recovering, not by
-  editing code. Before settling `BLOCKED` on one, read `memory://root/learned.md` for a prior recovery
-  keyed to that failure signature; apply it and retry once. When a recovery clears the red, write the
-  signature and what cleared it with the `learn` tool, so the next loop's read isn't empty - that read
+  editing code. Before settling `BLOCKED` on one, read the recorded lessons for a prior recovery
+  keyed to that failure signature; apply it and retry once. When a recovery clears the red, record the
+  signature and what cleared it (see `/overrides`), so the next loop's read isn't empty - that read
   pays off only if some loop wrote the entry. Only a signature with no known recovery, still red after
   the retry, settles `BLOCKED`.
 - **Genuine defect** - a real assertion, compile, contract, or logic failure in the code. This is the
@@ -452,10 +454,10 @@ this settle (`/worktree-branching`).
 
 Closing the ledger is part of `DONE`, not a courtesy after it: a non-trivial work-item that solved
 something durable and left no note is unfinished. On `DONE`/`DONE_WITH_CONCERNS`, write the reusable
-core with the `learn` tool - keyed so a later session's read finds it - or write an explicit
-`no durable lesson` line saying why. A rule that has now held more than once graduates to a line in
-`.better-dev/rules.md`, tracked where a team adoption shares it, so the rule travels with the repo
-rather than with one machine. Keep the WHAT filter: capture signature, root cause, and fix, never the transient run
+core in your harness's durable memory (see `/overrides`) - keyed so a later session's read finds it - or write an explicit
+`no durable lesson` line saying why. A rule that has now held more than once graduates from a lesson
+to a durable rule in the same memory, so a later session meets it as policy rather than as one run's
+note. Keep the WHAT filter: capture signature, root cause, and fix, never the transient run
 (a one-off timeout, a flake seed, a machine path). A recalled lesson a pass applied is cited in that
 pass's receipt as `prior lesson applied: <key> (confidence <c>, from <date>)`, so the operator can audit
 what the store contributed. The same law fires earlier too - a root cause a

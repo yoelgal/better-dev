@@ -20,8 +20,9 @@ line would turn the suite red, so a suite at 90% coverage with vacuous assertion
 take a coverage figure as evidence here, and never finish a pass having raised one instead of settling a
 test.
 
-Read `.better-dev/overrides.md` first - a project override (a suite always excluded, a runner invocation
-this repo pins) wins over anything below.
+Honor this project's recorded decisions - from your harness's durable memory where you have it,
+otherwise from the brief you were given (see `/overrides`). A suite always excluded, or a runner
+invocation this repo pins, wins over anything below.
 
 ## The spine: mutate the code, watch the test
 
@@ -141,7 +142,7 @@ tree-clean line reads yes. It re-reads this table rather than a summary of it. A
 stops the handoff and goes back as a nomination, since a test repaired against a description of its
 weakness is the next pass's `MISSED`.
 
-Close out at the end of a pass: record the one reusable line with the `learn` tool - a recurring shape
+Close out at the end of a pass: record the one reusable line durably (see `/overrides`) - a recurring shape
 such as "this repo's service tests assert on the fixture's own doubles" - or write an explicit
 `no durable lesson` line saying why. A count of what this run found is a receipt, not a lesson.
 
