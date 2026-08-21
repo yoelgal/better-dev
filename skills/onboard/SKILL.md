@@ -336,7 +336,9 @@ Only one kind of evidence settles it: what you can see in *this* session's conte
 not evidence that a host loaded it - the plugin's session hook is an omp convention (`hooks/pre/*.ts`),
 while Claude Code loads plugin hooks from `hooks/hooks.json` as shell or HTTP entries and hermes loads
 Python `register(ctx)` modules, so on those hosts that exact file ships and never runs (D44). Absence
-of delivery is the ordinary case on most hosts, not a fault to diagnose.
+of delivery is the ordinary case wherever that file cannot run, and it never changes what you write -
+but on a host that *does* run `hooks/pre/*.ts` it is also a defect, and the third row of the table
+below is where you report it.
 
 Two observations settle it, in this order:
 
@@ -364,19 +366,23 @@ skills dir, so the path the host reports can be a link - then look two levels up
 `skills/onboard/`, where a plugin tree keeps `rules/` and `hooks/` beside `skills/`. **Proves:** a path
 a pointer can name, once `rules/comms.md` reads back from it. **Proves nothing about delivery**, in
 either direction: `hooks/pre/bd-session.ts` sitting there is the same shipped file on a host that cannot
-run it, and even on omp the hook deliberately stays silent whenever a native provider already loads
-`rules/` - so a present hook file next to an absent sentinel is the design working, not a broken
-install. Measured 2026-08-20, both directions: `npx skills add yoelgal/better-dev --all -g` lands
-`skills/` only (real dirs at `~/.agents/skills/<name>/`, symlinked into every host skills dir) and no
-`rules/` or `comms.md` anywhere on the machine - nothing to point at; while a plugin-channel install
-lands the whole repo, so the file is there to point at even on the hosts that never run the hook
+run it, and on omp the hook deliberately stays silent whenever a native provider already loads `rules/`.
+That second case never reaches the table's third row, though - a native provider puts the rule *in
+context*, so observation 2 answers yes and the run stops at row two. Measured 2026-08-20, both
+directions: `npx skills add yoelgal/better-dev --all -g` lands `skills/` only (real dirs at
+`~/.agents/skills/<name>/`, symlinked into every host skills dir), and in that run's throwaway `HOME` no
+`rules/` and no `comms.md` arrived with it - so that channel supplies no pointer target *of its own*.
+Hold that scope: stated unqualified, "no `comms.md` anywhere on the machine" is false on any machine that
+also carries a clone or a plugin-channel install, and acting on the unqualified version would stop you
+asking for the path the next two rows exist to ask for. A plugin-channel install lands the whole repo,
+so the file is there to point at even on the hosts that never run the hook
 (`~/.hermes/plugins/better-dev/rules/comms.md`, and `~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/`).
 
 | What you observed | What that proves | What to write |
 |---|---|---|
 | the `better-dev:comms` sentinel in context | the hook delivered the rule into this session | nothing |
 | no sentinel, and the comms rule itself already standing in context | a native rules provider delivers it here | nothing |
-| no sentinel, no rule in context, and `rules/comms.md` reads back from a path you resolved or the operator named | nothing delivers it, and there is a file to point at | the pointer block below |
+| no sentinel, no rule in context, and `rules/comms.md` reads back from a path you resolved or the operator named | nothing delivers it, and there is a file to point at | the pointer block below - and, on a host that runs `hooks/pre/*.ts` (omp), a recap clause naming the defect: the plugin tree is installed, the hook is the delivery route here, and it delivered nothing |
 | no sentinel, no rule in context, and no `rules/comms.md` on this machine | nothing delivers it and there is nothing yet to point at | ask for a path; with none, the recap line naming the install that fixes it |
 | the host will not say where the running skill came from | only the path is unmeasured; both observations above still stand | ask where better-dev is installed, then finish the row |
 
@@ -392,6 +398,26 @@ write-nothing-and-hope.
 
 Whichever row resolves, name it in the Phase 5 recap in a clause ("comms rule already delivered by the
 session hook - nothing written"); that clause is what stops the next run from measuring this over again.
+
+Row three carries a second clause, and only on a host that runs `hooks/pre/*.ts` - omp today. There the
+two observations are not independent, so absence there means more than it does anywhere else: a native
+rules provider that loads `rules/` puts the rule in context, which makes observation 2 a yes and stops
+the run at row two. So the only way an omp session arrives at row three - no sentinel, no rule in
+context, and a plugin tree sitting on disk above the skill - is that the hook *was* this install's
+delivery route and delivered nothing. That is a broken plugin, not the ordinary absence, and this is the
+one repo positioned to notice its own delivery route failing. Write the pointer, then report it:
+
+> better-dev's comms rule did not reach this session. The plugin tree is installed at `<resolved path>`,
+> and on omp the session hook in that tree is the delivery route - so it ran and delivered nothing.
+> That is a defect in better-dev, not in this repo. I wrote the pointer block into `<entry file>`, so
+> the rule governs this session anyway. It is a workaround, not the fix: the hook decides delivery per
+> install shape, so `omp plugin list` (and the scope you installed with) is the one fact that makes this
+> reproducible - worth reporting with that line attached.
+
+The operator owes one command and a report, and neither blocks them: the pointer already restored the
+rule for this session. Never quietly substitute the workaround for the fix. A run that repairs its own
+delivery route and says nothing is how a channel dies in silence - which is the whole reason this clause
+exists rather than just the pointer.
 
 For the pointer row, write into the entry file this phase already chose - the consent rule above governs
 this write too - between its own markers, replacing any existing block in place:

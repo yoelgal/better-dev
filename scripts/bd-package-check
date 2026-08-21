@@ -582,24 +582,30 @@ bdhook="$bdhookdir/$bdhookfile"
 [ -f "$bdhook" ] \
   && ok "the session hook ships at $bdhook" \
   || bad "the session hook is missing from $bdhook - a marketplace install then delivers no comms rule at all, and both session-start nudges are gone with it"
-# The host discovers a hook by LISTING the directory, never by name: discoverHooksInPackageRoot reads
-# hooks/pre/ and keeps every entry isExtensionFile accepts - `.ts || .js`, any basename, symlinks
-# included (omp extensibility/extensions/loader.ts:491, :603). So this directory's contents ARE the
-# hook roster, and anything else parked here is imported into every session, found to export no
-# factory, and logged where only a debug file sees it. Excluding one filename pattern (*.test.ts) is
-# narrower than that rule and let both `helper.ts` and `extra.test.js` through, so the roster is
-# asserted as an exact set instead.
+# The host discovers a hook by LISTING the directory, never by name - and it lists BOTH conventional
+# directories, not one. discoverHooksInPackageRoot loops `for (const hookType of ["pre", "post"])`
+# and keeps every entry `isFile() || isSymbolicLink()` that isExtensionFile accepts - `.ts || .js`,
+# any basename (omp extensibility/extensions/loader.ts:491-493, :591-609). The ambient provider a
+# plugin install actually goes through is wider still: discovery/omp-plugins.ts:159-171 runs the same
+# pre/post loop through loadFilesFromDir with NO extensions filter, so the glob is bare `*`
+# (discovery/helpers.ts:498-504) and EVERY non-hidden file under either directory becomes a hook
+# entry, which extensibility/hooks/loader.ts:146-156 then `import()`s with no extension guard. So
+# these two directories' contents ARE the hook roster, and anything else parked in either is imported
+# into every session, found to export no factory, and logged where only a debug file sees it. The
+# roster is therefore asserted as an exact set across both directories and over every filename: a
+# check scoped to one directory, or excluding one filename pattern, is narrower than the rule it
+# quotes, and the two rounds this check has already needed were both that same mistake.
 bdhookroster=""
-for bdhookentry in "$bdhookdir"/*.ts "$bdhookdir"/*.js; do
-  [ -f "$bdhookentry" ] && bdhookroster="$bdhookroster ${bdhookentry##*/}"
+for bdhookentry in hooks/pre/* hooks/post/*; do
+  { [ -f "$bdhookentry" ] || [ -L "$bdhookentry" ]; } && bdhookroster="$bdhookroster ${bdhookentry#hooks/}"
 done
 bdhookroster="${bdhookroster# }"
-[ "$bdhookroster" = "$bdhookfile" ] \
-  && ok "$bdhookdir/ holds exactly the one file the host should load as a hook" \
-  || bad "$bdhookdir/ should hold exactly $bdhookfile; the host would load: ${bdhookroster:-nothing} - every extra .ts/.js there is imported into every session, found to export no factory, and logged where nobody reads it"
-# The behaviour suite lives in hooks/ but NOT in hooks/pre/: one directory up is outside the scan
-# above. Discovered rather than named, because the roster check already pins what hooks/pre/ may
-# hold - so the suite's own filename is free to change without this gate having to learn the new one.
+[ "$bdhookroster" = "pre/$bdhookfile" ] \
+  && ok "hooks/pre/ and hooks/post/ together hold exactly the one file the host should load as a hook" \
+  || bad "hooks/pre/ + hooks/post/ should hold exactly pre/$bdhookfile; the host would load: ${bdhookroster:-nothing} - every extra entry under EITHER directory is imported into every session, found to export no factory, and logged where nobody reads it"
+# The behaviour suite lives in hooks/ but in NEITHER hooks/pre/ nor hooks/post/: one directory up is
+# outside both scans above. Discovered rather than named, because the roster check already pins what
+# those two may hold - so the suite's own filename is free to change without this gate learning it.
 bdhooktest=""
 for bdhookentry in hooks/*.test.ts hooks/*.test.js; do
   [ -f "$bdhookentry" ] && bdhooktest="${bdhooktest:+$bdhooktest }$bdhookentry"

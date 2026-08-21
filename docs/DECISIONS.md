@@ -1569,13 +1569,18 @@ Code and hermes, and the hook only for omp marketplace installs. Supporting the 
 protocols above is a **named gap**, not a maybe: it would mean shipping a `hooks/hooks.json` shell entry
 for Claude Code and a Python `register(ctx)` module for hermes, neither of which exists here.
 
-**A skills-only install has no pointer target at all.** Measured the same day:
-`npx skills add yoelgal/better-dev --all -g` lands `skills/` only - real directories at
-`~/.agents/skills/<name>/`, symlinked into every host skills dir - and no `rules/` directory and no
-`comms.md` anywhere on the machine. So on that channel the hook cannot run *and* there is nothing to
-point at; `/onboard` reads the path back before writing, and where it does not resolve it writes no
-block and asks for a path where the repo itself is on disk (plugin channel or a plain clone), which
-turns the row back into the pointer row.
+**A skills-only install brings no pointer target of its own.** Measured the same day, and the scope is
+part of the result: run against a **throwaway `HOME`**, `npx skills add yoelgal/better-dev --all -g`
+lands `skills/` only - real directories at `~/.agents/skills/<name>/`, symlinked into every host skills
+dir - and no `rules/` directory and no `comms.md` arrived with it. That scope is not decoration. Stated
+unqualified - "no `comms.md` anywhere on the machine" - the claim is measurably false on any machine
+that also carries a clone or a plugin-channel install, and it misdirects the one reader that acts on it:
+`skills/onboard/SKILL.md` is agent-executed text whose very next routing row tells the agent to ask the
+operator for a path where the repo is on disk, which an unqualified "there is nothing anywhere" tells it
+not to bother doing. So the honest statement is per-channel, not per-machine: that channel cannot run
+the hook *and* supplies nothing to point at. `/onboard` reads the path back before writing, and where it
+does not resolve it writes no block and asks for a path where the repo itself is on disk (plugin channel
+or a plain clone), which turns the row back into the pointer row.
 
 **File presence was mistaken for execution.** `/onboard`'s detection tested whether
 `hooks/pre/bd-session.ts` sat two levels above the running skill and converted a yes into either "the
@@ -1584,11 +1589,23 @@ present and the hook never runs, so both landed on the contradiction row, wrote 
 repair the skill had - the pointer - was suppressed by the observation that should have triggered it.
 The detection is now built on the sentinel alone, which is a positive in-session observable: present
 means the hook ran here this session, absent means it did not deliver and the reason never changes the
-response. The contradiction row is **deleted**, on two independent grounds: file presence never
-evidenced execution, and even on omp the hook deliberately stays quiet when a native rules provider
-already loads `rules/`, so a present hook file beside an absent sentinel is the dedup design working
-rather than a broken install. The tree walk survives only as path resolution for the pointer - it
-answers *what path can a pointer name*, never *is the rule delivered*.
+response. The contradiction row is **deleted from the routing decision**, on two independent grounds:
+file presence never evidenced execution, and even on omp the hook deliberately stays quiet when a native
+rules provider already loads `rules/`, so a present hook file beside an absent sentinel is the dedup
+design working rather than a broken install. The tree walk survives only as path resolution for the
+pointer - it answers *what path can a pointer name*, never *is the rule delivered*.
+
+**The diagnosis survives as a recap clause, though, and deleting that too was a mistake.** The second
+ground above describes a state the routing never reaches: when the native provider delivers, the rule is
+in context, so `/onboard`'s observation 2 answers yes and the run stops one row earlier. On omp the two
+observations are therefore not independent, and the only way a session reaches the pointer row is that
+the hook *was* this install's delivery route and delivered nothing - a broken plugin, not the ordinary
+absence. The first fix round dropped the routing test and the note with it, which left the one repo
+positioned to notice its own delivery route failing writing a workaround and reporting nothing. So the
+pointer write is unconditional (that part of the deletion was right) and, on a host that runs
+`hooks/pre/*.ts`, the recap names the defect alongside it: tree installed, hook is the route here, it
+delivered nothing, pointer is a workaround, and `omp plugin list` plus the install scope is the fact
+that makes it reproducible (`skills/onboard/SKILL.md`, row three and the clause under it).
 
 **One measurement cited for the marketplace path did not show it.** The claim that "a root named like a
 marketplace cache dir gave sentinel=true, correct" was an instance of the `___` basename false
@@ -1599,3 +1616,30 @@ real and confirmed in source (`discovery/claude-plugins.ts:603-641` registers Sk
 CustomTool and MCPServer providers and no Rule provider, against `discovery/omp-plugins.ts:110` which
 loads rules for other roots), and D43's own linked-probe measurement stands. That one end-to-end line
 does not, and no text in this repo may repeat it.
+
+**The marketplace path now carries a measurement of its own.** It is recorded here because its evidence
+expires everywhere else - a chat message and `~/.omp/logs` - and because the line it replaces was just
+retracted above, which would otherwise leave the channel table's omp-marketplace cell resting on source
+inference with no observation written down anywhere. Measured 2026-08-20, and corroborated by the
+re-reviewer from omp's own logs rather than from the implementer's report:
+
+- `Marketplace added name=better-dev sourceType=local`, then `Plugin installed
+  pluginId=better-dev@better-dev version=0.1.0
+  cachePath=/Users/yoelgal/.omp/plugins/cache/plugins/better-dev___better-dev___0.1.0` - that is
+  `MarketplaceManager.installPlugin`, a real install into the marketplace cache, not a hand-built
+  directory wearing a marketplace-shaped name.
+- Two omp sessions run against it in `/tmp/bd-mkt-proj` observed
+  `lastRole=developer lastHasSentinel=true firstRole=user`: the hook delivered, as a `developer` turn
+  appended after the operator's own prompt.
+- The link-root control gave `n=1` and no sentinel - the hook correctly silent where omp loads `rules/`
+  natively - and that control's `~/.omp/plugins/node_modules/better-dev` symlink is stamped **after**
+  both marketplace sessions, so it was not present during them. That stray symlink is exactly what
+  invalidated the retracted measurement; here it is absent from the window being measured.
+
+**What it did not cover: project scope.** The install was user-scope. A marketplace install at
+`--scope project` writes its runtime symlink under `<project>/.omp/plugins` while its cache stays at the
+user root whatever the scope, and that shape was found to deliver nothing at all (N1 of the re-review) -
+fixed on this branch by testing the marketplace cache mark against every state root before resolving any
+`node_modules` entry, rather than against the root the link happened to be found under. So this
+measurement is evidence for one sub-shape of the marketplace channel, never for the channel: any future
+claim about `--scope project` needs its own observation.
