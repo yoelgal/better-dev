@@ -1770,3 +1770,34 @@ table, not on a live reading. hermes and Codex were not probed, and the `@`-impo
 `CLAUDE.md` holding only `@AGENTS.md`) is unmeasured - the skill writes both files there
 anyway, because a duplicate block is visible and deletable while a missed write is silent. Re-run the
 probe when a host version moves.
+
+## D47 - the adoption tier picks the entry files, the running host picks nothing
+
+D46 keyed the second write on the host `/onboard` ran from: root `CLAUDE.md` only when that host was
+Claude Code, and a solo adoption writing `.omp/AGENTS.md` on omp or `CLAUDE.local.md` on Claude Code.
+That is wrong, and the operator found it in one sentence: the same person opens the same repo in
+another agent next week.
+
+The other agent is a later session on one repo, not a different user. A block written for omp alone is
+invisible the first time they open that repo in Claude Code, and the reverse holds too. Keying on the
+running host makes the repo's wiring depend on which terminal happened to be open when it was wired,
+which is not a property of the repo at all.
+
+**The tier decides committed against local. Both files in that tier are always written.**
+
+- team adoption: root `AGENTS.md` and root `CLAUDE.md`
+- solo adoption: `.omp/AGENTS.md` and `CLAUDE.local.md`, both in `.git/info/exclude`
+
+The reconciler argument from D46 is what still makes two copies safe, and it is unchanged: `/onboard`
+replaces between its markers on every run.
+
+This does not change the hook's entry-file list, and the distinction is worth keeping straight. The
+nudge asks "is this repo wired for the host I am running on", so it reads only omp's paths - root
+`AGENTS.md` and `.omp/AGENTS.md`. `/onboard` writes for every host the operator might use; the hook
+reports on the one it is running inside. Widening the hook to the full union was tried and reverted
+the same day: it reported `terminal-browser` as wired on the strength of a `CLAUDE.local.md` omp
+cannot read, which silenced the only message that would have fixed it.
+
+Cost, stated plainly: a repo wired on a machine that only ever runs one agent carries one block it
+does not need, at a few lines of per-turn tax in a file that host does not load. A missed write costs
+silence instead, and silence is the failure this whole line of decisions exists to remove.
