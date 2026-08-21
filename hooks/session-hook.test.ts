@@ -24,6 +24,10 @@ const RULE_BODY = "## Communication style\n\nLead with the next action. SENTINEL
 const RULE_FILE = `---\nalwaysApply: true\n---\n${RULE_BODY}\n`;
 const FRONTMATTER_ONLY = "---\nalwaysApply: true\n---\n";
 
+// An entry file that IS wired, for cases that need the onboard nudge out of the way so they can
+// assert on something else. Must carry the same marker the hook greps for.
+const WIRED_ENTRY = "<!-- BEGIN better-dev -->\nwired\n<!-- END better-dev -->\n";
+
 const PACKAGE_NAME = "better-dev";
 
 /**
@@ -60,6 +64,8 @@ interface Fixture {
   entryFile?: string;
   /** Which entry file carries it. Both names are promised by the install docs. */
   entryFileName?: "CLAUDE.md" | "AGENTS.md";
+  /** A second entry file beside the first, so order-independence can be measured. */
+  secondEntryFile?: { name: "CLAUDE.md" | "AGENTS.md"; text: string };
   /** false makes cwd a plain directory with no repo above it. */
   repo?: boolean;
   /** Start the session this far below the repo root, the way an agent launched in a subdir does. */
@@ -148,6 +154,9 @@ async function run(fixture: Fixture): Promise<Run> {
   if (fixture.repo !== false) mkdirSync(join(repoRoot, ".git"), { recursive: true });
   if (fixture.entryFile !== undefined) {
     writeFileSync(join(repoRoot, fixture.entryFileName ?? "CLAUDE.md"), fixture.entryFile);
+  }
+  if (fixture.secondEntryFile !== undefined) {
+    writeFileSync(join(repoRoot, fixture.secondEntryFile.name), fixture.secondEntryFile.text);
   }
 
   const version = fixture.version ?? "0.1.0";
@@ -445,7 +454,10 @@ test("marks the injected rule synthetic and stamps it", async () => {
 });
 
 test("says nothing at all when rules/comms.md is absent", async () => {
-  const result = await run({ install: "marketplace" });
+  // Wired entry file on purpose: this case is about the rule path, and a repo with no block would
+  // legitimately raise the onboard nudge, which would make the empty-notices assertion measure two
+  // things and fail for the wrong reason.
+  const result = await run({ install: "marketplace", entryFile: WIRED_ENTRY });
   expect(result.contextHandlers).toBe(0);
   expect(result.messages).toHaveLength(1);
   expect(result.notices).toEqual([]);
@@ -654,8 +666,24 @@ test("stays quiet when the entry file already carries the discovery block", asyn
   expect(result.notices.filter(line => line.includes("/onboard"))).toEqual([]);
 });
 
-test("stays quiet when the repo has no entry file", async () => {
+// The reported bug, inverted from what this suite used to assert. A repo carrying no entry file at
+// all is the clearest case for onboarding, and it was the one case that stayed silent: measured
+// 2026-08-21 on two real repos, one with both entry files and no block (nudged) and one with neither
+// (silent).
+test("nudges a repo that carries no entry file at all", async () => {
   const result = await run({ install: "marketplace", rule: RULE_FILE });
+  expect(result.notices.filter(line => line.includes("/onboard"))).toHaveLength(1);
+});
+
+// Order independence: the block living in the second entry file must count, or the answer depends on
+// which name the hook happens to check first. Repos carrying both files are common.
+test("counts the block in AGENTS.md even when an unrelated CLAUDE.md exists", async () => {
+  const result = await run({
+    install: "marketplace",
+    rule: RULE_FILE,
+    entryFile: "# project notes, no block\n",
+    secondEntryFile: { name: "AGENTS.md", text: WIRED_ENTRY },
+  });
   expect(result.notices.filter(line => line.includes("/onboard"))).toEqual([]);
 });
 

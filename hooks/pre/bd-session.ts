@@ -455,16 +455,25 @@ function repoRoot(from: string): string | undefined {
   }
 }
 
-/** The repo's entry file, when it has one, and the block state of it. */
+/**
+ * Is this repo unwired?
+ *
+ * Asked as "does any entry file carry the block", never as "does the first entry file that exists
+ * carry it". Two faults in the earlier reading, both observed on real repos:
+ *
+ * A repo with NO entry file fell through to false and said nothing, which is backwards - a repo with
+ * no agent config at all is the clearest case for onboarding, and it was the one case that got
+ * silence. Measured 2026-08-21: `terminal-browser` (both files, no block) nudged, `meetings-thing`
+ * (neither file) stayed quiet.
+ *
+ * And returning on the first file that existed made the answer depend on `ENTRY_FILES` order: a repo
+ * carrying the block in `AGENTS.md` and an unrelated `CLAUDE.md` was told it was unwired. Repos with
+ * both files are common - `terminal-browser` is one.
+ */
 function needsOnboard(cwd: string): boolean {
   const root = repoRoot(cwd);
   if (root === undefined) return false;
-  for (const name of ENTRY_FILES) {
-    const text = readText(join(root, name));
-    if (text === undefined) continue;
-    return !text.includes(DISCOVERY_BLOCK);
-  }
-  return false;
+  return !ENTRY_FILES.some(name => readText(join(root, name))?.includes(DISCOVERY_BLOCK) === true);
 }
 
 // --- (a) where the rule goes --------------------------------------------------------------------
