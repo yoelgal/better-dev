@@ -255,12 +255,16 @@ context, so on-disk is not in-context. omp's half has a documented cause: its co
 (`omp://context-files.md`). Re-run the probe when a host version moves: this is two versions read on
 one day, not a standard.
 
-The targets that follow, on a team adoption:
+The targets that follow, on a team adoption. Write **both**, whichever host you happen to be running
+on:
 
-- **root `AGENTS.md` - always.** The one file omp reads, and Codex and the cross-tool convention
-  read it too.
-- **root `CLAUDE.md` - when it already exists, or when the host you are running on is Claude Code.**
-  Anywhere else it is a file nothing loads, so do not create one.
+- **root `AGENTS.md`** - the one file omp reads, and Codex and the cross-tool convention read it too.
+- **root `CLAUDE.md`** - the one Claude Code reads. Create it where it does not exist.
+
+The host you run `/onboard` from decides nothing here, and that is the point. The operator's other
+agent is a later session on the same repo, not a different user: they open the repo in Claude Code
+next week and a block written for omp alone is invisible. An earlier version of this skill keyed the
+second write on the running host and got exactly that wrong.
 
 Write both wherever both apply, even where `CLAUDE.md` holds nothing but an `@AGENTS.md` import. That
 import is Claude Code's own mechanism and no other host's guarantee, and the two failures do not cost
@@ -294,20 +298,21 @@ appended and explained itself with "`/onboard` was taken as the 'ask' its edit r
 operator came back with "next time actually ask before touching CLAUDE.md". The rule holds for any file
 carrying that instruction, not `CLAUDE.md` alone.
 
-**Solo adoption keeps the same rule and changes the files.** Local-only means a file git never tracks,
-and which file that is depends on the host:
+**Solo adoption keeps the same rule and changes the files.** Local-only means a file git never tracks.
+Write **both**, for the same reason the team tier writes both:
 
-- **omp** - `.omp/AGENTS.md`, with that path appended to `.git/info/exclude`, the same mechanism
-  Phase 3 used for `.better-dev/`. It is omp's own documented answer for project-local uncommitted
-  context, and its `native` provider reads it.
-- **Claude Code** - `CLAUDE.local.md`, loaded beside `CLAUDE.md` and excluded the same way.
+- **`.omp/AGENTS.md`**, with that path appended to `.git/info/exclude`, the same mechanism Phase 3
+  used for `.better-dev/`. It is omp's own documented answer for project-local uncommitted context,
+  and its `native` provider reads it.
+- **`CLAUDE.local.md`**, which Claude Code loads beside `CLAUDE.md`, excluded the same way.
 
-`CLAUDE.local.md` is Claude Code's file and no other host's, so **it is never the only target.** A
-solo adoption on omp that writes only there writes into a void: nothing loads the file, the operator
-sees no block, and every later session behaves as though the repo was never wired. That was the live
-defect the probe above was run to settle. A host with no local-only file of its own gets no block;
-name that limitation in the Phase 5 recap, where discovery then rests on the installed skills' own
-descriptions.
+Neither file is ever the only target. A solo adoption that writes only `CLAUDE.local.md` writes into a
+void on omp: nothing loads it, the operator sees no block, and every later session behaves as though
+the repo was never wired. That was the live defect the probe above was run to settle. Writing only
+`.omp/AGENTS.md` fails the same way the first time they open the repo in Claude Code.
+
+A host with no local-only file of its own gets no block. Name that limitation in the Phase 5 recap,
+where discovery then rests on the installed skills' own descriptions.
 
 The consent rule above governs each of these writes, and the operator's answer covers the whole block
 wherever it lands - one ask, not one per file. On a team re-run upgrading a solo adoption, remove any
@@ -552,8 +557,9 @@ repo, never as part of a re-run, which only ever fills gaps.
 
 - **The block comes out by its markers, never by a line range.** Locate
   `<!-- BEGIN better-dev -->` and `<!-- END better-dev -->` and cut from one to the other with the
-  file-edit tool, in every file Phase 4 wrote it into: root `AGENTS.md`, root `CLAUDE.md`, and the
-  local-only file a solo adoption used (`.omp/AGENTS.md` on omp, `CLAUDE.local.md` on Claude Code).
+  file-edit tool, in every file Phase 4 wrote it into: root `AGENTS.md` and root `CLAUDE.md` on a team
+  adoption, or `.omp/AGENTS.md` and `CLAUDE.local.md` on a solo one. Check all four regardless of which
+  tier the recap names, because a repo upgraded from solo to team carries both pairs.
   A recorded range is stale the moment the operator edits above the block, and what a
   wrong range deletes is their own prose. A missing marker or an unbalanced pair is a stop: report the
   file and let the operator point at the boundary rather than inferring it. Read each file back before
@@ -566,8 +572,9 @@ repo, never as part of a re-run, which only ever fills gaps.
   then stat the path to confirm it is gone) rather than naming files inside it: a purge here once
   enumerated three files and left six others sitting in the directory it reported clean, so either the
   directory goes or you enumerate every file and read the directory back empty. Solo adoption also
-  appended a `.better-dev/` line to `.git/info/exclude`, and on omp an `.omp/AGENTS.md` line beside
-  it; drop both in the same step, or git keeps ignoring a path that no longer exists.
+  appended a `.better-dev/` line to `.git/info/exclude`, plus an `.omp/AGENTS.md` line and a
+  `CLAUDE.local.md` line beside it; drop all three in the same step, or git keeps ignoring paths that
+  no longer exist.
 
 What this does not do is uninstall the plugin. That runs through the host's own plugin channel and is the
 operator's to do, and this repo's unwiring is correct either way - a repo can be unwired while the plugin
