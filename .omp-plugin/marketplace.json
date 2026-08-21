@@ -8,7 +8,7 @@
     {
       "name": "better-dev",
       "source": "./",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "description": "Portable dev practices as skills - onboard a repo, plan or diagnose in worktrees, drive an autonomous loop to proven-done, review, source tools, and self-extend. Runs inside the coding agent you already use.",
       "category": "development",
       "author": {
