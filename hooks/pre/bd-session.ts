@@ -206,12 +206,74 @@ function hostAgentDir(pi: HookApi): string | undefined {
 }
 
 /**
- * The host's user-scope plugin state root, sibling to the agent dir. Undefined when it is not on
- * disk, which is also the answer to "is there a marketplace cache here to read a catalog from".
+ * The config-directory name at PROJECT scope. A literal in the host too (`CONFIG_DIR_NAME`,
+ * `pi-utils/dirs.ts:23`), which is what its project extension roots
+ * (`discovery/omp-extension-roots.ts:135`) and `getProjectAgentDir` (`dirs.ts:501-502`) join onto a
+ * repo path: `PI_CONFIG_DIR` renames the user config directory only.
+ */
+const PROJECT_CONFIG_DIR = ".omp";
+
+/** The host's application name, which is what it suffixes an XDG root with (`APP_NAME`, `dirs.ts:20`). */
+const APP_NAME = "omp";
+
+/**
+ * The user config directory's name, which `PI_CONFIG_DIR` does rename (`getConfigDirName`,
+ * `pi-utils/dirs.ts:209-211`) and which the project plugin registry is anchored on
+ * (`resolveActiveProjectRegistryPath`, `discovery/helpers.ts:843-845`).
+ *
+ * Read from the same environment variable the host reads, NOT off the agent dir's parent. Under a
+ * named profile the agent dir is `<config>/profiles/<name>/agent`, so that parent's name is the
+ * PROFILE's - and the walk below went hunting for a directory literally called e.g. `work`, found
+ * the first ancestor that happened to carry one, and read a plugin root that was never there.
+ */
+const USER_CONFIG_DIR = process.env.PI_CONFIG_DIR || PROJECT_CONFIG_DIR;
+
+/**
+ * The user-scope plugin state root, derived the way the host derives it rather than assumed to sit
+ * beside the agent dir. `getPluginsDir()` is `rootSubdir("plugins", "data")`
+ * (`pi-utils/dirs.ts:534-539`), whose base is the config root unless an XDG data root is live - so
+ * on a machine `omp config init-xdg` has migrated the plugins tree is at `$XDG_DATA_HOME/omp/plugins`
+ * while the agent dir stays put, and the agent dir's sibling names an empty path.
+ *
+ * That mattered for the update nudge rather than for the rule: an unresolvable state root delivers
+ * the rule anyway, the safe direction, but it also makes the nudge SILENT - which is the one failure
+ * mode here that looks exactly like a healthy install.
+ *
+ * `PI_CODING_AGENT_DIR` is the one supported layout still outside this: it moves the agent dir while
+ * the config root stays anchored at the home directory, so no path the host hands a hook names that
+ * root. Declared here rather than guessed at, and it lands where the rest of this file lands - a
+ * duplicated rule, and a nudge that stays quiet.
+ */
+function userPluginsRoot(agentDir: string): string {
+  const configRoot = dirname(agentDir);
+  return join(xdgDataRoot(agentDir, configRoot) ?? configRoot, "plugins");
+}
+
+/**
+ * The XDG data root the host would use, or undefined where it would use none. Every clause below is
+ * the host resolver's own (`DirResolver`, `pi-utils/dirs.ts:264-295`): the platform is linux or
+ * darwin, the variable is set, the agent dir is the config root's own `agent/` - an override opts
+ * out of XDG entirely - and the migrated tree ALREADY EXISTS, which is the check `init-xdg`
+ * satisfies. A named profile is keyed on its own path under that root, never on the base app root.
+ */
+function xdgDataRoot(agentDir: string, configRoot: string): string | undefined {
+  const dataHome = process.env.XDG_DATA_HOME;
+  if (dataHome === undefined || dataHome === "") return undefined;
+  if (process.platform !== "linux" && process.platform !== "darwin") return undefined;
+  if (agentDir !== join(configRoot, "agent")) return undefined;
+  const appRoot = join(dataHome, APP_NAME);
+  const profile = basename(dirname(configRoot)) === "profiles" ? basename(configRoot) : undefined;
+  const root = profile === undefined ? appRoot : join(appRoot, "profiles", profile);
+  return existsSync(root) ? root : undefined;
+}
+
+/**
+ * That root when it is on disk, which is also the answer to "is there a marketplace cache here to
+ * read a catalog from".
  */
 function pluginStateRoot(agentDir: string | undefined): string | undefined {
   if (agentDir === undefined) return undefined;
-  const root = join(dirname(agentDir), "plugins");
+  const root = userPluginsRoot(agentDir);
   return existsSync(root) ? root : undefined;
 }
 
@@ -233,9 +295,9 @@ function cachedFrom(pluginRoot: string): { marketplace: string; plugin: string }
 
 /**
  * Every plugin state root the host installs into, in the order the host resolves them: the user
- * root beside the agent dir, then the project root - which the host anchors at the nearest ancestor
- * of the startup directory carrying a config dir. Both scopes are loaded, so both scopes deliver
- * rules/; reading only the user root is what made a project-scope install deliver this rule twice.
+ * root, then the project root - which the host anchors at the nearest ancestor of the startup
+ * directory carrying a config dir. Both scopes are loaded, so both scopes deliver rules/; reading
+ * only the user root is what made a project-scope install deliver this rule twice.
  *
  * The host takes `.git` as a second anchor when no config dir is found at all
  * (`resolveActiveProjectRegistryPath`, pass 2). That pass is deliberately not mirrored, because it
@@ -244,11 +306,10 @@ function cachedFrom(pluginRoot: string): { marketplace: string; plugin: string }
  * The host needs the fallback to choose where to CREATE a registry; this only ever reads one.
  */
 function stateRoots(agentDir: string, cwd: string): string[] {
-  const configRoot = dirname(agentDir);
-  const userRoot = join(configRoot, "plugins");
-  // Read back off the agent dir rather than hardcoded: the config directory is renameable, and
-  // taking the host's own spelling keeps this in step with whatever it chose.
-  const configDir = basename(configRoot);
+  const userRoot = userPluginsRoot(agentDir);
+  // The project anchor is the config directory's NAME, taken from where the host takes it rather
+  // than off the agent dir's parent - see USER_CONFIG_DIR for what a named profile does to that.
+  const configDir = USER_CONFIG_DIR;
   let dir = resolve(cwd);
   for (;;) {
     if (existsSync(join(dir, configDir))) {
@@ -299,7 +360,10 @@ function linkedUnder(stateRoot: string, pluginRoot: string): boolean {
  */
 function namedInExtensions(agentDir: string, cwd: string, pluginRoot: string): boolean {
   const target = canonical(pluginRoot);
-  const configDir = basename(dirname(agentDir));
+  // Project scope is the literal name here, not USER_CONFIG_DIR: the host's project extension root
+  // is `path.join(ctx.cwd, ".omp")` outright (`discovery/omp-extension-roots.ts:135`), so
+  // `PI_CONFIG_DIR` does not move it and neither does a profile.
+  const configDir = PROJECT_CONFIG_DIR;
   for (const settings of [join(agentDir, "settings.json"), join(cwd, configDir, "settings.json")]) {
     const entries = readJson(settings)?.extensions;
     if (!Array.isArray(entries)) continue;
@@ -425,8 +489,12 @@ function needsOnboard(cwd: string): boolean {
  *     operator's request and demoted the real one into history. Prepending never did that.
  *   - GitHub Copilot classifies the request from the last message's role, so a non-`user` tail makes
  *     every request read as agent-initiated rather than user-initiated (`inferCopilotInitiator`).
- *   - The OpenAI Chat Completions and Responses adapters place their prompt-cache breakpoint from
- *     the last user-or-developer entry, so a trailing rule moves that boundary each call.
+ *   - GitLab Duo Workflow reads a `user` or `developer` entry sitting after the tool results it is
+ *     about to answer as the operator steering mid-batch (`hasGitLabDuoWorkflowSteerAfterBatch`,
+ *     `gitlab-duo-workflow.ts:667-686`), and a steer is not something that wire can carry: the
+ *     caller abandons the live workflow instead, closing the socket and stopping the workflow
+ *     server-side before seeding a fresh one (`:1008-1010` sets the flag, `:1053-1068` tears it
+ *     down). Appended, this rule was that steer on every call of a tool loop.
  *
  * So the placement is keyed on the promotion's own signal rather than on taste. Where the promotion
  * is available the rule takes the tail, which is worth having. Where it is not, the rule is an
@@ -435,7 +503,9 @@ function needsOnboard(cwd: string): boolean {
  * tool_use whose tool_result does not follow it. That means directly after the last user turn, or
  * directly before that turn when the turn is itself the tail. Measured on the same six shapes: one
  * position later than a prepend on five of them, the same on the sixth (a first turn, where there
- * is only one message to be earlier than), and never last on any.
+ * is only one message to be earlier than), and never last on any - bar the one case the guard below
+ * declares outright: a call carrying no messages, where the rule is the only message there is and
+ * so cannot be anything but first and last.
  *
  * One case both branches share: an assistant turn at the tail is a prefill the model is meant to
  * continue, and appending after it would break the prefill and forfeit the promotion anyway, since
@@ -444,6 +514,10 @@ function needsOnboard(cwd: string): boolean {
  */
 function placeRule(messages: HostMessage[], rule: HostMessage, promotable: boolean): HostMessage[] {
   const last = messages.length - 1;
+  // A call with no messages leaves nowhere later than first to go, and both branches below would
+  // arrive at index 0 by arithmetic rather than by saying so. Same list either way; the point is
+  // that the one position the promotion forbids is now a declared case instead of a silent one.
+  if (last < 0) return [rule];
   const at = ((): number => {
     if (promotable) return messages[last]?.role === "assistant" ? last : messages.length;
     for (let i = last; i >= 0; i--) {

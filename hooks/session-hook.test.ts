@@ -77,6 +77,17 @@ interface Fixture {
   /** How a settings `extensions` entry is spelled. The host accepts all three. */
   extensionEntry?: "absolute" | "tilde" | "relative";
   /**
+   * The host layout the state roots are read out of, all three of which the default derivation got
+   * wrong. `profile` is `OMP_PROFILE=work`: the agent dir sits one level deeper, at
+   * `<config>/profiles/work/agent`, so the parent directory's name is the profile's rather than the
+   * config dir's. `xdg` is a machine `omp config init-xdg` has migrated: the plugins tree moves to
+   * `$XDG_DATA_HOME/omp/plugins` and the agent dir stays where it was, so the two stop being
+   * siblings at all. `xdg-unmigrated` exports the variable and never migrated, which is the common
+   * case on linux: the host keeps the config root, and reading XDG there would be wrong the other
+   * way round.
+   */
+  layout?: "profile" | "xdg" | "xdg-unmigrated";
+  /**
    * What the host reports as the active model. `promoting` is a first-party Anthropic Opus 4.8+ /
    * Sonnet 5+ model, whose resolved compat carries `supportsMidConversationSystem: true` - the
    * exact field the converter reads before it promotes a developer turn to a wire `system` block.
@@ -118,10 +129,16 @@ async function run(fixture: Fixture): Promise<Run> {
   const underHome = fixture.extensionEntry === "tilde";
   const root = mkdtempSync(join(underHome ? homedir() : tmpdir(), ".bd-session-"));
   if (underHome) homeRoots.push(root);
-  // Mirrors the host's real layout: the plugin state root is a sibling of the agent dir, and the
-  // directory holding both names the config dir the project scope is looked up under.
-  const agentDir = join(root, ".omp", "agent");
-  const stateRoot = join(root, ".omp", "plugins");
+  // Mirrors the host's real layout. By default the plugin state root is a sibling of the agent dir;
+  // the two layouts below are the supported configurations where it is not, and each is built as
+  // the host builds it rather than by pointing the hook at a path.
+  const configRoot = fixture.layout === "profile" ? join(root, ".omp", "profiles", "work") : join(root, ".omp");
+  const agentDir = join(configRoot, "agent");
+  // The resolver only takes the XDG path once `$XDG_DATA_HOME/omp` is already on disk, which is what
+  // `omp config init-xdg` leaves behind - so where the tree is created below is what arms each case,
+  // and `xdg-unmigrated` sets the variable while leaving that path absent.
+  const xdgDataHome = fixture.layout?.startsWith("xdg") === true ? join(root, "xdg") : undefined;
+  const stateRoot = fixture.layout === "xdg" ? join(root, "xdg", "omp", "plugins") : join(configRoot, "plugins");
   mkdirSync(agentDir, { recursive: true });
   mkdirSync(join(stateRoot, "node_modules"), { recursive: true });
 
@@ -265,6 +282,12 @@ async function run(fixture: Fixture): Promise<Run> {
   // the repo's rules/ and package.json instead of the fixture's. chdir'd first, because the hook
   // resolves the host's project-scope plugin root from the startup directory, at load.
   const before = process.cwd();
+  // Every case sets this variable, including the ones that want no XDG root at all: a developer
+  // machine that happens to export it and happens to have `$XDG_DATA_HOME/omp` on disk would
+  // otherwise move the state root out from under every other fixture here, silently.
+  const beforeXdg = process.env.XDG_DATA_HOME;
+  if (xdgDataHome === undefined) delete process.env.XDG_DATA_HOME;
+  else process.env.XDG_DATA_HOME = xdgDataHome;
   process.chdir(cwd);
   let factory: (api: unknown) => void;
   try {
@@ -272,13 +295,18 @@ async function run(fixture: Fixture): Promise<Run> {
   } finally {
     process.chdir(before);
   }
-  factory(api);
-  for (const handler of sessionStart) handler(undefined, ctx);
 
   let messages: Message[] = fixture.conversation ?? [{ role: "user", content: "the actual request" }];
-  for (const handler of context) {
-    const result = handler({ messages }, ctx);
-    if (result?.messages) messages = result.messages;
+  try {
+    factory(api);
+    for (const handler of sessionStart) handler(undefined, ctx);
+    for (const handler of context) {
+      const result = handler({ messages }, ctx);
+      if (result?.messages) messages = result.messages;
+    }
+  } finally {
+    if (beforeXdg === undefined) delete process.env.XDG_DATA_HOME;
+    else process.env.XDG_DATA_HOME = beforeXdg;
   }
   return { notices, statuses, messages, contextHandlers: context.length };
 }
@@ -394,6 +422,19 @@ test("never splits an assistant's tool call from its result", async () => {
   expect(promoting.messages.map(message => message.role)).toEqual(["user", "assistant", "toolResult", "developer"]);
 });
 
+// A call carrying no messages: `messages.length - 1` is -1, the non-promoting loop never runs, and
+// index 0 falls out of the arithmetic on both branches. The list this pins is the one the hook has
+// always produced, so removing the guard that now states the case keeps this green - it is here to
+// hold the output, and to be the place a later edit to that arithmetic gets caught.
+test("hands back the rule alone when the call carries no messages at all", async () => {
+  const fixture = { install: "marketplace", rule: RULE_FILE, conversation: [] } as const;
+  for (const modelCompat of ["plain", "promoting"] as const) {
+    const result = await run({ ...fixture, modelCompat });
+    expect(result.messages).toHaveLength(1);
+    expect(String(result.messages[0]?.content)).toContain("SENTINEL-RULE-BODY-LINE");
+  }
+});
+
 // Not decoration: `synthetic` marks the turn as not authored by the operator, and the host reads a
 // message's timestamp when it orders and renders one.
 test("marks the injected rule synthetic and stamps it", async () => {
@@ -498,6 +539,21 @@ test("stays quiet on a scoped-package install, which nests one directory deeper"
   await quietWithPositiveControl({ install: "link-scoped", rule: RULE_FILE });
 });
 
+// The two layouts where the state roots are not where the agent dir says they are, and both were
+// read wrong. Under a named profile the agent dir is `<config>/profiles/work/agent`, so taking the
+// parent's name gave `work` and the upward walk hunted for a directory called that - here it finds
+// the repo's own parent and reads a plugin root nothing was ever installed into.
+test("finds a project-scope install under a named profile, whose agent dir sits a level deeper", async () => {
+  await quietWithPositiveControl({ install: "project", rule: RULE_FILE, layout: "profile" });
+});
+
+// After `omp config init-xdg` the plugins tree is at `$XDG_DATA_HOME/omp/plugins` and the agent dir
+// has not moved, so the sibling path names nothing and every install under the real root read as
+// unrecognised.
+test("reads a link install out of the plugins tree an XDG migration moved", async () => {
+  await quietWithPositiveControl({ install: "link", rule: RULE_FILE, layout: "xdg" });
+});
+
 // The bias, and it is the whole reason the answers above are allowed to be wrong in one direction
 // only: a shape this code does not recognise gets the rule. A duplicate wastes context; a miss
 // loses the thing the operator asked for. The CLI's `-e <dir>` roots are the live example - they
@@ -516,6 +572,20 @@ test("names the upgrade when the cached catalog is ahead of the installed versio
   // The status line is width-clamped by the host, so an over-long line is a line the reader never
   // finishes. Measured: a 111-column notification came back clipped mid-sentence.
   expect(result.statuses[0]?.length).toBeLessThan(80);
+});
+
+// The failure this pins is silence, which is why it needs its own case rather than riding along with
+// the delivery ones above. An XDG-migrated machine has no plugins tree beside the agent dir, so the
+// state root resolved to undefined and the nudge stopped firing - the alert half of what this hook
+// is for, gone, on a session that looks perfectly healthy from the outside.
+test("still names the upgrade after an XDG migration has moved the plugins tree", async () => {
+  const fixture = { install: "marketplace", rule: RULE_FILE, version: "0.1.0", catalogVersion: "0.2.0" } as const;
+  const result = await run({ ...fixture, layout: "xdg" });
+  expect(result.statuses).toEqual(["better-dev=omp plugin upgrade better-dev@bd - 0.2.0 available"]);
+  // And the other way round, which is the reading a bare `$XDG_DATA_HOME` check would get wrong: the
+  // variable is exported, nothing was ever migrated, and the host stays with the config root.
+  const unmigrated = await run({ ...fixture, layout: "xdg-unmigrated" });
+  expect(unmigrated.statuses).toEqual(["better-dev=omp plugin upgrade better-dev@bd - 0.2.0 available"]);
 });
 
 test("stays quiet when the cached catalog is level with the installed version", async () => {

@@ -1647,3 +1647,55 @@ fixed on this branch by testing the marketplace cache mark against every state r
 `node_modules` entry, rather than against the root the link happened to be found under. So this
 measurement is evidence for one sub-shape of the marketplace channel, never for the channel: any future
 claim about `--scope project` needs its own observation.
+
+## D45 - install is one prompt, and the host facts behind it are recorded here
+
+The install surface is a single copy-pasteable prompt in `README.md`. It sends the agent to
+`BOOTSTRAP.md`, which is an executable procedure rather than prose: detect the host, install through
+that host's own channel, confirm `rules/comms.md` is delivered, wire the update alert, run `/onboard`.
+The agent is the per-host adapter, so a host nobody wrote a channel for still gets wired or hears why
+it cannot be. This replaces the human-facing channel table, which became the agent's decision table.
+
+The bar a channel must clear is the operator's, recorded 2026-08-20: a channel earns its place by
+auto-updating or by raising an update alert. These rules shape every reply, so an install that ages in
+silence is experienced as the practices not working. A channel that can do neither is named as such
+rather than listed as supported.
+
+**Host measurements, 2026-08-20.** These live here because `BOOTSTRAP.md` acts on them and a procedure
+whose facts live only in its own prose cannot be re-checked when a host changes.
+
+- Claude Code 2.1.233's `claude plugin` carries `install`, `update`, `uninstall`, `list` and
+  `marketplace add/list/remove/update`. An earlier check in this session reported only four verbs
+  because it piped `--help` through `head -20` and read the truncation as the whole list.
+- Claude Code's `plugin-catalog-cache.json` holds records for the official marketplace only. Three
+  third-party plugins installed on the measuring machine were all absent from it, and every marketplace
+  clone sat at exactly the commit its install record named with no `FETCH_HEAD` since install. So local
+  state never advances on its own and a read-only version comparison can never fire: an alert has to
+  run `claude plugin marketplace update` before comparing. Scoped to a machine where better-dev itself
+  was installed through omp.
+- hermes 0.16.0 fires `on_session_start` from `hooks:` in `config.yaml` (`VALID_HOOKS`,
+  `hermes_cli/plugins.py:128`) once per session, and discards the return value, so an alert there has
+  to reach the operator by its own channel. `hermes plugins install` registers no skills from this repo;
+  `skills.external_dirs` is what makes them load, read at `agent/skill_utils.py:417,454`.
+- The `npx skills add` CLI at 1.5.23 offers `update` and no check or notify verb, so that channel clears
+  neither half of the bar by its own command list.
+
+**Carried gaps, not fixed.** Each is real, each was measured or source-read, and each is cheaper to
+record than to close today.
+
+- `stateRoots` derives omp's config-dir name as `basename(dirname(agentDir))`. That holds for
+  `PI_CONFIG_DIR` and breaks for a named profile, whose config root is `~/.omp/profiles/<name>`, and for
+  `PI_CODING_AGENT_DIR`, which moves the agent dir without moving the config root. Both duplicate the
+  rule rather than losing it, so the delivery bias holds at the cost of one extra body per call.
+- The stage 3 pointer-target probe ORs a hermes path against a Claude Code cache glob, so on a machine
+  carrying both CLIs a stale hermes tree can satisfy the check for a Claude Code install that failed. It
+  proves some `comms.md` exists, never that this install's does.
+- Stage 1's check is a self-assessment with no failing branch, and nothing asks the agent to identify
+  which host it is, so naming the wrong one satisfies it.
+- The prompt names `BOOTSTRAP.md` at `main` rather than at a ref, so an operator installing version N is
+  handed the procedure for HEAD. It also requires web fetch, with no branch for an agent that cannot,
+  which is not universally enabled on the hosts stage 2 routes to `npx skills add`.
+- Stage 5 invokes `/onboard` in the session that ran the install, while the same file says twice that a
+  running session keeps the text it loaded at start. Claude Code's own help states `restart required to
+  apply`. The fallback nobody wrote down is reading `skills/onboard/SKILL.md` out of the installed tree
+  and executing it as text, which stage 3 already resolves a path for.

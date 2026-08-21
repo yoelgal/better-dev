@@ -51,11 +51,13 @@ skill you wrote under the same name still wins.
 **The bar a channel has to clear.** These rules shape every reply, so an install that ages in
 silence is the failure this library designs against: you experience a months-old copy as the
 practices not working. So a channel earns its place by auto-updating or by raising an update alert.
-omp's marketplace channel auto-updates once you allow it. Claude Code raises the alert from a
-session-start hook, once that hook refreshes the host's own copy of the marketplace. A skills-only
-install through `npx skills add` can do neither, by that CLI's own command list, so your agent is told
-to say so in as many words and name what to add rather than reporting success. Either way you finish
-knowing which of the two you got.
+omp's marketplace channel auto-updates once you allow it. Claude Code carries no alert of its own: the
+plugin ships no session-start hook there, so your agent writes the check as a shell command and hands it
+to you to paste into `~/.claude/settings.json`, and the alert exists from the moment you paste it and
+not before. A skills-only install through `npx skills add` can do neither, by that CLI's own command
+list, so your agent is told to say so in as many words and name what to add rather than reporting
+success. Either way you finish knowing which of these you got, and knowing whatever is still waiting on
+you.
 
 Removal runs through the same paste: ask your agent to remove better-dev from this machine, and
 `BOOTSTRAP.md` carries the verb for the channel it used. A repo you wired keeps its own

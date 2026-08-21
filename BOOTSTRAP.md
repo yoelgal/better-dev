@@ -59,7 +59,7 @@ plugin sourced from the repo root) and a marketplace channel delivers the whole 
 |---|---|---|---|
 | omp, marketplace | `omp plugin marketplace add` + `omp plugin install` | injected by the session hook | yes, auto-update |
 | omp, git or link root | `omp plugin install <git-url>`, or `omp plugin link <clone>` | injected by omp's own rules provider | no: the operator pulls, and nothing reminds them |
-| Claude Code | `claude plugin marketplace add` + `claude plugin install` | pointer, written in stage 5 | yes, by the session-start alert you wire in stage 4 |
+| Claude Code | `claude plugin marketplace add` + `claude plugin install` | pointer, written in stage 5 | only once the operator pastes the session-start alert stage 4 writes; wired and unproven until they do |
 | hermes | `hermes plugins install` + one `skills.external_dirs` line | pointer, written in stage 5 | an `on_session_start` command can run; getting its line to the operator is the work |
 | no plugin channel | `npx skills add yoelgal/better-dev --all -g` | nothing on this channel alone | no, and stage 4 says so out loud |
 
@@ -74,10 +74,22 @@ Take the default user scope. It is the shape the stage 3 measurements cover, and
 install resolves its runtime symlink and its cache from different roots, so on that shape stage 3's
 check is the only thing that tells you whether the rule arrived.
 
-**Check.** `omp plugin list` names `better-dev@better-dev`. Where it does not, `omp plugin doctor` is
-what reports a tree the host registered and then declined to load. A clone linked with
-`omp plugin link` needs the repo's root `package.json` and its `omp` key: without them omp prints
-success and loads no skills, and doctor is again the only surface that says so.
+**Check.** Which listing you read depends on the channel. A marketplace install appears under
+**Marketplace Plugins** as the plugin id, `better-dev@better-dev (0.1.0) (user)`
+(`cli/plugin-cli.ts:584`). A git or link install appears under **npm Plugins** as `better-dev@0.1.0`,
+name@version rather than name@marketplace (`:555`), so an agent looking for the marketplace spelling on
+a link reads a healthy install as a failed one.
+
+On a link the listing settles nothing in either direction, and that is measured rather than reasoned. A
+clone linked with `omp plugin link` needs the repo's root `package.json` and its `omp` key; without them
+omp prints `Linked better-dev`, lists `better-dev@0.1.0` byte-for-byte as a healthy clone does, and
+loads no skills at all, because the listing synthesises a manifest for a package carrying no `omp` or
+`pi` key (`plugins/manager.ts:675`) while discovery skips that package outright
+(`plugins/loader.ts:126-130`). So on a link the check is `omp plugin doctor`, and specifically its
+`plugin:better-dev` line. A healthy link prints `v0.1.0` and nothing after it, since this repo declares
+no `description`; the same link without the `omp` key prints
+`v0.1.0 - No omp/pi manifest (not an omp plugin)`. Read that line rather than the summary: doctor grades
+it a warning, so both installs end `0 errors` and both exit 0.
 
 **Claude Code:**
 
@@ -115,10 +127,18 @@ skills:
     - ~/.hermes/plugins/better-dev/skills
 ```
 
-**Check.** The summary line at the foot of `hermes skills list` counts 33 local and 33 enabled. When the
-operator asks about updating later, the verb is `hermes plugins update better-dev`. A second
-`hermes plugins install` is refused at `plugins_cmd.py:532-536`, so pointing them at a repeat install
-wastes their turn:
+**Check.** The summary line at the foot of `hermes skills list` counts **33 local**. Read that half
+only. The enabled count spans every source, and hermes ships 71 builtin skills of its own with all of
+them enabled, so a correct install reads 33 local against 104 enabled: `enabled_count` is incremented
+for any skill that is not disabled, whatever its source (`hermes_cli/skills_hub.py:951-963`, summarised
+at `:974-979`). Measured on this machine before the config line landed, that line reported 0
+hub-installed, 71 builtin, 0 local and 71 enabled, so 33 enabled is unreachable on a stock hermes and
+an agent holding a correct install would report this stage as not landed. Hermes separates the counts
+from the totals with an em dash, which this file does not reproduce, so match on the numbers rather
+than on the punctuation between them.
+When the operator asks about updating later, the verb is `hermes plugins update better-dev`. A second
+`hermes plugins install` is refused at `hermes_cli/plugins_cmd.py:524-529`, so pointing them at a
+repeat install wastes their turn:
 
 ```text
 Plugin 'better-dev' already exists. Use force reinstall or run `hermes plugins update better-dev`.
@@ -150,10 +170,15 @@ every `.ts` under a plugin's `hooks/pre/` as an extension entry point, which is 
 On an omp git or link root, omp's own rules provider loads `rules/` natively and the hook stays
 deliberately quiet, so the rule is in context with no marker.
 
-**Check.** In a fresh session, before reading any file, answer whether the token `better-dev:comms` is
-in your own context. That injection is context-only, re-supplied per call and never written to the
-transcript, so no file and no command prints it: searching your own context is the confirmation, and it
-is the same observable `/onboard` reads. Do not send the operator to grep for it.
+**Check.** Answer whether a `developer` or `system` turn in this session carries the marker
+`better-dev:comms` - a turn you did not read out of a file, and did not author yourself. The delivery
+shape is the observable, not the token's presence: this file names that marker in the paragraph above,
+so finding the string proves only that you read this file. What proves delivery is the marker standing
+on a turn nothing in this session put there. That injection is context-only, re-supplied per call and
+never written to the transcript, so no file and no command prints it and there is nothing to send the
+operator grepping for. Absence answers only its own negation: the rule did not arrive by injection,
+which is the ordinary case on every host in the next paragraph, and stage 5 then writes the pointer.
+This is the same observable `/onboard` reads, so the answer you reach here is the one you carry into it.
 
 **Pointed at.** Claude Code and hermes ship the hook file and never run it. Claude Code loads plugin
 hooks from `hooks/hooks.json`, or from an inline `hooks` key in `plugin.json`, as shell-command or HTTP
@@ -232,7 +257,11 @@ clone from source, and the comparison then has something to see. Read the actual
 **Check.** Run your command by hand twice before you hand over the settings block. Once as installed,
 where it stays silent. Once against a version you know differs, where it has to print the alert. A check
 whose alerting branch has never run is the same shape as the fixture that asserted nothing, named at the
-top of this file. Then start a fresh session and confirm the line appears.
+top of this file. Then hand the settings block over and ask the operator to start a fresh session and
+tell you whether the line appeared: you are inside the session that ran this install, the block is
+still with them as a paste, and the hook fires for a session you never see. Where you cannot get that
+confirmation before you finish, say so plainly - the alert is wired and nobody has seen it fire - and
+carry that wording into stage 6 rather than reporting the route as proven.
 
 **hermes** updates by verb: `hermes plugins update better-dev`, run by the operator. It does run shell
 commands at session start, and the shape of that mechanism decides what an alert can be. Read from
@@ -253,9 +282,12 @@ channel can neither auto-update nor alert. Tell the operator in as many words, a
 install through one of the plugin channels above, or clone the repo and point `/onboard` at the clone,
 which turns stage 3 into the pointer row and gives the update route something to pull.
 
-**Cursor's own `.cursor/hooks.json`** does carry a `sessionStart` event. It is IDE-only, and it has open
-bug reports about injected context never reaching the agent, so leave it out of your plan rather than
-presenting it as a delivery route.
+**Cursor's own `.cursor/hooks.json`** does carry a `sessionStart` event, and it is IDE-only. Read
+2026-08-21: its `additional_context` is reported as merged in the Hooks log and then absent from the
+agent's own context, in the IDE and in the Cursor SDK at 1.0.28. Three open reports, by forum thread
+id - `158452`, `167274`, `168441`, each at `https://forum.cursor.com/t/topic/<id>`. So leave it out of
+your plan rather than presenting it as a delivery route, and re-read those three before you revisit the
+call: fixed upstream, this row becomes a real channel.
 
 ## Stage 5. Wire the repo: run `/onboard`
 
@@ -278,10 +310,20 @@ host it is where the repo's own data comes from.
   cannot drift from what shipped. `/onboard` reads the path back first and writes no block where nothing
   resolves, naming the gap instead.
 
-**Check.** The entry file carries both sentinels around a block that names a path you have read back,
-`.better-dev/rules.md` and `.better-dev/overrides.md` both exist, and `/onboard`'s own recap names the
-delivery route it found. Where its recap and your stage 3 answer disagree, the disagreement is the
-finding: report it rather than picking the friendlier one.
+**Check.** Three observations, and each one has to be something this stage did not itself create:
+
+- Read the entry file back and quote the line inside the sentinels that names the installed
+  `rules/comms.md`, then read that path back too. The sentinels alone prove nothing - `/onboard` was
+  just asked to write them - so the content and its resolving target are the observation. Where stage 3
+  answered injected, there is no pointer block, and the observation is that absence with the stage 3
+  answer beside it.
+- Open `.better-dev/rules.md` and `.better-dev/overrides.md` and name one thing in each that belongs to
+  *this* repo: its stack, its branching, an override the operator settled during the run. Both files
+  already exist in any repo wired before this run, better-dev's own among them, because this step
+  re-runs safely, so their existence is not evidence that this run wrote anything.
+- Quote `/onboard`'s recap clause naming the delivery route, verbatim, rather than reporting that a
+  recap appeared. Where that quote and your stage 3 answer disagree, the disagreement is the finding:
+  report it rather than picking the friendlier one.
 
 `/onboard` is idempotent, asks one decision at a time and only on real ambiguity, and never overwrites
 the operator's conventions or edits.
@@ -292,7 +334,8 @@ Give the operator five lines, and no more than five:
 
 - the host, and the channel you installed through
 - how the comms rule reaches a session here: injected, or by pointer
-- how it stays current: auto-update, alert, or neither, in which case name the repair
+- how it stays current: auto-update, an alert you have seen fire, an alert wired that nobody has yet
+  seen fire, or neither, in which case name the repair
 - anything you handed over as a paste block and are waiting on
 - any check that did not pass, with what it means for them
 
