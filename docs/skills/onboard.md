@@ -2,78 +2,83 @@
 
 ## What it does
 
-Brings better-dev into a repo - greenfield or existing - by detecting what's already there, adapting
-to it rather than imposing a house shape, and leaving the repo wired: a `.better-dev/` data directory
-holding the repo's overrides, rules, and work-item ledger, and a discovery block in every entry file
-this repo's agents read (root `AGENTS.md`, plus root `CLAUDE.md` where that host reads it) so
-every later session knows the practices are available. It never vendors the skills themselves into the
-repo and never overwrites a convention the repo already follows - a detected branch prefix, an
-installed skill, an integration branch that isn't `main` - it records the difference as an override
-instead. Idempotent by design: a re-run only fills gaps.
+Reads a repo - greenfield or existing - and establishes its actual shape, then records what it found
+as standing facts in your harness's durable memory: the stack, the real test and lint commands, the
+branch model and its integration branch, whether this is a team project or your own, and whether
+guardrails already exist. A later session in the repo then starts already holding them, and a
+dispatched worker gets them in its brief - instead of every step re-deriving the same facts from
+whatever files it happened to open.
+
+It writes no files into your repo. No entry file, no scaffold, no ignore line, no directory. The one
+mutation it can make is a git branch, and only on a yes: where a staged branch model resolves and the
+integration branch does not exist, it offers once to create it, because a recorded model naming a
+branch git does not have is the exact premise-versus-fact mistake the skill exists to prevent.
+Idempotent by design - a re-run fills gaps and refreshes a fact that went stale.
 
 ## When to reach for it
 
-The first thing you run in a repo that doesn't have `.better-dev/` yet, or a repo whose host already
-loads the better-dev plugin but has no scaffold and no discovery block. Re-run any time -
-after a release changes what a repo needs wired, after adopting a repo from solo to team, or when a
-phase was deferred and the trigger it was waiting on has now landed. It has nothing to install, since
-the plugin that carries it is already loaded by the time it runs, and it does not set up a shared
-foundation for a brand-new multi-part project (that's `/groundwork`).
+The first better-dev session in a project, and any later one after the repo's shape moved - a new
+integration branch, a stack that landed, a verify command that changed - so the recorded facts stop
+matching the repo. It has nothing to install, since the plugin that carries it is already loaded by
+the time it runs, and it does not set up a shared foundation for a brand-new multi-part project
+(that's `/groundwork`).
 
-It also runs the other direction, on an explicit ask and never as part of a re-run:
+Skipping it costs re-derivation, not function: every skill downstream can detect what it needs on its
+own, more slowly and without the operator's confirmation on any of it.
+
+It also runs one cleanup path, on an explicit ask and never as part of a re-run:
 
 | Situation | What it does |
 |---|---|
-| "wire this repo", a repo with no scaffold or no discovery block | wires it, filling only what is missing |
-| "remove better-dev from this repo", "unwire this", or a repo still carrying the managed block after the plugin was uninstalled | takes the block out and, on a second ask, the `.better-dev/` data |
-| Uninstalling better-dev from the machine | not this - that is your host's own plugin channel, and a repo can be unwired while the plugin stays installed elsewhere |
+| a repo whose shape has never been established, or whose recorded facts went stale | detects, confirms, records, and hands off to `/guardrails-install` |
+| a repo still carrying a managed better-dev block written by an older version | takes both marker pairs out of whatever files hold them, and names anything left over for the operator to drop |
+| uninstalling better-dev from the machine | not this - that is your host's own plugin channel |
 
 ## Where it fits
 
-The foundation every other skill in the chain assumes is already in place: worktrees, the loop,
-reviews, and releases all read `.better-dev/overrides.md` for the repo's defaults and keep work-item
-state under `.better-dev/ledger/`, and onboard is what creates both. The discovery block it writes
-carries only what nothing else delivers - that this repo is wired, and where its records live - and it
-goes into one file per host, because the two hosts read disjoint sets (D46). It hands off to
-`/guardrails-install` for the repo's verify command and safety baseline, and closes by pointing a
-greenfield repo at `/groundwork` or `/gauntlet`.
+It runs first because everything after it needs what it recorded: `/worktree-branching` needs the
+integration branch, `/release-promotion` needs the branch model, `/autonomous-loop` needs the verify
+command, `/review` needs the safety baseline. It records the repo-shape facts itself and hands the
+command facts to `/guardrails-install`, which owns the verify, `dev-run`, and `seed-reset` keys and
+the safety baseline. It closes by pointing a greenfield repo at `/groundwork` or `/gauntlet`, and a
+repo that already has history at `/vision`.
 
 ## Common questions
 
-**Why did it ask whether this is a solo or team adoption, and does the answer matter?** A repo with a
-remote and other authors in `git log` gets asked once, before anything shared is written - one
-developer's yes is not team consent. Answering solo keeps `.better-dev/` out of git entirely (via
-`.git/info/exclude`, never a tracked ignore entry), puts the discovery block in the host's own
-local-only file - `.omp/AGENTS.md` on omp, `CLAUDE.local.md` on Claude Code, excluded the same way -
-and never offers or creates a shared branch. Going team later is a re-run the team answers, not a
-flag one person flips.
+**Why did it ask whether this is a solo or team project?** Because it decides one thing that cannot be
+taken back quietly: whether the run may offer to create a shared branch at all. A repo with a remote
+and other authors in `git log` gets asked; one developer's yes is not team consent, so a solo repo
+gets no shared-branch offer and records the trunk model on its default branch.
 
-**Why did the discovery block go in through the file editor instead of a script?** In an interactive
-session, an opaque piped write into an always-loaded entry file reads to a host's action classifier as
-instruction injection and gets denied. The file-edit tool shows the same marker-bounded block as a
-reviewable diff instead, which lands cleanly; the shell writer is kept only for scripted, non-interactive
-contexts.
+**Why did it ask before recording anything?** A recorded fact is a standing claim about your project,
+and standing claims are yours to approve. It is one ask for the whole batch, not one per fact - correct
+a line, strike a line, or say yes to the list.
 
-**Will a re-run duplicate the discovery block?** No - it is replaced in place between fixed markers,
-byte-stable when nothing changed.
+**It found my test command but did not record it - why?** Because `/guardrails-install` owns that key.
+Onboard spots the command with its `file:line` and hands it over, so there is exactly one writer per
+recorded key and a re-run of either skill cannot produce two disagreeing values.
 
-**It removed the block but left `.better-dev/` behind - is that a bug?** No, that is the design. The
-recorded rules, the overrides you wrote by hand, and the ledger history are your data, so unwiring the
-entry file never licenses deleting them; removing the directory is a second explicit ask, and the two
-stay separate even when you say yes to both. When it does remove it, it removes the directory whole
-rather than naming files inside it, because a purge that enumerated three files once left six others
-sitting in a directory it reported clean.
+**It reported a command as a gap when the README names one.** That is the rule working. A command in
+prose is a premise; it counts as detected only once it is verified where it actually lives. An
+unverified command is a gap to ask about, never one to invent - a wrong verify command makes every
+later "green" meaningless.
+
+**It removed an old block but left `.better-dev/` behind - is that a bug?** No. Anything left there is
+your data, and `ledger/` is live loop state a running work-item depends on - removing it destroys the
+only record that survives a compaction. So cleanup names what is there and leaves the decision to you,
+as a second and separate ask.
 
 ## It's working if
 
-- Every entry file this repo's agents read carries a `better-dev` block between
-  `<!-- BEGIN/END better-dev -->` markers, identical between the copies, naming the repo's actual
-  branch convention and integration branch
-- `.better-dev/overrides.md` and `.better-dev/rules.md` both open with the `read` tool, so the
-  defaults later skills consult are actually on disk
-- `git branch --show-current` shows the working tree standing on the branch the block names as the
-  integration branch, not a different one left over from before the run
-- The closing recap names every deferred or skipped phase by name, rather than reading as fully done
-  while something upstream is still waiting on the operator
-- After an unwire, a search for `better-dev` in each of those files returns nothing, and the operator's
-  own prose above and below where the block sat is untouched
+- A later session in the repo already knows the branch model, the integration branch, and the verify
+  surface without re-deriving any of it - `/worktree-branching` names the base without asking
+- Every fact it recorded was one you saw in the confirm list first, and any fact you struck is absent
+  from the record and named once in the close-out
+- A fact it could not settle is recorded as an explicit unknown rather than left blank, so a later
+  session can tell "nobody could determine this" from "nobody ever looked"
+- `git status` after the run is identical to before it - no new file, no modified file
+- The integration branch it recorded is one `git branch` actually lists, not one a doc mentioned
+- The closing recap leads with the one thing still waiting on your hands, and names every deferred
+  item by the step that closes it, rather than reading as fully done
+- After a cleanup, a search for `better-dev` in each entry file returns nothing, and your own prose
+  above and below where the block sat is untouched

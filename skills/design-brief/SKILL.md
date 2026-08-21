@@ -71,10 +71,10 @@ Either state leaves the component-level picks open - a toast, a command palette,
 virtualized list - and those are a dependency decision rather than a direction one: enter
 `/pick-ui-library` when the design calls for one and the repo has not already solved it.
 
-Either way, record the choice so the next feature inherits it instead of reinventing it: `edit` the
-token set and the named direction into `.better-dev/overrides.md`. This is the frozen shared interface
-`/groundwork` pins for a UI product - a design decided per-feature is two worktrees styling the same
-button differently.
+Either way, record the choice so the next feature inherits it instead of reinventing it: record the
+token set and the named direction in your harness's durable memory (see `/overrides`). This is the
+frozen shared interface `/groundwork` pins for a UI product - a design decided per-feature is two
+worktrees styling the same button differently.
 
 The recorded token set names one token source in the repo - CSS custom properties, a Tailwind theme, a
 tokens module - and that file is the visual contract. The loop inherits one deviation criterion from
@@ -104,9 +104,11 @@ misalignment - the fix differs by class, and the class rides with the finding.
 
 ## 3. Compose the host's design skill; source one on a gap
 
-Read `.better-dev/overrides.md` first - a repo often already settles taste. A host may ship
-`/frontend-design` for direction or `/web-design-guidelines` for the accessibility and UX audit, or pin
-its own design skill. Name-check what is wired at runtime and use it. If nothing is, hand the gap to
+Honor this project's recorded decisions - from your harness's durable memory where you have it,
+otherwise from the brief you were given (see `/overrides`). A repo often already settles taste. A host
+may ship `/frontend-design` for direction or
+`/web-design-guidelines` for the accessibility and UX audit, or pin its own design skill. Name-check
+what is wired at runtime and use it. If nothing is, hand the gap to
 `/tool-sourcing` - discover, vet, try, adopt - and record the choice so it stays swappable. Never
 hardcode a stack, framework, or aesthetic here; this skill ships the practice, not a taste.
 
@@ -118,8 +120,8 @@ pins slots for and deliberately never fills. One that offers principles and a mo
 and nothing else, so its criteria stay yours to write. Grade it by opening it and looking for those
 three, never by its author's standing: a value whose only warrant is reputation has nothing that can
 notice when it goes stale. Two such skills installed together will disagree on a value for the same
-element class with nothing to arbitrate, so adoption records which one owns which domain in
-`.better-dev/overrides.md`; a conflict found mid-audit is otherwise settled by whichever loaded last.
+element class with nothing to arbitrate, so adoption records which one owns which domain in your
+harness's durable memory; a conflict found mid-audit is otherwise settled by whichever loaded last.
 
 ## 4. Hand plan-grill checkable visual done-criteria
 
@@ -164,8 +166,8 @@ An "AI tell" is a checkable ban, not a taste. The seed tells - the model-default
 unguided generation reaches for - ship with this skill; the full list, the clean-or-flag audit form,
 and the trunk test live in `slop-and-checks.md` beside this file. Per project: add tells you can
 count or measure ("the palette is the token set, no ad-hoc hex" - the repo's em-dash ban is the same
-species) and filter seed items by the register on the direction card, recording additions in
-`.better-dev/overrides.md`. The list is never filtered to empty - the rule for that case is in
+species) and filter seed items by the register on the direction card, recording additions in your
+harness's durable memory. The list is never filtered to empty - the rule for that case is in
 `slop-and-checks.md`. The audit in step 4 checks the render against the combined list, item by item.
 
 ## 6. Redesign mode - audit against the brief, name what can't change silently

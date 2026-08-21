@@ -12,8 +12,9 @@ decided here. The moment the problem sentence is agreed the run is over and `/pl
 its input - it ideates, grills, and writes the done-contract, and it needs no second decode because
 this artifact is the one it would have produced.
 
-Read `.better-dev/overrides.md` first - a project override, such as a house problem-statement template
-or a standing definition of a recurring word, wins over anything below.
+Honor this project's recorded decisions - from your harness's durable memory where you have it,
+otherwise from the brief you were given (see `/overrides`). A house problem-statement template, or a
+standing definition of a recurring word, wins over anything below.
 
 ## The gate
 
@@ -120,6 +121,6 @@ second sprint.
 | No problem anyone can state yet | Stop at the artifact and send it - a decode that ends in a draft sentence and five honest questions is a finished run, not a failed one, and inventing a problem to look finished is the failure this skill exists to prevent |
 
 A decode that settles something standing - what a particular requester's recurring word turns out to
-mean, which metric a team actually reacts to - closes with one `learn` tool call; one that settled
+mean, which metric a team actually reacts to - closes with one durable record (see `/overrides`); one that settled
 nothing durable writes an explicit `no durable lesson` line saying why. `/writing-skills` carries the
 full close-out form.

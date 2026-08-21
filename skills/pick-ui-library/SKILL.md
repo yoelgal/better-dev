@@ -14,9 +14,10 @@ skill decides one thing: whether this component takes a dependency, and of what 
 It does not choose the look (`/design-brief` owns direction and the token set), does not build the
 component, and is not dependency policy for the rest of the stack.
 
-Read `.better-dev/overrides.md` first and honor any project override before applying anything below.
-The steps run in order, and step 1 lands before any proposal reaches the user: a recommendation
-written before the manifest was read is how a repo acquires its second toast system.
+Honor this project's recorded decisions - from your harness's durable memory where you have it,
+otherwise from the brief you were given (see `/overrides`). The steps run in order, and step 1 lands
+before any proposal reaches the user: a recommendation written before the manifest was read is how a
+repo acquires its second toast system.
 
 ## 1. The repo has usually already decided - read that first
 
@@ -27,8 +28,9 @@ Four observable lookups, cheapest first:
 - **The component layer** - a `components/ui/` tree, a primitives module the app re-exports, a design
   system package in the workspace. A component already wrapped there is this project's answer, with
   its own styling contract attached.
-- **The recorded pick** - read `.better-dev/overrides.md`, plus `memory://root/learned.md` for a lesson
-  keyed to a UI library. Per-project trusted lists live there, set by the operator; this skill ships
+- **The recorded pick** - this project's recorded decisions, for a recorded pick or a lesson keyed to a
+  UI library: from your harness's durable memory where you have it, otherwise from the brief you were
+  given (see `/overrides`). Per-project trusted lists live there, set by the operator; this skill ships
   none. A curated list of packages is one author's taste with a shelf life, and a list pinned inside a
   skill goes stale without anyone editing it.
 - **The recorded design system** - `/design-brief` records the named system and the token source. A
@@ -131,7 +133,7 @@ hand-roll:   no - one live region and keyboard dismissal are the work, not the s
 criteria:    a screen reader announces each toast once; Escape dismisses the focused toast
 ```
 
-Close out by making the pick the project's rather than this run's: `edit` one line into
-`.better-dev/overrides.md` - `<class>: <package> - <one-line reason>` - so the next feature inherits it
-at step 1 instead of re-deciding. If the vetting taught something durable about a source, record it
-with the `learn` tool; otherwise write one line saying there was no durable lesson.
+Close out by making the pick the project's rather than this run's: record it in your harness's durable
+memory (see `/overrides`) as `<class>: <package> - <one-line reason>`, so the next feature inherits it
+at step 1 instead of re-deciding. If the vetting taught something durable about a source, record that
+too, keyed to the source; otherwise write one line saying there was no durable lesson.

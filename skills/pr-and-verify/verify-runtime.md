@@ -38,7 +38,7 @@ rule recorded the criterion settles NEEDS_INPUT naming the recorder. A recorded 
 settles NEEDS_INPUT too, naming who runs the job - the absent route is a recorded fact, not a
 question to re-detect - never an improvised production command.
 
-Standing a local surface up follows the same pattern: recall `"dev-run"` for the command that runs
+Standing a local surface up follows the same pattern: read the recorded `dev-run` line for the command that runs
 this tree's app, and `"seed-reset"` where the flow needs data - a recorded `seed-reset: none` is a
 named gap `/plan-grill` can plan a work-item for, never a silent skip. Both are recorded once by
 `/guardrails-install`; re-discovering them per worktree is the re-detection those keys exist to end.

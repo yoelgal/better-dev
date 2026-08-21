@@ -12,8 +12,9 @@ Package them as a fix-contract in the ledger and hand off to `/autonomous-loop`,
 same red→green loop a feature does. One job: **make the bug reproducible and explained before anyone
 touches a fix.**
 
-Read `.better-dev/overrides.md` first - a project override (a repro command, a test seam convention,
-a "we never instrument prod" rule) wins over anything here.
+Honor this project's recorded decisions - from your harness's durable memory where you have it,
+otherwise from the brief you were given (see `/overrides`). A repro command, a test seam convention,
+or a "we never instrument prod" rule wins over anything here.
 
 Locate the repo's contribution guide in the same setup read: an override may pin its path; else look
 for `CONTRIBUTING.md` or a coding-standards file at the root, under `docs/`, or under `.github/`. If
@@ -23,7 +24,8 @@ fix-contract carries one census line - "contribution guide: `CONTRIBUTING.md`" o
 guide found" - so a missed guide is a visible miss, not a silent one.
 
 Before you re-derive anything about this area, read what earlier sessions recorded about it - the
-lessons at `memory://root/learned.md` - and cite what it returned, or an explicit "nothing recorded":
+recorded lessons, from your harness's durable memory where you have it, otherwise from the brief you
+were given (see `/overrides`) - and cite what it returned, or an explicit "nothing recorded":
 a lesson you already paid for is cheaper than the mistake it prevents. A recalled lesson is a prior
 claim, not a current fact - verify it against today's code before acting on it. A fix item carved
 by `/groundwork` also reads its epic's record first
@@ -117,8 +119,9 @@ in Phase 3 and becomes the clean regression test in Phase 4.
 **Recall first.** Before generating any hypotheses, distill the red signal into a **failure
 signature** - the stable fingerprint of *this* failure, drawn from the whole error and stack you read
 in Phase 0, not the run that happened to expose it: the error class and message shape, the top frames
-of the stack, the failing assertion, the symptom in one line. Search `memory://root/learned.md` for a
-prior diagnosis of the same shape. A
+of the stack, the failing assertion, the symptom in one line. Search the recorded lessons for a
+prior diagnosis of the same shape - your harness's durable memory where you have it, otherwise what the
+brief carried (see `/overrides`). A
 confident match returns a known root cause and the fix that resolved it last time - apply it and
 re-run the Phase 1 signal to confirm it goes green here too, rather than re-deriving from scratch. A
 match that no longer holds (the signal stays red) isn't wasted: it rules out a candidate and tells you
@@ -233,7 +236,7 @@ test at a correct seam* - no new discipline for the loop to learn; the merge lin
 contract for the PR stage, not the loop.
 
 When the diagnosis was fresh (nothing recorded matched), close the loop that Phase 3 opened: write the
-**failure signature → root cause + fix** with the `learn` tool so the
+**failure signature → root cause + fix** in your harness's durable memory (see `/overrides`) so the
 next occurrence of this shape hits the fast-path instead of re-deriving. Record the *durable* thing -
 the root cause and the fix that resolved it, plus any repro technique worth reusing - never the
 transient run that surfaced it (a one-off timeout, a flake seed, a machine-specific path).
@@ -241,8 +244,8 @@ transient run that surfaced it (a one-off timeout, a flake seed, a machine-speci
 ## Composability
 
 Diagnose adds; it never replaces an installed debugger, test runner, or observability skill - it
-sequences them. On a production incident with no telemetry to read, the `obs-*` lines in
-`.better-dev/rules.md` name the gap, and once the incident is stabilized
+sequences them. On a production incident with no telemetry to read, this project's recorded `obs-*`
+lines name the gap, and once the incident is stabilized
 `/observability-install` is the route that fills it - per-incident instrumentation covers this
 diagnosis, not the next one. It's the fix-side twin of `/plan-grill` (the feature front-end); both
 feed the same `/autonomous-loop`. A live production incident is diagnosed here first; once the fix

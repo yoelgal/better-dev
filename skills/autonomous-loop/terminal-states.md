@@ -8,7 +8,7 @@ came from. The loop records the settled state as the last line of `progress.md`.
 |---|---|---|
 | `DONE` | Proven against the done-criteria - a real check went green, not a claim. | Hand off to the PR-into-staging gate (`/pr-and-verify`). |
 | `DONE_WITH_CONCERNS` | Proven, with residue no fix pass can retire: reviewer-accepted rebuttals, unresolved cannot-verify items, judgment-call doc concerns. A fixable finding of any severity never rides here. | Hand off; carry the flags into the PR body. |
-| `BLOCKED` | An external blocker - something outside the loop must move first (red base, infra, a dependency). | An infra red first gets a recovery-signature recall and one retry (see the loop's "Triage the red"); if still red, surface the blocker, wait it out or route it, then resume. |
+| `BLOCKED` | An external blocker - something outside the loop must move first (red base, infra, a dependency). | An infra red first gets a recovery-signature lookup and one retry (see the loop's "Triage the red"); if still red, surface the blocker, wait it out or route it, then resume. |
 | `NEEDS_INPUT` | A human decision, missing context, or an approval is required. | Ask the one question; resume once answered. |
 | `EXHAUSTED` | A budget or iteration limit was reached - the operator's, or the hard turn/wall-clock ceiling an unattended or scheduled run carries so it can't bill without limit. | Report honestly; the operator raises the budget or narrows scope. |
 | `NO_PROGRESS` | Stagnated - a stuck-check `confirmed` it. | Restart-from-contract (read `restart.md`). |

@@ -65,7 +65,7 @@ is the larger share of a run's cost, so a tight output spec moves the bill more 
    mechanically before dispatching, not by recall: `git worktree list`, then per live branch
    `git diff --name-only <base>...<branch>` - a path two lanes both touch makes those lanes
    sequential, and discovering the overlap at PR time buys a conflict-resolution round instead. One
-  more read rides that check: `.better-dev/rules.md` - a recorded
+  more read rides that check: this project's recorded decisions - a recorded
    `shared-runtime: serialize` (written by `/worktree-branching` where lanes share one mutable
    datastore with no per-lane split) makes writing lanes sequential even with zero file overlap,
    because they collide in data the file diff can't show. A
@@ -151,8 +151,8 @@ and is re-read every turn. Move artifacts as files instead:
   `NEEDS_INPUT`), so a fresh worker doesn't discover the rule only at review. Not your session history.
   Write it into the shared ledger as `.better-dev/ledger/<work-item>/brief-<role>.md` and hand the worker that path.
 - **The project's skill list** - a project can record the skills a dispatched worker should use
-  as a `dispatch-skills: <skill or capability> (<when it applies>), ...` line in `.better-dev/rules.md`.
-  Read that file once per run and paste the entries
+  as a `dispatch-skills: <skill or capability> (<when it applies>), ...` line in your harness's durable
+  memory (see `/overrides`). Read that record once per run and paste the entries
   bearing on a slice into its brief as an imperative to load them before it starts, never a mention: a
   skill named in passing prose does not reliably load, and the worker then solves in its own ad-hoc way
   a problem this project already has a skill for. No record means no line and dispatch as today.
@@ -376,7 +376,7 @@ off to the PR-into-staging gate. A half-finished item moving to a colleague or a
 the handoff bundle `/worktree-branching`'s handoff notes define - consent re-pins on the receiving side,
 never imports. A work-item spanning two repositories has no shared ledger or PR to coordinate through -
 read `cross-repo.md` for the three contract lines that tie the two halves together. `/autonomous-loop` composes this skill as its outer layer: it reaches
-for the dispatch verb here rather than re-specifying it. Lessons worth keeping go through the `learn`
-tool, durable project rules into `.better-dev/rules.md`, and any project override in
-`.better-dev/overrides.md` wins over these defaults - read it first. When you revise this skill, follow
+for the dispatch verb here rather than re-specifying it. Lessons worth keeping and durable project
+rules go into your harness's durable memory, and a recorded project override wins over these defaults
+- honor it first (see `/overrides`). When you revise this skill, follow
 `/writing-skills`.

@@ -20,11 +20,11 @@ Three rules hold across the whole run:
   4, tell the operator in plain words and name the repair. Reporting success over a stage that did not
   land is the single outcome this file exists to prevent.
 
-better-dev has two layers. This procedure installs the first and offers the second. The **plugin** (the
-skills, the always-applied comms rule, the session hook) is installed once for the machine and shared by
-every repo, and that is what stages 1 to 4 do. A repo's **`.better-dev/`** data is written per repo by
-`/onboard`, which stage 5 offers rather than performs, because the directory the operator happened to
-run this from is not necessarily one they want wired.
+better-dev is one layer. The **plugin** - the skills, the always-applied comms rule, the session hook -
+is installed once for the machine and shared by every repo, and it writes nothing into any repo. Stages
+1 to 4 install it. Stage 5 establishes the durable memory the practices record into, which is a machine
+setting rather than a repo file, and offers `/onboard` to fill it for the repo the operator is standing
+in.
 
 ## Stage 1. Identify the host, and what is already installed
 
@@ -61,8 +61,8 @@ plugin sourced from the repo root) and a marketplace channel delivers the whole 
 |---|---|---|---|
 | omp, marketplace | `omp plugin marketplace add` + `omp plugin install` | injected by the session hook | yes, auto-update |
 | omp, git or link root | `omp plugin install <git-url>`, or `omp plugin link <clone>` | injected by omp's own rules provider | no: the operator pulls, and nothing reminds them |
-| Claude Code | `claude plugin marketplace add` + `claude plugin install` | pointer, written in stage 5 | only once the operator pastes the session-start alert stage 4 writes; wired and unproven until they do |
-| hermes | `hermes plugins install` + one `skills.external_dirs` line | pointer, written in stage 5 | an `on_session_start` command can run; getting its line to the operator is the work |
+| Claude Code | `claude plugin marketplace add` + `claude plugin install` | not at all: see stage 3 | only once the operator pastes the session-start alert stage 4 writes; wired and unproven until they do |
+| hermes | `hermes plugins install` + one `skills.external_dirs` line | not at all: see stage 3 | an `on_session_start` command can run; getting its line to the operator is the work |
 | no plugin channel | `npx skills add yoelgal/better-dev --all -g` | nothing on this channel alone | no, and stage 4 says so out loud |
 
 **omp:**
@@ -164,7 +164,8 @@ fixes it.
 ## Stage 3. Confirm the comms rule reaches a session
 
 The skills are text the host lists, so stage 2's check settles them. The comms rule shapes every reply
-and arrives by one of two routes. Establish which one you got, because it decides what stage 5 writes.
+and reaches a session on one host family only. Establish whether it reached this one, because the answer
+is a line the operator is owed in stage 6 rather than a detail.
 
 **Injected.** On an omp marketplace install the session hook delivers `rules/comms.md` as a `developer`
 turn led by the literal marker `<!-- better-dev:comms source=hooks/pre/bd-session.ts -->`. omp treats
@@ -179,32 +180,25 @@ so finding the string proves only that you read this file. What proves delivery 
 on a turn nothing in this session put there. That injection is context-only, re-supplied per call and
 never written to the transcript, so no file and no command prints it and there is nothing to send the
 operator grepping for. Absence answers only its own negation: the rule did not arrive by injection,
-which is the ordinary case on every host in the next paragraph, and stage 5 then writes the pointer.
-This is the same observable `/onboard` reads, so the answer you reach here is the one you carry into it.
+which on the hosts in the next paragraph means it did not arrive.
 
-**Pointed at.** Claude Code and hermes ship the hook file and never run it. Claude Code loads plugin
+**Not delivered.** Claude Code and hermes ship the hook file and never run it. Claude Code loads plugin
 hooks from `hooks/hooks.json`, or from an inline `hooks` key in `plugin.json`, as shell-command or HTTP
 entries keyed by event name, and this repo carries neither, which is why `Hooks (0)` is the honest
 reading of stage 2's check rather than a broken install. hermes takes a plugin as a Python module that
-registers itself through `register(ctx)`. On both hosts `/onboard` writes a pointer to the installed
-`rules/comms.md` in stage 5, and both channels land the whole repo tree, so that pointer has a real
-target.
+registers itself through `register(ctx)`. Neither host reads a plugin's `rules/` either, so on both of
+them the comms rule is on disk and in no session.
 
-**Check.** Read the target back before stage 5, because a pointer at a missing file fails every session
-in silence:
+This is a known open gap, not a step you can complete. better-dev used to close it by writing a pointer
+to `rules/comms.md` into the repo's own entry file, and that write was removed with every other repo
+write: a library that promises no repo footprint cannot keep one delivery route that needs one. So the
+honest report on these hosts is that the skills arrived and the rule did not.
 
-```sh
-ls -l ~/.hermes/plugins/better-dev/rules/comms.md
-ls -l ~/.claude/plugins/cache/*/better-dev/*/rules/comms.md
-```
-
-Where neither resolves and the skills came from `npx skills add`, that channel supplies nothing to point
-at. Ask the operator for a path where the repo itself is on disk, through a plugin channel above or a
-plain `git clone`, and give that path to `/onboard`.
-
-The operator is owed the difference between the two routes in one sentence: injected text sits in
-context before their message is answered, while a pointer costs you a read and holds as far as you
-honour the entry file.
+**Check.** Say which of the two answers you reached, in one sentence, and carry it into stage 6. Where
+the answer is that the rule did not arrive, name the one repair that exists: an omp install gets it, by
+the hook on a marketplace channel and by omp's own rules provider on a git or link one. Do not offer the
+operator a workaround you have not run, and do not report the install as fully landed when this half is
+missing.
 
 ## Stage 4. Wire the update route, or say the host cannot
 
@@ -281,8 +275,7 @@ them it is due. That sentence is the deliverable on this host, and it beats a ho
 **A skills-only install misses the bar, and that is the report.** The `skills` CLI carries `update`,
 with no check verb and no notification mechanism (its own `--help`, read on 1.5.23). So this
 channel can neither auto-update nor alert. Tell the operator in as many words, and name the repair:
-install through one of the plugin channels above, or clone the repo and point `/onboard` at the clone,
-which turns stage 3 into the pointer row and gives the update route something to pull.
+install through one of the plugin channels above, which gives the update route something to pull.
 
 **Cursor's own `.cursor/hooks.json`** does carry a `sessionStart` event, and it is IDE-only. Read
 2026-08-21: its `additional_context` is reported as merged in the Hooks log and then absent from the
@@ -291,62 +284,72 @@ id - `158452`, `167274`, `168441`, each at `https://forum.cursor.com/t/topic/<id
 your plan rather than presenting it as a delivery route, and re-read those three before you revisit the
 call: fixed upstream, this row becomes a real channel.
 
-## Stage 5. Offer to wire a repo, and wire it only if asked
+## Stage 5. Establish durable memory, then offer `/onboard`
 
-Stages 1 to 4 changed the machine. This stage changes a repo, so it is offered rather than performed.
-The operator may have installed from their home directory, a scratch clone, or somewhere they have no
-intention of wiring, and a directory being the one they happen to stand in is not consent to write
-into it.
+Stages 1 to 4 changed the machine and no repo. This stage keeps it that way. What better-dev records
+about a project - its stack, its verify command, its branch model, and every standing correction the
+operator makes in flow - goes into the agent's own durable memory rather than into a file in the repo.
+That surface has to exist before anything can record into it, and on omp it ships switched off.
 
-Two questions before anything, both answerable from the shell:
+**Read the setting first.**
+
+```sh
+omp config get memory.backend
+```
+
+`off` is the shipped default, verified against omp's own settings table: "Memory is disabled by
+default". The other values are `local`, `mnemopi` and `hindsight`, and any of them is a memory that
+persists, so a value other than `off` means this is already established and you move on. Where the host
+is not omp, read its own equivalent and apply the same rule; where it has none, that is the answer and
+the paragraph below on declining is what you report.
+
+**Where it reads `off`, offer to turn it on and name the cost in the same breath.** Same shape as stage
+4's auto-update offer: the operator decides, you do not set it quietly.
+
+```sh
+omp config set memory.backend local
+```
+
+The cost, and they are owed it in one sentence: durable memory means the agent keeps facts about their
+project across sessions without asking again, and it also means it keeps things they may not want kept.
+
+**Check.** `omp config get memory.backend` prints the value they chose. Read it back rather than
+trusting the set: this is the one setting the rest of the library assumes.
+
+**Where they decline, say what they lose, plainly.** A correction they make in flow does not survive
+the session, so they restate it the next time. Recorded project facts go the same way, and every skill
+that would have read them derives them again. That is a real half of the library missing, so it goes in
+the stage 6 report the way a wired-but-unproven alert does, and the install is not reported as
+complete-and-fine without it.
+
+**Then offer `/onboard`, once, for the repo they are standing in.** It writes nothing into that repo. It
+reads the stack, the test and lint commands, the branch model and integration branch, and the
+team-or-solo shape, and records them to durable memory so later sessions and every other skill get
+those facts without re-deriving them.
+
+Two questions before you offer it, both answerable from the shell:
 
 - **Is this directory inside a git repo?** Where it is not, do not offer. Say the install landed, name
-  that `/onboard` wires a repo when they want one wired, and stop. That is a complete, successful run.
-- **Do they want this one wired?** Ask, in one line, naming the repo by its root. A yes runs `/onboard`.
-  Anything else finishes the same way: installed, nothing written, and `/onboard` available whenever
-  they ask for it.
+  that `/onboard` records a repo's facts whenever they want one recorded, and stop. That is a complete,
+  successful run.
+- **Is durable memory on?** Where the operator declined it above, say that `/onboard` would have nowhere
+  to record and offer it anyway only if they ask - its findings then last one session.
 
-Where they accept, run `/onboard` from inside that repo. Run it even where stage 2 and stage 3 both
-passed: on a host that gets the rule by pointer this is the step that delivers it, and on every host it
-is where the repo's own data comes from.
+`/onboard` is recommended rather than required. Skipping it costs re-derivation, not function. Its one
+possible repo mutation is a git branch: on a staged branch model with no integration branch it offers
+once to create one, and only on a yes.
 
-`/onboard` detects the stack, memory system and branching, adapts to what is already there, and writes:
+**Check, where `/onboard` ran.** Two observations, and neither may be something this stage created:
 
-- **`.better-dev/`, data only, committed:** `rules.md` and `overrides.md`. Loop state under `ledger/`
-  stays gitignored.
-- **A discovery block** in every entry file this repo's agents read - root `AGENTS.md` always, root
-  `CLAUDE.md` beside it where that host reads it - naming where this repo's overrides and rules live.
-  The two hosts read disjoint sets of files (D46), so one copy per host is the rule, and `/onboard`
-  replaces between its own markers on every run, which is what keeps the copies from drifting. This
-  block is the whole of discovery, so a later session that lacks it never learns the practices are
-  installed.
-- **A committed `.omp/config.yml`** naming the shell commands that need the operator's approval, so the
-  policy travels with the repo rather than living on one machine.
-- **The comms pointer where stage 3 landed on the pointer row**, written between
-  `<!-- BEGIN better-dev-comms -->` and `<!-- END better-dev-comms -->` in those same entry files and replacing
-  any existing block in place. It names the installed `rules/comms.md` instead of copying its text, so it
-  cannot drift from what shipped. `/onboard` reads the path back first and writes no block where nothing
-  resolves, naming the gap instead.
+- Read back one recorded fact that belongs to *this* repo - its stack, its verify command, its branch
+  model - and quote it. The recording having been asked for is not evidence that it landed.
+- Quote `/onboard`'s own recap clause naming what it recorded, verbatim, rather than reporting that a
+  recap appeared. Where that quote and the fact you read back disagree, the disagreement is the
+  finding: report it rather than picking the friendlier one.
 
-**Check, where nothing was wired.** The observation is the absence: name the directory, say it is not a
-repo or that the operator declined, and confirm you wrote nothing into it. A run that installs and
-wires nothing is complete, and reporting it as complete is the honest outcome rather than a shortfall.
-
-**Check, where `/onboard` ran.** Three observations, and each one has to be something this stage did not
-itself create:
-
-- Read the entry file back and quote the line inside the sentinels that names the installed
-  `rules/comms.md`, then read that path back too. The sentinels alone prove nothing - `/onboard` was
-  just asked to write them - so the content and its resolving target are the observation. Where stage 3
-  answered injected, there is no pointer block, and the observation is that absence with the stage 3
-  answer beside it.
-- Open `.better-dev/rules.md` and `.better-dev/overrides.md` and name one thing in each that belongs to
-  *this* repo: its stack, its branching, an override the operator settled during the run. Both files
-  already exist in any repo wired before this run, better-dev's own among them, because this step
-  re-runs safely, so their existence is not evidence that this run wrote anything.
-- Quote `/onboard`'s recap clause naming the delivery route, verbatim, rather than reporting that a
-  recap appeared. Where that quote and your stage 3 answer disagree, the disagreement is the finding:
-  report it rather than picking the friendlier one.
+**Check, where nothing ran.** The observation is the absence: name the directory, say it is not a repo
+or that the operator declined, and confirm you wrote nothing into it. A run that installs and records
+nothing is complete, and reporting it as complete is the honest outcome rather than a shortfall.
 
 `/onboard` is idempotent, asks one decision at a time and only on real ambiguity, and never overwrites
 the operator's conventions or edits.
@@ -356,10 +359,10 @@ the operator's conventions or edits.
 Give the operator six lines, and no more than six:
 
 - the host, and the channel you installed through
-- how the comms rule reaches a session here: injected, or by pointer
+- how the comms rule reaches a session here: injected, or not at all on this host
 - how it stays current: auto-update, an alert you have seen fire, an alert wired that nobody has yet
   seen fire, or neither, in which case name the repair
-- which repo you wired, or that you wired none and why: not a repo, or they declined
+- whether durable memory is on, and where it is not, that a correction does not survive the session
 - anything you handed over as a paste block and are waiting on
 - any check that did not pass, with what it means for them
 
@@ -371,8 +374,8 @@ one that carries all of this.
 Removal runs whichever channel installed it: `omp plugin uninstall better-dev@better-dev`,
 `claude plugin uninstall better-dev@better-dev`, `hermes plugins remove better-dev`, or `skills remove`
 for a skills-only install. Also remove anything you had the operator paste into a settings file, since a
-`SessionStart` entry pointing at a plugin that has gone fails every session afterwards. That takes the
-plugin away and leaves a wired repo's own files alone; `/onboard` has the unwiring step for those.
+`SessionStart` entry pointing at a plugin that has gone fails every session afterwards. There is nothing
+else to undo: the install wrote into no repo, so removing the plugin removes better-dev.
 
 On a plugin channel nothing of better-dev's lands in the operator's own skills folder. Plugin skills
 load through the host's plugin provider, so `~/.claude/skills` and `~/.omp/agent/skills` hold only what

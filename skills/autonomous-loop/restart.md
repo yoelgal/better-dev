@@ -47,7 +47,7 @@ The steps:
 
 1. **Keep the map.** `contract.md`, `progress.md`, and `receipts.md` stay - they live in the primary
    checkout, untouched by anything that happens in the feature worktree. Read what the stalled attempt
-   learned. Fold any durable lesson into `contract.md` and write it with the `learn` tool, so the
+   learned. Fold any durable lesson into `contract.md` and record it durably (see `/overrides`), so the
    rebuild doesn't re-enter the same dead end; a failure diagnosed but not yet fixed goes in at low
    confidence under its signature key, so the next session's read surfaces it as unfinished rather
    than as settled fact. Append a line to

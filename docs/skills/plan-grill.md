@@ -35,8 +35,10 @@ work-items from an epic; a red dependency audit from
 ## Prerequisites
 
 The work-item's own worktree already exists - `/worktree-branching` sets it up before the grill
-starts. `.better-dev/overrides.md` is read at the top of the flow; a project override on planning
-style, spec location, or a skipped phase wins over anything the skill defaults to.
+starts. This project's recorded decisions are honored at the top of the flow - from the harness's
+durable memory where the run has it, otherwise from the brief it was given; a recorded override on
+planning style, spec location, or a skipped phase wins over anything the skill defaults to (see
+`/overrides`).
 
 ## Common questions
 

@@ -21,7 +21,7 @@ Near neighbours:
 |---|---|
 | Same need, but the surface is a browser | the native `browser` tool, driven straight from the loop |
 | No on-device check needed, code-level assertion is enough | stays with the loop, this skill doesn't fire |
-| Repo already pins its own device harness (XCUITest suite, device farm, `test:device` script) | honor `.better-dev/overrides.md`, skip straight to wiring the check |
+| Repo already pins its own device harness (XCUITest suite, device farm, `test:device` script) | honor that recorded decision, from durable memory or from the brief (see `/overrides`), and skip straight to wiring the check |
 | No Mac host, a device farm requirement, or an Android sibling | `/tool-sourcing` picks up the gap |
 
 ## Where it fits

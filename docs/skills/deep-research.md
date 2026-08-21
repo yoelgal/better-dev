@@ -35,8 +35,10 @@ whichever of those called it, and nothing installs or ships as a result of the p
 
 ## Prerequisites
 
-A way to search and fetch outside sources. `.better-dev/overrides.md` is read first, since a project
-may pin its sources of record, forbid a fetch lane, or name domains it does not trust.
+A way to search and fetch outside sources. This project's recorded decisions are honored first - from
+the harness's durable memory where the run has it, otherwise from the brief it was given - since a
+project may pin its sources of record, forbid a fetch lane, or name domains it does not trust (see
+`/overrides`).
 
 ## Common questions
 

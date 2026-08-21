@@ -9,7 +9,7 @@ Its center of gravity is the **done-criteria**. Everything else frames them.
 Beyond these per-feature criteria, every contract inherits the project's **standing definition of
 done**: verified at runtime, not just compiled; new behavior covered by a test that fails without the
 change; untrusted input reviewed; a rollback path for anything risky; the result reported honestly. If
-the project keeps that bar in `.better-dev/` or a guardrails reference, point to it - don't restate it
+the project records that bar, or keeps it in a guardrails reference, point to it - don't restate it
 here. (No standing bar yet is a `/guardrails-install` gap, not a plan-grill one.)
 
 ## Done-criteria - the observable part
@@ -65,7 +65,7 @@ a predicate observes, it never mutates. Name the symbol or path, not "cleaned up
 
 An **operational-job** criterion's completion observable lives only in production - "every row
 backfilled" has no local seam. It attaches to the recorded ops-runner surface
-(the `ops-runner` line in `.better-dev/rules.md` - recorded by `/guardrails-install`; when absent the
+(this project's recorded `ops-runner` line - written by `/guardrails-install`; when absent the
 criterion is a `NEEDS_INPUT` naming the recorder, not a guess). Pair it with a fixture-level
 rehearsal criterion the loop can drive red-to-green; the operational criterion's own box flips
 only on the execution receipt - the command as run on the recorded runner, the completion
@@ -127,7 +127,7 @@ its goal still takes one shape from the list above, usually an end-state or a re
 parts:
 
 - **Baseline verify stays green** - the repo's recorded verify commands
-  (the `verify` line in `.better-dev/rules.md`) green before the change and green after, on unchanged
+  (the recorded `verify` line) green before the change and green after, on unchanged
   assertions. For a refactor this is the behavior-preserving check; where the touched area has no
   coverage, a characterization test pinning current behavior lands first, as part of the chore.
 - **The chore's own observable** - one runnable check, red now, green when the chore lands: a
@@ -284,8 +284,8 @@ anything: a known human gate, and a write this item will have to make outside it
 second is there because `/autonomous-loop` stops on a write target outside its own worktree unless
 the contract named it - so a target named and answered here is the difference between the loop writing
 it and the loop handing the operator a command to run. Read the repo's gates while writing this section
-(`.better-dev/rules.md`, then the overrides layer, which wins) and check them against the surface this
-plan already
+(this project's recorded decisions, where a recorded override wins over the baseline - see `/overrides`)
+and check them against the surface this plan already
 says it will touch. Where they intersect, name the intersection and put the gate to the user here,
 in the same breath as the merge question they are answering anyway. A gate first raised after the
 work is built collects a rubber stamp: at that point the only options are approve or discard ninety
@@ -322,7 +322,7 @@ Before you pin the contract, each line reads yes or the contract isn't ready:
 - The Merge line reads `auto` or `hold` - `auto` only where the repo records
   `merge-policy: auto-on-green` AND the user chose auto for this item (asked at seal, never assumed).
 - The gated-paths line names every recorded safety gate this plan's own surface intersects, each with
-  the user's answer, or reads `none expected` - checked against a live `recall "safety"` plus the
+  the user's answer, or reads `none expected` - checked against the recorded `safety-` keys plus the
   overrides layer, never from memory of what this repo gates.
 - The stop conditions are specific to this plan's real risks, not boilerplate.
 - No secret values appear anywhere - locations and credential types only.
@@ -337,7 +337,7 @@ of them.
 
 ## Approval is written into the contract
 
-At the same confirmation, settle the Merge line. Where `.better-dev/rules.md` records
+At the same confirmation, settle the Merge line. Where this project records
 `merge-policy: auto-on-green`, ask one question
 beside the contract confirm: when the loop settles DONE and every gate passes - independent review,
 CI, the driven done-criteria - merge into the integration branch automatically, or hold the green PR
@@ -345,7 +345,7 @@ for your look? Record the answer as the contract's `merge:` line. Where the poli
 write `merge: hold` with the reason - the standing allowance is `/guardrails-install`'s to grant,
 never this seal's to improvise.
 
-Nothing recorded splits in two, and the split is load-bearing. Read `.better-dev/rules.md`: where a
+Nothing recorded splits in two, and the split is load-bearing. Read this project's records: where a
 parked `pending-decision` names the merge
 policy - what a greenfield `/onboard` writes, having deferred the question because the repo then had no
 PR to merge - **this seal is the collector**. There is a PR to merge now, so ask the standing question

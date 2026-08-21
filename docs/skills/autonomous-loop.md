@@ -28,8 +28,9 @@ near neighbours:
 The middle of the chain: a front-end (`/plan-grill`, `/diagnose`) hands this skill a contract in its
 own worktree (`/worktree-branching`), it dispatches fresh workers per step through
 `/orchestrating-agents`, and a settled `DONE` or `DONE_WITH_CONCERNS` hands off to `/pr-and-verify`.
-It leans on `/review` for the independent verdict it deliberately doesn't self-grade, and reads
-`.better-dev/overrides.md` before applying any default of its own.
+It leans on `/review` for the independent verdict it deliberately doesn't self-grade, and honors this
+project's recorded decisions before applying any default of its own - from the harness's durable memory
+where the run has it, otherwise from the brief it was given (see `/overrides`).
 
 ## Prerequisites
 

@@ -168,7 +168,7 @@ list, reached by a prose pointer ("before settling a pass as done, read `rationa
 sibling travels with the folder, so it survives isolation too, and progressive disclosure keeps it out of
 context until a pass is about to declare done. Every row names an excuse that was actually produced,
 not one that could be, so go find them before writing any: `docs/TRAPS.md` records the scenarios a
-into, and `memory://root/learned.md` carries the lessons a prior run paid for. Size the table to
+into, and the project's recorded lessons carry what a prior run paid for. Size the table to
 what the hunt returned - a heavily-run skill earns six rows, and most skills earn two or three inline
 counters and no table at all - because an invented excuse teaches the executor a rationalization it had
 not thought of.
@@ -204,7 +204,7 @@ exact spot the excuse shows up.
 
 A skill whose run can settle something durable ends with a close-out at its terminal moment - `DONE`, a
 fresh diagnosis, an incident, an adoption - never mid-run. The close-out is one call or one sentence:
-record the single keyed lesson with the `learn` tool, or write an explicit `no durable lesson` line saying
+record the single keyed lesson durably (see `/overrides`), or write an explicit `no durable lesson` line saying
 why. Two tests gate the write, and failing either
 means the `no durable lesson` line is the correct output: the line names a cause, technique, or standing
 fact - an event of this run ("fixed the typo", "CI was slow today", "PR merged") is a ledger receipt, not
@@ -238,11 +238,13 @@ a keyed lesson or a trap.
   other, named in the text so the next editor knows where to start: change it there first, then
   propagate. The failure is not the second copy, it is the third edit, which reaches two of the three
   and leaves the reader holding a current instruction and a stale one at the same time.
-- Read `.better-dev/overrides.md` first and honor any project override before applying a default.
-- Record a lesson through the `learn` tool and a durable project rule as a line in
-  `.better-dev/rules.md`. A lesson is one atomic insight with a recall key on the front, not a paragraph
-  of narrative - one insight per `learn` call. The long write-up belongs in the ledger receipt; the
-  reusable line belongs in the lesson store, keyed so a future read finds it.
+- Honor this project's recorded decisions - from your harness's durable memory where you have it,
+  otherwise from the brief you were given (see `/overrides`).
+- A lesson and a durable project rule are both records worth keeping, and `/overrides` owns who writes
+  them: a worker reports the finding, the agent talking to the operator records it. A lesson is one
+  atomic insight with a recall key on the front, not a paragraph of narrative - one insight per record.
+  The long write-up belongs in the ledger receipt; the reusable line belongs in memory, keyed so a
+  future read finds it.
 
 ## How this standard reaches skills
 

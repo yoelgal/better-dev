@@ -143,6 +143,6 @@ stage and names which of the three is missing, rather than building on a decisio
 - **Surface the state.** After every action, and on every variant switch, render the full relevant
   state so the change is visible.
 
-Close out in one line: record the keyed lesson with the `learn` tool if the run taught one that
+Close out in one line: record the keyed lesson durably (see `/overrides`) if the run taught one that
 outlives this decision, else say `no durable lesson` and why. The verdict itself is not the lesson; it
 already lives in `decisions.md`.

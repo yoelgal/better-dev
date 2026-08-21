@@ -31,27 +31,34 @@ Paste this into your agent. It installs for the whole machine, so it does not ma
 Install better-dev on this machine if it is not already there. Read
 https://raw.githubusercontent.com/yoelgal/better-dev/main/BOOTSTRAP.md and follow it: work out which
 agent you are, install through your own channel, and run the check each stage names. Write nothing
-into a repo unless I ask - when the install lands, say what it did and offer to onboard this
-directory if it is a repo. If your channel cannot keep better-dev current, tell me that instead of
-finishing quietly.
+into a repo. When the install lands, say what it did. If your channel cannot keep better-dev current,
+tell me that instead of finishing quietly.
 ```
 
-**Wiring a repo is a separate step, and it is asked for rather than assumed.** The install puts the
-skills and the comms rule on your machine; `/onboard` writes into one repo, so it runs when you say so
-and never on whatever directory you happened to be standing in. Once the plugin is there, any repo
-needs only `/onboard` - it is one of the skills that arrived.
+**The install writes nothing into a repo.** It puts the skills and the always-applied comms rule on
+your machine, and that is the whole of it: no discovery block, no config file, no data directory. Any
+repo is then ready, because the skills your agent loaded are the whole of what arrived.
+
+Recommended once per repo, and it writes nothing either: `/onboard` reads the stack, the test and lint
+commands, the branch model and integration branch, and the team-or-solo shape, and records them to
+your agent's durable memory, so later sessions and every other skill get those facts without
+re-deriving them. Skip it and you pay that re-derivation, not a loss of function.
+
+Durable memory is what holds those facts, and your agent may ship it switched off - omp does. So the
+install reads that setting, offers to turn it on with the cost named in the same breath, and where you
+decline it says what you lose: a correction you make in flow does not survive the session, so you
+restate it next time.
 
 [`BOOTSTRAP.md`](BOOTSTRAP.md) is written for your agent to execute: it carries the channel for each
 host, the check that proves each stage landed, and the words to hand back when a check cannot pass.
-Your agent is the part that adapts, so a host nobody has written a channel for still ends up wired, or
-hears why it cannot be.
+Your agent is the part that adapts, so a host nobody has written a channel for still ends up installed,
+or hears why it cannot be.
 
 **What the install puts on your machine.** One plugin, once, carrying the 33 skills, the
-always-applied comms rule that shapes every reply, and the session hook. Nothing in any repo.
-
-**What `/onboard` adds, per repo, when you ask for it.** That repo's own `.better-dev/` data and a
-discovery block in every entry file your agents read - `AGENTS.md` always, `CLAUDE.md` beside it for
-Claude Code, because the two hosts read disjoint sets of files.
+always-applied comms rule that shapes every reply, and the session hook. Nothing in any repo. That
+rule reaches a session on omp - by the hook on a marketplace install, by omp's own rules provider on a
+git or link one. A host that reads neither gets the skills and not the rule, and `BOOTSTRAP.md` says
+so on the host where it happens rather than leaving you to notice.
 
 On a plugin channel your own skills folder stays yours: plugin skills load through your agent's
 plugin provider, so `~/.claude/skills` and `~/.omp/agent/skills` keep only what you put there, and a
@@ -69,12 +76,12 @@ success. Either way you finish knowing which of these you got, and knowing whate
 you.
 
 Removal runs through the same paste: ask your agent to remove better-dev from this machine, and
-`BOOTSTRAP.md` carries the verb for the channel it used. A repo you wired keeps its own
-`.better-dev/` data and its managed blocks until you ask for those to go too.
+`BOOTSTRAP.md` carries the verb for the channel it used. There is nothing to unwire afterwards,
+because nothing was written into a repo.
 
-Once a repo is wired, your next message can just be *"here's a bug…"*, *"here's a feature…"*, or *"let's
-build an app that…"* - the wired repo carries an utterance-to-skill routing table, so you say what you want
-and the chain runs itself.
+Your next message can just be *"here's a bug…"*, *"here's a feature…"*, or *"let's build an app
+that…"* - each skill's own description is what routes it, so you say what you want and the chain runs
+itself.
 
 ## The method
 
@@ -99,8 +106,10 @@ Start a project **from scratch**, or land a feature or fix in an **existing code
    fallback (staged, tested, then promoted).
 
 Loop state for each work-item lives in `.better-dev/ledger/<slug>/` as plain files, so it survives a
-session ending and every worktree reads the same copy. Override any practice in flow and it persists to
-`.better-dev/overrides.md` and *wins* - the shared skills are never rewritten to encode your preference.
+session ending and every worktree reads the same copy. The loop creates that directory when it starts
+an item, and it is the only thing better-dev ever puts in a repo. Override any practice in flow and it
+is recorded in your agent's durable memory, where it beats any built-in default (see `/overrides`) -
+the shared skills are never rewritten to encode your preference.
 
 ## The skills
 
@@ -115,17 +124,13 @@ session ending and every worktree reads the same copy. Override any practice in 
 | **Sourced capabilities** | `ios-capability` (on-device proof; fetches the QA tool from upstream on demand) · `pick-ui-library` (settle the dependency question before building a component) |
 | **Foundations** | `writing-skills` · `packaging` · `overrides` · `vision` · `wait-what` (re-pitch a message that didn't land) |
 
-## What a wired repo gains
+## What stays out of your repo
 
-`/onboard` writes this repo's own data:
-
-- `.better-dev/overrides.md` - your standing corrections, which beat any default
-- `.better-dev/rules.md` - what this repo records about itself
-- `.better-dev/ledger/` - loop state per work-item, gitignored
-- a discovery block in each entry file your agents read (`AGENTS.md`, and `CLAUDE.md` for Claude Code)
-- a committed `.omp/config.yml` - which shell commands need your approval, travelling with the repo
-- on a host the session hook cannot reach, a pointer to the installed `rules/comms.md`, between its own
-  `<!-- BEGIN better-dev-comms -->` sentinels, once that file is on disk to point at
+Nothing better-dev learns about a repo is written into it. What it records about the project, your
+standing corrections and the lessons a session learns all live in your agent's own durable memory,
+which already survives a session ending and already loads itself at the start of the next one (see
+`/overrides`). The one exception is a work-item's loop state under `.better-dev/ledger/<slug>/`, which
+the loop creates when it starts one and which git ignores.
 
 Skills you later mint with `/self-extension` are **repo-scoped** by default, committed to that repo's own
 `.claude/skills/<name>` and seen only there. A plugin upgrade never touches them.
@@ -135,7 +140,7 @@ Skills you later mint with `/self-extension` are **repo-scoped** by default, com
 | Path | What |
 |------|------|
 | `skills/` | the practices, one dir per skill - the roster above is the count of record |
-| `rules/` | the always-applied rules, one file each: injected by omp's rules provider on a git or link install, by the session hook on an omp marketplace install, and named by `/onboard`'s pointer elsewhere |
+| `rules/` | the always-applied rules, one file each: injected by omp's rules provider on a git or link install, and by the session hook on an omp marketplace install |
 | `hooks/pre/` | the session hook in the shape omp reads, loaded from the installed plugin tree, versioned with it, and gone when you uninstall |
 | `.omp-plugin/` · `.claude-plugin/` | omp's marketplace catalog · Claude Code's catalog beside the version stamp (`plugin.json`) |
 | `package.json` | required: `omp plugin link` refuses a directory without one and skips the plugin entirely unless it declares an `omp` key |

@@ -3,9 +3,9 @@
 #
 # Lints every skill (frontmatter minimal + name==folder + "Use when" description + no @-links + calm
 # voice), runs every helper's selftest, parses every shipped script, validates the plugin manifest,
-# asserts the managed discovery block sits in a file this repo's own host reads, and fails on any
-# shipped file that still names a path this release deleted. Non-zero exit on any failure - a release
-# / CI gate, and what `/self-extension` runs before promoting a freshly authored skill.
+# grades the session hook that carries the comms rule, and fails on any shipped file that still names
+# a path this release deleted. Non-zero exit on any failure - a release / CI gate, and what
+# `/self-extension` runs before promoting a freshly authored skill.
 set -uo pipefail
 
 # Package root = the dir holding skills/ + scripts/ (run from anywhere in the dev repo).
@@ -414,21 +414,21 @@ done
 
 echo "== em/en dash gate =="
 # Standing repo rule: no em (U+2014) or en (U+2013) dashes in shipped text. Match the raw UTF-8 bytes
-# under LC_ALL=C so this holds on BSD grep (no -P) as well as GNU. Covers the shipped surfaces,
-# both root entry files included - each one carries a copy of the discovery block, and nothing else
-# scans them.
+# under LC_ALL=C so this holds on BSD grep (no -P) as well as GNU. Covers the shipped surfaces, the
+# root AGENTS.md included - it is this repo's own always-loaded context file, and nothing else scans
+# it.
 em="$(printf '\342\200\224')"; en="$(printf '\342\200\223')"
 dash_hits=""
-for f in $(find skills rules scripts docs -type f 2>/dev/null; ls README.md BOOTSTRAP.md AGENTS.md CLAUDE.md 2>/dev/null); do
+for f in $(find skills rules scripts docs -type f 2>/dev/null; ls README.md BOOTSTRAP.md AGENTS.md 2>/dev/null); do
   LC_ALL=C grep -lq -e "$em" -e "$en" "$f" 2>/dev/null && dash_hits="$dash_hits $f"
 done
 [ -z "$dash_hits" ] && ok "no em/en dashes in shipped text" || bad "em/en dash in:$dash_hits"
 
 echo "== no-ai-slop gate =="
 # Standing library default, not a project preference: the no-ai-slop guidelines ship to every user inside
-# rules/comms.md, which is why they live in the block's delete list rather than in one repo's
-# overrides. Only the mechanically checkable ones are gated here; the rest is an authoring judgment a
-# grep cannot make, and the block carries those as prose.
+# rules/comms.md, which is why they live in that rule's delete list rather than in one repo's
+# recorded decisions. Only the mechanically checkable ones are gated here; the rest is an authoring
+# judgment a grep cannot make, and the rule carries those as prose.
 #
 # What is deliberately NOT in this list, and why the omission is the load-bearing part: the source's
 # banned-word list was written for consumer prose and bans `harness`, `leverage`, `robust`, `streamline`
@@ -445,11 +445,11 @@ slop="$slop|what if I told you|stands as a testament|marks a pivotal moment|play
 slop="$slop|underscores its significance|experts agree|at the end of the day|in today'?s world"
 slop="$slop|let'?s dive in|is not just|isn'?t just|the question isn'?t|in conclusion"
 slop_hits=""
-for f in $(find skills rules docs -type f -name '*.md' 2>/dev/null; ls README.md BOOTSTRAP.md AGENTS.md CLAUDE.md 2>/dev/null); do
+for f in $(find skills rules docs -type f -name '*.md' 2>/dev/null; ls README.md BOOTSTRAP.md AGENTS.md 2>/dev/null); do
   case "$f" in
     # Three files must name a pattern in order to forbid it, so they are exempt by construction rather
-    # than by exception: the shipped block itself, the decision record that quotes the ruling, and any
-    # docs page about the patterns. Exempting the block is not a loophole - it is the one file whose job
+    # than by exception: the shipped rule itself, the decision record that quotes the ruling, and any
+    # docs page about the patterns. Exempting the rule is not a loophole - it is the one file whose job
     # is to carry the list.
     rules/comms.md|docs/skills/no-ai-slop*|docs/DECISIONS.md) continue ;;
   esac
@@ -459,6 +459,61 @@ if [ -z "$slop_hits" ]; then
   ok "no gated ai-slop phrasing in shipped markdown"  # prove-new: regression-guard every pattern returned zero across the shipped surfaces when the list landed (see the note above), so the check locks in a property the repo already had rather than demanding a cleanup
 else
   bad "ai-slop phrasing in:$slop_hits (the full list is the delete list in rules/comms.md)"
+fi
+
+echo "== recorded-decisions wording =="
+# One measured asymmetry, and it is why this is gated rather than agreed. A default subagent has NO
+# read path to durable memory: on omp `memory://` is an unknown protocol inside a worker, `recall`,
+# `reflect` and `retain` are absent from its inventory, and nothing is injected. Claude Code has the
+# same asymmetry by another mechanism. Most skills here run in workers, so a sentence telling a reader
+# to consult durable memory and nothing else is a silent nothing on the host that reads it - the same
+# failure as the discovery block this release deleted, which sat in a file its host never loaded.
+#
+# So the shipped READ sentence names BOTH sources: durable memory where the reader has it, otherwise
+# the brief it was given. What is gated is the superseded opener, matched at THREE WORDS. Not the whole
+# sentence: a 15-word literal survives one rewrap or one edited word, and the gate then passes over the
+# stale file it was added to catch, which is worse than no gate because it certifies what it missed.
+#
+# What is deliberately NOT gated, because it was tried and measured: the pairing itself, as "a paragraph
+# naming durable memory beside `consult`/`honor` must also name the brief". It came back nine hits on
+# this tree and five were wrong - a WRITE sentence saying later runs `honor` the recorded value, a
+# numbered list whose bullets the paragraph reader joins into one, and two decision records explaining
+# the very defect. A gate that cries wolf gets disabled and takes the useful half with it, which is the
+# same reason the slop list above holds only phrases with no legitimate use. Catching a paraphrase is an
+# authoring judgment a grep cannot make; `/overrides` holds the canonical pair so there is one place to
+# copy from.
+#
+# Scope is every shipped `.md` plus the skill bodies, the historical records INCLUDED. Leaving those
+# out by construction, the way the deleted-paths sweep does, would let a record carrying a live
+# instruction string pass silently one directory over. They earn their mention by ATTRIBUTION instead,
+# the same shape this file already uses for `hooks/hooks.json`: a paragraph that says `supersede` is
+# recording the old wording rather than instructing anyone in it. `raw/` is the verbatim source
+# archive and is gitignored, so it is out of the sweep already; rewriting quoted material there would
+# be wrong. `skills/overrides/SKILL.md` and its docs page are the single home for per-harness
+# mechanism detail, so they are the one place that discusses the surface at length.
+rd_opener=""
+for f in $(find skills rules docs -type f -name '*.md' 2>/dev/null; ls README.md BOOTSTRAP.md AGENTS.md 2>/dev/null); do
+  case "$f" in skills/overrides/SKILL.md|docs/skills/overrides.md) continue ;; esac
+  rd_opener="$rd_opener$(awk '
+    function flush() {
+      if (para != "") {
+        low = tolower(para)
+        if (low ~ /consult your harness/ && low !~ /supersede/) printf "%s:%d ", FILENAME, start
+      }
+      para = ""
+    }
+    /^[ \t]*$/ { flush(); next }
+    { if (para == "") start = FNR; para = para " " $0 }
+    END { flush() }
+  ' "$f")"
+done
+# if/else rather than `&& ok || bad`, because prove-new reads a regression-guard declaration as a
+# trailing comment on the CALL LINE and pairs a check by its ok label - so a declaration parked on a
+# continuation `bad` line never reaches the ok token, and the check reports itself UNPROVEN.
+if [ -z "$rd_opener" ]; then
+  ok "no shipped file carries the superseded Consult-your-harness opener" # prove-new: regression-guard the wording this guards did not exist at base, where these paragraphs named a file path instead, so it cannot come back red there - proven red instead by pasting the superseded opener into docs/skills/vision.md, and proven to honour its attribution escape by pasting the same string into a paragraph saying superseded
+else
+  bad "superseded READ opener at: $rd_opener- it asserts a surface a worker has no path to; name the brief as the other source, per /overrides"
 fi
 
 echo "== zsh path-variable trap =="
@@ -640,16 +695,23 @@ if [ -f "$bdhook" ]; then
   else
     bad "$bdhook contains an absolute path - it would break on any machine but the one it was written on"
   fi
-  # /onboard's comms detection has ONE observable: it searches the session's own context for this
-  # token. The hook's own comment says changing the constant breaks that skill, and the behaviour
-  # test pins the literal - so hook and test move together while the skill's documented observable
-  # silently does not. Keyed on the VALUE, never a line number: both files get edited in the same
-  # rounds this one does.
+  # The comms rule's delivery has ONE observable: an agent searches the session's own context for
+  # this token. The hook's own comment says changing the constant breaks that, and the behaviour test
+  # pins the literal - so hook and test move together while the shipped prose that tells a reader
+  # what to look for silently does not. Keyed on the VALUE and swept rather than pointed at one file:
+  # the earlier version named `skills/onboard/SKILL.md`, and when that skill was rewritten the check
+  # went red on a correct tree, which is a gate reporting its own staleness as a defect.
   bdsentinel="$(sed -n 's/^const SENTINEL = "\([^"]*\)".*/\1/p' "$bdhook" | head -1)"
-  if [ -n "$bdsentinel" ] && grep -qF "$bdsentinel" skills/onboard/SKILL.md; then
-    ok "the hook's SENTINEL is the token skills/onboard/SKILL.md tells the agent to search for" # prove-new: regression-guard reads the hook's text, so a base without the file grades nothing - proven red instead by changing SENTINEL in the hook alone
+  bdsentinelhomes=""
+  if [ -n "$bdsentinel" ]; then
+    for bdsentinelf in $(find skills rules docs -type f -name '*.md' 2>/dev/null; ls README.md BOOTSTRAP.md 2>/dev/null); do
+      grep -qF "$bdsentinel" "$bdsentinelf" && bdsentinelhomes="$bdsentinelhomes $bdsentinelf"
+    done
+  fi
+  if [ -n "$bdsentinelhomes" ]; then
+    ok "the hook's SENTINEL is the token the shipped prose tells the agent to search for:${bdsentinelhomes}" # prove-new: regression-guard reads the hook's text, so a base without the file grades nothing - proven red instead by changing SENTINEL in the hook alone
   else
-    bad "the hook's SENTINEL ${bdsentinel:+($bdsentinel) }is not named in skills/onboard/SKILL.md - /onboard's detection then searches for a token nothing injects, and calls the rule undelivered on the one host that delivers it"
+    bad "the hook's SENTINEL ${bdsentinel:+($bdsentinel) }is named by no shipped skill or doc - the one observable for 'the rule arrived' is then a token nothing tells a reader to look for"
   fi
 fi
 # The static checks above cannot tell whether the hook still WORKS. The behaviour suite can, so
@@ -793,52 +855,6 @@ else
   fi
 fi
 
-echo "== discovery block =="
-# The managed block is the whole of discovery: nothing announces the practices to a fresh session but
-# this text. What replaced the old check here matters more than the check. The old one asserted
-# `CLAUDE.md carries the managed block` and it passed every run, while this repo's own host provably
-# could not read that file - a green line reporting a property that did not hold where it mattered.
-#
-# Measured 2026-08-21, one unique token per file in a temp git repo, each agent then asked which
-# tokens were in its context with no tool calls: omp loads root AGENTS.md and loads NEITHER root
-# CLAUDE.md NOR CLAUDE.local.md. Claude Code 2.1.233 loads both of those and not AGENTS.md - its
-# answer even noted AGENTS.md existed on disk while its contents were absent from context. The two
-# hosts read disjoint sets of committed files, so no single file is agent-agnostic and /onboard has to
-# write one copy per host.
-#
-# Two copies of anything normally drift. They are safe here for one reason, and it is the reason this
-# check exists rather than a comment: /onboard replaces between its markers on every run, so it is
-# the reconciler the two-copies pattern usually lacks, and this line fails the moment two copies stop
-# agreeing. Drop either half and the pattern stops being safe.
-DB_BEGIN='<!-- BEGIN better-dev -->'
-DB_END='<!-- END better-dev -->'
-# The targets omp's own context providers reach, per its provider table: `agents-md` picks up a
-# standalone root AGENTS.md, `native` picks up `.omp/AGENTS.md`. No provider matches a bare root
-# CLAUDE.md, which is why the measurement above comes out the way it does.
-DB_HOST_READS="AGENTS.md .omp/AGENTS.md"
-# /onboard's remaining targets. Real homes for the block, read by Claude Code rather than by this
-# repo's host - so a copy in one of these is legitimate and can never be the only copy.
-DB_OTHER="CLAUDE.md CLAUDE.local.md"
-db_errs=""; db_carriers=""; db_host=""; db_first=""; db_first_file=""
-for f in $DB_HOST_READS $DB_OTHER; do
-  [ -f "$f" ] && grep -qxF "$DB_BEGIN" "$f" || continue
-  db_carriers="$db_carriers $f"
-  case " $DB_HOST_READS " in *" $f "*) db_host="$db_host $f" ;; esac
-  grep -qxF "$DB_END" "$f" || db_errs="$db_errs $f:no-end-sentinel"
-  db_block="$(awk -v b="$DB_BEGIN" -v e="$DB_END" '$0==b{f=1} f{print} $0==e{exit}' "$f")"
-  # A block that says the practices exist but not where their overrides live sends the reader to guess.
-  printf '%s' "$db_block" | grep -qF '.better-dev/overrides.md' || db_errs="$db_errs $f:no-overrides-pointer"
-  printf '%s' "$db_block" | grep -qF '.better-dev/rules.md' || db_errs="$db_errs $f:no-rules-pointer"
-  if [ -z "$db_first_file" ]; then
-    db_first="$db_block"; db_first_file="$f"
-  elif [ "$db_block" != "$db_first" ]; then
-    db_errs="$db_errs $f:disagrees-with-$db_first_file"
-  fi
-done
-[ -n "$db_carriers" ] || db_errs="$db_errs no-copy-in-any-entry-file"
-[ -n "$db_host" ] || db_errs="$db_errs no-copy-in-a-file-this-repo-host-reads"
-[ -z "$db_errs" ] && ok "the managed block sits in a file this repo's own host reads (${db_host# }) and every copy agrees (${db_carriers# })" || bad "managed block:$db_errs - a block in a file the running host does not read is invisible to every session, and the /onboard nudge it was meant to clear then never stops firing"
-
 echo "== deleted paths =="
 # The harness now provides what this library used to ship, and every shipped file has to point at the
 # native replacement. A file that still names a removed script or directory costs its reader a turn
@@ -853,8 +869,8 @@ gone="$gone|bd-session-start|bd-subagent-start|bd-graphify-refresh-stale|bd-migr
 gone="$gone|bd-omp-runtime-check|bd-awareness|[.]better-dev/bin|hooks/bd-"
 gone="$gone|hosts/(claude|codex|hermes|omp)|better-dev/hooks|graphify|browse/src|learnings[.]jsonl"
 gone="$gone|orchestrating-agents/tiers[.]md|/bootstrap-hooks|/codebase-map|/browser-capability"
-gone="$gone|install[.]sh|bd-uninstall|friction/"
-swept="$(find skills rules scripts .github docs/skills -type f 2>/dev/null; ls README.md AGENTS.md CLAUDE.md BOOTSTRAP.md .claude-plugin/plugin.json .omp-plugin/marketplace.json .claude-plugin/marketplace.json 2>/dev/null)"
+gone="$gone|install[.]sh|bd-uninstall|friction/|[.]better-dev/(overrides|rules)[.]md"
+swept="$(find skills rules scripts .github docs/skills -type f 2>/dev/null; ls README.md AGENTS.md BOOTSTRAP.md .claude-plugin/plugin.json .omp-plugin/marketplace.json .claude-plugin/marketplace.json 2>/dev/null)"
 gone_hits=""
 for f in $swept; do
   [ "$f" = scripts/bd-package-check ] && continue

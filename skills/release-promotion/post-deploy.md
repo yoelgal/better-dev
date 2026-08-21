@@ -9,9 +9,9 @@ at the end of this file.
 
 ## Everything here comes from recorded rules
 
-Every command and URL in this pass comes from the recorded `deploy-*` rules in
-`.better-dev/rules.md`, written once by `/guardrails-install` - detected,
-premise-verified, never guessed. A value that isn't recorded is a `NEEDS_INPUT` naming
+Every command and URL in this pass comes from the recorded `deploy-*` rules in your harness's durable
+memory (see `/overrides`), written once by `/guardrails-install` - detected, premise-verified, never
+guessed. A value that isn't recorded is a `NEEDS_INPUT` naming
 `/guardrails-install` as the recorder, not a guess. On a greenfield product where nothing was ever
 created, the recorder's own fork routes to `/deploy-capability` - the `NEEDS_INPUT` names the
 creator, not a recorder with nothing to observe. The same rule the main body holds for branches
@@ -116,7 +116,7 @@ The receipt fields are the record; these are the states the release settles:
 - `DEGRADED` - `DONE_WITH_CONCERNS`, findings named.
 - `UNVERIFIED` - the deploy state is unknown, or the surface can't be driven from here (VPN-only,
   a missing credential): `NEEDS_INPUT` naming exactly what has to run.
-- `REVERTED` - the receipt says so, and the cause goes to the `learn` tool so the next planning
+- `REVERTED` - the receipt says so, and the cause is recorded durably (see `/overrides`) so the next planning
   pass sees it.
 
 Neither a spent wait budget nor an unreachable probe is ever a success state.

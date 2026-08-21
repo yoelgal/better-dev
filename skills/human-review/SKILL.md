@@ -25,10 +25,12 @@ is wrong is a conflict to surface, not a change to undo.
 ## The batch is a file on disk before anything is applied
 
 Feedback that lives only in a browser tab is lost work - three tab crashes across one three-hour
-review sent an upstream reviewer back to plain chat. So the batch is written under
-`.better-dev/review/feedback-<slug>-<n>.json` and read from there, and clearing it is a separate step
-from reading it: a half-applied batch is then recoverable rather than gone, and a session that dies
-mid-apply resumes from the file instead of asking the human to mark the artifact up again.
+review sent an upstream reviewer back to plain chat. So the batch is written to a stable scratch path
+outside the repo - `${TMPDIR:-/tmp}/bd-human-review/feedback-<slug>-<n>.json` - and read from there,
+and clearing it is a separate step from reading it: a half-applied batch is then recoverable rather
+than gone, and a session that dies
+mid-apply resumes from the file instead of asking the human to mark the artifact up again. The path is
+stable rather than minted per run precisely so a fresh session can find it.
 
 The shape, which is the contract a sourced surface has to emit:
 

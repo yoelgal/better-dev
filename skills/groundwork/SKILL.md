@@ -21,8 +21,9 @@ history. Where a vision is already recorded, read it before shaping
 (`VISION.md`) - its acceptance policy is a premise this pass inherits
 rather than re-derives.
 
-Read `.better-dev/overrides.md` first. A project's own stack,
-architecture conventions, or a house way of slicing work wins over any default below.
+Honor this project's recorded decisions - from your harness's durable memory where you have it,
+otherwise from the brief you were given (see `/overrides`). A project's own stack, architecture
+conventions, or a house way of slicing work wins over any default below.
 
 **One fork after that read, before shaping starts, on every greenfield build ask.** Two routes reach a
 built product and they spend the user's own attention very differently: this skill's - a shared
@@ -176,7 +177,7 @@ foundation-first order the branching model already anticipates (`/worktree-branc
 its stack-agnostic half only and recorded one deferred line, because at `/onboard` time there was no
 stack to detect: no verify command, no `dev-run` or `seed-reset`, no real denylist. The foundation is
 what makes them detectable, and this is the named trigger the deferred record itself points at
-(`recall "guardrails"`). Skipping it fans N work-items out onto a loop whose verify command is
+(the recorded guardrail keys). Skipping it fans N work-items out onto a loop whose verify command is
 unrecorded and whose blast-radius policy is empty - every item then re-guesses both, differently. Do it
 before the wave, not after: it is one run, and it is the difference between N loops that grade against
 a recorded bar and N that invent one.

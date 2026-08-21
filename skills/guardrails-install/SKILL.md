@@ -32,8 +32,9 @@ guardrails wired after the fact.
   and test commands - the ones you detected. An unmapped check is a gap to report and ask about, not a
   command to invent. Silence beats a wrong guess, the same discipline `/onboard` uses.
 
-Read `.better-dev/overrides.md` first - if the project has already recorded a guardrail preference,
-honor it before applying any default here.
+Honor this project's recorded decisions - from your harness's durable memory where you have it,
+otherwise from the brief you were given (see `/overrides`). A guardrail preference the project already
+recorded wins.
 
 Interactive installers stay operator-run, with the rest of the class `/onboard` names (host settings
 and permission files at either scope, and any machine-global change D26's list does not name): emit a
@@ -58,7 +59,7 @@ So on a no-stack repo, split the skill:
   and needs nothing detected, and the committed bash policy below describes shell rather than a stack,
   so its destructive-command patterns hold on an empty tree. Install both, prove each one (a clean
   commit passes, a planted secret is refused, a `rm -r` prompts), and keep going.
-- **Do not write `none` placeholders.** One deferred line in `.better-dev/rules.md` beats four hollow
+- **Do not write `none` placeholders.** One deferred line in your harness's durable memory beats four hollow
   records that read like findings: `- guardrails: deferred at onboard - no stack yet; re-run
   /guardrails-install once /groundwork lands one, which is when verify/dev-run/seed-reset/ops-runner
   and the real denylist can be recorded from what exists`.
@@ -68,7 +69,7 @@ So on a no-stack repo, split the skill:
   (`/onboard` Phase 5's mechanism), instead of spending the operator's attention now on a choice they
   have no context to make. Park them by writing the record, not by intending to - an unwritten park is
   indistinguishable from a policy the operator deliberately left unset, and the difference is the whole
-  point of parking. Both lines go in `.better-dev/rules.md`:
+  point of parking. Both lines go in your harness's durable memory:
 
   ```
   - pending-decision: merge-policy - may the agent merge a gates-passed green PR, or does a human click it? (parked at onboard, no stack yet)
@@ -196,10 +197,10 @@ proof where a push is cheap, and an explicit "unproven: CI gate observed clean o
 
 Show the operator what you propose to write - the hook body, the CI file - before writing it. One
 decision at a time, not a wall of questions. Their answer becomes the default here; if it diverges from a
-better-dev default, offer to persist it as a line in `.better-dev/overrides.md` so later runs
-honor it.
+better-dev default, offer to record it in your harness's durable memory (see `/overrides`) so later
+runs honor it.
 
-After wiring, record each check you mapped as a durable rule in `.better-dev/rules.md`, so the rest of
+After wiring, record each check you mapped as a durable rule in your harness's durable memory, so the rest of
 better-dev knows the repo's *real* verify commands rather than re-detecting them:
 
 ```
@@ -229,7 +230,7 @@ re-probes rather than skips: a script renamed since the record was written surfa
 as a worker's own check failing in a fresh worktree, where the cheapest reading is broken code and
 the cheapest fix is a local workaround that leaves the record wrong for every session after it. A
 probe that contradicts the record is re-recorded, and the superseded line is edited out in the same
-pass - a rules file holding both values leaves two rules in force, and the stale one reads exactly as
+pass - one record holding both values leaves two rules in force, and the stale one reads exactly as
 current.
 
 **Record the deploy surface.** Deploy commands travel exactly like the verify commands above - detected
@@ -386,7 +387,7 @@ denylist paths, the gated classes, the scope number - one decision at a time, an
 it turns that surface into something the loop, `/review`, and the PR brief read and grade against, so the
 one detection is reused everywhere and nothing downstream re-guesses it.
 
-Promote it as durable rules in `.better-dev/rules.md`, keyed under one `safety-` prefix family so a
+Promote it as durable rules in your harness's durable memory, keyed under one `safety-` prefix family so a
 reader looking for the policy finds all of it together - the same shape this skill already uses for the
 verify commands. The scope key carries two axes: a file count, ~10 by default, and a line ceiling
 counting neither lockfiles, snapshots, generated output, nor docs. Its line half is calibrated from
@@ -460,9 +461,9 @@ Two more durable safety rules travel with the policy - the *why* behind the deny
 ```
 
 A recorded default, never a hardcode and never a permanent hard-fail - each entry is an escalation a human
-answers, not a wall. A project waives, narrows, or widens any of it through `/overrides`: a line in the
-read-first `.better-dev/overrides.md` (e.g. "safety scope-gate is 20 files", "don't gate dependency bumps
-here") wins over the recorded baseline. The loop and `/review` read that overrides layer first, then the
+answers, not a wall. A project waives, narrows, or widens any of it through `/overrides`: a recorded
+override (e.g. "safety scope-gate is 20 files", "don't gate dependency bumps here") wins over the
+recorded baseline. The loop and `/review` read that overrides layer first, then the
 baseline - so the resolved policy is honored every run and stays this project's to adjust.
 
 One standing rule beyond the blast-radius policy travels the same way. The repo's always-loaded context -
@@ -470,7 +471,7 @@ whichever entry file this host reads, plus the managed blocks in it - is read on
 per-turn tax; carry it lean or it compounds. Name the file this repo's host actually loads rather than
 assuming `CLAUDE.md`: measured 2026-08-21, omp reads a root `AGENTS.md` and does not read a root
 `CLAUDE.md`, and Claude Code is the reverse, so a recorded rule naming the wrong one describes a file
-nothing loads. Record the discipline as one more line in the same file:
+nothing loads. Record the discipline as one more recorded line beside the rest:
 
 ```
 - context-hygiene: the repo's standing context (the entry files this host reads + always-loaded blocks) is a per-turn tax - keep it lean, prune stale lines on each release, and rewrite instructions written for an older model rather than carrying them forward.

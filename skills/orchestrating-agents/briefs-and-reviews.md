@@ -21,9 +21,25 @@ What belongs in the brief:
 - The task itself, and the exact values it must use verbatim: numbers, magic strings, signatures, test
   cases. These live in the brief, not in your prose around it.
 - Interfaces and decisions from earlier tasks that the brief can't derive on its own.
+- **This project's recorded decisions that bear on the slice.** A worker cannot read them for itself:
+  durable memory belongs to the conversation the operator is in, so a dispatched agent has no read path
+  to it (measured on omp - no `recall` in a worker's inventory, no injected memories, and `memory://`
+  unregistered there). Carried or lost. The seven that exist: branch model, integration branch, feature
+  prefix, shared-or-solo and stack-or-greenfield from `/onboard`, plus the verify surface and the
+  runnable entry points from `/guardrails-install`.
+
+  Two shapes matter more than the list. A slot the brief omits means **none was passed**, never that
+  none exists, so a worker that needs one asks rather than assuming the project has no opinion. And a
+  fact nobody settled is written `unknown`, never left blank: blank reads as "no constraint" and the
+  worker invents one, which is the whole reason `/onboard` refuses to record a guess.
+
+  The return direction is the other half. A worker that finds something worth standing returns it as a
+  finding; the parent confirms it with the operator and records it. A worker never records - it has no
+  write path either, and a standing decision nobody approved is not one.
 - Lessons that bear on this task's area: the relevant `learned` lines from this work-item's receipts, and
-  any lesson on the area in `memory://root/learned.md`. A pitfall one worker already paid for is cheaper
-  in the brief than rediscovered in the run.
+  any lesson on the area held in durable memory, which you read and paste in because the worker cannot
+  (see `/overrides`). A pitfall one worker already paid for is cheaper in the brief than rediscovered in
+  the run.
 - Your resolution of any ambiguity you noticed while writing it - don't pass a known ambiguity through.
 - Capabilities, not exact tool names ("a browser check", never "the DesignSync tool"). A named tool the
   worker can't find means look for the equivalent capability under another name and proceed, reporting
@@ -35,9 +51,9 @@ What belongs in the brief:
   migrations, auth code, payments/PII, infra or prod config, dependency manifests and lockfiles - the
   worker settles `NEEDS_INPUT` with what it found and what it needs, rather than editing blind and letting
   the rule surface only at review. `/guardrails-install` records that list per repo as the `safety-` lines
-  in `.better-dev/rules.md`; read them there, then apply any `.better-dev/overrides.md` adjustments (which
-  win), so the brief carries this repo's actual set rather than a generic one.
-- The entries from the project's skill list (the `dispatch-skills` line in `.better-dev/rules.md`, per this skill's
+  in your harness's durable memory; read them there, and a recorded override adjustment wins (see
+  `/overrides`), so the brief carries this repo's actual set rather than a generic one.
+- The entries from the project's skill list (the recorded `dispatch-skills` line, per this skill's
   SKILL.md) that bear on this slice, pasted as an instruction to load them before starting. The record
   pairs each skill with when it applies, so a worker whose slice touches none of them loads none:
 

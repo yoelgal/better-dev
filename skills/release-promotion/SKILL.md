@@ -20,10 +20,10 @@ closed: every check comes back green from git and CI directly, and an *unknown* 
 
 Four shapes ship and two facts pick one, neither of them assumed. The branch names are defaults, not
 a mandate - a project may integrate on `develop`, release from `master`, or prefix hotfixes `hf/` -
-so start from what the repo records and let it win. Read `.better-dev/overrides.md` and
-`.better-dev/rules.md` with the `read` tool - the rules file is where `branch-model`,
-`version-surface`, and `release-automation` are recorded - plus `memory://root/learned.md` for what
-an earlier release paid to learn, then name both ends from what they say:
+so start from what the repo records and let it win. Honor this project's recorded decisions - from
+your harness's durable memory where you have it, otherwise from the brief you were given
+(see `/overrides`). That is where `branch-model`, `version-surface`, and `release-automation` are
+recorded, and where an earlier release's lessons sit; name both ends from what it says:
 
 ```bash
 integration="staging"   # honor an override (e.g. develop)
@@ -190,12 +190,13 @@ git diff --diff-filter=ADR --name-only $R -- 'skills/*/SKILL.md'      # skill ro
 git diff --name-only $R -- skills/onboard/ rules/                     # reonboard candidates
 ```
 
-- `reonboard` - a repo surface changed: anything `/onboard` writes into a wired repo (the discovery
-  block, the `.better-dev` scaffold). The second diff lists *candidates* only, and each hit forces a
-  stated judgement about whether a wired repo has anything to re-run - a prose-only edit under
-  `skills/onboard/` changes no repo surface, and a marker that says re-run for nothing gets ignored.
+- `reonboard` - what `/onboard` records changed: the set of standing facts it establishes, or how it
+  establishes them. `/onboard` writes no file into a repo, so the signal is the record, not a surface.
+  The second diff lists *candidates* only, and each hit forces a stated judgement about whether a wired
+  repo has anything to re-run - a prose-only edit under `skills/onboard/` changes no recorded fact, and
+  a marker that says re-run for nothing gets ignored.
 - `offer` - judgement, with no mechanical signal behind it: the release added something opt-in. An
-  `offer` always carries `reonboard`, because the repo surface is where an accepted offer lands.
+  `offer` always carries `reonboard`, because the recorded facts are where an accepted offer lands.
 - **Both empty is an upgrade-only release, and upgrade-only means NO LINE AT ALL.** Flags are never
   empty in the ledger, so do not render a flagless line - say "upgrade-only, no ledger line" in the
   confirmation below and commit the version surface on its own.
@@ -334,7 +335,7 @@ once rather than quietly repairing it.
 ## After the tag: verify the deploy
 
 A pushed tag starts the release; users have it only when the deploy lands and the deployed thing
-runs. Read the `deploy-*` rules in `.better-dev/rules.md` for the recorded deploy surface. Three
+runs. Read this project's recorded `deploy-*` rules for the deploy surface. Three
 recorded answers, three paths:
 
 - `deploy-surface: none` - nothing runs anywhere (a library, a CLI). Record `deploy: NO_SURFACE` and
@@ -354,7 +355,7 @@ never loop states; `post-deploy.md` maps them to the terminal states.
 
 ## Distill the loop's memory
 
-A release is where a cycle's lessons get consolidated rather than letting `rules.md` only ever grow.
+A release is where a cycle's lessons get consolidated rather than letting the promoted rules only ever grow.
 That whole pass - the reconcile verbs and the library-defect fork - is in `distill.md`; read it once
 the release has settled.
 

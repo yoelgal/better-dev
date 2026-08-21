@@ -20,7 +20,7 @@ receipts.
 
 ```bash
 l="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")/.better-dev/ledger/<work-item>"
-h=".better-dev/handoff/<work-item>"
+h="handoff/<work-item>"
 mkdir -p "$h"
 cp "$l/contract.md" "$l/receipts.md" "$h/"
 cp "$l/review.md" "$h/" 2>/dev/null || true
@@ -30,9 +30,11 @@ git add "$h" && git commit -m "<work-item>: handoff bundle" && git push origin "
 An item handed off before its contract was approved carries no approval line - the bundle holds what
 exists, and pick-up then starts at the front-end's own confirm rather than step 3 below.
 
-Confirm git will actually carry it before committing: `git check-ignore -q "$h"` exiting 0 means the
-path is ignored in this repo (a fully-gitignored `.better-dev/` layout) - put the bundle at
-`handoff/<work-item>/` in the repo root instead.
+The bundle sits at the repo root, never under `.better-dev/`. That directory holds the ledger, which is
+local by design and commonly gitignored whole, so a bundle placed inside it is a bundle git refuses to
+carry - and the failure is silent, because `git add` on an ignored path succeeds and commits nothing.
+Confirm it anyway before committing: `git check-ignore -q "$h"` exiting 0 means this repo ignores the
+root path too, and the handoff needs a path it does not.
 
 ## Picking up: re-establish, then trust nothing on the record
 

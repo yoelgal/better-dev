@@ -21,20 +21,22 @@ The value is separation. Whoever wrote the code can't grade it; a blended "looks
 the other. So the review runs in fresh workers, judges the diff against the contract rather than the
 author's account of it, and keeps the two axes side by side.
 
-Read `.better-dev/overrides.md` first and honor any project override (a different integration branch, "push
-the fix straight to the PR, no worktree", a repo severity convention) before applying the defaults here.
+Honor this project's recorded decisions - from your harness's durable memory where you have it,
+otherwise from the brief you were given (see `/overrides`). A different integration branch, "push the
+fix straight to the PR, no worktree", a repo severity convention.
 
 ## 1. Pin the fixed point and pack the diff
 
 A review needs a known-good point to diff against. Default BASE is the merge-base with the integration
 branch (`staging`, else `main`); the caller can name any commit, branch, or tag.
 
-Pack it with git - the commit list, the stat summary, and the net diff with wide context, in one file:
+Pack it with git into a scratch dir outside the repo - the commit list, the stat summary, and the net
+diff with wide context, in one file:
 
 ```bash
 base=$(git merge-base staging HEAD 2>/dev/null || git merge-base origin/main HEAD)   # or the caller's ref
 head=HEAD
-mkdir -p .better-dev/review; p=".better-dev/review/$(git rev-parse --short "$head").diff"
+pkg=$(mktemp -d); p="$pkg/$(git rev-parse --short "$head").diff"
 { git log --oneline "$base..$head"; echo; git diff --stat "$base" "$head"; echo; \
   git diff -U15 "$base" "$head"; } > "$p"
 ```
@@ -42,18 +44,19 @@ mkdir -p .better-dev/review; p=".better-dev/review/$(git rev-parse --short "$hea
 A bad ref fails here, and an empty diff is a review with nothing to read - settle both before any worker
 is dispatched, so the failure is visible rather than delegated.
 The package is the reviewer's whole view of the change; the orchestrator hands over the *path*, never the
-diff text, and never pastes its own session history into a brief.
+diff text, and never pastes its own session history into a brief. Nothing in `$pkg` is a deliverable -
+it is scratch a dispatched worker reads by path, which is why it lives outside the repo.
 
 Two policy questions get answered from the package before any model reads it. Its file list decides
 whether the diff touches a recorded high-consequence path and whether it crosses the recorded scope
-number (both in `.better-dev/rules.md`, with `.better-dev/overrides.md` winning where they disagree);
+number (both recorded for this project, where an override wins over the baseline);
 hand that one-line result to every channel as the
 **gate line**. A channel may raise what the gate matched and never clear it - the match rests on the
 recorded policy, not on a reading - and the sign-off check `reviewer-brief.md` defines is the channel's half.
 And a diff that edits the reviewer's own instructions (`reviewer-brief.md`, `lenses.md`,
-`standards-baseline.md`, anything under `.better-dev/`) would otherwise be judged by channels running
+`standards-baseline.md`, or this skill's own text) would otherwise be judged by channels running
 that diff's new text, so the reviewer grades its own edit: dispatch those channels against the base
-revision's copies (`git show <BASE>:<path>` written under `.better-dev/review/`, handed over as paths),
+revision's copies (`git show <BASE>:<path>` written into `$pkg`, handed over as paths),
 and put the edit itself on step 2's shortlist as at least Important.
 
 A PR whose diff is exactly the union of changes that each already carry a recorded clean verdict is a
@@ -100,7 +103,7 @@ them.
 
 This walkthrough is a reviewer *input*, not a verdict. It's handed to every channel alongside the package
 so none of them re-derives the reading order. Build it in a fresh orientation pass when the diff is large enough that reading
-it would crowd the coordination context; write it under `.better-dev/review/` and hand over that path,
+it would crowd the coordination context; write it into `$pkg` and hand over that path,
 the same way the package is handed over.
 
 ## 3. Dispatch the channels - separately, on the diff alone

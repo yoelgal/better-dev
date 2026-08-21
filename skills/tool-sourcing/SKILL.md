@@ -16,7 +16,8 @@ returns an empty list on any error, so an outage looks identical to "no such ski
 is all in wrapping that discovery: search wider, distrust the ranking, and never let an empty result quietly
 conclude the capability doesn't exist.
 
-Read `.better-dev/overrides.md` first and honor any project override - a repo may pin an internal skills
+Honor this project's recorded decisions - from your harness's durable memory where you have it,
+otherwise from the brief you were given (see `/overrides`). A repo may pin an internal skills
 registry, forbid third-party installs, or already name the tool it wants for a given job.
 
 ## 1. Name the gap
@@ -94,9 +95,10 @@ with `-a`). Inside an agent it auto-detects the harness and targets it non-inter
 ## 6. Record, or hand off
 
 If a tool was adopted, record it and the verdict so the choice survives compaction and a later run reuses it
-instead of re-sourcing: a `sourced <skill> for <capability> - <verdict>` line in `.better-dev/rules.md`,
-plus the `learn` tool for anything durable the vetting taught (a source to trust or avoid, a query that
-worked). A rejection is worth recording too - "looked for X, nothing adequate" saves the next run the search.
+instead of re-sourcing: record a `sourced <skill> for <capability> - <verdict>` line in your harness's
+durable memory (see `/overrides`), plus anything durable the vetting taught (a source to trust or
+avoid, a query that worked). A rejection is worth recording too - "looked for X, nothing adequate" saves
+the next run the search.
 
 If nothing adequate survived vetting and try-before-adopt, this is where sourcing ends and creation begins:
 hand off to `/self-extension` to draft a new skill (the fallback, only now that the ecosystem came up empty).

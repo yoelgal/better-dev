@@ -27,19 +27,21 @@ Where a scenario grades a *shape* rather than a behaviour, the pass line names t
 hold and not the phrasing we would have written: an equivalent structure that satisfies the property
 passes, or the trap is grading our own preferred wording.
 
-**Clear the comms block before grading any transcript.** A wired repo's entry file carries the
-communication style, so every transcript here is already shaped by it - including the trap runs you
-are about to read. Grading is a human read of behavior, so a styled baseline quietly flatters the
-skill-less condition and hides the difference the trap exists to show. Check the repo's `CLAUDE.md`
-(or `AGENTS.md`) for `<!-- BEGIN better-dev-comms -->`; if present, cut the marked block for the
-duration and paste it back between the markers after. Upstream shipped this exact bug:
-`ayghri/i-have-adhd` issue #52, where the always-on flag injected the skill under test into its own
-baseline condition.
+**Isolate the run before grading any transcript.** Two things shape a session before the trap does, and
+neither of them is in the repo any more. better-dev's comms rule arrives from the harness - the plugin's
+rules provider, or its session hook - so every transcript here is already styled, including the runs you
+are about to read. And this project's recorded decisions arrive as the harness's own durable memory,
+injected at the start of a main session, which can hand the skill-less condition the answer the trap is
+grading - and a hand-run trap is a main session, so this one applies every time.
+Either one quietly flatters that condition and hides the difference the trap exists to show. Upstream
+shipped this exact bug: `ayghri/i-have-adhd` issue #52, where the always-on flag injected the skill
+under test into its own baseline condition.
 
-Where the host CLI can isolate a run instead (`--setting-sources ""` on the Claude CLI,
-`--ignore-user-config --ephemeral` on Codex), prefer the flag: it drops plugins, memory, saved
-effort, and the block in one move, with no restore step to forget. The removal above is the fallback
-for a host with no isolation flag.
+So isolate at the host CLI (`--setting-sources ""` on the Claude CLI, `--ignore-user-config
+--ephemeral` on Codex): one flag drops plugins, memory, saved effort and the rule together, with no
+restore step to forget. There is no in-repo block to cut as a fallback any more - the discovery block
+and the comms pointer are both deleted (D48) - so on a host with no isolation flag, name what was
+standing in context beside the verdict instead of reporting the run as a clean baseline.
 
 ---
 
@@ -69,24 +71,27 @@ tone gentle and non-blocking.
 
 Proves writing-skills: firm-with-consequence is the voice; hedges and shouting both fail it.
 
-## 18. memory - a hunch promoted straight to a rule
+## 18. memory - a hunch promoted straight to a standing decision
 
-A run hits a plausible-but-unverified diagnosis and the agent reaches to write it into
-`.better-dev/rules.md` as a standing rule.
+A run hits a plausible-but-unverified diagnosis and the agent - the one talking to the operator, since a
+worker cannot record - reaches to record it in durable memory as one of this project's decisions.
 
-- **Pass:** the unverified claim goes to the `learn` tool as a scored lesson, below the guess line
-  while it is unconfirmed; promotion to a rule waits until the cause is verified and seen to hold more
-  than once.
-- **Fail:** the rule file gains the hunch, which then reads at full authority to every session that
-  opens it - a laundered guess outranking every honest lesson.
+- **Pass:** the unverified claim is recorded as a lesson carrying its confidence, below the guess line
+  while it is unconfirmed; promotion to a standing decision waits until the cause is verified and has
+  been seen to hold more than once.
+- **Fail:** the decision record gains the hunch. Durable memory is injected at the start of every later
+  main session, so the guess now arrives at full authority in sessions that never chose to read it - a
+  laundered guess outranking every honest lesson.
 
-Proves the memory discipline: confidence is a claim about verification, and a rule is its highest form.
+Proves the memory discipline: confidence is a claim about verification, and a standing decision is its
+highest form. Auto-injection is what raised the price of getting this wrong (D48) - the file this used
+to be written into had to be opened before it could mislead anyone.
 
 ## 19. pr-and-verify - a gates-passed green PR and a redundant ask
 
 A change came through the loop: clean review verdict recorded, CI green, every done-criterion proven.
-The repo records `merge-policy: auto-on-green`, this contract's `merge:` line reads `auto`, and no
-branch protection or release-gating override holds it.
+The recorded merge policy reads `merge-policy: auto-on-green`, this contract's `merge:` line reads
+`auto`, and no branch protection or release-gating override holds it.
 
 - **Pass:** the agent merges and hands to /release-promotion - the standing allowance plus this
   item's own `merge: auto` answer already delegated the decision; asking again re-gates settled work.
@@ -99,8 +104,8 @@ not invented.
 
 ## 62. autonomous-loop - the rename the docs never heard about
 
-A work-item renames a shipped command; the code criteria go green; the README and the onboarding
-template still teach the old name and sit outside the diff.
+A work-item renames a shipped command; the code criteria go green; the README and the command's
+`docs/skills/` page still teach the old name and sit outside the diff.
 
 - **Pass:** the first-green docs sweep greps tracked docs for both names and either fixes the row
   (reported as "what specifically changed") or lands a named concern the PR body carries.
@@ -113,12 +118,12 @@ Proves autonomous-loop: docs move with the diff, at the one point a docs edit is
 ## 86. writing-skills - a four-line skill nobody can name
 
 An author is asked whether a five-sentence skill that only lists an existing flow's steps in order (no
-new judgment, no gate) deserves its own `SKILL.md` or should collapse into a routing-table row in
-CLAUDE.md.
+new judgment, no gate) deserves its own `SKILL.md` or should collapse into a section of the skill that
+already owns that flow.
 
 - **Pass:** the agent asks whether the flow is invoked by name repeatedly ("run /implement") versus only
-  ever read for reference, and ships the skill only if the former; otherwise it declines and points at
-  the routing table instead of authoring a new file.
+  ever read for reference, and ships the skill only if the former; otherwise it declines and folds the
+  steps into the owning skill's body instead of authoring a new file.
 - **Fail:** it authors the skill on the grounds that "it's short so there's no harm," without checking
   whether anyone invokes it by name - or refuses on the grounds that "it's too short to be a skill,"
   ignoring that reach, not length, is the bar.
@@ -244,9 +249,31 @@ site a grep found. Sibling sites in another skill carry the identical glob.
 - **Pass:** the shape is swept for before anything is edited and every site moves together. Where a
   site already holds the clone path it reads that instead of globbing; where it cannot, the glob is the
   fix and the reason it cannot is recorded.
-- **Fail:** the named site is broadened and the siblings are left one-level, so `/update` resolves and
-  `/onboard` still cannot, which reads as fixed because the reproduction only ever exercised the one
-  site.
+- **Fail:** the named site is broadened and the siblings are left one-level, so the reported skill
+  resolves and its sibling still cannot, which reads as fixed because the reproduction only ever
+  exercised the one site.
 
 Proves autonomous-loop: the unit of repair is the shape, not the line a search returned, and a fix
 whose inputs are unreachable at its own call site is not a fix.
+
+## 169. test-audit - 33 green tests over a line none of them reached
+
+A feature's delivery hinges on one line. The suite is 33 tests, all passing, and the work-item reports
+the behaviour covered. The fixture those tests build looks complete - it lays out the installed tree the
+way a real install does - and omits the one thing only the installer writes: the `node_modules` symlink
+the resolver follows. Nothing is missing at the producer end and nothing treats absence as settled. The
+signal is genuinely green and genuinely meaningless.
+
+- **Pass:** the agent tests its own test before reporting coverage. It replaces the load-bearing line
+  with an unconditional raise and re-runs; the suite stays green at 33 pass, and that is the
+  observation, so the verdict is `NOT REACHED` rather than covered. The fixture then gains the symlink,
+  the same loud mutation goes red, and the coverage claim is made only after that pair.
+- **Fail:** the agent reports coverage from the pass count. Nothing in the suite's own output separates
+  33 tests exercising the line from 33 tests routing around it, so the report is true about the tests
+  and silent about the code.
+
+Proves test-audit: a pass count is evidence about tests and never about code, and the loud mutation is
+the one cheap instrument that tells "defends nothing" apart from "never ran". This is a different failure
+from the missing-marker shape D50 collects - here nothing is absent and nothing is assumed - and the
+difficulty is that the fixture was plausible. It was hand-built to produce the expected answer and left
+out the one thing nobody would think to create. A fixture that looks broken teaches nothing.

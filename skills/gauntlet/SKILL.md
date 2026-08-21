@@ -23,8 +23,9 @@ decompositions the lead agent should own. When the conversation drifts toward bu
 here, hand the prompt over instead - a gauntlet run inside a half-spent session is the method minus
 its advantage.
 
-Read `.better-dev/overrides.md` first when a repo is wired; a project override wins over any
-default below.
+Honor this project's recorded decisions - from your harness's durable memory where you have it,
+otherwise from the brief you were given (see `/overrides`). A recorded override wins over any default
+below.
 
 ## 1. Grill until the slots are settled
 
@@ -197,5 +198,5 @@ done-criteria, each row becoming a criterion with a runnable check or an explici
 The skill's terminal state is the handoff - a run started, watched, or debugged afterwards is its own
 new work, and a wired repo's loop items still route through `/plan-grill` and `/autonomous-loop`.
 
-Close out in one line: record the keyed lesson with the `learn` tool if the grill taught one, else
+Close out in one line: record the keyed lesson durably (see `/overrides`) if the grill taught one, else
 say `no durable lesson` and why.

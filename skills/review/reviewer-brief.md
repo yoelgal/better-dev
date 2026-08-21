@@ -175,9 +175,11 @@ creation (`/autonomous-loop`), and here you scan the diff for the shortcut that 
 Some of those surfaces carry a bounded-blast-radius policy the loop is meant to honor, and crossing it is
 a finding in its own right - the loop should have escalated for a human (settled NEEDS_INPUT with the
 evidence) rather than auto-editing or merging. The policy is the one `/guardrails-install` records per
-repo: read the denylist, the gated classes, and the scope number from `.better-dev/rules.md`, then
-`.better-dev/overrides.md`, whose waivers and narrowings win. Where the rules file says nothing, fall
-back to the brief defaults below rather than treating the surface as unguarded:
+repo: read the denylist, the gated classes, and the scope number out of this project's recorded
+decisions - carried in the brief where you were given them (see `/overrides`) - and a recorded
+override's waivers and narrowings win over the recorded baseline.
+Where nothing is recorded, fall back to the brief defaults below rather than treating the surface as
+unguarded:
 
 - **High-consequence denylist** - the paths the loop escalates rather than auto-edits: secrets and
   credentials, DB migrations, auth/authz code, payments/billing/PII, infrastructure and prod config, and
