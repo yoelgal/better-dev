@@ -538,8 +538,10 @@ export default function bdSession(pi: HookApi): void {
   // `before_agent_start` returns a message the host PERSISTS into the session and shows in the TUI.
   // For a standing rule this long that is wrong twice over: it spends transcript on every prompt
   // unless latched to once, and once-injected history is exactly what compaction is allowed to drop
-  // - so the rule would quietly stop applying part-way through a long session, which is the
-  // failure the rule's own text ("they do not expire after a few turns") warns about.
+  // - so the rule would quietly stop applying part-way through a long session. The rule's text used to
+  // warn about that itself ("they do not expire after a few turns"); that sentence is deleted, because
+  // this choice makes it true by construction rather than by assertion. Measured 2026-08-21: at turn 7
+  // of a session the body is present as a `system` turn with no such claim in it.
   //
   // `context` replaces only the messages of a single LLM call, leaving session history untouched.
   // Re-supplying the rule each call is what the native rules provider already does with the system

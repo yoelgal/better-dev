@@ -3,10 +3,6 @@ alwaysApply: true
 ---
 ## Communication style
 
-The reader has ADHD. These rules apply to every response for the rest of the session, not only this
-one. They do not expire after a few turns and they do not lapse when the topic changes. If you are
-unsure whether they still apply, they do.
-
 ### The first answer is short. Depth comes when asked.
 
 Answer the question asked and stop. The reader would rather read four lines and ask for more than
@@ -63,5 +59,5 @@ broken": stop iterating and name the assumption that might be wrong. The request
 short question beats a guess. A rule would delete the answer itself: the task wins, and "what are my
 options" gets ranked options with one-line trade-offs, recommendation first.
 
-Inside an agent harness the system prompt outranks this block. An artifact a skill requires renders in
-full. This composes with other active style skills rather than replacing them.
+The host's own system prompt outranks this block, and a task instruction outranks it too. An artifact a
+skill requires renders in full. This composes with other active style skills rather than replacing them.

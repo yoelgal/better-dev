@@ -832,19 +832,29 @@ grep -qxF 'alwaysApply: true' "$CB" 2>/dev/null \
 if [ ! -f "$CB" ]; then
   bad "$CB missing (the comms block body's single home)"
 else
-  # Sentinel = the body's opening sentence, which changes when the block is reworded - it changed once
-  # already (from "may have ADHD" to upstream's declarative "has ADHD") and a stale sentinel finds zero
-  # homes and reads as a missing block. Scan the shipped surfaces the same way the dash gate does,
-  # NOT the git index: an uncommitted second copy is exactly the drift this gate exists to catch, and
-  # `git ls-files` cannot see one. raw/ is the gitignored source archive and stays out of scope.
-  probe="The reader has ADHD"
+  # Sentinel = a load-bearing rule from the middle of the body, never its opening sentence. The opener
+  # is what rewording touches first: it changed twice (from "may have ADHD" to "has ADHD", then the
+  # persistence claim carrying it was deleted outright once measurement showed `context` re-supplies the
+  # rule every call). Both times a stale sentinel found zero homes and reported a MISSING block, which
+  # is a different fault with the same message - so the zero case now names which one it is. Scan the
+  # shipped surfaces the same way the dash gate does, NOT the git index: an uncommitted second copy is
+  # exactly the drift this gate exists to catch, and `git ls-files` cannot see one. raw/ is the
+  # gitignored source archive and stays out of scope.
+  probe="Cut whole paragraphs and whole sections"
   homes="$(find skills rules scripts docs -type f 2>/dev/null; ls README.md BOOTSTRAP.md 2>/dev/null)"
   homes="$(printf '%s\n' "$homes" \
     | while read -r f; do [ -f "$f" ] && grep -lqF "$probe" "$f" 2>/dev/null && printf '%s\n' "$f"; done \
     | grep -v 'scripts/bd-package-check' || true)"
   nhomes="$(printf '%s' "$homes" | grep -c . || true)"
-  [ "$nhomes" = 1 ] && ok "comms block body has exactly one home ($CB)" \
-    || bad "comms block body must live in exactly one shipped file, found $nhomes:$(printf ' %s' $homes)"
+  if [ "$nhomes" = 1 ]; then
+    ok "comms block body has exactly one home ($CB)"
+  elif [ "$nhomes" = 0 ]; then
+    # Zero homes has two causes and they need different fixes: the block moved out of $CB, or the
+    # sentinel no longer appears in it. Ask $CB directly rather than leaving the reader to guess.
+    bad "comms sentinel \"$probe\" not found in $CB - the body was reworded, so update the probe in this script (the block itself is not missing)"
+  else
+    bad "comms block body must live in exactly one shipped file, found $nhomes:$(printf ' %s' $homes)"
+  fi
   # Count the BODY, not the file: frontmatter is stripped before injection, so it is not part of the
   # per-turn tax the cap exists to bound. Counting the file instead would silently spend cap headroom.
   lines="$(awk 'NR==1 && $0=="---" {fm=1; next} fm==1 && $0=="---" {fm=2; next} fm!=1' "$CB" | grep -c '' || true)"
