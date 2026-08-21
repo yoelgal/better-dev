@@ -1699,3 +1699,74 @@ record than to close today.
   running session keeps the text it loaded at start. Claude Code's own help states `restart required to
   apply`. The fallback nobody wrote down is reading `skills/onboard/SKILL.md` out of the installed tree
   and executing it as text, which stage 3 already resolves a path for.
+
+## D46 - the discovery block goes into every file the repo's agents read; a root `CLAUDE.md` reaches only one host (retracts an unrecorded `/onboard` assumption; 2026-08-21)
+
+`/onboard` wrote its discovery block into one file - root `CLAUDE.md`, or `CLAUDE.local.md` on a solo
+adoption. The assumption underneath was that a root `CLAUDE.md` is the universal entry file. **It is
+false on omp, and it was false in this repo's own tree**: better-dev's block sat in a root `CLAUDE.md`
+its own host never loaded, so the block was invisible while the session hook kept nudging the repo with
+no way to clear the nudge.
+
+**The probe, so it can be re-run rather than trusted.** Two live probes, 2026-08-21. In a throwaway git
+repo, write one unique token into each of three files, start a session on the host, and ask the agent
+which tokens are in its context **with no tool calls allowed** - the no-tool-calls clause is what makes
+the answer a reading of context rather than a reading of disk.
+
+| File | omp | Claude Code 2.1.233 |
+|---|---|---|
+| root `AGENTS.md` | loaded | not loaded |
+| root `CLAUDE.md` | not loaded | loaded |
+| `CLAUDE.local.md` | not loaded | loaded |
+
+Claude Code's answer even named `AGENTS.md` as present on disk while its contents were absent from
+context, which is the distinction the method was built to catch.
+
+**The finding is disjointness, not a winner.** The two hosts read non-overlapping sets of committed
+files, so **no single file is agent-agnostic** and any one-file rule writes into a void on one host.
+omp's half has a documented cause in its provider table (`omp://context-files.md`, priority `native`
+100 > `claude` 80 > `agents`/`codex` 70 > `gemini` 60 > `github` 30 > `agents-md` 10): `native` reads
+`.omp/AGENTS.md`, `claude` reads `.claude/CLAUDE.md` at the cwd with no ancestor walk-up, `agents`
+reads `.agent/AGENTS.md` and `.agents/AGENTS.md`, and `agents-md` reads a standalone `AGENTS.md`
+walking up to the repo root while ignoring any file whose parent directory starts with `.`. No provider
+matches a bare root `CLAUDE.md`, which is exactly what the probe measured.
+
+**So the block is written into every entry file the repo's agents read.** Committed adoption: root
+`AGENTS.md` always (omp, Codex, and the cross-tool convention), plus root `CLAUDE.md` when it already
+exists or when the running host is Claude Code - never created on a host that would not load it. Solo
+adoption, where nothing may be committed: `.omp/AGENTS.md` plus a `.git/info/exclude` line on omp,
+which is omp's own documented answer for project-local uncommitted context, and `CLAUDE.local.md` for
+Claude Code. `CLAUDE.local.md` is named as Claude-Code-only and **is never the only target**; that
+spelling was the live defect, because on omp it writes into a void.
+
+**Two copies are allowed here because `/onboard` is the reconciler.** This repo spent 2026-08-21
+deleting the two-copies pattern, and the reason it deleted it holds: nothing reconciled the copies, so
+the spliced comms body drifted and served a stale rule for the rest of its life (D42). The difference
+is mechanical, not a promise - `/onboard` is idempotent and **replaces** the text between its markers on
+every run, so a re-run makes the copies identical again by construction. That argument is load-bearing
+and is stated in the skill at the point the second write happens: **if the write ever becomes an append
+rather than a replace-between-markers, the copies begin drifting and this ruling stops being safe.**
+Whoever changes the write shape owns re-deciding the target set with it.
+
+**The licence stops at the markers.** Text outside them has no reconciler, so it never gets a second
+copy: it lives once in the file the running host reads, and the other entry file carries a pointer to
+it. Applied here the same day - this repo's "Repo layout" prose moved into root `AGENTS.md`, the file
+its own host reads, and root `CLAUDE.md` now points at it rather than holding a second copy that
+nothing would keep in step. `scripts/bd-package-check` enforces the inside-the-markers half by failing
+when two copies of the block disagree, verified red on purpose by rewording one bullet in `CLAUDE.md`
+and green again once restored.
+
+**The block is trimmed, because it is now paid for twice per turn.** Its unique payload is that this
+repo is wired and where its records live. Two measurements retire the rest: 28 of the 33 skills read
+`.better-dev/overrides.md` themselves, so the block restating an override helps nobody who was not
+going to read the file; and the routing table restated skill descriptions the host injects anyway,
+proven by this repo running a whole session with its own block unread while routing worked. The
+template drops the routing table and the per-skill bullets and keeps the wired line plus the record
+paths.
+
+**Unsettled, and named as such.** The probe covers two hosts on one day, and it covered three
+committed files rather than four: `.omp/AGENTS.md` and `.claude/CLAUDE.md` rest on omp's provider
+table, not on a live reading. hermes and Codex were not probed, and the `@`-import path (a root
+`CLAUDE.md` holding only `@AGENTS.md`) is unmeasured - the skill writes both files there
+anyway, because a duplicate block is visible and deletable while a missed write is silent. Re-run the
+probe when a host version moves.

@@ -101,8 +101,6 @@ const SENTINEL = "better-dev:comms";
 // `<!-- BEGIN better-dev-comms -->`, so a comms pointer block never reads as a discovery block.
 const DISCOVERY_BLOCK = "<!-- BEGIN better-dev -->";
 
-const ENTRY_FILES = ["CLAUDE.md", "AGENTS.md"];
-
 // --- small helpers -----------------------------------------------------------------------------
 
 function readText(path: string): string | undefined {
@@ -454,6 +452,30 @@ function repoRoot(from: string): string | undefined {
     dir = up;
   }
 }
+
+// Every file /onboard can write the block into, so a wired repo is never told it is unwired. Two
+// hosts, and they read disjoint sets of committed files - measured 2026-08-21, one unique token per
+// file in a temp repo, each agent asked which tokens reached its context: omp loads root AGENTS.md
+// and loads NEITHER root CLAUDE.md NOR CLAUDE.local.md, while Claude Code 2.1.233 loads both of
+// those and not AGENTS.md. So no single file is agent-agnostic, and `/onboard` writes one copy per
+// host: root `AGENTS.md` always, root `CLAUDE.md` for Claude Code, `.omp/AGENTS.md` for a solo
+// adoption that commits nothing, `CLAUDE.local.md` for the same on Claude Code.
+//
+// This list is NOT that union. It is only the subset THIS host reads, because the question the nudge
+// asks is "is this repo wired for me", never "is it wired for somebody". `hooks/pre/*.ts` is an omp
+// convention - Claude Code reports Hooks (0) against this repo - so whenever this code runs, it runs
+// on omp, and only omp's readable paths count.
+//
+// The difference is not academic. A repo wired by an earlier solo run carries its block in
+// `CLAUDE.local.md`, which omp never loads. Counting that file reports the repo as wired while every
+// omp session in it has no discovery block at all, and the nudge that would have fixed it stays
+// silent. Observed on a real repo, 2026-08-21: `terminal-browser` has exactly that shape.
+//
+// Relative paths only - each is joined against the repo root. It sits here rather than up with the
+// other constants because it reads `PROJECT_CONFIG_DIR`, which is declared further down: a
+// module-level const evaluated before its own dependency throws at load, and this hook failing at
+// load costs all three of its features at once.
+const ENTRY_FILES = ["AGENTS.md", join(PROJECT_CONFIG_DIR, "AGENTS.md")];
 
 /**
  * Is this repo unwired?

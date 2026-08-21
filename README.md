@@ -50,7 +50,8 @@ hears why it cannot be.
 always-applied comms rule that shapes every reply, and the session hook. Nothing in any repo.
 
 **What `/onboard` adds, per repo, when you ask for it.** That repo's own `.better-dev/` data and a
-discovery block in `CLAUDE.md` or `AGENTS.md`.
+discovery block in every entry file your agents read - `AGENTS.md` always, `CLAUDE.md` beside it for
+Claude Code, because the two hosts read disjoint sets of files.
 
 On a plugin channel your own skills folder stays yours: plugin skills load through your agent's
 plugin provider, so `~/.claude/skills` and `~/.omp/agent/skills` keep only what you put there, and a
@@ -121,7 +122,7 @@ session ending and every worktree reads the same copy. Override any practice in 
 - `.better-dev/overrides.md` - your standing corrections, which beat any default
 - `.better-dev/rules.md` - what this repo records about itself
 - `.better-dev/ledger/` - loop state per work-item, gitignored
-- a discovery block in `CLAUDE.md` / `AGENTS.md` - the routing table your agent reads every session
+- a discovery block in each entry file your agents read (`AGENTS.md`, and `CLAUDE.md` for Claude Code)
 - a committed `.omp/config.yml` - which shell commands need your approval, travelling with the repo
 - on a host the session hook cannot reach, a pointer to the installed `rules/comms.md`, between its own
   `<!-- BEGIN better-dev-comms -->` sentinels, once that file is on disk to point at

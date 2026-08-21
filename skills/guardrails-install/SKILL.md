@@ -466,11 +466,14 @@ here") wins over the recorded baseline. The loop and `/review` read that overrid
 baseline - so the resolved policy is honored every run and stays this project's to adjust.
 
 One standing rule beyond the blast-radius policy travels the same way. The repo's always-loaded context -
-CLAUDE.md and the managed blocks - is read on every turn, so it is a per-turn tax; carry it lean or it
-compounds. Record the discipline as one more line in the same file:
+whichever entry file this host reads, plus the managed blocks in it - is read on every turn, so it is a
+per-turn tax; carry it lean or it compounds. Name the file this repo's host actually loads rather than
+assuming `CLAUDE.md`: measured 2026-08-21, omp reads a root `AGENTS.md` and does not read a root
+`CLAUDE.md`, and Claude Code is the reverse, so a recorded rule naming the wrong one describes a file
+nothing loads. Record the discipline as one more line in the same file:
 
 ```
-- context-hygiene: the repo's standing context (CLAUDE.md + always-loaded blocks) is a per-turn tax - keep it lean, prune stale lines on each release, and rewrite instructions written for an older model rather than carrying them forward.
+- context-hygiene: the repo's standing context (the entry files this host reads + always-loaded blocks) is a per-turn tax - keep it lean, prune stale lines on each release, and rewrite instructions written for an older model rather than carrying them forward.
 ```
 
 ## Earned autonomy - propose the standing line the record already supports

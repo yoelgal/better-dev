@@ -50,6 +50,21 @@ type Install =
   | "settings-extension-user"
   | "unknown";
 
+/**
+ * Where an entry file is written, relative to the repo root. The first four are every target
+ * /onboard writes the discovery block into, and the hook has to read all four - omp reads the two
+ * AGENTS.md spellings and neither CLAUDE one, Claude Code reads the two CLAUDE ones and not
+ * AGENTS.md, so a hook that checks a subset tells a wired repo it is unwired and nudges it forever.
+ * The last path is a decoy: only the repo ROOT's copies count, and a walk that found this one would
+ * read any vendored subtree as wiring the whole repo.
+ */
+type EntryPath =
+  | "AGENTS.md"
+  | "CLAUDE.md"
+  | ".omp/AGENTS.md"
+  | "CLAUDE.local.md"
+  | "packages/core/AGENTS.md";
+
 interface Fixture {
   install: Install;
   /** Version in the plugin's own package.json. */
@@ -60,12 +75,12 @@ interface Fixture {
   catalogAt?: "bare" | ".omp-plugin" | ".claude-plugin";
   /** Omit to ship no rules/comms.md. */
   rule?: string;
-  /** Entry-file contents at the repo root. Omit to ship no entry file. */
+  /** Entry-file contents, at `entryFileName`. Omit to ship no entry file. */
   entryFile?: string;
-  /** Which entry file carries it. Both names are promised by the install docs. */
-  entryFileName?: "CLAUDE.md" | "AGENTS.md";
+  /** Which entry file carries it. Defaults to the repo root's CLAUDE.md. */
+  entryFileName?: EntryPath;
   /** A second entry file beside the first, so order-independence can be measured. */
-  secondEntryFile?: { name: "CLAUDE.md" | "AGENTS.md"; text: string };
+  secondEntryFile?: { name: EntryPath; text: string };
   /** false makes cwd a plain directory with no repo above it. */
   repo?: boolean;
   /** Start the session this far below the repo root, the way an agent launched in a subdir does. */
@@ -152,11 +167,16 @@ async function run(fixture: Fixture): Promise<Run> {
   mkdirSync(cwd, { recursive: true });
   const repoRoot = join(root, "work");
   if (fixture.repo !== false) mkdirSync(join(repoRoot, ".git"), { recursive: true });
-  if (fixture.entryFile !== undefined) {
-    writeFileSync(join(repoRoot, fixture.entryFileName ?? "CLAUDE.md"), fixture.entryFile);
-  }
+  // Two of the four targets are nested (`.omp/AGENTS.md`), and one fixture writes below a package
+  // dir, so the parent has to be created rather than assumed to be the repo root.
+  const writeEntry = (name: EntryPath, text: string): void => {
+    const at = join(repoRoot, name);
+    mkdirSync(dirname(at), { recursive: true });
+    writeFileSync(at, text);
+  };
+  if (fixture.entryFile !== undefined) writeEntry(fixture.entryFileName ?? "CLAUDE.md", fixture.entryFile);
   if (fixture.secondEntryFile !== undefined) {
-    writeFileSync(join(repoRoot, fixture.secondEntryFile.name), fixture.secondEntryFile.text);
+    writeEntry(fixture.secondEntryFile.name, fixture.secondEntryFile.text);
   }
 
   const version = fixture.version ?? "0.1.0";
@@ -457,7 +477,7 @@ test("says nothing at all when rules/comms.md is absent", async () => {
   // Wired entry file on purpose: this case is about the rule path, and a repo with no block would
   // legitimately raise the onboard nudge, which would make the empty-notices assertion measure two
   // things and fail for the wrong reason.
-  const result = await run({ install: "marketplace", entryFile: WIRED_ENTRY });
+  const result = await run({ install: "marketplace", entryFileName: "AGENTS.md", entryFile: WIRED_ENTRY });
   expect(result.contextHandlers).toBe(0);
   expect(result.messages).toHaveLength(1);
   expect(result.notices).toEqual([]);
@@ -660,11 +680,32 @@ test("finds the repo's entry file when the session starts in a subdirectory", as
   expect(result.notices.filter(line => line.includes("/onboard"))).toHaveLength(1);
 });
 
-test("stays quiet when the entry file already carries the discovery block", async () => {
-  const entryFile = "# Repo\n\n<!-- BEGIN better-dev -->\nwired\n<!-- END better-dev -->\n";
-  const result = await run({ install: "marketplace", rule: RULE_FILE, entryFile });
-  expect(result.notices.filter(line => line.includes("/onboard"))).toEqual([]);
-});
+// One case per target /onboard writes the block into, and the whole reason that list is four names
+// long. Measured 2026-08-21, a unique token per file in a temp repo with each agent asked what
+// reached its context: omp loads root AGENTS.md and loads neither root CLAUDE.md nor
+// CLAUDE.local.md; Claude Code 2.1.233 loads both of those and not AGENTS.md. The hosts read
+// disjoint sets, so /onboard writes one copy per host. The nudge asks whether THIS host is wired, so
+// only omp's readable paths clear it: this hook is `hooks/pre/*.ts`, an omp convention that Claude
+// Code does not load, so every run of it is an omp run.
+for (const name of ["AGENTS.md", ".omp/AGENTS.md"] as EntryPath[]) {
+  test(`stays quiet when the block is in ${name}, which omp reads`, async () => {
+    const entryFile = `# Repo\n\n${WIRED_ENTRY}`;
+    const result = await run({ install: "marketplace", rule: RULE_FILE, entryFileName: name, entryFile });
+    expect(result.notices.filter(line => line.includes("/onboard"))).toEqual([]);
+  });
+}
+
+// The other half, and the reason the union was wrong. A block in a file omp never loads leaves every
+// omp session in that repo with no discovery block, so it must still nudge. Counting these reported
+// the repo as wired and silenced the one message that would have fixed it. Observed on a real repo:
+// `terminal-browser` carries its block in `CLAUDE.local.md` from an earlier solo run.
+for (const name of ["CLAUDE.md", "CLAUDE.local.md"] as EntryPath[]) {
+  test(`still nudges when the block is only in ${name}, which omp does not read`, async () => {
+    const entryFile = `# Repo\n\n${WIRED_ENTRY}`;
+    const result = await run({ install: "marketplace", rule: RULE_FILE, entryFileName: name, entryFile });
+    expect(result.notices.filter(line => line.includes("/onboard"))).toHaveLength(1);
+  });
+}
 
 // The reported bug, inverted from what this suite used to assert. A repo carrying no entry file at
 // all is the clearest case for onboarding, and it was the one case that stayed silent: measured
@@ -685,6 +726,44 @@ test("counts the block in AGENTS.md even when an unrelated CLAUDE.md exists", as
     secondEntryFile: { name: "AGENTS.md", text: WIRED_ENTRY },
   });
   expect(result.notices.filter(line => line.includes("/onboard"))).toEqual([]);
+});
+
+// The solo adoption shape on omp: nothing is committed, so the wiring sits in `.omp/AGENTS.md` while
+// the committed entry file carries none of it.
+test("counts the block in .omp/AGENTS.md when the committed entry file carries none", async () => {
+  const result = await run({
+    install: "marketplace",
+    rule: RULE_FILE,
+    entryFile: "# project notes, no block\n",
+    entryFileName: "AGENTS.md",
+    secondEntryFile: { name: ".omp/AGENTS.md", text: WIRED_ENTRY },
+  });
+  expect(result.notices.filter(line => line.includes("/onboard"))).toEqual([]);
+});
+
+// The real `terminal-browser` shape, end to end: committed files carry no block, the Claude-Code-only
+// local file does. omp is unwired here, so the nudge has to fire.
+test("nudges when only CLAUDE.local.md is wired and the committed files are not", async () => {
+  const result = await run({
+    install: "marketplace",
+    rule: RULE_FILE,
+    entryFile: "# project notes, no block\n",
+    secondEntryFile: { name: "CLAUDE.local.md", text: WIRED_ENTRY },
+  });
+  expect(result.notices.filter(line => line.includes("/onboard"))).toHaveLength(1);
+});
+
+// Only the repo root's copies count, and one target being nested is exactly what would tempt a later
+// edit into a recursive search. A vendored subtree carrying its own AGENTS.md says nothing about
+// whether THIS repo is wired, and a walk that counted it would read every such repo as wired.
+test("does not count an AGENTS.md below the repo root", async () => {
+  const result = await run({
+    install: "marketplace",
+    rule: RULE_FILE,
+    entryFileName: "packages/core/AGENTS.md",
+    entryFile: WIRED_ENTRY,
+  });
+  expect(result.notices.filter(line => line.includes("/onboard"))).toHaveLength(1);
 });
 
 test("stays quiet outside a git repo", async () => {
