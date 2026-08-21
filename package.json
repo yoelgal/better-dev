@@ -1,6 +1,6 @@
 {
   "name": "better-dev",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "private": true,
   "scripts": {
     "test": "bun test hooks/session-hook.test.ts"
