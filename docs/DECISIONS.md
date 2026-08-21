@@ -1483,3 +1483,219 @@ readers; `/packaging` says so in those words.
 
 `scripts/bd-package-check` and `scripts/bd-skill-stage` survive as maintainer gates run from a checkout.
 They are not shipped capability, and shipped skill prose no longer instructs anyone to run them.
+
+## D43 - the comms rule reaches a hookless channel through a hook in the plugin tree (extends D42; 2026-08-20)
+
+D42 made `rules/comms.md` the single home for the comms block and deleted the splice that used to paste
+its body into a host entry file. It also measured the hole that left: the provider serving marketplace
+roots registers skills, commands, hooks, tools and MCP but not rules, so a marketplace-installed plugin
+ships the rule file and no session loads it - the block reached a session only through
+`omp plugin link`. **A hook shipped inside the plugin tree closes that hole**, at
+`hooks/pre/bd-session.ts`: it injects `rules/comms.md` where nothing else delivered it, surfaces an
+available update, and nudges `/onboard` in a repo carrying no discovery block.
+
+**Measured before it was designed.** A minimal probe plugin carrying one `hooks/pre/probe.ts` was
+linked, and a single `omp -p` run wrote:
+
+```
+FACTORY-CALLED dir=/private/tmp/bd-hookprobe/hooks/pre
+SESSION_START-FIRED
+CONTEXT-FIRED messages=1
+```
+
+The negative control - the same probe with the plugin uninstalled - wrote nothing at all. So the hook is
+discovered from the installed plugin tree with no manifest entry and no path registered anywhere
+(`marketplace.md:151`, "runtime hooks are discovered from the installed plugin tree"); both the
+`session_start` and `context` events fire; and `import.meta.dirname` resolves to the hook's own directory
+*inside the plugin*, which is the fact the whole design rests on - the hook reaches its sibling content
+by relative path, so an update cannot strand it. The probe also fired on a run whose model call failed,
+so the mechanism costs no tokens.
+
+**This is not the hook D42 deleted.** `install.sh` registered its hooks by absolute path into
+machine-global config, so a `git pull` that moved a target left every session failing a hook forever -
+the defect that killed the installer. A hook in the plugin tree resolves its siblings relative to
+`import.meta.dirname`, is versioned with the plugin that ships it, and is gone the moment the plugin is
+uninstalled; there is no absolute path anywhere to strand. The cutover was right to delete the installer
+and wrong to conclude the hook had to go with it.
+
+**Hookless hosts get a documented pointer, never a copy.** A host reached only by `npx skills add` has
+no plugin hook mechanism, so `/onboard` writes a pointer between
+`<!-- BEGIN better-dev-comms -->` / `<!-- END better-dev-comms -->` in the repo's entry file, replacing
+any existing block in place. Its body points at the installed `rules/comms.md` and restates none of it:
+a copy cannot receive an update, and the drifted 80-line splice D42 deleted is this library's own
+instance of that bug. That install is genuinely partial, and the channel table says so in those words
+rather than hiding it. (That table has since moved to `BOOTSTRAP.md`, where it is the agent's decision
+procedure rather than a menu a human picks from; only the pointer moved, not the ruling.)
+
+`/onboard` writes that block only after measuring which of the three routes the session is on - the
+plugin-tree hook (observable: the hook leads its injection with a `better-dev:comms` sentinel), a native
+rules provider (the rule's subject in context with no sentinel), or neither - because a step that cannot
+report "already delivered" gets re-run forever.
+
+## D44 - the plugin hook is an omp mechanism; Claude Code and hermes take the pointer (corrects D43; 2026-08-20)
+
+D43 recorded the mechanism as if the hook reached every plugin-capable host, and `/onboard`'s first cut
+read the hook file's presence on disk as evidence the hook had run. Both are wrong, and they compound.
+An independent review of `feat/plugin-session-hook` (`HookReview`, findings F1 and F2, report in
+`.better-dev/review/`) read the host sources:
+
+- **`hooks/pre/*.ts` is an omp convention.** omp treats every `.ts`/`.js` file under a plugin's
+  `hooks/pre/` as an extension entry point (`isExtensionFile`,
+  `pi-coding-agent/src/extensibility/extensions/loader.ts:491-493` - verified in the installed
+  `17.3.8`) and calls its default export as a hook factory.
+- **Claude Code** loads plugin hooks from `hooks/hooks.json`, or an inline `hooks` key in
+  `plugin.json`, as shell-command or HTTP entries keyed by event name. It has no `hooks/pre/`
+  convention and no TypeScript factory protocol, and this repo ships neither file
+  (code.claude.com/docs/en/plugins-reference; anthropics/claude-code
+  `plugins/plugin-dev/skills/hook-development/SKILL.md`).
+- **hermes 0.16.0** is a Python agent: plugins are Python modules discovered by entry point and loaded
+  by importing the module and calling its `register(ctx)`
+  (`~/.hermes/hermes-agent/hermes_cli/plugins.py:1490-1650`; the missing-`register()` refusal is at
+  `:1539`), and hooks are shell commands declared under `hooks:` in `~/.hermes/config.yaml`
+  (`~/.hermes/hermes-agent/agent/shell_hooks.py:175`). Nothing there scans `hooks/pre/*.ts`.
+
+So on both hosts the hook file ships, is never loaded, and the sentinel is absent by design. Confirmed
+on 2026-08-20 from the hosts' own CLIs (measured by `DocsFix`, not inferred):
+`claude --plugin-dir . plugin details better-dev` prints `Skills (33)` and **`Hooks (0)`**;
+`hermes plugins install <git-url>` warns the repo "doesn't contain plugin.yaml or `__init__.py`", after
+which `hermes plugins list` does not list better-dev at all.
+
+**Those hosts get the rule through `/onboard`'s pointer, and that is stated, not hidden.** Each reads a
+project entry file, which is the route the pointer block uses, so it genuinely works on both - and it is
+weaker than injection: it is one read the agent has to honour rather than a body already in context.
+Both hosts do land the **whole repo tree** even though neither runs the hook, so the pointer has a real
+target: `~/.hermes/plugins/better-dev/rules/comms.md` (verified on disk, 6877 bytes) and
+`~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/`. The channel table says pointer for Claude
+Code and hermes, and the hook only for omp marketplace installs. Supporting the two host-specific hook
+protocols above is a **named gap**, not a maybe: it would mean shipping a `hooks/hooks.json` shell entry
+for Claude Code and a Python `register(ctx)` module for hermes, neither of which exists here.
+
+**A skills-only install brings no pointer target of its own.** Measured the same day, and the scope is
+part of the result: run against a **throwaway `HOME`**, `npx skills add yoelgal/better-dev --all -g`
+lands `skills/` only - real directories at `~/.agents/skills/<name>/`, symlinked into every host skills
+dir - and no `rules/` directory and no `comms.md` arrived with it. That scope is not decoration. Stated
+unqualified - "no `comms.md` anywhere on the machine" - the claim is measurably false on any machine
+that also carries a clone or a plugin-channel install, and it misdirects the one reader that acts on it:
+`skills/onboard/SKILL.md` is agent-executed text whose very next routing row tells the agent to ask the
+operator for a path where the repo is on disk, which an unqualified "there is nothing anywhere" tells it
+not to bother doing. So the honest statement is per-channel, not per-machine: that channel cannot run
+the hook *and* supplies nothing to point at. `/onboard` reads the path back before writing, and where it
+does not resolve it writes no block and asks for a path where the repo itself is on disk (plugin channel
+or a plain clone), which turns the row back into the pointer row.
+
+**File presence was mistaken for execution.** `/onboard`'s detection tested whether
+`hooks/pre/bd-session.ts` sat two levels above the running skill and converted a yes into either "the
+hook delivers the rule" or "contradiction - write nothing". On Claude Code and hermes that file is
+present and the hook never runs, so both landed on the contradiction row, wrote nothing, and the one
+repair the skill had - the pointer - was suppressed by the observation that should have triggered it.
+The detection is now built on the sentinel alone, which is a positive in-session observable: present
+means the hook ran here this session, absent means it did not deliver and the reason never changes the
+response. The contradiction row is **deleted from the routing decision**, on two independent grounds:
+file presence never evidenced execution, and even on omp the hook deliberately stays quiet when a native
+rules provider already loads `rules/`, so a present hook file beside an absent sentinel is the dedup
+design working rather than a broken install. The tree walk survives only as path resolution for the
+pointer - it answers *what path can a pointer name*, never *is the rule delivered*.
+
+**The diagnosis survives as a recap clause, though, and deleting that too was a mistake.** The second
+ground above describes a state the routing never reaches: when the native provider delivers, the rule is
+in context, so `/onboard`'s observation 2 answers yes and the run stops one row earlier. On omp the two
+observations are therefore not independent, and the only way a session reaches the pointer row is that
+the hook *was* this install's delivery route and delivered nothing - a broken plugin, not the ordinary
+absence. The first fix round dropped the routing test and the note with it, which left the one repo
+positioned to notice its own delivery route failing writing a workaround and reporting nothing. So the
+pointer write is unconditional (that part of the deletion was right) and, on a host that runs
+`hooks/pre/*.ts`, the recap names the defect alongside it: tree installed, hook is the route here, it
+delivered nothing, pointer is a workaround, and `omp plugin list` plus the install scope is the fact
+that makes it reproducible (`skills/onboard/SKILL.md`, row three and the clause under it).
+
+**One measurement cited for the marketplace path did not show it.** The claim that "a root named like a
+marketplace cache dir gave sentinel=true, correct" was an instance of the `___` basename false
+positive: that root (`/tmp/mkt___better-dev___0.1.0`) was still symlinked into
+`~/.omp/plugins/node_modules/better-dev`, making it a **link** root, which omp does load `rules/` from -
+so the injection observed there was a duplicate, not a marketplace delivery. The marketplace hole is
+real and confirmed in source (`discovery/claude-plugins.ts:603-641` registers Skill, SlashCommand, Hook,
+CustomTool and MCPServer providers and no Rule provider, against `discovery/omp-plugins.ts:110` which
+loads rules for other roots), and D43's own linked-probe measurement stands. That one end-to-end line
+does not, and no text in this repo may repeat it.
+
+**The marketplace path now carries a measurement of its own.** It is recorded here because its evidence
+expires everywhere else - a chat message and `~/.omp/logs` - and because the line it replaces was just
+retracted above, which would otherwise leave the channel table's omp-marketplace cell resting on source
+inference with no observation written down anywhere. Measured 2026-08-20, and corroborated by the
+re-reviewer from omp's own logs rather than from the implementer's report:
+
+- `Marketplace added name=better-dev sourceType=local`, then `Plugin installed
+  pluginId=better-dev@better-dev version=0.1.0
+  cachePath=/Users/yoelgal/.omp/plugins/cache/plugins/better-dev___better-dev___0.1.0` - that is
+  `MarketplaceManager.installPlugin`, a real install into the marketplace cache, not a hand-built
+  directory wearing a marketplace-shaped name.
+- Two omp sessions run against it in `/tmp/bd-mkt-proj` observed
+  `lastRole=developer lastHasSentinel=true firstRole=user`: the hook delivered, as a `developer` turn
+  appended after the operator's own prompt - on the promoting model that session used. Appending is
+  now conditional on the resolved model carrying `supportsMidConversationSystem`; elsewhere the rule
+  goes immediately before the last user turn, because three providers read the final entry as the
+  request itself and an appended rule became the request.
+- The link-root control gave `n=1` and no sentinel - the hook correctly silent where omp loads `rules/`
+  natively - and that control's `~/.omp/plugins/node_modules/better-dev` symlink is stamped **after**
+  both marketplace sessions, so it was not present during them. That stray symlink is exactly what
+  invalidated the retracted measurement; here it is absent from the window being measured.
+
+**What it did not cover: project scope.** The install was user-scope. A marketplace install at
+`--scope project` writes its runtime symlink under `<project>/.omp/plugins` while its cache stays at the
+user root whatever the scope, and that shape was found to deliver nothing at all (N1 of the re-review) -
+fixed on this branch by testing the marketplace cache mark against every state root before resolving any
+`node_modules` entry, rather than against the root the link happened to be found under. So this
+measurement is evidence for one sub-shape of the marketplace channel, never for the channel: any future
+claim about `--scope project` needs its own observation.
+
+## D45 - install is one prompt, and the host facts behind it are recorded here
+
+The install surface is a single copy-pasteable prompt in `README.md`. It sends the agent to
+`BOOTSTRAP.md`, which is an executable procedure rather than prose: detect the host, install through
+that host's own channel, confirm `rules/comms.md` is delivered, wire the update alert, run `/onboard`.
+The agent is the per-host adapter, so a host nobody wrote a channel for still gets wired or hears why
+it cannot be. This replaces the human-facing channel table, which became the agent's decision table.
+
+The bar a channel must clear is the operator's, recorded 2026-08-20: a channel earns its place by
+auto-updating or by raising an update alert. These rules shape every reply, so an install that ages in
+silence is experienced as the practices not working. A channel that can do neither is named as such
+rather than listed as supported.
+
+**Host measurements, 2026-08-20.** These live here because `BOOTSTRAP.md` acts on them and a procedure
+whose facts live only in its own prose cannot be re-checked when a host changes.
+
+- Claude Code 2.1.233's `claude plugin` carries `install`, `update`, `uninstall`, `list` and
+  `marketplace add/list/remove/update`. An earlier check in this session reported only four verbs
+  because it piped `--help` through `head -20` and read the truncation as the whole list.
+- Claude Code's `plugin-catalog-cache.json` holds records for the official marketplace only. Three
+  third-party plugins installed on the measuring machine were all absent from it, and every marketplace
+  clone sat at exactly the commit its install record named with no `FETCH_HEAD` since install. So local
+  state never advances on its own and a read-only version comparison can never fire: an alert has to
+  run `claude plugin marketplace update` before comparing. Scoped to a machine where better-dev itself
+  was installed through omp.
+- hermes 0.16.0 fires `on_session_start` from `hooks:` in `config.yaml` (`VALID_HOOKS`,
+  `hermes_cli/plugins.py:128`) once per session, and discards the return value, so an alert there has
+  to reach the operator by its own channel. `hermes plugins install` registers no skills from this repo;
+  `skills.external_dirs` is what makes them load, read at `agent/skill_utils.py:417,454`.
+- The `npx skills add` CLI at 1.5.23 offers `update` and no check or notify verb, so that channel clears
+  neither half of the bar by its own command list.
+
+**Carried gaps, not fixed.** Each is real, each was measured or source-read, and each is cheaper to
+record than to close today.
+
+- `stateRoots` derives omp's config-dir name as `basename(dirname(agentDir))`. That holds for
+  `PI_CONFIG_DIR` and breaks for a named profile, whose config root is `~/.omp/profiles/<name>`, and for
+  `PI_CODING_AGENT_DIR`, which moves the agent dir without moving the config root. Both duplicate the
+  rule rather than losing it, so the delivery bias holds at the cost of one extra body per call.
+- The stage 3 pointer-target probe ORs a hermes path against a Claude Code cache glob, so on a machine
+  carrying both CLIs a stale hermes tree can satisfy the check for a Claude Code install that failed. It
+  proves some `comms.md` exists, never that this install's does.
+- Stage 1's check is a self-assessment with no failing branch, and nothing asks the agent to identify
+  which host it is, so naming the wrong one satisfies it.
+- The prompt names `BOOTSTRAP.md` at `main` rather than at a ref, so an operator installing version N is
+  handed the procedure for HEAD. It also requires web fetch, with no branch for an agent that cannot,
+  which is not universally enabled on the hosts stage 2 routes to `npx skills add`.
+- Stage 5 invokes `/onboard` in the session that ran the install, while the same file says twice that a
+  running session keeps the text it loaded at start. Claude Code's own help states `restart required to
+  apply`. The fallback nobody wrote down is reading `skills/onboard/SKILL.md` out of the installed tree
+  and executing it as text, which stage 3 already resolves a path for.

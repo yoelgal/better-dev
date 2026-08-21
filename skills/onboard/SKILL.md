@@ -329,6 +329,117 @@ better-dev is additive: it complements, never replaces, whatever else is install
 Then confirm `.better-dev/rules.md` and `.better-dev/overrides.md` exist and the block reads
 correctly at its destination.
 
+**Then check whether the comms rule reaches this session at all.** better-dev's response-style rule
+ships as one file in the plugin tree, `rules/comms.md`, and whether anything loads it is decided by the
+channel that delivered the skills, never by the host's name (`BOOTSTRAP.md` carries the per-host table).
+Only one kind of evidence settles it: what you can see in *this* session's context. A file on disk is
+not evidence that a host loaded it - the plugin's session hook is an omp convention (`hooks/pre/*.ts`),
+while Claude Code loads plugin hooks from `hooks/hooks.json` as shell or HTTP entries and hermes loads
+Python `register(ctx)` modules, so on those hosts that exact file ships and never runs (D44). Absence
+of delivery is the ordinary case wherever that file cannot run, and it never changes what you write -
+but on a host that *does* run `hooks/pre/*.ts` it is also a defect, and the third row of the table
+below is where you report it.
+
+Two observations settle it, in this order:
+
+1. Search this session's own context for the literal token `better-dev:comms`. The hook leads its
+   injection with that sentinel. **Proves:** the hook ran here, on this host, in this session, and the
+   rule's body is in context - which is the whole claim. **Absence proves only its own negation:** the
+   rule did not arrive that way, and never says why. You do not need why. Whether the host has no hook
+   mechanism, ships one this file cannot use, or loads `rules/` natively so the hook stayed quiet on
+   purpose, the response is identical - something else has to deliver the rule.
+2. **Before you open `rules/comms.md`**, answer whether better-dev's comms rule itself is already
+   standing in context from a source you did not read. A native rules provider injects the body with no
+   sentinel, which is what this catches. **Proves:** something already delivers the rule here, so a
+   pointer would be redundant. **Does not prove** which channel did it - and nothing downstream needs
+   to know. Three constraints on the answer: reading the file puts the text in context too, so the
+   order is what makes the answer worth anything; a memory of seeing it in an earlier session is not an
+   observation of this one; and your host's own brevity guidance is not this rule - recognise the rule,
+   not its topic. **Only a confident yes counts**, because the two errors do not cost the same: a wrong
+   yes writes nothing and leaves the session with no rule at all, a wrong no costs one redundant
+   pointer to a file already in context. Unsure is a no.
+
+Resolving where `rules/comms.md` lives is a separate job from routing, and it answers a different
+question - not *is the rule delivered* but *what path can a pointer name*. Resolve the **real** path of
+the skill you are running - a skills-only install symlinks each skill directory into the host's own
+skills dir, so the path the host reports can be a link - then look two levels up, above
+`skills/onboard/`, where a plugin tree keeps `rules/` and `hooks/` beside `skills/`. **Proves:** a path
+a pointer can name, once `rules/comms.md` reads back from it. **Proves nothing about delivery**, in
+either direction: `hooks/pre/bd-session.ts` sitting there is the same shipped file on a host that cannot
+run it, and on omp the hook deliberately stays silent whenever a native provider already loads `rules/`.
+That second case never reaches the table's third row, though - a native provider puts the rule *in
+context*, so observation 2 answers yes and the run stops at row two. Measured 2026-08-20, both
+directions: `npx skills add yoelgal/better-dev --all -g` lands `skills/` only (real dirs at
+`~/.agents/skills/<name>/`, symlinked into every host skills dir), and in that run's throwaway `HOME` no
+`rules/` and no `comms.md` arrived with it - so that channel supplies no pointer target *of its own*.
+Hold that scope: stated unqualified, "no `comms.md` anywhere on the machine" is false on any machine that
+also carries a clone or a plugin-channel install, and acting on the unqualified version would stop you
+asking for the path the next two rows exist to ask for. A plugin-channel install lands the whole repo,
+so the file is there to point at even on the hosts that never run the hook
+(`~/.hermes/plugins/better-dev/rules/comms.md`, and `~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/`).
+
+| What you observed | What that proves | What to write |
+|---|---|---|
+| the `better-dev:comms` sentinel in context | the hook delivered the rule into this session | nothing |
+| no sentinel, and the comms rule itself already standing in context | a native rules provider delivers it here | nothing |
+| no sentinel, no rule in context, and `rules/comms.md` reads back from a path you resolved or the operator named | nothing delivers it, and there is a file to point at | the pointer block below - and, on a host that runs `hooks/pre/*.ts` (omp), a recap clause naming the defect: the plugin tree is installed, the hook is the delivery route here, and it delivered nothing |
+| no sentinel, no rule in context, and no `rules/comms.md` on this machine | nothing delivers it and there is nothing yet to point at | ask for a path; with none, the recap line naming the install that fixes it |
+| the host will not say where the running skill came from | only the path is unmeasured; both observations above still stand | ask where better-dev is installed, then finish the row |
+
+**Absence always ends in a route.** The last three rows are one finding - nothing delivers the rule -
+and they differ only in whether a pointer has a target. Row three writes it. Rows four and five ask the
+operator one question - *where is better-dev's own repo on this machine?* - and act on the answer: a
+path whose `rules/comms.md` reads back turns the row into row three, no matter how the repo got there
+(plugin channel, or a plain `git clone`). Only an operator who has none closes without a block, and
+that close is still a route: the recap names the install that puts the file on disk (`README.md`'s
+table names it per host). A pointer to a file that is not there fails every session in silence, so that
+line belongs in the recap and never as a dead path in an entry file. No observation ends in
+write-nothing-and-hope.
+
+Whichever row resolves, name it in the Phase 5 recap in a clause ("comms rule already delivered by the
+session hook - nothing written"); that clause is what stops the next run from measuring this over again.
+
+Row three carries a second clause, and only on a host that runs `hooks/pre/*.ts` - omp today. There the
+two observations are not independent, so absence there means more than it does anywhere else: a native
+rules provider that loads `rules/` puts the rule in context, which makes observation 2 a yes and stops
+the run at row two. So the only way an omp session arrives at row three - no sentinel, no rule in
+context, and a plugin tree sitting on disk above the skill - is that the hook *was* this install's
+delivery route and delivered nothing. That is a broken plugin, not the ordinary absence, and this is the
+one repo positioned to notice its own delivery route failing. Write the pointer, then report it:
+
+> better-dev's comms rule did not reach this session. The plugin tree is installed at `<resolved path>`,
+> and on omp the session hook in that tree is the delivery route - so it ran and delivered nothing.
+> That is a defect in better-dev, not in this repo. I wrote the pointer block into `<entry file>`, so
+> the rule governs this session anyway. It is a workaround, not the fix: the hook decides delivery per
+> install shape, so `omp plugin list` (and the scope you installed with) is the one fact that makes this
+> reproducible - worth reporting with that line attached.
+
+The operator owes one command and a report, and neither blocks them: the pointer already restored the
+rule for this session. Never quietly substitute the workaround for the fix. A run that repairs its own
+delivery route and says nothing is how a channel dies in silence - which is the whole reason this clause
+exists rather than just the pointer.
+
+For the pointer row, write into the entry file this phase already chose - the consent rule above governs
+this write too - between its own markers, replacing any existing block in place:
+
+```markdown
+<!-- BEGIN better-dev-comms -->
+Response style here follows better-dev's comms rule. Read it once, before your first reply:
+`<path to the installed rules/comms.md>`. That file is the only current version of the rule; this block
+is a pointer to it, not a copy.
+<!-- END better-dev-comms -->
+```
+
+**The pointer stays a pointer.** A copy cannot receive an update: the 80-line splice of that rule's body
+into a host entry file, which D42 deleted, drifted from the shipped file and served a stale block for the
+rest of its life. One file, read live.
+
+Read the path back before writing it, every time - what an install actually puts on disk is a
+measurement, not an inference from its name. Where the read fails there is nothing to point at: write
+no block, and give the recap the honest line instead - this host has the skills without the comms rule,
+and what fixes it is getting the repo itself onto this machine, through the host's plugin channel or a
+plain clone, then telling `/onboard` where it landed.
+
 ---
 
 ### Phase 5 - Confirm & close
