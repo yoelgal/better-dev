@@ -1,0 +1,205 @@
+# Extraction recipes (verified on macOS, arm64)
+
+Concrete per-type recipes for stage 1 of `source-harvest`. All verified working on
+macOS (arm64), 2026-07-07 unless a recipe notes its own date; on another OS keep each
+recipe's shape - the canonical capture, then the page read - and swap the tool
+invocations. Re-verify a recipe
+against its tool's --help if it misbehaves before debugging deeper.
+
+## X post (plain text)
+
+Syndication API - x.com blocks plain fetch, this does not need auth:
+
+    curl -s "https://cdn.syndication.twimg.com/tweet-result?id=<TWEET_ID>&token=x"
+
+Gives user, date, text, photos, and for long-form posts the article URL stub. If
+`.entities.urls[0].expanded_url` points at `x.com/i/article/...` it is an X Article and
+the text is NOT in the JSON - use the browser recipe.
+
+The JSON is the canonical capture (exact text, date, media URLs), not the whole
+source. Follow it with the browser full-page read of the thread URL (recipe below):
+the rendered page carries what the API cuts - the author's self-replies continuing
+the thread, replies and quote-posts worth quoting, and outbound links expanded past
+t.co. Quote the high-signal parts into source.md and promote each load-bearing link
+to its own ingest item, one hop deep. Skipping the page read is fine only for a
+self-contained single post with no links and no thread.
+
+Attached images: the JSON's `.photos[]` array carries public `pbs.twimg.com` URLs -
+curl each into `media/` (no auth needed), then transcribe or describe them into
+source.md. Downloaded image files are readable by extraction subagents (the
+main-agent-only constraint applies to conversation-pasted images, not files on disk).
+
+Images INSIDE an X Article: the preferred outerHTML capture (recipe below) keeps
+them as img tags - harvest the `pbs.twimg.com/media/...` URLs from the cleaned
+markdown into `media/`. Only the select-all fallback loses them; if forced onto it,
+screenshot the rendered page into `media/` and note in source.md which figures were
+captured versus skipped - never silently drop them.
+
+## Full-page browser read (X Articles, threads, any authenticated page)
+
+Preferred (verified 2026-08-05): a **headless browser impersonating the operator** -
+Playwright chromium loading the operator's own cookie jar, so authenticated pages
+render logged-in, in the background, with no visible browser and no focus theft. The
+runner is `headless-read.py` next to this file:
+
+    python3 <skill-dir>/headless-read.py "<URL>" <out-basename> \
+      --cookies ~/.cache/harvest/cookies.txt --wait 6
+
+Writes `<out>.html` (rendered DOM) and `<out>.md` (pandoc-cleaned). It scrolls to
+pull in lazy-loaded replies/feeds (`--scrolls` tunes how far); a logged-in capture is
+roughly double a logged-out one on an X thread - compare sizes when unsure which you
+got. Confirm the capture names the expected author/title before filing. Content
+images are the `pbs.twimg.com/media/...` URLs in the markdown (`profile_images/` is
+avatar junk), curl each into `media/`. This read also recovers truncated note-tweets:
+the thread page carries the full text the syndication API cuts at ~280 chars.
+
+**One page per process is wrong for a batch.** `headless-read.py` launches its own chromium,
+which is right for one page and thrashes at scale: 40 pages fanned out five-at-a-time managed
+four pages in ten minutes, while a single browser holding one context and reading four pages
+concurrently did nineteen in eighty-two seconds. For any batch past a handful, reuse one
+browser: launch chromium once, add the jar to one context, then `asyncio.gather` over the
+URL list behind a semaphore, writing the same `<out>.html` plus pandoc-cleaned `<out>.md` per
+page. Same capture contract, same cookie handling, one launch.
+
+**When only the text is wanted, try `api.fxtwitter.com` first.** It returns a full note-tweet
+where the syndication API truncates, for the cost of one request rather than a rendered page.
+It serves a single post with no reply tree, so it settles rung 1 and never rung 3.
+
+**The cookie jar is operator-run, once per batch.** Agent reads of the browser's
+cookie store are classifier-blocked (credential access), so hand the operator this
+paste-ready line (pbcopy it) and wait for the jar before the first authenticated read:
+
+    mkdir -p ~/.cache/harvest && yt-dlp --cookies-from-browser chrome \
+      --cookies ~/.cache/harvest/cookies.txt --skip-download --no-warnings \
+      "https://x.com/home"
+
+A "No video could be found" error is fine - the jar still writes (verify with `wc -l`).
+The jar holds live credentials: it stays in `~/.cache`, never in the archive, never in
+a repo. Stale-jar tell: pages render logged-out (small captures, no reply pane) -
+re-run the export. Two mechanics the script already handles, recorded here so a
+rewrite keeps them: yt-dlp exports Chrome cookies with WebKit-epoch microsecond
+expiries (convert > 1e14 values via `/1e6 - 11644473600` or Playwright rejects the
+jar), and session cookies carry `expires: 0` (map to `-1`).
+
+Fallback (no Playwright, or a site that blocks headless): drive the operator's
+visible Chrome via osascript - it steals the screen and focus, so it is the fallback,
+not the default. Needs View > Developer > Allow JavaScript from Apple Events (one-time,
+per profile); if off, osascript errors telling you so.
+
+    osascript <<'EOF' > raw-capture.html
+    tell application "Google Chrome" to open location "https://x.com/i/article/<ARTICLE_ID>"
+    delay 7
+    tell application "Google Chrome" to get execute active tab of front window javascript "document.documentElement.outerHTML"
+    EOF
+    pandoc -f html -t gfm-raw_html raw-capture.html -o raw-capture.md
+
+A slow page can hand you the previous tab's DOM, so apply the same expected-author
+check; on a mismatch re-run with a longer delay. Note this path captures whatever
+rendered at snapshot time - no scrolling, so reply panes are routinely missing.
+
+The top-level thread DOM is one layer, not the conversation: replies clipped at "Show
+more" and subthreads folded behind "Show replies" are absent from it. Give each
+truncated reply its own syndication fetch (its status id is in the page), and each
+substantive subthread its own permalink page read with this same recipe - the author's
+canonical answers routinely live two levels down, under a reply the top page shows
+only folded.
+
+Last resort (Apple-Events JavaScript off, no settings needed): open the page,
+select-all, copy, read the clipboard. Frontmost gotcha (hit 2026-07-07): some terminal apps (cmux) stay
+frontmost after `activate`, so the keystrokes land in the terminal and you copy your
+own session. Force focus inside System Events right before the keystrokes - `set
+frontmost of process "Google Chrome" to true`, delay 2 - and apply the same
+expected-author check before trusting the clipboard.
+
+    pbpaste > /tmp/clip-backup.txt   # restore the user's clipboard after the batch
+    osascript <<'EOF'
+    tell application "Google Chrome"
+      activate
+      open location "https://x.com/i/article/<ARTICLE_ID>"
+    end tell
+    delay 7
+    tell application "System Events"
+      keystroke "a" using command down
+      delay 0.7
+      keystroke "c" using command down
+      delay 0.5
+    end tell
+    EOF
+    pbpaste > raw-capture.txt
+    cat /tmp/clip-backup.txt | pbcopy
+
+Either way, strip the X page chrome: content starts at the article title, ends
+before "Want to publish your own Article?". Keep the author's trailing promo if it is
+part of the article body; sed line ranges beat regex here.
+
+## Instagram reel / video
+
+    DYLD_LIBRARY_PATH=/opt/homebrew/opt/expat/lib \
+      yt-dlp --cookies-from-browser chrome --write-info-json \
+      -o "media/%(id)s.%(ext)s" "<REEL_URL>"
+    ffmpeg -y -i media/<id>.mp4 -ar 16000 -ac 1 media/audio.wav
+    whisper-cli -m ~/.cache/whisper-models/ggml-base.en.bin -f media/audio.wav \
+      -otxt -of transcript
+
+Notes: IG needs the logged-in browser cookies; the DYLD prefix fixes brew Python's
+pyexpat mismatch on DASH manifests; whisper output lines start with a space - strip
+with `sed 's/^ //'`. Post date comes from `.upload_date` in the info.json.
+
+**A near-empty transcript means the video is silent, not empty.** Product and skill
+announcements are routinely screen recordings with no narration: whisper returns a few dozen
+bytes and the payload is entirely on screen. Check the transcript's byte count, and where it
+is negligible, sample frames and read them:
+
+    ffmpeg -y -i media/<id>.mp4 -vf "fps=1/4,scale=1100:-1" media/frames/%02d.jpg
+
+One frame per four seconds is dense enough for a demo and cheap enough to read. Only the main
+agent can see conversation-pasted images, but frames written to disk are readable by
+extraction agents too, so name the frame directory in the brief rather than transcribing them
+all yourself. Three silent videos in one batch hid a sixteen-step pipeline table and a list of
+mechanically enforced invariants, which were that batch's two best finds; the whisper output
+for all three totalled 46 bytes.
+
+## GitHub repo
+
+    git clone --depth 1 https://github.com/<owner>/<repo> <scratch>/repos/<owner>-<repo>
+
+Clone to scratch, never into the library. Then dispatch the extraction agent per the
+brief in SKILL.md. For npm/PyPI/crates packages use a package-source reading skill,
+where the host ships one, instead of guessing from the README.
+
+## Research paper (a post recirculating one)
+
+The paper is the source; the post is only the pointer. Fetch the actual PDF (arXiv:
+`curl -sL arxiv.org/pdf/<id>` into scratch, Read with `pages`) and read the main text
+before writing the FEEDS summary - the tweet-level summary reliably misses the
+load-bearing mechanics and can even misattribute the authors.
+
+## Execution transcript (of a model's own run)
+
+Split prompt-supplied from model-contributed behavior before extracting: the
+scaffolding (gates, budgets, receipt standards) harvests as harness patterns; only the
+model's own moves harvest as dispositions. Crediting the wrong layer overstates the
+model.
+
+## Operator judgement doc (a mined codex of someone's own rules)
+
+Already synthesis, not raw ore: the work is a coverage diff against current skill text,
+rule by rule, not extraction - expect most ground already held and the real gaps at the
+seams the library deliberately avoided. Get the persona/library ruling first: which
+rules universalize into shared skills, and whether any personal persona layer ships at
+all.
+
+## Image / screenshot
+
+Only the main agent sees pasted images - transcribe fully yourself into source.md
+(structure, headings, margin notes, captions), and copy the temp file into `media/`
+IMMEDIATELY: clipboard temp paths under /var/folders vanish.
+
+## Manifest
+
+Per batch, append to the archive's manifest: item, type, status
+(extracted/dupe/failed+why), files written, and the tier band plus model of the agent
+that wrote each extraction ("by extraction agent (<model>, cheap band)") - the manifest
+line is the harvest's dispatch receipt, and one without a band means the tier decision
+never reached the dispatch call. The manifest is what makes "did we ingest X?"
+answerable without re-crawling.

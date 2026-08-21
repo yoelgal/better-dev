@@ -1,0 +1,381 @@
+# The done-contract
+
+Step 4 of plan-grill in full. This is the artifact the whole flow exists to produce: a synthesis of
+the grilled conversation into something the autonomous loop can drive to and prove. No fresh
+interview - write down what the grill already settled.
+
+Its center of gravity is the **done-criteria**. Everything else frames them.
+
+Beyond these per-feature criteria, every contract inherits the project's **standing definition of
+done**: verified at runtime, not just compiled; new behavior covered by a test that fails without the
+change; untrusted input reviewed; a rollback path for anything risky; the result reported honestly. If
+the project keeps that bar in `.better-dev/` or a guardrails reference, point to it - don't restate it
+here. (No standing bar yet is a `/guardrails-install` gap, not a plan-grill one.)
+
+## Done-criteria - the observable part
+
+Each criterion is a check that can run, not a sentence to nod at:
+
+- a **runnable check** - a command or a test - that is **red now** and turns **green exactly when**
+  the criterion is met,
+- the **seam** it attaches to - the point in the system where the behavior is observed,
+- the **observable it asserts** at that seam - the concrete thing the check turns on: the exact
+  status code, the returned value, the row that must exist, the log or output line that must appear.
+  A seam plus an adjective ("green when it works") is the gap a trivially-true check slips through.
+  The loop still writes the test body, but it writes it to *your* asserted observable, not a
+  stand-in it can wave green.
+
+Rules for the seam:
+
+- Prefer an existing seam to a new one; a feature that needs no new seam is the good case.
+- Use the **highest** seam that still observes the behavior - an end-to-end or API-level check over a
+  unit poke at internals, so the check survives refactors.
+- Keep the count low; the ideal is one. More seams is more to maintain and more to go stale.
+- Check the seams with the user before locking them - a seam mismatch here misdirects the loop.
+- A seam is a **test anchor** named before code. Declaring where each check bites, up front, is what
+  lets a check exist to go red before implementation makes it green; the loop writes its checks
+  against these anchors first. Enumerating them is part of locking the contract, not the loop's job to
+  discover later.
+- The main goal carries at least one criterion a human could run unaided in under a minute - open
+  the surface, take the action, see the result. If no criterion can be phrased that way, the seam
+  is too low or the goal has no observable effect; either is a finding, not a formatting problem.
+
+"Done" is a check going green. Never a claim, never "until it looks right." The loop reads these,
+drives them red-to-green, and refuses to mark done what it can't prove. Each criterion's status is a
+typed marker the loop flips - the checkbox carries met/unmet (`[ ]` -> `[x]`), a field a session sets,
+never a prose sentence it re-interprets each pass.
+
+Pinning the observable here is one layer of the self-authored-test defense: on creation the loop
+claims each loop-authored test into its protect-set (`/autonomous-loop`), and the reviewer scans for
+weakened or trivially-true tests (`/review`). Pin the observable so both have something concrete to
+guard and to check against.
+
+### Right-size the criteria
+
+Aim for the smallest set that proves the goal - one per distinct property the goal claims, not a
+coverage quota. Run one self-check on each candidate: *would removing this miss a property the goal
+claims?* If no, drop it - it's redundant with another criterion or it's checking a path the goal never
+promised.
+
+An **absence or removal** criterion has no runtime observable, so its check is a source-level predicate,
+and the craft is in the predicate. Negate a grep so success means the thing is gone -
+`! grep -n '<symbol>' -- <touched dirs>`, exit 0 = no matches = satisfied. Scope the paths to the
+directories the change touches, so an unrelated hit elsewhere doesn't fail the check. Keep it read-only;
+a predicate observes, it never mutates. Name the symbol or path, not "cleaned up".
+
+An **operational-job** criterion's completion observable lives only in production - "every row
+backfilled" has no local seam. It attaches to the recorded ops-runner surface
+(the `ops-runner` line in `.better-dev/rules.md` - recorded by `/guardrails-install`; when absent the
+criterion is a `NEEDS_INPUT` naming the recorder, not a guess). Pair it with a fixture-level
+rehearsal criterion the loop can drive red-to-green; the operational criterion's own box flips
+only on the execution receipt - the command as run on the recorded runner, the completion
+observable's before-and-after values, one idempotent re-run - never on the loop's local green. The
+job's safety properties (batching, resumability, no half-state) are the failure-behavior pass's
+rows, the same as any data-integrity operation.
+
+### How the criteria prove the goal
+
+Under the criteria, write a ≤2-sentence line tying the set back to the goal's end-state - *these checks,
+green, mean the goal holds because …*. It's the join between the criteria and the goal, not a
+restatement of each check. Its real work is negative: a goal that no criterion covers surfaces here as a
+sentence you find you can't honestly write.
+
+## Goal shape
+
+Give the feature's goal one clear phrasing so its proof is obvious:
+
+- **Capability** - the system will support `<X>`.
+- **End-state** - `<Y>` will be the new state of `<subsystem>`.
+- **Invariant** - `<Z>` will always hold for `<entity>`.
+- **Removal** - `<deprecated thing>` will no longer be reachable.
+
+Not "refactor X" (a task), not "add tests" (a means), not "fix the bug" (no specificity). Behavioral
+shapes prove out through runnable checks; a removal or a structural fact proves through a
+source-level predicate (a `grep`, a build check).
+
+### Scope cap - at most three committed goals
+
+A contract commits to a small goal set: one main goal plus at most two secondary end-states, three in
+all. Past that, the change is too large to review as one unit and its criteria sprawl beyond what a
+reviewer can hold in their head. When the grill surfaces a fourth committed goal, halt *before any code*
+and split into focused work items - each its own contract, worktree, and PR - rather than carrying a
+contract nobody can review whole. Out-of-scope items don't count against the cap; they're the explicit
+record of what this feature won't do.
+
+### Boundaries bind only when co-located
+
+An out-of-scope line holds the loop only when it is explicit and sits beside the goal it borders. A
+boundary left as a bare list at the foot of the file is one the loop fills in for itself - it reads
+the unstated edge as license to tidy, refactor, or "while I was in there." State each boundary as a
+positive-and-negative pair next to the goal it touches: what this work-item does, and the adjacent
+thing it must not touch. "Adds the export endpoint; does not change the existing import path" holds; a
+trailing "out of scope: imports" at the foot of the file does not.
+
+### Scope tripwire
+
+The **scope tripwire** is the halt condition the boundaries arm. The loop halts and reports - it does
+not silently proceed - if it would edit a path in the forbidden set above, more than `<N>` files
+change outside the owned set, or a test that was green goes red. Set `<N>` to the owned-file count
+plus a small margin and name it in the contract. This file owns the term: the loop's scope-guard and
+the review scope gate reference this tripwire by that name.
+
+## Contract-lite - the chore shape
+
+A chore-class work-item (the gate lives in the skill body) carries four parts instead of the full
+template - deliberately cheaper than a feature contract, priced to the chore's blast radius - and
+its goal still takes one shape from the list above, usually an end-state or a removal. The four
+parts:
+
+- **Baseline verify stays green** - the repo's recorded verify commands
+  (the `verify` line in `.better-dev/rules.md`) green before the change and green after, on unchanged
+  assertions. For a refactor this is the behavior-preserving check; where the touched area has no
+  coverage, a characterization test pinning current behavior lands first, as part of the chore.
+- **The chore's own observable** - one runnable check, red now, green when the chore lands: a
+  dependency upgrade's lockfile resolving the target version with the audit gate exiting 0; a
+  removal's negated grep (the rule above); the named test or doc existing where it didn't.
+- **Scope line** - the forbidden path set and N, exactly as the scope tripwire defines.
+- **Merge line** - the same seal question as any contract, `merge: auto | hold`; omitted, it leaves
+  `/pr-and-verify`'s merge gate nothing to read, so the gate holds.
+
+The failure-behavior walk and the threat-surface pass run only when the chore crosses a trust
+boundary - a major bump of an auth or crypto dependency does. Approval pinning, the planned-at
+SHA, and the pre-seal checklist's applicable lines are unchanged.
+
+## Failure behavior - the pass agents skip
+
+Done-criteria prove the goal *works*. They say nothing about what happens when it doesn't - and a spec
+silent on failure doesn't make an agent stop to ask; it makes the agent pick something plausible and
+ship it with full confidence: a log line, then full speed ahead. To close that gap, at contract seal
+walk eight categories in this fixed order - the order matters because it surfaces the ones you
+personally always skip:
+
+**user types, contexts of use, unexpected inputs and system failures, user error, feature
+interactions, load, security and privacy, accessibility.**
+
+Most categories won't apply to a given feature, and that is expected - only a category that yields a
+*load-bearing* scenario emits a row:
+
+| Scenario | Expected behavior | What ships if we stay silent |
+|---|---|---|
+| <the off-happy-path case> | <the defined behavior, specific> | <the plausible-but-wrong default an agent picks> |
+
+The third column is the honesty-forcing function: if you can't name a worse-than-nothing default the
+loop would ship, the scenario probably doesn't apply - drop the row rather than pad the table. Any row
+whose expected behavior is load-bearing (money, data integrity, auth, irreversibility) promotes to a
+**done-criterion** with its own runnable check - a re-run that stays idempotent, a malformed input
+that's rejected, a mid-run failure that leaves no half-state.
+
+One mitigation gets named here rather than wished for at release time: a risky but reversible
+change - a pricing change, a default flip, anything user-facing whose only backout is a
+revert-and-redeploy - is a candidate for shipping flag-gated where the repo has a flag mechanism.
+When taken, the contract records the flag as `flag: <name>=<state at ship>` (filled:
+`flag: new-pricing=off`) under the template's Failure behavior section - the line
+`/release-promotion`'s post-deploy verify reads to drive the surface in the state users get, and
+the flag whose kill that skill holds as the faster rollback. A flag considered and declined gets
+its one-line reason in Implementation decisions, so the exposure reads as chosen, not overlooked.
+
+Where the foundation already settled a category's policy, inherit it - don't re-decide. groundwork's
+cross-cutting policy fixes the reconciliation stance (what the system does when the money doesn't add
+up), idempotency of anything re-runnable, units and currency, and the trust boundaries; this pass
+cites that policy for those categories and spends its attention on the feature-specific scenarios the
+foundation couldn't foresee. The security-and-privacy category, when the feature crosses a trust
+boundary, gets its full treatment in the threat-surface pass below.
+
+## Threat surface - name it before you build it
+
+Gated: run this only when the feature reads something from outside its own trust boundary - HTTP
+requests, form fields, file uploads, webhooks, third-party APIs, message queues, auth, money or PII, or
+model output. A feature that touches no external input skips the section and says so in one line; if you
+can't name the trust boundaries, the plan isn't ready to secure.
+
+For each boundary the feature crosses, write one abuse case beside the use case ("an attacker sends X").
+The strongest abuse cases become done-criteria directly - an abuse case is just a red-now check whose
+green state is "the attack is refused": red now because the attack succeeds or the input is accepted,
+green when it's rejected. Pull the matching rows from `/security-pass`'s per-vuln-class checklist (user
+input, auth/session, payments, file upload, external fetch, LLM feature) as additional criteria rather
+than re-deriving them, and let `/security-pass` own the depth.
+
+## Template
+
+```markdown
+# Done-contract - <work-item>
+
+## Problem
+<one measurable sentence - who experiences what, with baseline and target each a receipt or
+TBD(<owner>); when the intent arrived as an external brief, the requester's verbatim words sit
+above it in quotes, attributed>
+
+## Solution
+<the solution, from the user's perspective>
+
+## Goal
+The main goal in one shape (capability / end-state / invariant / removal), plus any secondary
+committed end-states - at most three in all (see scope cap).
+
+## User stories
+A long, numbered list. Each: As a <actor>, I want <feature>, so that <benefit>.
+Cover the feature's aspects extensively.
+
+## Done-criteria
+For each, a runnable check + its seam + the observable it asserts + red-now/green-when. The `[ ]`/`[x]`
+box is the typed status the loop flips, not prose to re-read:
+- [ ] <criterion> - check: `<command or test>` at seam `<where>`; asserts `<concrete observable>`;
+  red now, green when <condition>.
+
+How these prove the goal: <≤2 sentences tying the criteria set back to the goal's end-state>.
+
+## Failure behavior
+| Scenario | Expected behavior | What ships if silent |
+|---|---|---|
+| ... | ... | ... |
+Rows with load-bearing behavior are promoted to done-criteria above. Categories the foundation
+already settled (reconciliation stance, idempotency, units) are inherited, not re-decided.
+flag: <name>=<state at ship>   <- optional; only when the change ships flag-gated.
+
+## Threat surface
+Trust boundaries crossed: <list, or "none - no external input">.
+Abuse cases: <attacker action -> defined refusal>. Promoted checks: <which became done-criteria>.
+
+## Implementation decisions
+Modules touched, interfaces, schema/API contracts, architectural calls, clarifications from the
+grill. No file paths or code snippets - they go stale. Exception: inline a small prototype-derived
+type, schema, reducer, or state-machine when it pins a decision more precisely than prose; note it
+came from a prototype and trim to the decision. Any preference question the user left unanswered is
+recorded here as `Assumption: <chose X because Y>`, so the default is visible instead of buried.
+Any new external dependency gets one line here: its purpose, why the existing stack can't cover it,
+and the reimplementation test - a capability writable in roughly twenty lines is written, not added
+as a dependency. Record the decision either way; a dependency with no line is a lens finding
+(`lenses.md`, engineering).
+
+## Out of scope
+Each boundary as a positive-and-negative pair beside the goal it borders: <what this does> - does not
+touch <the adjacent thing>. Not a bare trailing list; an unstated edge is one the loop fills in itself.
+Each deferral also carries one sentence saying why it is not needed now, so a reviewer can diff the
+diff against a list of chosen absences instead of guessing which gaps were decisions (`/review` owns
+that drift diff). The common tempting-but-deferred set - auth, settings, admin surfaces, analytics -
+is deferred by default unless it is the feature.
+
+## Scope tripwire
+Forbidden path set: <paths the loop must not edit>. N = <owned-file count + margin>. The loop halts
+and reports if it would edit a forbidden path, more than N files change outside the owned set, or a
+green test goes red.
+
+## Stop conditions
+<condition specific to this plan's real risk - "if X turns out to be load-bearing, stop and report">.
+Named to this feature's actual failure modes, not boilerplate a reviewer can't tell from filler. When
+reality doesn't match the plan, the loop stops here and reports rather than improvising a way through.
+
+## Open concerns
+Anything unresolved. If one blocks the plan, the state is NEEDS_INPUT - stop, don't guess.
+
+## Merge
+merge: <auto | hold> - <auto only where the repo records merge-policy: auto-on-green and the
+user said auto for this item at seal; hold otherwise, including when no policy is recorded>
+gated paths: <recorded safety-gate paths this item is expected to touch, AND any write target outside
+this work-item's worktree (the primary checkout, global config, another repo), each with the
+operator's answer - or "none expected">
+Neither line is mechanically enforced - nothing refuses a contract that omits one. The **merge** line
+omitted leaves `/pr-and-verify`'s merge gate with nothing to read, so it holds; the **gated-paths**
+line omitted is simply silent, and the pre-seal checklist below is the only thing that catches it. Say
+that rather than letting either line's position imply an enforcement it does not have.
+
+The gated-paths line carries two kinds of entry, both asked at the only moment they can still change
+anything: a known human gate, and a write this item will have to make outside its own worktree. The
+second is there because `/autonomous-loop` stops on a write target outside its own worktree unless
+the contract named it - so a target named and answered here is the difference between the loop writing
+it and the loop handing the operator a command to run. Read the repo's gates while writing this section
+(`.better-dev/rules.md`, then the overrides layer, which wins) and check them against the surface this
+plan already
+says it will touch. Where they intersect, name the intersection and put the gate to the user here,
+in the same breath as the merge question they are answering anyway. A gate first raised after the
+work is built collects a rubber stamp: at that point the only options are approve or discard ninety
+minutes of work, and an operator who cannot realistically say no is not reviewing, whatever the log
+records. Asked at seal, no is still cheap - the plan can change seam, scope, or approach in a
+sentence.
+
+This is pre-authorization, never a replacement. What the seal names is a prediction of blast radius,
+and predictions are wrong: an item that grows into a gated path nobody listed was never authorized
+for it, so the merge-time gate stands and fires on any gated path this line did not name. An item
+cannot buy its way out of a gate by mis-predicting its own reach, and the loop's mid-run escalation
+(`/autonomous-loop`'s human-gate classes) is unaffected - the log of what was consented at seal is
+exactly the list of what does not stop twice.
+
+## Approval
+approved: <date> - "<the operator's own words>" - <who said it>
+planned-at: <short SHA>
+
+## Ground truth
+Verdict from the baseline check + link to ground-truth.md.
+```
+
+## Pre-seal checklist
+
+Before you pin the contract, each line reads yes or the contract isn't ready:
+
+- A fresh context could execute this from the contract and the repo alone.
+- Every done-criterion is a command with an expected result, not a judgment ("make sure it works").
+- Every criterion names its concrete observable - a value, status, row, or output line.
+- Every number in Problem and Goal, and every threshold a done-criterion asserts, carries a named
+  source or a `TBD(<owner>)` marker - an unsourced number is an invented one. A latency, size, or
+  rate criterion cites a measured baseline, a real comp, or its owner; a bar the plan invented is
+  the run's private sense of sufficient wearing a number.
+- The Merge line reads `auto` or `hold` - `auto` only where the repo records
+  `merge-policy: auto-on-green` AND the user chose auto for this item (asked at seal, never assumed).
+- The gated-paths line names every recorded safety gate this plan's own surface intersects, each with
+  the user's answer, or reads `none expected` - checked against a live `recall "safety"` plus the
+  overrides layer, never from memory of what this repo gates.
+- The stop conditions are specific to this plan's real risks, not boilerplate.
+- No secret values appear anywhere - locations and credential types only.
+- Every promoted objection and lens finding has its matching contract line - an open concern, an
+  out-of-scope pair, or a criterion. A disposition with no line is unresolved - the same
+  acceptance-without-the-edit failure `/review`'s accept-or-rebut pattern (reception.md) re-audits.
+- The planned-at SHA is stamped.
+
+The right-size self-check (would removing a criterion miss a property the goal claims?) and the grill's
+predict-the-next-three-questions check already ran; this is the last read before the gate, not a re-run
+of them.
+
+## Approval is written into the contract
+
+At the same confirmation, settle the Merge line. Where `.better-dev/rules.md` records
+`merge-policy: auto-on-green`, ask one question
+beside the contract confirm: when the loop settles DONE and every gate passes - independent review,
+CI, the driven done-criteria - merge into the integration branch automatically, or hold the green PR
+for your look? Record the answer as the contract's `merge:` line. Where the policy is `human`, skip the question and
+write `merge: hold` with the reason - the standing allowance is `/guardrails-install`'s to grant,
+never this seal's to improvise.
+
+Nothing recorded splits in two, and the split is load-bearing. Read `.better-dev/rules.md`: where a
+parked `pending-decision` names the merge
+policy - what a greenfield `/onboard` writes, having deferred the question because the repo then had no
+PR to merge - **this seal is the collector**. There is a PR to merge now, so ask the standing question
+here, once, and write the answer through its owner (`/guardrails-install` records
+`merge-policy: <auto-on-green | human>`), then clear the parked line and settle the `merge:`
+line from it. A park is a deferral with a named collector; a collector that quietly writes `hold`
+instead of asking converts it into a decision the operator never made, and the repo then carries a
+policy nobody chose - the outcome parking exists to prevent.
+
+Where nothing is recorded and nothing was parked, the policy is genuinely unset: write `merge: hold`
+with the reason, and name the `/guardrails-install` run that would record one.
+
+When the user confirms the contract, fill the `## Approval` block in `contract.md` itself: the date,
+their yes quoted in their own words, and who said it. The quote is what carries the provenance - a
+line the agent wrote for itself authorizes nothing. Nothing checks it mechanically, so the loop reads
+the block and applies one test: an approval older than the contract's last amendment is an approval of
+text that no longer exists. Amending a contract therefore means clearing that line and asking again,
+and the loop refuses to drive a contract whose approval is missing or stale rather than advancing on a
+silently-changed sign-off. Present the delta when you re-ask - a re-confirm is a judgment on what
+changed, not a re-read of the whole contract.
+
+The **planned-at** short SHA rides the same block: the commit the plan was written against. The
+approval line guards the contract's text, the SHA guards the code under it. At loop entry
+`/autonomous-loop` drift-checks the touched area against this SHA and re-baselines before building if
+the code moved since the contract was sealed, rather than building on a stale premise.
+
+## Optional: hand to a slice breakdown
+
+At the planning/implementation boundary the plan can be cut into vertical-slice work-items - each a
+thin path through every layer, demoable on its own, prefactoring first. If you do, present the slices
+numbered with their blockers and the user stories each covers, and iterate until the user approves
+the granularity and dependencies. This decomposition may equally belong to the implementation loop;
+it's optional here, not part of locking the contract.

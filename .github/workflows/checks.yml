@@ -1,0 +1,41 @@
+name: checks
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # prove-new diffs this ref against its base, and a default checkout is fetch-depth 1 -
+          # the base commit simply is not in the clone, so the mode would have nothing to compare.
+          fetch-depth: 0
+      - name: git identity for selftests that commit in fixtures
+        run: |
+          git config --global user.email ci@better-dev.local
+          git config --global user.name better-dev-ci
+          git config --global init.defaultBranch main
+      # One step, because the gate is the whole suite: it lints every skill, runs every shipped
+      # script's selftest, parses every shipped script, and validates the manifest. It fails rather
+      # than reporting a pass when a sweep matches nothing - a green that covered zero files is how
+      # this job once certified a suite it never executed.
+      - name: package gate
+        run: scripts/bd-package-check
+      # A check that is green before the thing it guards exists proves nothing and reads exactly
+      # like one that works. Every check this diff adds has to come back red against the base tree.
+      - name: new checks must have been red before their implementation
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          base="$BASE_SHA"
+          [ -n "$base" ] || base="$(git rev-parse --verify -q HEAD~1 || true)"
+          # A root commit has no base tree, so there is nothing to prove a new check red against.
+          # Say so rather than passing quietly: a check that skips in silence reads exactly like one
+          # that ran, which is the same defect this step exists to catch.
+          if [ -n "$base" ]; then
+            scripts/bd-package-check --prove-new "$base"
+          else
+            echo "prove-new: skipped - HEAD is a root commit, so no base tree exists to compare against"
+          fi

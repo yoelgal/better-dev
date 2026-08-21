@@ -1,0 +1,129 @@
+# Runtime observation - the portable verify rubric
+
+The acceptance check for a done-criterion is what the change *does* when it runs, observed directly. This
+is the discipline `/pr-and-verify` step 3 runs - against the PR's preview deployment where the repo
+records one - that `/autonomous-loop` points at for its end-to-end
+handoff, that a GUI check narrows onto its own surface, and that `/release-promotion`'s deploy-verify
+pass runs against the deployed surface. Where the host ships `/verify`, compose it as
+the executor; where it doesn't (Codex, pi, a bare host), this is the rubric to run inline. Same standard
+either way. Runtime and UI verification benefit from a context separate from the one that produced the
+diff - the maker's context inherits the maker's blind spots.
+
+## Observe the runtime, don't re-run the suite
+
+Re-running the tests or the typechecker proves the suite still runs, not that the change works - spend that
+time driving the app instead. A suite the author wrote is their evidence: read it to learn what to check,
+then go exercise the real path yourself. If your whole plan is build / typecheck / run-the-test-file,
+you've planned a CI rerun, not a verification.
+
+## Find the surface
+
+The change surfaces somewhere a user or caller meets it. Follow it there and observe it on that surface -
+an internal function is not a surface, so trace its caller out to one of these rows:
+
+| Change | Surface | Drive it, then look |
+|---|---|---|
+| CLI / TUI | the terminal | run the exact invocation a user would; capture the pane as the evidence |
+| Server / API | the socket | send the request, read the response body |
+| GUI | the pixels | drive it under Playwright / computer-use, screenshot and actually look |
+| Mobile app | the device or simulator screen | install the build, drive the flow by touch, screenshot and actually look |
+| Library | the public export | exercise the package boundary, never `import ./src/...` |
+| Migration / data | the store | run it, read the rows and the resulting schema back |
+| Operational prod job (a backfill, a one-off batch) | the recorded `ops-runner` surface | run or observe it there, read the completion receipt back - job status plus row counts before/after |
+| Prompt / agent config | the agent | run it and capture what it does |
+
+The operational-job row runs where the recorded `ops-runner` rule says prod jobs run (recorded by
+`/guardrails-install` - run it if absent); its observation is the completion receipt, and with no
+rule recorded the criterion settles NEEDS_INPUT naming the recorder. A recorded `ops-runner: none`
+settles NEEDS_INPUT too, naming who runs the job - the absent route is a recorded fact, not a
+question to re-detect - never an improvised production command.
+
+Standing a local surface up follows the same pattern: recall `"dev-run"` for the command that runs
+this tree's app, and `"seed-reset"` where the flow needs data - a recorded `seed-reset: none` is a
+named gap `/plan-grill` can plan a work-item for, never a silent skip. Both are recorded once by
+`/guardrails-install`; re-discovering them per worktree is the re-detection those keys exist to end.
+
+A criterion carrying a timing, size, or rate threshold is observed as a distribution, not a number: report
+the machine and the repetition count beside the measurement, against the baseline the criterion already
+cites (`/plan-grill`'s pre-seal requires one). A single run on the machine that just built the branch is
+noise wearing a verdict.
+
+Through the real interface: if a user clicks a button, click the button, don't curl the API underneath it.
+The diff's own tests count as the author's claim, never as a surface to observe - on a mixed src+tests
+change, drive the src's surface and leave the test files out of the observation. Operator feedback that
+contradicts a verified state triggers a
+which-surface-are-you-looking-at check before any re-diagnosis: a worktree's server shows this tree, while
+the habitual dev server shows stale code until the merge lands.
+
+## UI evidence - one capture per state
+
+"I looked at it", backed by one screenshot of the happy path, is how a UI criterion passes without being
+observed. A change with UI surface earns a capture of every state it reaches - empty, loading, error,
+populated - plus one capture of the key interaction driven end to end, a short recording where the host
+can make one and a frame per step where it cannot. Where behavior changed, capture the before beside the
+after, so the delta is visible without building the old revision.
+
+The captures go where the operator reads them: their paths ride in the evidence rows `/pr-and-verify`
+step 3 splices into the PR body. A capture taken before the last commit to that surface is evidence for
+code that no longer runs, so a later push re-captures the states it touched instead of reusing the frames.
+
+## Probe past the happy path
+
+Confirming the happy path is the first half, not the job. Try to break your own change at the same surface
+with at least one adversarial input: an empty value, the same action fired twice, a conflicting option, a
+malformed body, a missing required field, a concurrent edit, an empty state, a re-run over stale state. Even a
+probe that turns up nothing gets written down as a step taken - `--limit '' → rejected cleanly:
+--limit needs a number, exit 2` is a result worth keeping. Where the contract carries a scenario table, that
+table is the
+walk-list; drive each branch a user could take, not just the golden one, because an agent-written unit
+test overfits the golden path and the skipped branch is exactly where the bug lives.
+
+## Verdict
+
+Settle each criterion at one of four:
+
+- **PASS** - driven on its surface, observed doing the right thing, and it survived at least one probe.
+  What counts as right is the criterion, never the diff: where the surface shows something the criterion is
+  silent on, source the expectation outside the change - the base revision's behavior, a committed test,
+  the product copy, the operator - before calling it correct or calling it a defect, because a screen that
+  matches the code you just wrote is a tautology rather than an observation.
+- **FAIL** - it did the wrong thing, threw, or a probe broke it.
+- **BLOCKED** - something outside the change stopped the check from running (a missing credential, an
+  environment that won't stand up). Name what blocked it.
+- **SKIP** - the change never reaches a runtime surface (docs, or types with no emitted code). Report `SKIP
+(no runtime
+  surface): <reason>`, and don't run the suite to fill the space.
+
+A pass is all-or-nothing: three green scenarios out of four settle FAIL until the fourth goes green or
+its miss gets an explicit disposition. Output you cannot read confidently settles FAIL and carries the
+raw capture - ambiguity never reads toward a pass. Uncertainty tilts the same way, because the cost
+asymmetry runs one direction: a wrong PASS ships a defect to users, a wrong FAIL only buys a second
+look. The observation is the evidence; a criterion with no capture behind it is unproven, not passed.
+Keep each capture quotable in one line - an output line, a row count, a screenshot path - because
+`/pr-and-verify` step 3 carries it into the PR body's evidence region beside the verdict token.
+
+## Every claim points to a tool result
+
+The SKIP rule keeps one claim honest; this holds the whole report to the same line. Before handing back any
+status - a verdict, a progress note, a PR brief - audit each claim in it against a tool result from this
+session. Report only what you can point at: a command and its exit code, a captured output tail, a runtime
+behavior you observed. A claim with no session evidence behind it is marked unverified in the same breath -
+not dropped, not dressed up as done. A check that failed is stated with its output; a step that was skipped
+is said to be skipped. A plausible summary with nothing behind it is the fabricated status this gate exists
+to catch.
+
+## Destructive paths and shared state
+
+If the change deletes, publishes, sends, or writes outside the workspace and there is no dry-run, don't
+drive it live - verify what you safely can around it and say plainly which path you left unexercised and
+why. Isolate any shared process state so a check can't corrupt the host: a scratch directory, a named
+socket, a free port, a disposable fixture. A verification that damages the machine it runs on is not a
+verification.
+
+## Scale to the blast radius
+
+Take the narrowest observation that would change your confidence, and widen it with the reach of the
+change. A one-line typo needs a glance; a localized change needs its own surface driven; a shared function
+a dozen callers reach needs each of those surfaces driven, since the break shows up at the caller, not at
+the edit. If a criterion genuinely can't be driven from here, say so and name what has to run - an
+unproven criterion is never rounded up to green.

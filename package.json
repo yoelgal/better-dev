@@ -1,0 +1,9 @@
+{
+  "name": "better-dev",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "test": "bun test hooks/session-hook.test.ts"
+  },
+  "omp": {}
+}
