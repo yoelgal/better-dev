@@ -162,6 +162,14 @@ prove_new() {
     esac
   }
 
+  # KNOWN BLIND SPOT, second one after `__SKIPPED__` above: this loop reads (ok, bad, reason) triples,
+  # so it models a construct as at most one `ok` and one `bad`. An if/elif/else with three ok/bad calls
+  # emits three tokens, the extra one pairs into a neighbouring triple, and a `regression-guard` reason
+  # written for ONE branch exempts the sibling it got paired with - so a genuinely new check can ship
+  # audited by nobody, while this mode prints a green EXEMPT row. Observed 2026-08-21 on the comms-home
+  # check, where a third branch inherited the exemption written for the `ok` line. Until the grouping
+  # counts calls instead of pairing them, keep added checks to two branches per construct and vary a
+  # message where you would have added a third - the comms-home check shows the shape.
   local oklab badlab why
   while IFS= read -r oklab && IFS= read -r badlab && IFS= read -r why; do
     [ -n "$oklab$badlab" ] || continue
@@ -832,19 +840,35 @@ grep -qxF 'alwaysApply: true' "$CB" 2>/dev/null \
 if [ ! -f "$CB" ]; then
   bad "$CB missing (the comms block body's single home)"
 else
-  # Sentinel = the body's opening sentence, which changes when the block is reworded - it changed once
-  # already (from "may have ADHD" to upstream's declarative "has ADHD") and a stale sentinel finds zero
-  # homes and reads as a missing block. Scan the shipped surfaces the same way the dash gate does,
-  # NOT the git index: an uncommitted second copy is exactly the drift this gate exists to catch, and
-  # `git ls-files` cannot see one. raw/ is the gitignored source archive and stays out of scope.
-  probe="The reader has ADHD"
+  # Sentinel = a load-bearing rule from the middle of the body, never its opening sentence. The opener
+  # is what rewording touches first: it changed twice (from "may have ADHD" to "has ADHD", then the
+  # persistence claim carrying it was deleted outright once measurement showed `context` re-supplies the
+  # rule every call). Both times a stale sentinel found zero homes and reported a MISSING block, which
+  # is a different fault with the same message - so the zero case now names which one it is. Scan the
+  # shipped surfaces the same way the dash gate does, NOT the git index: an uncommitted second copy is
+  # exactly the drift this gate exists to catch, and `git ls-files` cannot see one. raw/ is the
+  # gitignored source archive and stays out of scope.
+  probe="Cut whole paragraphs and whole sections"
   homes="$(find skills rules scripts docs -type f 2>/dev/null; ls README.md BOOTSTRAP.md 2>/dev/null)"
   homes="$(printf '%s\n' "$homes" \
     | while read -r f; do [ -f "$f" ] && grep -lqF "$probe" "$f" 2>/dev/null && printf '%s\n' "$f"; done \
     | grep -v 'scripts/bd-package-check' || true)"
   nhomes="$(printf '%s' "$homes" | grep -c . || true)"
-  [ "$nhomes" = 1 ] && ok "comms block body has exactly one home ($CB)" \
-    || bad "comms block body must live in exactly one shipped file, found $nhomes:$(printf ' %s' $homes)"
+  # Zero homes has two causes needing different fixes - the block moved out of $CB, or the sentinel no
+  # longer appears in it - so the message names which. This stays ONE assertion rather than a third
+  # branch on purpose: `--prove-new` reads (ok, bad, reason) triples, so a three-branch construct pairs
+  # its new branch with a sibling and inherits that line's exemption, leaving the new check audited by
+  # nobody. Varying the text of one `bad` keeps the diagnosis and adds no unaudited assertion.
+  if [ "$nhomes" = 1 ]; then
+    ok "comms block body has exactly one home ($CB)"  # prove-new: regression-guard this assertion and its label are unchanged; only the control structure moved from `&&`/`||` to if/else so the zero case could name its own cause, and the one-home case was green at base and still is
+  else
+    if [ "$nhomes" = 0 ] && ! grep -qF "$probe" "$CB" 2>/dev/null; then
+      why="the sentinel is stale, not the block missing - $CB no longer contains \"$probe\", so update the probe in this script"
+    else
+      why="expected exactly one:$(printf ' %s' $homes)"
+    fi
+    bad "comms block body must live in exactly one shipped file, found $nhomes - $why"  # prove-new: regression-guard same assertion and same leading label as at base, reached through `else` instead of `||`; only the trailing diagnosis is new, and a message change cannot come back red
+  fi
   # Count the BODY, not the file: frontmatter is stripped before injection, so it is not part of the
   # per-turn tax the cap exists to bound. Counting the file instead would silently spend cap headroom.
   lines="$(awk 'NR==1 && $0=="---" {fm=1; next} fm==1 && $0=="---" {fm=2; next} fm!=1' "$CB" | grep -c '' || true)"
