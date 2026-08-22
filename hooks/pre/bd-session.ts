@@ -9,7 +9,7 @@
 // directory inside the plugin), is versioned with the plugin, and disappears when the plugin is
 // removed. Nothing here can outlive or rot away from the tree it shipped in.
 //
-// The two jobs, each measured against a real omp session before being written:
+// The three jobs, each measured against a real omp session before being written:
 //
 //   (a) deliver rules/comms.md when no rules provider did. On a marketplace install the host loads
 //       the plugin's skills, commands, hooks and tools but NOT its rules/ - measured: a marketplace
@@ -21,13 +21,21 @@
 //       own docs, `notify` mode "writes update availability only to the debug log; it does not show
 //       a user-facing notification". This reads the same on-disk state that computation reads.
 //
-// Both are one line at most. (b) goes to two places: the status line, which persists and costs no
-// tokens, and pi.sendMessage, which puts the same line in the transcript so a user who never looks
-// at chrome still sees it. triggerTurn stays off: this is a fact, not a prompt.
+//   (c) say whether this git repo has been onboarded on this machine. /onboard writes no repo file,
+//       so the signal is a stamp in the user cache, never a .better-dev directory. A repo with no
+//       stamp is told to run /onboard; a stamped one is told better-dev is wired. Not a git repo:
+//       silence. The line is operator-visible every session, because skipping onboard is how later
+//       skills re-derive the stack and get it wrong.
+//
+// (b) and (c) are one line each. Both go to the status line and to pi.sendMessage so a user who
+// never looks at chrome still sees them. triggerTurn stays off: these are facts, not prompts.
 
 import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
+import { createRequire } from "node:module";
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve, sep } from "node:path";
+
+const require = createRequire(import.meta.url);
 
 // --- host contract -----------------------------------------------------------------------------
 //
@@ -561,26 +569,38 @@ export default function bdSession(pi: HookApi): void {
     }));
   }
 
-  // The update alert is a standing fact. Status line for anyone looking at chrome; sendMessage so
-  // the same line sits in the transcript. Neither path may throw out of session_start.
+  // (b) and (c) are standing facts. Status line for chrome; sendMessage for the transcript.
+  // Neither path may throw out of session_start.
   pi.on("session_start", (_event, ctx) => {
-    // (b) The catalog the host already cached is ahead of what is installed.
+    const lines: string[] = [];
+
     const stateRoot = pluginStateRoot(agentDir);
     const cached = cachedFrom(PLUGIN_ROOT);
     if (stateRoot !== undefined && cached !== undefined && ownVersion !== "") {
       const available = cachedCatalogVersion(stateRoot, cached.marketplace, cached.plugin);
       if (available !== undefined && isUpgrade(available, ownVersion)) {
-        const line = `omp plugin upgrade ${cached.plugin}@${cached.marketplace} - ${available} available`;
-        try {
-          ctx.ui?.setStatus?.("better-dev", line);
-        } catch {
-          // A nudge that throws would be a hook error on the session-start path. Never worth it.
-        }
-        try {
-          pi.sendMessage?.({ customType: "better-dev-update", content: line, display: true }, { triggerTurn: false });
-        } catch {
-          // Same: the status line already carried it, or neither path landed. Session start continues.
-        }
+        lines.push(`omp plugin upgrade ${cached.plugin}@${cached.marketplace} - ${available} available`);
+      }
+    }
+
+    try {
+      const stamp = require("../onboard-stamp.js") as { sessionLine(cwd: string, version: string): string };
+      const line = stamp.sessionLine(process.cwd(), ownVersion);
+      if (line) lines.push(line);
+    } catch {
+      // Missing helper or a dead git: skip the onboard line, keep comms and the update alert.
+    }
+
+    for (const line of lines) {
+      try {
+        ctx.ui?.setStatus?.("better-dev", line);
+      } catch {
+        // A nudge that throws would be a hook error on the session-start path. Never worth it.
+      }
+      try {
+        pi.sendMessage?.({ customType: "better-dev-session", content: line, display: true }, { triggerTurn: false });
+      } catch {
+        // Same: the status line already carried it, or neither path landed. Session start continues.
       }
     }
   });
