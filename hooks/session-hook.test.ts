@@ -108,6 +108,8 @@ interface Run {
   notices: string[];
   /** Every ctx.ui.setStatus call, as "key=text". */
   statuses: string[];
+  /** Every pi.sendMessage call, as the content string. */
+  sent: string[];
   /** Message list after the context chain ran, or the input unchanged when no handler took it. */
   messages: Message[];
   contextHandlers: number;
@@ -241,6 +243,7 @@ async function run(fixture: Fixture): Promise<Run> {
   const context: Array<(event: unknown, ctx: unknown) => { messages?: Message[] } | undefined> = [];
   const notices: string[] = [];
   const statuses: string[] = [];
+  const sent: string[] = [];
   const throwingAgentDir = {
     getAgentDir: (): string => {
       throw new Error("no agent dir");
@@ -252,6 +255,12 @@ async function run(fixture: Fixture): Promise<Run> {
       if (event === "context") context.push(handler);
     },
     logger: { debug() {} },
+    sendMessage(message: { content?: string }) {
+      sent.push(String(message.content ?? ""));
+      if (fixture.host === "throwing-status") {
+        // Status already threw; this path must still be independently catchable.
+      }
+    },
     pi:
       fixture.host === "no-pi"
         ? undefined
@@ -305,7 +314,7 @@ async function run(fixture: Fixture): Promise<Run> {
     if (beforeXdg === undefined) delete process.env.XDG_DATA_HOME;
     else process.env.XDG_DATA_HOME = beforeXdg;
   }
-  return { notices, statuses, messages, contextHandlers: context.length };
+  return { notices, statuses, sent, messages, contextHandlers: context.length };
 }
 
 /** The message the hook injected, or undefined when it injected nothing. */
@@ -566,6 +575,7 @@ test("delivers the rule when the install shape is unrecognised, rather than drop
 test("names the upgrade when the cached catalog is ahead of the installed version", async () => {
   const result = await run({ install: "marketplace", rule: RULE_FILE, version: "0.1.0", catalogVersion: "0.2.0" });
   expect(result.statuses).toEqual(["better-dev=omp plugin upgrade better-dev@bd - 0.2.0 available"]);
+  expect(result.sent).toEqual(["omp plugin upgrade better-dev@bd - 0.2.0 available"]);
   // The status line is width-clamped by the host, so an over-long line is a line the reader never
   // finishes. Measured: a 111-column notification came back clipped mid-sentence. And the alert goes
   // to the status line rather than through notify, which is the other half of that measurement: a
@@ -584,30 +594,36 @@ test("still names the upgrade after an XDG migration has moved the plugins tree"
   const fixture = { install: "marketplace", rule: RULE_FILE, version: "0.1.0", catalogVersion: "0.2.0" } as const;
   const result = await run({ ...fixture, layout: "xdg" });
   expect(result.statuses).toEqual(["better-dev=omp plugin upgrade better-dev@bd - 0.2.0 available"]);
+  expect(result.sent).toEqual(["omp plugin upgrade better-dev@bd - 0.2.0 available"]);
   // And the other way round, which is the reading a bare `$XDG_DATA_HOME` check would get wrong: the
   // variable is exported, nothing was ever migrated, and the host stays with the config root.
   const unmigrated = await run({ ...fixture, layout: "xdg-unmigrated" });
   expect(unmigrated.statuses).toEqual(["better-dev=omp plugin upgrade better-dev@bd - 0.2.0 available"]);
+  expect(unmigrated.sent).toEqual(["omp plugin upgrade better-dev@bd - 0.2.0 available"]);
 });
 
 test("stays quiet when the cached catalog is level with the installed version", async () => {
   const result = await run({ install: "marketplace", rule: RULE_FILE, version: "0.2.0", catalogVersion: "0.2.0" });
   expect(result.statuses).toEqual([]);
+  expect(result.sent).toEqual([]);
 });
 
 test("stays quiet when the cached catalog is behind, so a stale offline cache never cries wolf", async () => {
   const result = await run({ install: "marketplace", rule: RULE_FILE, version: "0.2.0", catalogVersion: "0.1.0" });
   expect(result.statuses).toEqual([]);
+  expect(result.sent).toEqual([]);
 });
 
 test("stays quiet when no catalog is cached at all", async () => {
   const result = await run({ install: "marketplace", rule: RULE_FILE, version: "0.1.0" });
   expect(result.statuses).toEqual([]);
+  expect(result.sent).toEqual([]);
 });
 
 test("stays quiet about updates on a link install, which git updates rather than the marketplace", async () => {
   const result = await run({ install: "link", rule: RULE_FILE, version: "0.1.0", catalogVersion: "0.2.0" });
   expect(result.statuses).toEqual([]);
+  expect(result.sent).toEqual([]);
 });
 
 // A catalog cached from a direct URL is the bare JSON; one cached from a git or local source is a
@@ -631,10 +647,11 @@ test("reads the catalog a cloned source cached under .claude-plugin/", async () 
 // that throws at load costs both features and reaches only the host's debug log, so nothing on
 // screen would say the plugin had stopped working.
 
-test("delivers the rule and says nothing when the host exposes no UI at all", async () => {
+test("delivers the rule and still names the upgrade when the host exposes no UI at all", async () => {
   const fixture = { install: "marketplace", rule: RULE_FILE } as const;
   const result = await run({ ...fixture, version: "0.1.0", catalogVersion: "0.2.0", host: "no-ui" });
   expect(result.statuses).toEqual([]);
+  expect(result.sent).toEqual(["omp plugin upgrade better-dev@bd - 0.2.0 available"]);
   expect(injected(result)).toBeDefined();
 });
 
@@ -645,6 +662,7 @@ test("survives a ctx.ui.setStatus that throws, rather than failing the session-s
   const fixture = { install: "marketplace", rule: RULE_FILE } as const;
   const result = await run({ ...fixture, version: "0.1.0", catalogVersion: "0.2.0", host: "throwing-status" });
   expect(result.statuses).toHaveLength(1);
+  expect(result.sent).toEqual(["omp plugin upgrade better-dev@bd - 0.2.0 available"]);
   expect(injected(result)).toBeDefined();
 });
 

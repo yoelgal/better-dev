@@ -61,7 +61,7 @@ plugin sourced from the repo root) and a marketplace channel delivers the whole 
 |---|---|---|---|
 | omp, marketplace | `omp plugin marketplace add` + `omp plugin install` | injected by the session hook | yes, auto-update |
 | omp, git or link root | `omp plugin install <git-url>`, or `omp plugin link <clone>` | injected by omp's own rules provider | no: the operator pulls, and nothing reminds them |
-| Claude Code | `claude plugin marketplace add` + `claude plugin install` | not at all: see stage 3 | only once the operator pastes the session-start alert stage 4 writes; wired and unproven until they do |
+| Claude Code | `claude plugin marketplace add` + `claude plugin install` | injected by the plugin's SessionStart hook | yes: the same hook prints one operator-visible line when a newer release exists |
 | hermes | `hermes plugins install` + one `skills.external_dirs` line | not at all: see stage 3 | an `on_session_start` command can run; getting its line to the operator is the work |
 | no plugin channel | `npx skills add yoelgal/better-dev --all -g` | nothing on this channel alone | no, and stage 4 says so out loud |
 
@@ -101,14 +101,12 @@ claude plugin install better-dev@better-dev
 ```
 
 **Check.** `claude plugin list` prints `better-dev@better-dev` with a version and an enabled status,
-and `claude plugin details better-dev` prints `Skills (33)`. Two details measured on Claude Code
-2.1.233, each of which costs a turn if you guess it. Against a **clone on disk** rather than an
-install, that command needs the directory flag:
-`claude --plugin-dir . plugin details better-dev` prints `Skills (33)` and `Hooks (0)`, and the same
-spelling without `--plugin-dir .` returns `Plugin "better-dev" not found`. And the verb list on that
-version runs `marketplace add`, `install`, `list`, `update`, `uninstall`, `details`, `enable`,
-`disable`, `validate`; read `claude plugin --help` on the machine in front of you before you depend on
-one, since the set has moved between builds.
+and `claude plugin details better-dev` prints `Skills (33)` and `Hooks (1) SessionStart`. Measured
+on Claude Code 2.1.233 against this tree: `claude --plugin-dir . plugin details better-dev` prints
+those two counts, and the same spelling without `--plugin-dir .` returns `Plugin "better-dev" not
+found`. And the verb list on that version runs `marketplace add`, `install`, `list`, `update`,
+`uninstall`, `details`, `enable`, `disable`, `validate`; read `claude plugin --help` on the machine
+in front of you before you depend on one, since the set has moved between builds.
 
 **hermes:**
 
@@ -164,41 +162,36 @@ fixes it.
 ## Stage 3. Confirm the comms rule reaches a session
 
 The skills are text the host lists, so stage 2's check settles them. The comms rule shapes every reply
-and reaches a session on one host family only. Establish whether it reached this one, because the answer
+and reaches a session on omp and Claude Code. Establish whether it reached this one, because the answer
 is a line the operator is owed in stage 6 rather than a detail.
 
-**Injected.** On an omp marketplace install the session hook delivers `rules/comms.md` as a `developer`
-turn led by the literal marker `<!-- better-dev:comms source=hooks/pre/bd-session.ts -->`. omp treats
-every `.ts` under a plugin's `hooks/pre/` as an extension entry point, which is why the hook runs there.
-On an omp git or link root, omp's own rules provider loads `rules/` natively and the hook stays
-deliberately quiet, so the rule is in context with no marker.
+**Injected on omp.** On a marketplace install the session hook delivers `rules/comms.md` as a
+`developer` turn led by the literal marker `<!-- better-dev:comms source=hooks/pre/bd-session.ts -->`.
+omp treats every `.ts` under a plugin's `hooks/pre/` as an extension entry point, which is why the hook
+runs there. On an omp git or link root, omp's own rules provider loads `rules/` natively and the hook
+stays deliberately quiet, so the rule is in context with no marker.
+
+**Injected on Claude Code.** The plugin declares Claude Code's hook manifest at
+`hooks/claude-hooks.json` (not omp's format). SessionStart runs
+`hooks/claude-session.js`, which prints the rule as `additionalContext` led by
+`<!-- better-dev:comms source=hooks/claude-session.js -->`. Stage 2's `Hooks (1) SessionStart` is
+the install check; the marker on a turn you did not author is the delivery check.
 
 **Check.** Answer whether a `developer` or `system` turn in this session carries the marker
 `better-dev:comms` - a turn you did not read out of a file, and did not author yourself. The delivery
-shape is the observable, not the token's presence: this file names that marker in the paragraph above,
-so finding the string proves only that you read this file. What proves delivery is the marker standing
-on a turn nothing in this session put there. That injection is context-only, re-supplied per call and
-never written to the transcript, so no file and no command prints it and there is nothing to send the
-operator grepping for. Absence answers only its own negation: the rule did not arrive by injection,
-which on the hosts in the next paragraph means it did not arrive.
+shape is the observable, not the token's presence: this file names that marker in the paragraphs
+above, so finding the string proves only that you read this file. What proves delivery is the marker
+standing on a turn nothing in this session put there. On omp the injection is context-only,
+re-supplied per call and never written to the transcript. Absence answers only its own negation: the
+rule did not arrive by injection.
 
-**Not delivered.** Claude Code and hermes ship the hook file and never run it. Claude Code loads plugin
-hooks from `hooks/hooks.json`, or from an inline `hooks` key in `plugin.json`, as shell-command or HTTP
-entries keyed by event name, and this repo carries neither, which is why `Hooks (0)` is the honest
-reading of stage 2's check rather than a broken install. hermes takes a plugin as a Python module that
-registers itself through `register(ctx)`. Neither host reads a plugin's `rules/` either, so on both of
-them the comms rule is on disk and in no session.
+**Not delivered.** hermes, and any host with no plugin hook, still get the skills and not the rule.
+hermes takes a plugin as a Python module that registers itself through `register(ctx)`, and this repo
+is not one. Neither host reads a plugin's `rules/` either, so the comms rule is on disk and in no
+session. That is a known open gap, not a step you can complete. Do not offer a workaround you have
+not run, and do not report the install as fully landed when this half is missing.
 
-This is a known open gap, not a step you can complete. better-dev used to close it by writing a pointer
-to `rules/comms.md` into the repo's own entry file, and that write was removed with every other repo
-write: a library that promises no repo footprint cannot keep one delivery route that needs one. So the
-honest report on these hosts is that the skills arrived and the rule did not.
-
-**Check.** Say which of the two answers you reached, in one sentence, and carry it into stage 6. Where
-the answer is that the rule did not arrive, name the one repair that exists: an omp install gets it, by
-the hook on a marketplace channel and by omp's own rules provider on a git or link one. Do not offer the
-operator a workaround you have not run, and do not report the install as fully landed when this half is
-missing.
+**Check.** Say which of the two answers you reached, in one sentence, and carry it into stage 6.
 
 ## Stage 4. Wire the update route, or say the host cannot
 
@@ -212,52 +205,34 @@ between one session and the next unasked.
 
 **Check.** `omp config get marketplace.autoUpdate` prints `auto`. The shipped default prints `notify`,
 which writes availability to omp's debug log and shows the operator nothing on screen. On a marketplace
-install better-dev's own hook also puts the upgrade command in the status line when the cached catalog
-copy runs ahead of the installed version; it reads local state only, so an offline session stays quiet.
-A git or link root updates when the operator pulls that clone, with nothing reminding them, so prefer
-the marketplace channel unless they want the clone.
+install better-dev's own hook also puts the upgrade command in the transcript (`pi.sendMessage`) and
+the status line when the cached catalog copy runs ahead of the installed version; it reads local state
+only, so an offline session stays quiet. A git or link root updates when the operator pulls that clone,
+with nothing reminding them, so prefer the marketplace channel unless they want the clone.
 
-**Claude Code** meets it by alert, wired as a `SessionStart` hook. The entry is a `type: command` hook
-in `settings.json`, in this shape, read live from a machine running 2.1.233:
+**Claude Code** meets it by alert, shipped in the plugin. `hooks/claude-session.js` compares the
+installed `plugin.json` version to the latest GitHub release (throttled to once an hour, silent on
+network failure). When newer, it prints one `systemMessage` the operator sees:
+`better-dev <version> available. Run: claude plugin update better-dev@better-dev`. Nothing is written
+into `~/.claude/settings.json`.
 
-```json
-{
-  "hooks": {
-    "SessionStart": [
-      { "matcher": "*", "hooks": [ { "type": "command", "command": "<your check>", "timeout": 10 } ] }
-    ]
-  }
-}
+**Check.** Run the hook by hand twice from the plugin tree before you finish. Once as installed:
+
+```sh
+BETTER_DEV_SKIP_UPDATE=1 node hooks/claude-session.js
 ```
 
-Your command compares the installed version against upstream. What the host keeps on disk, measured the
-same day: `~/.claude/plugins/installed_plugins.json` holds `.plugins["<plugin>@<marketplace>"][]` with a
-`version` (a semver, for a plugin from a third-party marketplace) beside a `gitCommitSha`. Two
-properties of that local state were measured too, and each one on its own is enough to make a naive
-comparison useless:
+The JSON must carry `additionalContext` containing `better-dev:comms`, and must not carry
+`systemMessage`. Then once against a version you know differs:
 
-- `plugin-catalog-cache.json` carried plugin records for `claude-plugins-official` only. Three plugins
-  installed from third-party marketplaces were all absent from it, so for better-dev it holds no version
-  to compare against.
-- Every marketplace clone under `~/.claude/plugins/marketplaces/` sat at exactly the commit its own
-  install record named, with no fetch since that install. Local state does not advance on its own, so a
-  command that only reads it can never fire.
+```sh
+BETTER_DEV_LATEST=9.9.9 node hooks/claude-session.js
+```
 
-Both were read on a machine where better-dev was installed through omp rather than through Claude Code,
-so treat them as the shape to expect and confirm each against the install you just made.
-
-So the command refreshes before it compares: `claude plugin marketplace update better-dev` updates that
-clone from source, and the comparison then has something to see. Read the actual plugin key back out of
-`installed_plugins.json` after installing rather than assuming its spelling.
-
-**Check.** Run your command by hand twice before you hand over the settings block. Once as installed,
-where it stays silent. Once against a version you know differs, where it has to print the alert. A check
-whose alerting branch has never run is the same shape as the fixture that asserted nothing, named at the
-top of this file. Then hand the settings block over and ask the operator to start a fresh session and
-tell you whether the line appeared: you are inside the session that ran this install, the block is
-still with them as a paste, and the hook fires for a session you never see. Where you cannot get that
-confirmation before you finish, say so plainly - the alert is wired and nobody has seen it fire - and
-carry that wording into stage 6 rather than reporting the route as proven.
+The JSON must carry `systemMessage` naming `9.9.9`. A check whose alerting branch has never run is
+the same shape as the fixture that asserted nothing, named at the top of this file. You are inside
+the session that ran this install, so you will not see the SessionStart line fire; the hand-run is
+the proof this stage can give.
 
 **hermes** updates by verb: `hermes plugins update better-dev`, run by the operator. It does run shell
 commands at session start, and the shape of that mechanism decides what an alert can be. Read from

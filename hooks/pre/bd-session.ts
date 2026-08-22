@@ -21,9 +21,9 @@
 //       own docs, `notify` mode "writes update availability only to the debug log; it does not show
 //       a user-facing notification". This reads the same on-disk state that computation reads.
 //
-// Both are one line at most, and (b) goes through ctx.ui.setStatus - no tokens, no transcript,
-// no-op when there is no UI. The rule this hook delivers bans banners and preamble; a hook that
-// shouted would discredit the thing it carries.
+// Both are one line at most. (b) goes to two places: the status line, which persists and costs no
+// tokens, and pi.sendMessage, which puts the same line in the transcript so a user who never looks
+// at chrome still sees it. triggerTurn stays off: this is a fact, not a prompt.
 
 import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
@@ -71,6 +71,10 @@ interface HookApi {
   on(event: "session_start", handler: (event: unknown, ctx: HookContext) => void): void;
   on(event: "context", handler: (event: ContextEvent, ctx: HookContext) => ContextResult | undefined): void;
   logger?: { debug?(message: string, data?: unknown): void };
+  sendMessage?(
+    message: { customType?: string; content?: string; display?: boolean },
+    options?: { triggerTurn?: boolean },
+  ): void;
   // The host's own exports, injected. `getAgentDir()` is the only member read here, and it is the
   // one thing that cannot be derived from this file's own path: it names the host's data root, so
   // the plugin state root beside it can be found without guessing at a home directory.
@@ -557,9 +561,8 @@ export default function bdSession(pi: HookApi): void {
     }));
   }
 
-  // The update alert is a standing fact, so it goes to the status line rather than through notify:
-  // a status entry persists and stays short, while a notification is one transient line that the
-  // next notify in the same tick replaces outright.
+  // The update alert is a standing fact. Status line for anyone looking at chrome; sendMessage so
+  // the same line sits in the transcript. Neither path may throw out of session_start.
   pi.on("session_start", (_event, ctx) => {
     // (b) The catalog the host already cached is ahead of what is installed.
     const stateRoot = pluginStateRoot(agentDir);
@@ -567,10 +570,16 @@ export default function bdSession(pi: HookApi): void {
     if (stateRoot !== undefined && cached !== undefined && ownVersion !== "") {
       const available = cachedCatalogVersion(stateRoot, cached.marketplace, cached.plugin);
       if (available !== undefined && isUpgrade(available, ownVersion)) {
+        const line = `omp plugin upgrade ${cached.plugin}@${cached.marketplace} - ${available} available`;
         try {
-          ctx.ui?.setStatus?.("better-dev", `omp plugin upgrade ${cached.plugin}@${cached.marketplace} - ${available} available`);
+          ctx.ui?.setStatus?.("better-dev", line);
         } catch {
           // A nudge that throws would be a hook error on the session-start path. Never worth it.
+        }
+        try {
+          pi.sendMessage?.({ customType: "better-dev-update", content: line, display: true }, { triggerTurn: false });
+        } catch {
+          // Same: the status line already carried it, or neither path landed. Session start continues.
         }
       }
     }

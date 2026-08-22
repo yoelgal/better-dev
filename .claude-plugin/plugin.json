@@ -8,6 +8,7 @@
   "homepage": "https://github.com/yoelgal/better-dev",
   "repository": "https://github.com/yoelgal/better-dev",
   "license": "MIT",
+  "hooks": "./hooks/claude-hooks.json",
   "keywords": [
     "skills",
     "dev-workflow",

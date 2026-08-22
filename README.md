@@ -6,7 +6,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT" />
-  <img src="https://img.shields.io/badge/hosts-omp%20·%20Claude%20Code%20·%20hermes%20·%20any%20marketplace%20host-0d9488" alt="hosts" />
+  <img src="https://img.shields.io/badge/hosts-omp%20·%20Claude%20Code-0d9488" alt="hosts" />
 </p>
 
 ---
@@ -18,10 +18,10 @@ opinionated method and gets out of the way of everything else you have installed
 > **idea → scope it into an observable contract → isolate it → drive a loop to *proven* done → ship** - and
 > when you're missing a tool, go source it.
 
-better-dev is text, plus one session hook. Your agent already provides discovery, dispatch, structural
-search, memory and command approval, so the library states the method and your agent carries it out. The
-hook runs at session start, on a host that loads it, for one job: hand the session whatever that
-host's plugin channel leaves out.
+better-dev is text, plus a session hook on the two hosts that can load one. Your agent already provides
+discovery, dispatch, structural search, memory and command approval, so the library states the method
+and your agent carries it out. The hook's job is the two things a plugin channel otherwise drops: the
+always-applied comms rule, and a one-line alert when a newer version is sitting unused.
 
 ## Install
 
@@ -54,26 +54,21 @@ host, the check that proves each stage landed, and the words to hand back when a
 Your agent is the part that adapts, so a host nobody has written a channel for still ends up installed,
 or hears why it cannot be.
 
-**What the install puts on your machine.** One plugin, once, carrying the 33 skills, the
-always-applied comms rule that shapes every reply, and the session hook. Nothing in any repo. That
-rule reaches a session on omp - by the hook on a marketplace install, by omp's own rules provider on a
-git or link one. A host that reads neither gets the skills and not the rule, and `BOOTSTRAP.md` says
-so on the host where it happens rather than leaving you to notice.
+**What the install puts on your machine.** One plugin, once, carrying the 33 skills. Nothing in any
+repo. The always-applied comms rule and the update alert reach a session on **omp** and **Claude Code**
+only:
 
-On a plugin channel your own skills folder stays yours: plugin skills load through your agent's
-plugin provider, so `~/.claude/skills` and `~/.omp/agent/skills` keep only what you put there, and a
-skill you wrote under the same name still wins.
+- **omp marketplace:** the TypeScript hook injects the rule every call, and puts the upgrade command
+  in the transcript (and the status line) when the cached catalog is ahead.
+- **omp git or link:** omp's own rules provider injects the rule. Updates are a `git pull`; nothing
+  reminds you.
+- **Claude Code:** the plugin's `SessionStart` hook injects the rule and, when GitHub has a newer
+  release, prints one operator-visible line with the update command. No paste into `settings.json`.
 
-**The bar a channel has to clear.** These rules shape every reply, so an install that ages in
-silence is the failure this library designs against: you experience a months-old copy as the
-practices not working. So a channel earns its place by auto-updating or by raising an update alert.
-omp's marketplace channel auto-updates once you allow it. Claude Code carries no alert of its own: the
-plugin ships no session-start hook there, so your agent writes the check as a shell command and hands it
-to you to paste into `~/.claude/settings.json`, and the alert exists from the moment you paste it and
-not before. A skills-only install through `npx skills add` can do neither, by that CLI's own command
-list, so your agent is told to say so in as many words and name what to add rather than reporting
-success. Either way you finish knowing which of these you got, and knowing whatever is still waiting on
-you.
+Every other host gets the 33 skills and not the rule. `BOOTSTRAP.md` says so on the host where it
+happens rather than leaving you to notice. A skills-only install through `npx skills add` can neither
+inject the rule nor raise an alert, by that CLI's own command list, so your agent is told to say so
+in as many words.
 
 Removal runs through the same paste: ask your agent to remove better-dev from this machine, and
 `BOOTSTRAP.md` carries the verb for the channel it used. There is nothing to unwire afterwards,
@@ -140,8 +135,9 @@ Skills you later mint with `/self-extension` are **repo-scoped** by default, com
 | Path | What |
 |------|------|
 | `skills/` | the practices, one dir per skill - the roster above is the count of record |
-| `rules/` | the always-applied rules, one file each: injected by omp's rules provider on a git or link install, and by the session hook on an omp marketplace install |
-| `hooks/pre/` | the session hook in the shape omp reads, loaded from the installed plugin tree, versioned with it, and gone when you uninstall |
+| `rules/` | the always-applied comms rule: injected by omp's rules provider on a git or link install, by `hooks/pre/` on an omp marketplace install, and by `hooks/claude-hooks.json` on Claude Code |
+| `hooks/pre/` | the omp session hook, loaded from the installed plugin tree |
+| `hooks/claude-hooks.json` | Claude Code's plugin-hook manifest (SessionStart). Not omp's format. |
 | `.omp-plugin/` · `.claude-plugin/` | omp's marketplace catalog · Claude Code's catalog beside the version stamp (`plugin.json`) |
 | `package.json` | required: `omp plugin link` refuses a directory without one and skips the plugin entirely unless it declares an `omp` key |
 | `scripts/` | the two maintainer helpers, run from a clone of this repo and never from a repo that uses better-dev: `bd-package-check` (the release gate) and `bd-skill-stage` (stage, lint and promote a freshly authored skill) |
