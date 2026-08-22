@@ -39,10 +39,11 @@ tell me that instead of finishing quietly.
 your machine, and that is the whole of it: no discovery block, no config file, no data directory. Any
 repo is then ready, because the skills your agent loaded are the whole of what arrived.
 
-Recommended once per repo, and it writes nothing either: `/onboard` reads the stack, the test and lint
-commands, the branch model and integration branch, and the team-or-solo shape, and records them to
-your agent's durable memory, so later sessions and every other skill get those facts without
-re-deriving them. Skip it and you pay that re-derivation, not a loss of function.
+**Run `/onboard` once in each repo you work in.** It records the stack, verify command, and branch
+model to durable memory. Skip it and every later skill re-derives those from whatever files it opens.
+On omp and Claude Code, session start says `Run /onboard` until that has happened on this machine,
+then `better-dev (<version>) wired`. The signal is a stamp in the user cache, not a `.better-dev/`
+folder - that folder is the loop ledger.
 
 Durable memory is what holds those facts, and your agent may ship it switched off - omp does. So the
 install reads that setting, offers to turn it on with the cost named in the same breath, and where you

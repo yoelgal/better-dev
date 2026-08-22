@@ -258,6 +258,19 @@ loop, not a score. Four signals, each drawn from what the phases above already t
 All four clear → the repo is ready to drive the loop. A gap isn't a blocker: name it alongside the
 `/onboard <phase>` or `/guardrails-install` that closes it, and let the operator decide when to.
 
+**Then write the machine-local stamp the session hook reads**, so the next session says
+`better-dev (<version>) wired` instead of asking again. Nothing in the repo. Find
+`hooks/onboard-stamp.js` in the installed plugin tree (on omp marketplace:
+`~/.omp/plugins/cache/plugins/`, the `better-dev` entry) and run it from this repo's root:
+
+```sh
+node /path/to/hooks/onboard-stamp.js --write
+```
+
+The script hashes `git rev-parse --show-toplevel` and writes `~/.cache/better-dev/onboarded/<id>`.
+A missing stamp is what fires the nudge; writing it is what closes it. Do this even on a re-run
+that recorded nothing new.
+
 When this was a greenfield or brand-new project, the next step is `/groundwork` - and name, in the
 same breath, that it opens by asking *how* the thing gets built, because the two routes cost the
 operator very different amounts of their own attention:

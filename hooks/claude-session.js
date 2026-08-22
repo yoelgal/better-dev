@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 // Claude Code SessionStart hook. This file is Claude Code's plugin-hook command, not omp's.
 //
-// Two jobs, both on stdout as the JSON Claude Code reads:
+// Three jobs, all on stdout as the JSON Claude Code reads:
 //   (a) additionalContext = rules/comms.md, so the rule reaches the session.
-//   (b) systemMessage     = one operator-visible line when a newer release exists.
+//   (b) systemMessage     = operator-visible lines: update when a newer release exists,
+//                           and whether this git repo is onboarded on this machine.
 //
 // Paths resolve from CLAUDE_PLUGIN_ROOT (the installed plugin tree). Nothing here is
 // registered into ~/.claude/settings.json, so uninstall removes the hook with the plugin.
@@ -138,11 +139,20 @@ async function main() {
     },
   };
 
+  const notices = [];
   const installed = ownVersion();
   const latest = await latestVersion();
   if (latest && installed && isUpgrade(latest, installed)) {
-    out.systemMessage = `better-dev ${latest} available. Run: claude plugin update better-dev@better-dev`;
+    notices.push(`better-dev ${latest} available. Run: claude plugin update better-dev@better-dev`);
   }
+  try {
+    const { sessionLine } = require("./onboard-stamp.js");
+    const line = sessionLine(process.cwd(), installed);
+    if (line) notices.push(line);
+  } catch {
+    // Missing helper or a dead git: skip the onboard line.
+  }
+  if (notices.length) out.systemMessage = notices.join(" ");
 
   process.stdout.write(JSON.stringify(out));
 }

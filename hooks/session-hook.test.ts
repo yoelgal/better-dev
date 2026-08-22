@@ -14,6 +14,7 @@
 // reads it at load, exactly as the host does.
 
 import { afterAll, expect, test } from "bun:test";
+import { spawnSync } from "node:child_process";
 import { cpSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
@@ -90,6 +91,10 @@ interface Fixture {
   modelCompat?: "promoting" | "plain" | "absent";
   /** The messages already in the request when the context event fires. */
   conversation?: Message[];
+  /** `git init` the session cwd so the onboard stamp can see a real repo. */
+  realGit?: boolean;
+  /** Write the onboard stamp for that repo before the hook runs. */
+  stamped?: boolean;
 }
 
 interface Message {
@@ -146,7 +151,14 @@ async function run(fixture: Fixture): Promise<Run> {
   // anchors on. `repo: false` leaves it a plain directory with no `.git` above it.
   const cwd = join(root, "work");
   mkdirSync(cwd, { recursive: true });
-  if (fixture.repo !== false) mkdirSync(join(cwd, ".git"), { recursive: true });
+  if (fixture.realGit === true) {
+    spawnSync("git", ["init"], { cwd, stdio: "ignore" });
+    if (fixture.stamped === true) {
+      spawnSync(process.execPath, [join(import.meta.dirname, "onboard-stamp.js"), "--write"], { cwd, stdio: "ignore" });
+    }
+  } else if (fixture.repo !== false) {
+    mkdirSync(join(cwd, ".git"), { recursive: true });
+  }
 
   const version = fixture.version ?? "0.1.0";
   const pluginRoot = (() => {
@@ -166,6 +178,7 @@ async function run(fixture: Fixture): Promise<Run> {
   })();
   mkdirSync(join(pluginRoot, "hooks", "pre"), { recursive: true });
   cpSync(HOOK_SOURCE, join(pluginRoot, "hooks", "pre", "bd-session.ts"));
+  cpSync(join(import.meta.dirname, "onboard-stamp.js"), join(pluginRoot, "hooks", "onboard-stamp.js"));
   writeFileSync(
     join(pluginRoot, "package.json"),
     fixture.badManifest === true ? "{ name: not json" : JSON.stringify({ name: PACKAGE_NAME, version }),
@@ -298,23 +311,19 @@ async function run(fixture: Fixture): Promise<Run> {
   let factory: (api: unknown) => void;
   try {
     factory = (await import(join(pluginRoot, "hooks", "pre", "bd-session.ts"))).default;
-  } finally {
-    process.chdir(before);
-  }
-
-  let messages: Message[] = fixture.conversation ?? [{ role: "user", content: "the actual request" }];
-  try {
+    let messages: Message[] = fixture.conversation ?? [{ role: "user", content: "the actual request" }];
     factory(api);
     for (const handler of sessionStart) handler(undefined, ctx);
     for (const handler of context) {
       const result = handler({ messages }, ctx);
       if (result?.messages) messages = result.messages;
     }
+    return { notices, statuses, sent, messages, contextHandlers: context.length };
   } finally {
+    process.chdir(before);
     if (beforeXdg === undefined) delete process.env.XDG_DATA_HOME;
     else process.env.XDG_DATA_HOME = beforeXdg;
   }
-  return { notices, statuses, sent, messages, contextHandlers: context.length };
 }
 
 /** The message the hook injected, or undefined when it injected nothing. */
@@ -689,3 +698,19 @@ test("still delivers the rule when its own package.json is malformed", async () 
   expect(injected(result)).toBeDefined();
   expect(result.statuses).toEqual([]);
 });
+
+test("asks for /onboard in a real git repo that has no stamp on this machine", async () => {
+  const result = await run({ install: "marketplace", rule: RULE_FILE, realGit: true });
+  expect(result.sent).toEqual(["Run /onboard - this repo has no recorded facts."]);
+});
+
+test("says better-dev is wired when the stamp is present", async () => {
+  const result = await run({ install: "marketplace", rule: RULE_FILE, version: "0.2.0", realGit: true, stamped: true });
+  expect(result.sent).toEqual(["better-dev (0.2.0) wired"]);
+});
+
+test("stays quiet about onboard when the session is not a git repo", async () => {
+  const result = await run({ install: "marketplace", rule: RULE_FILE, repo: false });
+  expect(result.sent).toEqual([]);
+});
+
