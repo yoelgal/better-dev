@@ -270,9 +270,7 @@ async function run(fixture: Fixture): Promise<Run> {
     logger: { debug() {} },
     sendMessage(message: { content?: string }) {
       sent.push(String(message.content ?? ""));
-      if (fixture.host === "throwing-status") {
-        // Status already threw; this path must still be independently catchable.
-      }
+      if (fixture.host === "throwing-status") throw new Error("no transcript");
     },
     pi:
       fixture.host === "no-pi"
@@ -583,15 +581,10 @@ test("delivers the rule when the install shape is unrecognised, rather than drop
 
 test("names the upgrade when the cached catalog is ahead of the installed version", async () => {
   const result = await run({ install: "marketplace", rule: RULE_FILE, version: "0.1.0", catalogVersion: "0.2.0" });
-  expect(result.statuses).toEqual(["better-dev=omp plugin upgrade better-dev@bd - 0.2.0 available"]);
   expect(result.sent).toEqual(["omp plugin upgrade better-dev@bd - 0.2.0 available"]);
-  // The status line is width-clamped by the host, so an over-long line is a line the reader never
-  // finishes. Measured: a 111-column notification came back clipped mid-sentence. And the alert goes
-  // to the status line rather than through notify, which is the other half of that measurement: a
-  // standing fact belongs where it persists, and two notify calls in one tick leave only the last on
-  // screen.
-  expect(result.statuses[0]?.length).toBeLessThan(80);
-  expect(result.statuses[0]).not.toContain("\n");
+  expect(result.statuses).toEqual([]);
+  expect(result.sent[0]?.length).toBeLessThan(80);
+  expect(result.sent[0]).not.toContain("\n");
   expect(result.notices).toEqual([]);
 });
 
@@ -602,13 +595,11 @@ test("names the upgrade when the cached catalog is ahead of the installed versio
 test("still names the upgrade after an XDG migration has moved the plugins tree", async () => {
   const fixture = { install: "marketplace", rule: RULE_FILE, version: "0.1.0", catalogVersion: "0.2.0" } as const;
   const result = await run({ ...fixture, layout: "xdg" });
-  expect(result.statuses).toEqual(["better-dev=omp plugin upgrade better-dev@bd - 0.2.0 available"]);
   expect(result.sent).toEqual(["omp plugin upgrade better-dev@bd - 0.2.0 available"]);
-  // And the other way round, which is the reading a bare `$XDG_DATA_HOME` check would get wrong: the
-  // variable is exported, nothing was ever migrated, and the host stays with the config root.
+  expect(result.statuses).toEqual([]);
   const unmigrated = await run({ ...fixture, layout: "xdg-unmigrated" });
-  expect(unmigrated.statuses).toEqual(["better-dev=omp plugin upgrade better-dev@bd - 0.2.0 available"]);
   expect(unmigrated.sent).toEqual(["omp plugin upgrade better-dev@bd - 0.2.0 available"]);
+  expect(unmigrated.statuses).toEqual([]);
 });
 
 test("stays quiet when the cached catalog is level with the installed version", async () => {
@@ -641,13 +632,13 @@ test("stays quiet about updates on a link install, which git updates rather than
 test("reads the catalog a cloned source cached under .omp-plugin/", async () => {
   const fixture = { install: "marketplace", rule: RULE_FILE, version: "0.1.0", catalogVersion: "0.2.0" } as const;
   const result = await run({ ...fixture, catalogAt: ".omp-plugin" });
-  expect(result.statuses[0]).toContain("0.2.0 available");
+  expect(result.sent[0]).toContain("0.2.0 available");
 });
 
 test("reads the catalog a cloned source cached under .claude-plugin/", async () => {
   const fixture = { install: "marketplace", rule: RULE_FILE, version: "0.1.0", catalogVersion: "0.2.0" } as const;
   const result = await run({ ...fixture, catalogAt: ".claude-plugin" });
-  expect(result.statuses[0]).toContain("0.2.0 available");
+  expect(result.sent[0]).toContain("0.2.0 available");
 });
 
 // --- every failure degrades to silence ----------------------------------------------------------
@@ -664,13 +655,10 @@ test("delivers the rule and still names the upgrade when the host exposes no UI 
   expect(injected(result)).toBeDefined();
 });
 
-// The one call the surviving nudge makes into the host's UI. Unwrapped, a status bar that refuses
-// the write would throw out of the session_start handler, which is a hook error on the session-start
-// path - and it would take the update alert's own reason for existing with it.
-test("survives a ctx.ui.setStatus that throws, rather than failing the session-start handler", async () => {
+test("survives a sendMessage that throws, rather than failing the session-start handler", async () => {
   const fixture = { install: "marketplace", rule: RULE_FILE } as const;
   const result = await run({ ...fixture, version: "0.1.0", catalogVersion: "0.2.0", host: "throwing-status" });
-  expect(result.statuses).toHaveLength(1);
+  expect(result.statuses).toEqual([]);
   expect(result.sent).toEqual(["omp plugin upgrade better-dev@bd - 0.2.0 available"]);
   expect(injected(result)).toBeDefined();
 });

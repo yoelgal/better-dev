@@ -27,8 +27,8 @@
 //       silence. The line is operator-visible every session, because skipping onboard is how later
 //       skills re-derive the stack and get it wrong.
 //
-// (b) and (c) are one line each. Both go to the status line and to pi.sendMessage so a user who
-// never looks at chrome still sees them. triggerTurn stays off: these are facts, not prompts.
+// (b) and (c) are one line each. They go through pi.sendMessage into the transcript, once.
+// The status line is not used: the same text there is a second copy of the same fact.
 
 import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -569,9 +569,8 @@ export default function bdSession(pi: HookApi): void {
     }));
   }
 
-  // (b) and (c) are standing facts. Status line for chrome; sendMessage for the transcript.
-  // Neither path may throw out of session_start.
-  pi.on("session_start", (_event, ctx) => {
+  // (b) and (c) are standing facts. One sendMessage each. triggerTurn stays off.
+  pi.on("session_start", (_event, _ctx) => {
     const lines: string[] = [];
 
     const stateRoot = pluginStateRoot(agentDir);
@@ -593,14 +592,9 @@ export default function bdSession(pi: HookApi): void {
 
     for (const line of lines) {
       try {
-        ctx.ui?.setStatus?.("better-dev", line);
-      } catch {
-        // A nudge that throws would be a hook error on the session-start path. Never worth it.
-      }
-      try {
         pi.sendMessage?.({ customType: "better-dev-session", content: line, display: true }, { triggerTurn: false });
       } catch {
-        // Same: the status line already carried it, or neither path landed. Session start continues.
+        // A nudge that throws would be a hook error on the session-start path. Never worth it.
       }
     }
   });
